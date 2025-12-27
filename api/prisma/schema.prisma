@@ -1,0 +1,82 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String    @id @default(uuid()) @db.Uuid
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+
+  attempts Attempt[]
+
+  @@map("users")
+}
+
+model Skill {
+  id        String     @id @default(uuid()) @db.Uuid
+  name      String     @unique
+  createdAt DateTime   @default(now())
+
+  questions Question[]
+
+  @@map("skills")
+}
+
+model Question {
+  id              String    @id @default(uuid()) @db.Uuid
+  statement       String
+  explanationText String
+  createdAt       DateTime  @default(now())
+
+  skillId String @db.Uuid
+  skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Restrict)
+
+  options  Option[]
+  attempts Attempt[]
+
+  @@index([skillId])
+  @@map("questions")
+}
+
+model Option {
+  id        String   @id @default(uuid()) @db.Uuid
+  text      String
+  isCorrect Boolean
+  createdAt DateTime @default(now())
+
+  questionId String   @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  attempts Attempt[]
+
+  @@index([questionId])
+  @@map("options")
+}
+
+model Attempt {
+  id        String   @id @default(uuid()) @db.Uuid
+  isCorrect Boolean
+  createdAt DateTime @default(now())
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  questionId String   @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedOptionId String @db.Uuid
+  selectedOption   Option @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
+
+  @@index([userId, createdAt])
+  @@index([questionId, createdAt])
+  @@index([selectedOptionId])
+  @@map("attempts")
+}
+
+

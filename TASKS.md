@@ -27,11 +27,11 @@ Acceptance:
 
 ## Phase 1 — Database & Prisma (API)
 
-- [ ] Add docker-compose Postgres for local dev (DB only; run API/Web locally)
-- [ ] Add Prisma + Postgres config in api/
-- [ ] Create Prisma schema for: User, Skill, Question, Option, Attempt
-- [ ] Run initial migration
-- [ ] Add seed script with 2–3 skills and 10–20 questions
+- [x] Add docker-compose Postgres for local dev (DB only; run API/Web locally)
+- [x] Add Prisma + Postgres config in api/
+- [x] Create Prisma schema for: User, Skill, Question, Option, Attempt
+- [x] Run initial migration
+- [x] Add seed script with 2–3 skills and 10–20 questions
 
 Acceptance:
 - DB tables exist, seed works, questions exist in DB.

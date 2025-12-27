@@ -13,10 +13,6 @@ Single repo, no Nx.
 In separate terminals:
 
 ```bash
-docker compose up -d
-```
-
-```bash
 cd api
 npm run start
 ```
@@ -31,6 +27,23 @@ Then open `http://localhost:4200`.
 ### Database (Phase 1)
 
 For Phase 1 we use **Docker Compose for Postgres only** (API/Web still run locally).
+
+```bash
+docker compose up -d
+```
+
+Create your API env file:
+
+```bash
+cp api/env.sample api/.env
+```
+
+Then (from `api/`):
+
+```bash
+npm run db:migrate -- --name init --skip-seed
+npm run db:seed
+```
 
 ### Phase 0 check
 

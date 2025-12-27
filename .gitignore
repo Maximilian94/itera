@@ -11,6 +11,9 @@
 # Env
 .env
 .env.*
+!.env.example
+!api/.env.example
+!web/.env.example
 
 # IDE
 .vscode/*
