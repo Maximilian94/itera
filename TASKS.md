@@ -29,7 +29,6 @@ Acceptance:
 
 - [ ] Add Prisma + Postgres config in api/
 - [ ] Create Prisma schema for: User, Skill, Question, Option, Attempt
-- [ ] Add Difficulty enum (Easy/Medium/Hard)
 - [ ] Run initial migration
 - [ ] Add seed script with 2–3 skills and 10–20 questions
 
@@ -52,7 +51,7 @@ Acceptance:
 ## Phase 3 — Core Learning Loop (API)
 
 - [ ] Implement GET /skills
-- [ ] Implement GET /questions (filters: skill_id, difficulty, history)
+- [ ] Implement GET /questions (filters: skill_id, history)
 - [ ] Implement POST /attempts (evaluate correctness, store attempt, return feedback)
 
 Acceptance:
@@ -64,7 +63,7 @@ Acceptance:
 
 - [ ] Login/Register pages
 - [ ] Practice page:
-  - filters (skill, difficulty, history)
+  - filters (skill, history)
   - list/select question
 - [ ] Question page:
   - options selection
@@ -79,7 +78,7 @@ Acceptance:
 
 ## Phase 5 — Metrics (API + Web)
 
-- [ ] Implement GET /metrics (overall + per-skill; optional per difficulty)
+- [ ] Implement GET /metrics (overall + per-skill)
 - [ ] Create Progress page (simple metrics view)
 
 Acceptance:

@@ -52,7 +52,6 @@ Each question has:
 - statement
 - multiple choice options (exactly one correct)
 - primary skill
-- difficulty (Easy / Medium / Hard)
 - one general explanation (text only)
 
 ### 4.2 Answering
@@ -80,7 +79,6 @@ Users can:
 Show:
 - overall accuracy
 - accuracy per skill
-- (optional) accuracy per difficulty
 
 ---
 
@@ -114,7 +112,7 @@ Show:
 ## 8. MVP Definition of Done
 A user can:
 1) Register and log in
-2) Practice questions with filters (skill, difficulty, history)
+2) Practice questions with filters (skill, history)
 3) Submit answers and see feedback + explanation
 4) Retry incorrect questions
 5) See overall progress and skill-level accuracy

@@ -56,7 +56,6 @@ Returns questions for practice.
 
 Query params (optional):
 - skill_id (uuid)
-- difficulty (Easy|Medium|Hard)
 - history (all|correct|incorrect)
 
 Response (list):
@@ -65,7 +64,6 @@ Response (list):
     id,
     statement,
     skill_id,
-    difficulty,
     options: [{ id, text }]
   }
 ]
@@ -110,9 +108,6 @@ Response:
   - accuracy (0..1)
 - by_skill: [
   { skill_id, skill_name, total_attempts, total_correct, accuracy (0..1) }
-]
-- (optional) by_difficulty: [
-  { difficulty, total_attempts, total_correct, accuracy (0..1) }
 ]
 
 Notes:

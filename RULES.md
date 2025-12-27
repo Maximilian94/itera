@@ -1,17 +1,13 @@
 # ITERA — Business Rules (MVP)
 
-## 1. Difficulty
-- Difficulty is a fixed enum: Easy, Medium, Hard.
-- Difficulty is manually assigned in seed data in MVP.
-
-## 2. Correctness Evaluation
+## 1. Correctness Evaluation
 - A question has exactly one correct option.
 - When user submits (question_id, selected_option_id):
   - verify option belongs to question
   - is_correct = option.is_correct
   - store Attempt with is_correct
 
-## 3. History Filters (Questions)
+## 2. History Filters (Questions)
 History filter is defined using user's attempts:
 
 - history=all:
@@ -26,16 +22,15 @@ History filter is defined using user's attempts:
 
 This supports iteration: “practice what I still get wrong”.
 
-## 4. Metrics
+## 3. Metrics
 Metrics are computed from Attempts (MVP rules):
 
 - overall accuracy = total_correct / total_attempts
 - per-skill accuracy = correct_attempts_for_skill / total_attempts_for_skill
-- optional per-difficulty accuracy = correct_attempts_for_difficulty / total_attempts_for_difficulty
 
 MVP uses attempt-based metrics (not “best attempt” or “last attempt”).
 
-## 5. Iteration Loop UX
+## 4. Iteration Loop UX
 After an incorrect answer, UI should encourage:
 - retry incorrect questions
 - continue practicing same skill

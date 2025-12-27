@@ -23,7 +23,6 @@ Notes:
 - id (uuid)
 - statement (text)
 - skill_id (FK -> Skill)
-- difficulty (enum: Easy | Medium | Hard)
 - explanation_text (text)  // one general explanation
 - created_at
 

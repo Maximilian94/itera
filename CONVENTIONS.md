@@ -9,8 +9,6 @@
 - REST endpoints use plural resources: /questions, /attempts, /skills
 - Use consistent casing:
   - JSON: snake_case OR camelCase (pick one and stick to it; recommended: camelCase)
-- Enums:
-  - Difficulty: Easy | Medium | Hard (string)
 
 ## Backend (NestJS)
 - Modules by feature:
