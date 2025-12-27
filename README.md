@@ -13,6 +13,10 @@ Single repo, no Nx.
 In separate terminals:
 
 ```bash
+docker compose up -d
+```
+
+```bash
 cd api
 npm run start
 ```
@@ -23,6 +27,10 @@ npm start
 ```
 
 Then open `http://localhost:4200`.
+
+### Database (Phase 1)
+
+For Phase 1 we use **Docker Compose for Postgres only** (API/Web still run locally).
 
 ### Phase 0 check
 
