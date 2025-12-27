@@ -1,0 +1,21 @@
+.DS_Store
+
+# Node
+**/node_modules/
+**/dist/
+**/.angular/
+**/.cache/
+**/coverage/
+**/*.log
+
+# Env
+.env
+.env.*
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+
+

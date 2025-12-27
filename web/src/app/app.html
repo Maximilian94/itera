@@ -1,0 +1,16 @@
+<main style="padding: 24px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;">
+  <h1>Itera (MVP)</h1>
+  <p style="max-width: 60ch;">
+    Phase 0 check: the Angular app calls the Nest API <code>/health</code> endpoint.
+  </p>
+
+  @if (apiHealth()) {
+    <p><strong>API Health:</strong> OK</p>
+    <pre style="background: #f6f8fa; padding: 12px; border-radius: 8px;">{{ apiHealth() | json }}</pre>
+  } @else if (apiHealthError()) {
+    <p><strong>API Health:</strong> ERROR</p>
+    <pre style="background: #fff5f5; padding: 12px; border-radius: 8px;">{{ apiHealthError() }}</pre>
+  } @else {
+    <p><strong>API Health:</strong> Loading…</p>
+  }
+</main>
