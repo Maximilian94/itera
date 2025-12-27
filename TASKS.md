@@ -14,11 +14,11 @@ Rules:
 
 ## Phase 0 — Repo & Apps Setup
 
-- [ ] Create repo folders: domain/, api/, web/
-- [ ] Initialize NestJS app in api/
-- [ ] Initialize Angular app in web/
-- [ ] Configure CORS in api for web dev origin
-- [ ] Verify both apps run locally
+- [x] Create repo folders: domain/, api/, web/
+- [x] Initialize NestJS app in api/
+- [x] Initialize Angular app in web/
+- [x] Configure CORS in api for web dev origin
+- [x] Verify both apps run locally
 
 Acceptance:
 - API and Web run locally and can communicate (simple health endpoint).
