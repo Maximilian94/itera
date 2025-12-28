@@ -53,14 +53,14 @@ Acceptance:
 
 Goal: get an end-to-end loop early (Web → API auth → protected routes) with a consistent UI kit.
 
-- [ ] Install PrimeNG + PrimeIcons + animations
-- [ ] Configure PrimeNG theme preset: Aura
-- [ ] Create /login and /register pages (PrimeNG)
-- [ ] Implement web AuthService calling API:
+- [x] Install PrimeNG + PrimeIcons + animations
+- [x] Configure PrimeNG theme preset: Aura
+- [x] Create /login and /register pages (PrimeNG)
+- [x] Implement web AuthService calling API:
   - POST /auth/register
   - POST /auth/login
-- [ ] Store token in localStorage (MVP) and attach Authorization header via HttpInterceptor
-- [ ] Add simple route guard for protected pages
+- [x] Store token in localStorage (MVP) and attach Authorization header via HttpInterceptor
+- [x] Add simple route guard for protected pages
 
 Acceptance:
 - User can register/login in the Web UI, token is stored, and protected route access works.
