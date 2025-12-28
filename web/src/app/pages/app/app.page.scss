@@ -1,8 +1,27 @@
 .page {
   min-height: 100%;
+  padding: 16px;
+  max-width: 980px;
+  margin: 0 auto;
   display: grid;
-  place-items: center;
-  padding: 24px;
+  gap: 16px;
+}
+
+.topbar__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.subtitle {
+  color: var(--p-text-muted-color);
+  font-size: 13px;
 }
 
 

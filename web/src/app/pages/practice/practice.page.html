@@ -1,0 +1,72 @@
+<div class="grid">
+  <p-card header="Criar prova">
+    <div class="form">
+      <div class="field">
+        <label>Skills</label>
+        <p-multiSelect
+          [options]="skillsSig()"
+          optionLabel="name"
+          optionValue="id"
+          placeholder="Selecione skills (opcional)"
+          [formControl]="form.controls.skillIds"
+          [loading]="loadingSkillsSig()"
+          display="chip"
+        />
+      </div>
+
+      <div class="row">
+        <div class="field field--inline">
+          <label>Somente não resolvidas</label>
+          <p-toggleswitch [formControl]="form.controls.onlyUnsolved" />
+        </div>
+
+        <div class="field field--inline">
+          <label>Qtd. questões</label>
+          <p-inputNumber
+            [formControl]="form.controls.questionCount"
+            [min]="1"
+            [showButtons]="true"
+            buttonLayout="horizontal"
+            incrementButtonIcon="pi pi-plus"
+            decrementButtonIcon="pi pi-minus"
+          />
+        </div>
+      </div>
+
+      <div class="actions">
+        <p-button
+          label="Criar prova"
+          icon="pi pi-play"
+          [loading]="creatingSig()"
+          (onClick)="createExam()"
+        />
+      </div>
+
+      <div class="error" *ngIf="errorSig() as err">{{ err }}</div>
+    </div>
+  </p-card>
+
+  <p-card *ngIf="examSig() as exam" header="Prova criada">
+    <div class="examHeader">
+      <div>
+        <div class="muted">Exam ID</div>
+        <div class="mono">{{ exam.exam.id }}</div>
+      </div>
+      <p-button label="Começar" icon="pi pi-arrow-right" (onClick)="startExam()" />
+    </div>
+
+    <p-divider />
+
+    <div class="questions">
+      <div class="question" *ngFor="let q of exam.questions; index as i">
+        <div class="question__left">
+          <div class="muted">#{{ i + 1 }}</div>
+          <div class="statement">{{ q.statement }}</div>
+        </div>
+        <p-button label="Abrir" severity="secondary" (onClick)="openQuestion(q.id)" />
+      </div>
+    </div>
+  </p-card>
+</div>
+
+

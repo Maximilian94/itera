@@ -18,5 +18,16 @@ export const routes: Routes = [
     path: 'app',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/app/app.page').then((m) => m.AppPage),
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        loadComponent: () => import('./pages/practice/practice.page').then((m) => m.PracticePage),
+      },
+      {
+        path: 'exams/:examId/questions/:questionId',
+        loadComponent: () => import('./pages/question/question.page').then((m) => m.QuestionPage),
+      },
+    ],
   },
 ];

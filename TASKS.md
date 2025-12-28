@@ -83,15 +83,16 @@ Acceptance:
 
 ## Phase 5 — Core Learning Loop (Web)
 
-- [ ] Login/Register pages
-- [ ] Practice page:
+- [x] Login/Register pages
+- [x] Practice page:
   - filters (skillIds, onlyUnsolved)
+  - create exam
   - list/select question
-- [ ] Question page:
+- [x] Question page:
   - options selection
-  - submit answer
+  - submit answer (with examId)
   - show feedback + explanation
-  - CTA to retry incorrect questions
+  - next question / finish
 
 Acceptance:
 - End-to-end: login → practice → answer → feedback → retry.

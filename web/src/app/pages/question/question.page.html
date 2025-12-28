@@ -1,0 +1,58 @@
+<p-card *ngIf="loadingSig()" header="Carregando..."></p-card>
+
+<p-card *ngIf="!loadingSig() && errorSig() as err" header="Erro">
+  <div class="error">{{ err }}</div>
+  <p-button label="Voltar" severity="secondary" (onClick)="next()" />
+</p-card>
+
+<p-card *ngIf="!loadingSig() && questionSig() as q" header="Questão">
+  <div class="statement">{{ q.statement }}</div>
+
+  <p-divider />
+
+  <div class="options">
+    <label class="option" *ngFor="let opt of q.options">
+      <p-radioButton
+        name="opt"
+        [value]="opt.id"
+        [ngModel]="selectedOptionIdSig()"
+        (ngModelChange)="selectedOptionIdSig.set($event)"
+        [disabled]="submittingSig() || !!feedbackSig()"
+      />
+      <span>{{ opt.text }}</span>
+    </label>
+  </div>
+
+  <div class="actions">
+    <p-button
+      label="Enviar"
+      icon="pi pi-check"
+      [disabled]="!selectedOptionIdSig() || submittingSig() || feedbackSig()"
+      [loading]="submittingSig()"
+      (onClick)="submit()"
+    />
+    <p-button
+      *ngIf="feedbackSig()"
+      label="Próxima"
+      severity="secondary"
+      icon="pi pi-arrow-right"
+      (onClick)="next()"
+    />
+  </div>
+
+  <p-divider *ngIf="feedbackSig()" />
+
+  <div *ngIf="feedbackSig() as fb" class="feedback">
+    <div class="feedback__row">
+      <p-tag [severity]="fb.isCorrect ? 'success' : 'danger'" [value]="fb.isCorrect ? 'Correto' : 'Incorreto'" />
+      <div class="muted">Correct option: <span class="mono">{{ fb.correctOptionId }}</span></div>
+    </div>
+
+    <div class="explanation">
+      <div class="muted">Explicação</div>
+      <div>{{ fb.explanationText }}</div>
+    </div>
+  </div>
+</p-card>
+
+

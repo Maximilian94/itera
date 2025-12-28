@@ -1,9 +1,17 @@
 <div class="page">
-  <p-card header="Dentro do app" subheader="Se você está vendo isso, o JWT funcionou ✅">
-    <p style="margin: 0 0 16px 0;">Próximo passo (Phase 4): implementar Skills/Questions/Attempts.</p>
+  <div class="topbar">
+    <p-card>
+      <div class="topbar__content">
+        <div>
+          <div class="title">ITERA</div>
+          <div class="subtitle">Practice (Exam)</div>
+        </div>
+        <p-button label="Sair" severity="secondary" (onClick)="logout()" />
+      </div>
+    </p-card>
+  </div>
 
-    <p-button label="Sair" severity="secondary" (onClick)="logout()" />
-  </p-card>
+  <router-outlet />
 </div>
 
 
