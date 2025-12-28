@@ -23,6 +23,7 @@
 - Keep UI thin: fetch from API and render
 - Avoid duplicating business logic from backend
 - Use a single API client service per resource or a shared HttpClient wrapper
+- UI library: PrimeNG (theme preset: Aura)
 
 ## Error Handling (API)
 - Use consistent error shape:

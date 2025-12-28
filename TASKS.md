@@ -49,7 +49,25 @@ Acceptance:
 
 ---
 
-## Phase 3 — Core Learning Loop (API)
+## Phase 3 — Web Auth UI + PrimeNG (Aura)
+
+Goal: get an end-to-end loop early (Web → API auth → protected routes) with a consistent UI kit.
+
+- [ ] Install PrimeNG + PrimeIcons + animations
+- [ ] Configure PrimeNG theme preset: Aura
+- [ ] Create /login and /register pages (PrimeNG)
+- [ ] Implement web AuthService calling API:
+  - POST /auth/register
+  - POST /auth/login
+- [ ] Store token in localStorage (MVP) and attach Authorization header via HttpInterceptor
+- [ ] Add simple route guard for protected pages
+
+Acceptance:
+- User can register/login in the Web UI, token is stored, and protected route access works.
+
+---
+
+## Phase 4 — Core Learning Loop (API)
 
 - [ ] Implement GET /skills
 - [ ] Implement GET /questions (filters: skill_id, history)
@@ -60,7 +78,7 @@ Acceptance:
 
 ---
 
-## Phase 4 — Core Learning Loop (Web)
+## Phase 5 — Core Learning Loop (Web)
 
 - [ ] Login/Register pages
 - [ ] Practice page:
@@ -77,7 +95,7 @@ Acceptance:
 
 ---
 
-## Phase 5 — Metrics (API + Web)
+## Phase 6 — Metrics (API + Web)
 
 - [ ] Implement GET /metrics (overall + per-skill)
 - [ ] Create Progress page (simple metrics view)
@@ -87,7 +105,7 @@ Acceptance:
 
 ---
 
-## Phase 6 — Minimal Polish
+## Phase 7 — Minimal Polish
 
 - [ ] Basic dashboard entry point (start practice + quick metrics)
 - [ ] Improve iteration CTAs (retry incorrect, continue practicing)

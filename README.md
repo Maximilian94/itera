@@ -45,6 +45,10 @@ npm run db:migrate -- --name init --skip-seed
 npm run db:seed
 ```
 
+### UI (Web)
+
+We use **PrimeNG** with theme preset **Aura** for the MVP UI (Phase 3).
+
 ### Phase 0 check
 
 - API health: `GET http://localhost:3000/health` should return `{ "ok": true }`
