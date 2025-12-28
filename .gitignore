@@ -21,4 +21,7 @@
 !.vscode/launch.json
 !.vscode/tasks.json
 
+# JetBrains
+.idea/
+
 

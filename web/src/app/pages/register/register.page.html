@@ -1,0 +1,39 @@
+<div class="page">
+  <p-card header="Criar conta" subheader="Comece a praticar agora">
+    <form class="form" [formGroup]="form" (ngSubmit)="submit()">
+      <label class="field">
+        <span class="label">Email Teste</span>
+        <input pInputText type="email" formControlName="email" autocomplete="email" />
+      </label>
+
+      <label class="field">
+        <span class="label">Senha</span>
+        <p-password
+          formControlName="password"
+          [feedback]="true"
+          [toggleMask]="true"
+          [fluid]="true"
+          autocomplete="new-password"
+        />
+      </label>
+
+      @if (error()) {
+        <p-message severity="error" [text]="error()!" />
+      }
+
+      <p-button
+        type="submit"
+        label="Criar conta"
+        [loading]="loading()"
+        [disabled]="form.invalid || loading()"
+      />
+    </form>
+
+    <div class="footer">
+      <span>Já tem conta?</span>
+      <a routerLink="/login">Entrar</a>
+    </div>
+  </p-card>
+</div>
+
+

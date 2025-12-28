@@ -1,0 +1,40 @@
+.page {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+  width: 360px;
+  max-width: 80vw;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.label {
+  font-size: 0.9rem;
+  opacity: 0.85;
+}
+
+.footer {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+  font-size: 0.95rem;
+}
+
+a {
+  text-decoration: none;
+}
+
+

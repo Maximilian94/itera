@@ -49,6 +49,21 @@ npm run db:seed
 
 We use **PrimeNG** with theme preset **Aura** for the MVP UI (Phase 3).
 
+### Best practices (project conventions)
+
+- **Env files**
+  - Use `api/env.sample` as the committed template.
+  - Create your real local file with `cp api/env.sample api/.env`.
+  - Never commit secrets in `.env` (it’s ignored by `.gitignore`).
+
+- **RxJS naming**
+  - Prefer suffix **`$`** for methods/variables that return an **Observable** (e.g. `login$`, `register$`, `user$`).
+
+- **Parameter Object (Options Object)**
+  - Prefer passing parameters as a **single object** for readability and easy evolution:
+    - Good: `auth.login$({ email, password })`
+    - Avoid: `auth.login$(email, password)`
+
 ### Phase 0 check
 
 - API health: `GET http://localhost:3000/health` should return `{ "ok": true }`
