@@ -40,6 +40,7 @@ Constraints:
 ### Attempt
 - id (uuid)
 - user_id (FK -> User)
+- exam_id (FK -> Exam, nullable in MVP for backward compatibility)
 - question_id (FK -> Question)
 - selected_option_id (FK -> Option)
 - is_correct (boolean)
@@ -49,6 +50,27 @@ Constraints:
 - Attempts are append-only (no updates in MVP).
 - Multiple attempts per (user_id, question_id) are allowed.
 
+### Exam
+- id (uuid)
+- user_id (FK -> User)
+- created_at
+- filter_skill_ids (uuid[]) // stores the filter the user selected when creating the exam (optional but useful)
+- only_unsolved (boolean)   // stores the filter the user selected (optional but useful)
+- question_count (int)
+
+Notes:
+- An Exam is a “snapshot” of a set of questions chosen at creation time.
+- Exams let us reproduce and review a specific “prova” later.
+
+### ExamQuestion
+- exam_id (FK -> Exam)
+- question_id (FK -> Question)
+- order (int)
+
+Constraints:
+- Each Question can appear at most once per Exam.
+- Order is defined at creation time.
+
 ---
 
 ## Relationships
@@ -57,6 +79,10 @@ Constraints:
 - User 1 — N Attempt
 - Question 1 — N Attempt
 - Option 1 — N Attempt (selected option)
+- User 1 — N Exam
+- Exam 1 — N ExamQuestion
+- Question 1 — N ExamQuestion
+- Exam 1 — N Attempt (optional link)
 
 ---
 

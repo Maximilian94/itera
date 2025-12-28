@@ -6,6 +6,10 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { PrismaModule } from './prisma/prisma.module';
+import { SkillsModule } from './skills/skills.module';
+import { QuestionsModule } from './questions/questions.module';
+import { AttemptsModule } from './attempts/attempts.module';
+import { ExamsModule } from './exams/exams.module';
 
 @Module({
   imports: [
@@ -14,6 +18,10 @@ import { PrismaModule } from './prisma/prisma.module';
     }),
     PrismaModule,
     AuthModule,
+    SkillsModule,
+    QuestionsModule,
+    AttemptsModule,
+    ExamsModule,
   ],
   controllers: [AppController],
   providers: [

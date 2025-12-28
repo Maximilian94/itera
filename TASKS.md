@@ -69,12 +69,15 @@ Acceptance:
 
 ## Phase 4 — Core Learning Loop (API)
 
-- [ ] Implement GET /skills
-- [ ] Implement GET /questions (filters: skill_id, history)
-- [ ] Implement POST /attempts (evaluate correctness, store attempt, return feedback)
+- [x] Implement GET /skills
+- [x] Implement GET /questions (filters: skillIds, onlyUnsolved) (question bank)
+- [x] Implement POST /exams (create exam from filters; freeze selected questions)
+- [x] Implement GET /exams/:id (fetch exam + frozen questions)
+- [x] Update POST /attempts to optionally accept examId and validate question belongs to exam
+- [x] Implement POST /attempts (evaluate correctness, store attempt, return feedback)
 
 Acceptance:
-- User can fetch questions, answer one, receive feedback, attempt stored.
+- User can create an exam, fetch its questions, answer one, receive feedback, attempt stored (linked to exam).
 
 ---
 
@@ -82,7 +85,7 @@ Acceptance:
 
 - [ ] Login/Register pages
 - [ ] Practice page:
-  - filters (skill, history)
+  - filters (skillIds, onlyUnsolved)
   - list/select question
 - [ ] Question page:
   - options selection

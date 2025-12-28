@@ -14,6 +14,7 @@ model User {
   createdAt    DateTime  @default(now())
 
   attempts Attempt[]
+  exams    Exam[]
 
   @@map("users")
 }
@@ -39,6 +40,7 @@ model Question {
 
   options  Option[]
   attempts Attempt[]
+  examQuestions ExamQuestion[]
 
   @@index([skillId])
   @@map("questions")
@@ -67,6 +69,9 @@ model Attempt {
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  examId String? @db.Uuid
+  exam   Exam?   @relation(fields: [examId], references: [id], onDelete: SetNull)
+
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
@@ -74,9 +79,40 @@ model Attempt {
   selectedOption   Option @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
+  @@index([examId, createdAt])
   @@index([questionId, createdAt])
   @@index([selectedOptionId])
   @@map("attempts")
 }
 
+model Exam {
+  id           String   @id @default(uuid()) @db.Uuid
+  createdAt    DateTime @default(now())
+  questionCount Int
+  onlyUnsolved Boolean  @default(false)
+  filterSkillIds String[]
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  questions ExamQuestion[]
+  attempts  Attempt[]
+
+  @@index([userId, createdAt])
+  @@map("exams")
+}
+
+model ExamQuestion {
+  order Int
+
+  examId     String @db.Uuid
+  exam       Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  questionId String   @db.Uuid
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@id([examId, questionId])
+  @@index([examId, order])
+  @@map("exam_questions")
+}
 

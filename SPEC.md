@@ -34,12 +34,13 @@ Not validating in MVP:
 ## 3. Core Iteration Loop
 
 The MVP must support the loop:
-1) User selects practice filters
-2) User answers a question
-3) System evaluates correctness
-4) System returns feedback + explanation
-5) User retries incorrect questions
-6) User checks progress (simple)
+1) User selects exam filters
+2) System creates an Exam (a “prova”) and freezes the selected questions
+3) User answers a question inside the Exam
+4) System evaluates correctness
+5) System returns feedback + explanation
+6) User retries incorrect questions (often by creating a new Exam with onlyUnsolved=true)
+7) User checks progress (simple)
 
 Every MVP feature must reinforce this loop.
 
@@ -56,13 +57,15 @@ Each question has:
 
 ### 4.2 Answering
 Users can:
-- list questions (with filters)
+- create an exam (with filters)
+- fetch the exam questions
 - answer questions
 - get immediate feedback (correctness + correct option + explanation)
 
 ### 4.3 Attempts
 For each answer, store:
 - user_id
+- exam_id (when answering inside an exam)
 - question_id
 - selected_option_id
 - is_correct
@@ -72,7 +75,7 @@ Multiple attempts per question are allowed.
 
 ### 4.4 History & Iteration
 Users can:
-- filter questions by history: all / only incorrect / only correct
+- create exams using history filter: all / only incorrect (attempted but not yet solved)
 - retry incorrect questions
 
 ### 4.5 Metrics (simple)
@@ -112,7 +115,7 @@ Show:
 ## 8. MVP Definition of Done
 A user can:
 1) Register and log in
-2) Practice questions with filters (skill, history)
-3) Submit answers and see feedback + explanation
-4) Retry incorrect questions
+2) Create an exam with filters (skillIds, onlyUnsolved)
+3) Answer exam questions and see feedback + explanation
+4) Create a new exam for retrying incorrect questions
 5) See overall progress and skill-level accuracy

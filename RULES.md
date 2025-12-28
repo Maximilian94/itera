@@ -8,21 +8,28 @@
   - store Attempt with is_correct
 
 ## 2. History Filters (Questions)
-History filter is defined using user's attempts:
+History filter is defined using user's attempts.
 
-- history=all:
-  - no restriction
+In the MVP API we expose this as a boolean query param:
 
-- history=correct:
-  - include questions for which the user has at least one correct attempt
-
-- history=incorrect:
+- onlyUnsolved=true:
   - include questions for which the user has at least one attempt AND no correct attempts
   - (i.e., attempted but not yet solved)
 
 This supports iteration: “practice what I still get wrong”.
 
-## 3. Metrics
+## 3. Exams (Provas)
+An Exam is a user-owned entity that represents a single “prova” session.
+
+Rules:
+- Exam questions are selected once at exam creation time and then frozen.
+- A question must not repeat inside the same Exam.
+- A question may repeat across different Exams.
+- When submitting an Attempt with an exam_id, the API must verify:
+  - exam belongs to user
+  - question belongs to exam (via ExamQuestion)
+
+## 4. Metrics
 Metrics are computed from Attempts (MVP rules):
 
 - overall accuracy = total_correct / total_attempts
