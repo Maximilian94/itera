@@ -40,9 +40,9 @@ Acceptance:
 
 ## Phase 2 — Auth (API)
 
-- [ ] Implement register (email + password)
-- [ ] Implement login (token-based)
-- [ ] Add auth guard for protected endpoints
+- [x] Implement register (email + password)
+- [x] Implement login (token-based)
+- [x] Add auth guard for protected endpoints
 
 Acceptance:
 - User can register, login, and access protected routes.
