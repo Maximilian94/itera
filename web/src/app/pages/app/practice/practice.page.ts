@@ -3,9 +3,9 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
-import { ExamsService, type ExamResponse } from '../../api/exams.service';
-import { SkillsService } from '../../api/skills.service';
-import type { Skill } from '../../api/api.types';
+import { ExamsService, type ExamResponse } from '../../../api/exams.service';
+import { SkillsService } from '../../../api/skills.service';
+import type { Skill } from '../../../api/api.types';
 import { Button } from 'primeng/button';
 import { Card } from 'primeng/card';
 import { MultiSelect } from 'primeng/multiselect';
@@ -96,5 +96,3 @@ export class PracticePage {
     await this.openQuestion(first.id);
   }
 }
-
-

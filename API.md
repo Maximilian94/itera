@@ -125,6 +125,36 @@ Response:
 - exam: { id, createdAt, questionCount }
 - questions: [{ id, statement, skillId, options: [{ id, text }] }]
 
+### GET /exams
+Lists exams for the current user (newest first) including simple result counts.
+
+Response:
+- exams: [
+  {
+    id,
+    createdAt,
+    questionCount,
+    correctCount,
+    incorrectCount,
+    unansweredCount
+  }
+]
+
+### GET /exams/:id/results
+Fetches an exam with per-question result status.
+
+Response:
+- exam: { id, createdAt, questionCount, correctCount, incorrectCount, unansweredCount }
+- questions: [
+  {
+    id,
+    statement,
+    skillId,
+    options: [{ id, text }],
+    status: 'correct' | 'incorrect' | 'unanswered'
+  }
+]
+
 ---
 
 ## Metrics (protected)

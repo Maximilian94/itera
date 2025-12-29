@@ -6,6 +6,41 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ExamsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  async listExams(input: { userId: string }) {
+    const exams = await this.prisma.exam.findMany({
+      where: { userId: input.userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        createdAt: true,
+        questionCount: true,
+        attempts: {
+          select: { questionId: true, isCorrect: true },
+        },
+      },
+    });
+
+    return {
+      exams: exams.map((e) => {
+        const correct = new Set(e.attempts.filter((a) => a.isCorrect).map((a) => a.questionId));
+        const attempted = new Set(e.attempts.map((a) => a.questionId));
+        const correctCount = correct.size;
+        const attemptedCount = attempted.size;
+        const incorrectCount = Math.max(0, attemptedCount - correctCount);
+        const unansweredCount = Math.max(0, e.questionCount - attemptedCount);
+
+        return {
+          id: e.id,
+          createdAt: e.createdAt,
+          questionCount: e.questionCount,
+          correctCount,
+          incorrectCount,
+          unansweredCount,
+        };
+      }),
+    };
+  }
+
   async createExam(input: {
     userId: string;
     skillIds?: string[];
@@ -103,6 +138,49 @@ export class ExamsService {
     return {
       exam: { id: exam.id, createdAt: exam.createdAt, questionCount: exam.questionCount },
       questions: rows.map((r) => r.question),
+    };
+  }
+
+  async getExamResults(input: { userId: string; examId: string }) {
+    const base = await this.getExamQuestions(input);
+
+    const attempts = await this.prisma.attempt.findMany({
+      where: { userId: input.userId, examId: input.examId },
+      select: { questionId: true, isCorrect: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // status per question:
+    // - correct: any correct attempt inside this exam
+    // - incorrect: attempted but no correct attempt
+    // - unanswered: no attempts
+    const statusByQuestionId = new Map<string, 'correct' | 'incorrect' | 'unanswered'>();
+    const anyAttempt = new Set(attempts.map((a) => a.questionId));
+    const anyCorrect = new Set(attempts.filter((a) => a.isCorrect).map((a) => a.questionId));
+
+    for (const q of base.questions) {
+      if (anyCorrect.has(q.id)) statusByQuestionId.set(q.id, 'correct');
+      else if (anyAttempt.has(q.id)) statusByQuestionId.set(q.id, 'incorrect');
+      else statusByQuestionId.set(q.id, 'unanswered');
+    }
+
+    const questions = base.questions.map((q) => ({
+      ...q,
+      status: statusByQuestionId.get(q.id) ?? 'unanswered',
+    }));
+
+    const correctCount = questions.filter((q) => q.status === 'correct').length;
+    const incorrectCount = questions.filter((q) => q.status === 'incorrect').length;
+    const unansweredCount = questions.filter((q) => q.status === 'unanswered').length;
+
+    return {
+      exam: {
+        ...base.exam,
+        correctCount,
+        incorrectCount,
+        unansweredCount,
+      },
+      questions,
     };
   }
 }

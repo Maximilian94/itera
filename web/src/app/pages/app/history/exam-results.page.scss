@@ -1,0 +1,40 @@
+.summary {
+  display: grid;
+  gap: 10px;
+}
+
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.section {
+  display: grid;
+  gap: 8px;
+}
+
+.section__title {
+  font-weight: 700;
+}
+
+.q {
+  padding: 8px 10px;
+  border: 1px solid var(--p-content-border-color);
+  border-radius: 10px;
+}
+
+.empty {
+  color: var(--p-text-muted-color);
+}
+
+.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.error {
+  color: var(--p-red-500);
+}
+
+

@@ -6,6 +6,11 @@ import { ExamsService } from './exams.service';
 export class ExamsController {
   constructor(private readonly exams: ExamsService) {}
 
+  @Get()
+  list(@Req() req: { user: { userId: string } }) {
+    return this.exams.listExams({ userId: req.user.userId });
+  }
+
   @Post()
   create(@Req() req: { user: { userId: string } }, @Body() dto: CreateExamDto) {
     return this.exams.createExam({
@@ -19,6 +24,11 @@ export class ExamsController {
   @Get(':id')
   getOne(@Req() req: { user: { userId: string } }, @Param('id') examId: string) {
     return this.exams.getExamQuestions({ userId: req.user.userId, examId });
+  }
+
+  @Get(':id/results')
+  getResults(@Req() req: { user: { userId: string } }, @Param('id') examId: string) {
+    return this.exams.getExamResults({ userId: req.user.userId, examId });
   }
 }
 

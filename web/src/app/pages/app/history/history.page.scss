@@ -1,0 +1,16 @@
+.actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty {
+  color: var(--p-text-muted-color);
+  padding: 12px 0;
+}
+
+.error {
+  color: var(--p-red-500);
+  margin-bottom: 12px;
+}
+
+

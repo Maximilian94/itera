@@ -99,7 +99,23 @@ Acceptance:
 
 ---
 
-## Phase 6 — Metrics (API + Web)
+## Phase 6 — Exam History / Review (API + Web)
+
+- [ ] API: List exams for the current user (newest first) with:
+  - total questions
+  - correct count
+  - incorrect count
+- [ ] API: Get exam details + per-question result (correct/incorrect/unanswered)
+- [ ] Web: History page
+  - list exams with counts
+  - click exam → show questions grouped by correct/incorrect/unanswered
+
+Acceptance:
+- User can review past exams and see which questions were correct/incorrect.
+
+---
+
+## Phase 7 — Metrics (API + Web)
 
 - [ ] Implement GET /metrics (overall + per-skill)
 - [ ] Create Progress page (simple metrics view)
@@ -109,7 +125,7 @@ Acceptance:
 
 ---
 
-## Phase 7 — Minimal Polish
+## Phase 8 — Minimal Polish
 
 - [ ] Basic dashboard entry point (start practice + quick metrics)
 - [ ] Improve iteration CTAs (retry incorrect, continue practicing)

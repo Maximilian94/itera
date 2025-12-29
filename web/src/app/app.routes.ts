@@ -22,11 +22,19 @@ export const routes: Routes = [
       {
         path: '',
         pathMatch: 'full',
-        loadComponent: () => import('./pages/practice/practice.page').then((m) => m.PracticePage),
+        loadComponent: () => import('./pages/app/practice/practice.page').then((m) => m.PracticePage),
+      },
+      {
+        path: 'history',
+        loadComponent: () => import('./pages/app/history/history.page').then((m) => m.HistoryPage),
+      },
+      {
+        path: 'history/:examId',
+        loadComponent: () => import('./pages/app/history/exam-results.page').then((m) => m.ExamResultsPage),
       },
       {
         path: 'exams/:examId/questions/:questionId',
-        loadComponent: () => import('./pages/question/question.page').then((m) => m.QuestionPage),
+        loadComponent: () => import('./pages/app/question/question.page').then((m) => m.QuestionPage),
       },
     ],
   },
