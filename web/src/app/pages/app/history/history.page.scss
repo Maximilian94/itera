@@ -3,13 +3,33 @@
   justify-content: flex-end;
 }
 
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.table th {
+  color: var(--muted);
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
 .empty {
   color: var(--p-text-muted-color);
   padding: 12px 0;
 }
 
 .error {
-  color: var(--p-red-500);
+  color: var(--danger);
   margin-bottom: 12px;
 }
 

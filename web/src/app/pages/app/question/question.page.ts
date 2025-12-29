@@ -5,17 +5,12 @@ import { finalize, map, switchMap } from 'rxjs';
 import { AttemptsService } from '../../../api/attempts.service';
 import { ExamsService } from '../../../api/exams.service';
 import type { AttemptFeedback, Question } from '../../../api/api.types';
-import { Button } from 'primeng/button';
-import { Card } from 'primeng/card';
-import { RadioButton } from 'primeng/radiobutton';
-import { Divider } from 'primeng/divider';
-import { Tag } from 'primeng/tag';
 import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-question-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, Card, Button, RadioButton, Divider, Tag],
+  imports: [CommonModule, FormsModule],
   templateUrl: './question.page.html',
   styleUrls: ['./question.page.scss'],
 })

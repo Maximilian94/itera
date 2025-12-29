@@ -4,9 +4,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { Card } from 'primeng/card';
-import { Divider } from 'primeng/divider';
-import { Tag } from 'primeng/tag';
 
 type QuestionWithStatus = {
   id: string;
@@ -31,7 +28,7 @@ type ExamResultsResponse = {
 @Component({
   selector: 'app-exam-results-page',
   standalone: true,
-  imports: [CommonModule, Card, Divider, Tag],
+  imports: [CommonModule],
   templateUrl: './exam-results.page.html',
   styleUrls: ['./exam-results.page.scss'],
 })

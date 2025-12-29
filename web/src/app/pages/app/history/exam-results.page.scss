@@ -20,12 +20,12 @@
 
 .q {
   padding: 8px 10px;
-  border: 1px solid var(--p-content-border-color);
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
 .empty {
-  color: var(--p-text-muted-color);
+  color: var(--muted);
 }
 
 .mono {
@@ -34,7 +34,7 @@
 }
 
 .error {
-  color: var(--p-red-500);
+  color: var(--danger);
 }
 
 

@@ -4,10 +4,6 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { Button } from 'primeng/button';
-import { Card } from 'primeng/card';
-import { TableModule } from 'primeng/table';
-import { Tag } from 'primeng/tag';
 
 type ExamListItem = {
   id: string;
@@ -21,7 +17,7 @@ type ExamListItem = {
 @Component({
   selector: 'app-history-page',
   standalone: true,
-  imports: [CommonModule, DatePipe, Card, TableModule, Button, Tag],
+  imports: [CommonModule, DatePipe],
   templateUrl: './history.page.html',
   styleUrls: ['./history.page.scss'],
 })
@@ -48,7 +44,10 @@ export class HistoryPage {
       .get<{ exams: ExamListItem[] }>(`${this.baseUrl}/exams`)
       .pipe(finalize(() => this.loadingSig.set(false)))
       .subscribe({
-        next: (res) => this.examsSig.set(res.exams),
+        next: (res) =>
+          this.examsSig.set(
+            [...res.exams].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0)),
+          ),
         error: () => this.errorSig.set('Falha ao carregar histórico'),
       });
   }

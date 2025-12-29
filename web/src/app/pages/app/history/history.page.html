@@ -1,15 +1,13 @@
-<p-card header="Histórico de provas">
-  <div *ngIf="errorSig() as err" class="error">{{ err }}</div>
+<div class="card">
+  <div class="card__header">
+    <div class="card__title">Histórico de provas</div>
+  </div>
 
-  <p-table
-    *ngIf="hasExams()"
-    [value]="examsSig()"
-    [loading]="loadingSig()"
-    sortField="createdAt"
-    [sortOrder]="-1"
-    dataKey="id"
-  >
-    <ng-template pTemplate="header">
+  <div *ngIf="errorSig() as err" class="error">{{ err }}</div>
+  <div *ngIf="loadingSig()" class="muted">Carregando...</div>
+
+  <table *ngIf="hasExams()" class="table">
+    <thead>
       <tr>
         <th>Data</th>
         <th>Questões</th>
@@ -18,24 +16,24 @@
         <th>Não respondidas</th>
         <th></th>
       </tr>
-    </ng-template>
-    <ng-template pTemplate="body" let-row>
-      <tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let row of examsSig()">
         <td>{{ row.createdAt | date: 'short' }}</td>
         <td>{{ row.questionCount }}</td>
-        <td><p-tag severity="success" [value]="row.correctCount" /></td>
-        <td><p-tag severity="danger" [value]="row.incorrectCount" /></td>
-        <td><p-tag severity="secondary" [value]="row.unansweredCount" /></td>
+        <td><span class="tag tag--success">{{ row.correctCount }}</span></td>
+        <td><span class="tag tag--danger">{{ row.incorrectCount }}</span></td>
+        <td><span class="tag tag--secondary">{{ row.unansweredCount }}</span></td>
         <td class="actions">
-          <p-button label="Ver" severity="secondary" (onClick)="open(row.id)" />
+          <button class="btn btn--secondary" type="button" (click)="open(row.id)">Ver</button>
         </td>
       </tr>
-    </ng-template>
-  </p-table>
+    </tbody>
+  </table>
 
   <div *ngIf="!loadingSig() && !hasExams()" class="empty">
     Nenhuma prova ainda.
   </div>
-</p-card>
+</div>
 
 

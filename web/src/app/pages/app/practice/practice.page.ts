@@ -6,12 +6,6 @@ import { finalize } from 'rxjs';
 import { ExamsService, type ExamResponse } from '../../../api/exams.service';
 import { SkillsService } from '../../../api/skills.service';
 import type { Skill } from '../../../api/api.types';
-import { Button } from 'primeng/button';
-import { Card } from 'primeng/card';
-import { MultiSelect } from 'primeng/multiselect';
-import { ToggleSwitch } from 'primeng/toggleswitch';
-import { InputNumber } from 'primeng/inputnumber';
-import { Divider } from 'primeng/divider';
 
 @Component({
   selector: 'app-practice-page',
@@ -19,12 +13,6 @@ import { Divider } from 'primeng/divider';
   imports: [
     CommonModule,
     ReactiveFormsModule,
-    Card,
-    Button,
-    MultiSelect,
-    ToggleSwitch,
-    InputNumber,
-    Divider,
   ],
   templateUrl: './practice.page.html',
   styleUrls: ['./practice.page.scss'],

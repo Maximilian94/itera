@@ -1,41 +1,23 @@
+  <header class="topbar">
+    <div class="topbar__start">
+      <a class="btn" [class.btn--primary]="isHomeActive()" [class.btn--secondary]="!isHomeActive()" routerLink="/app">
+        Home
+      </a>
+      <a
+        class="btn"
+        [class.btn--primary]="isHistoryActive()"
+        [class.btn--secondary]="!isHistoryActive()"
+        routerLink="/app/history"
+      >
+        Histórico
+      </a>
+    </div>
 
-<!--  <div class="topbar">-->
-<!--    <p-card>-->
-<!--      <div class="topbar__content">-->
-<!--        <div>-->
-<!--          <div class="title">ITERA</div>-->
-<!--          <div class="subtitle">Practice (Exam)</div>-->
-<!--        </div>-->
-<!--        <div class="topbar__actions">-->
-<!--          <p-button label="Home" severity="secondary" [routerLink]="['/app']" />-->
-<!--          <p-button label="Histórico" severity="secondary" [routerLink]="['/app/history']" />-->
-<!--          <p-button label="Sair" severity="secondary" (onClick)="logout()" />-->
-<!--        </div>-->
-<!--      </div>-->
-<!--    </p-card>-->
-<!--  </div>-->
+    <div class="topbar__center">Itera</div>
 
-  <p-toolbar>
-    <ng-template #start>
-      <div class="start">
-        <p-button
-          label="Home"
-          [severity]="isHomeActive() ? 'primary' : 'secondary'"
-          [routerLink]="['/app']"
-        />
-        <p-button
-          label="Histórico"
-          [severity]="isHistoryActive() ? 'primary' : 'secondary'"
-          [routerLink]="['/app/history']"
-        />
-      </div>
-    </ng-template>
-    <ng-template #center>
-        <span>Itera</span>
-    </ng-template>
-    <ng-template #end>
-      <p-button label="Sair" severity="secondary" (onClick)="logout()" />
-    </ng-template>
-  </p-toolbar>
+    <div class="topbar__end">
+      <button class="btn btn--secondary" type="button" (click)="logout()">Sair</button>
+    </div>
+  </header>
 
   <router-outlet />

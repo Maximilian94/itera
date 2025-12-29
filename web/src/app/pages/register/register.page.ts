@@ -3,11 +3,6 @@ import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
-import { ButtonModule } from 'primeng/button';
-import { Card } from 'primeng/card';
-import { InputText } from 'primeng/inputtext';
-import { Password } from 'primeng/password';
-import { Message } from 'primeng/message';
 
 @Component({
   selector: 'app-register-page',
@@ -16,11 +11,6 @@ import { Message } from 'primeng/message';
     CommonModule,
     ReactiveFormsModule,
     RouterLink,
-    Card,
-    InputText,
-    Password,
-    Message,
-    ButtonModule,
   ],
   templateUrl: './register.page.html',
   styleUrls: ['./register.page.scss'],

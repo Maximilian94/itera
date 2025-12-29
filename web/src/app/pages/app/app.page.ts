@@ -2,8 +2,6 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
 import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
-import { Button } from 'primeng/button';
-import { Toolbar } from 'primeng/toolbar';
 import { filter } from 'rxjs';
 
 @Component({
@@ -13,8 +11,6 @@ import { filter } from 'rxjs';
     CommonModule,
     RouterOutlet,
     RouterLink,
-    Button,
-    Toolbar,
   ],
   templateUrl: './app.page.html',
   styleUrls: ['./app.page.scss'],

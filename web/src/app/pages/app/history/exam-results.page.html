@@ -1,20 +1,30 @@
-<p-card *ngIf="loadingSig()" header="Carregando..."></p-card>
+<div class="card" *ngIf="loadingSig()">
+  <div class="card__header">
+    <div class="card__title">Carregando...</div>
+  </div>
+</div>
 
-<p-card *ngIf="!loadingSig() && errorSig() as err" header="Erro">
+<div class="card" *ngIf="!loadingSig() && errorSig() as err">
+  <div class="card__header">
+    <div class="card__title">Erro</div>
+  </div>
   <div class="error">{{ err }}</div>
-</p-card>
+</div>
 
-<p-card *ngIf="!loadingSig() && dataSig() as data" header="Resultado da prova">
+<div class="card" *ngIf="!loadingSig() && dataSig() as data">
+  <div class="card__header">
+    <div class="card__title">Resultado da prova</div>
+  </div>
   <div class="summary">
     <div class="mono">{{ data.exam.id }}</div>
     <div class="tags">
-      <p-tag severity="success" [value]="'Corretas: ' + data.exam.correctCount" />
-      <p-tag severity="danger" [value]="'Incorretas: ' + data.exam.incorrectCount" />
-      <p-tag severity="secondary" [value]="'Não respondidas: ' + data.exam.unansweredCount" />
+      <span class="tag tag--success">Corretas: {{ data.exam.correctCount }}</span>
+      <span class="tag tag--danger">Incorretas: {{ data.exam.incorrectCount }}</span>
+      <span class="tag tag--secondary">Não respondidas: {{ data.exam.unansweredCount }}</span>
     </div>
   </div>
 
-  <p-divider />
+  <hr class="hr" />
 
   <div class="section">
     <div class="section__title">Corretas</div>
@@ -22,7 +32,7 @@
     <div class="empty" *ngIf="correct().length === 0">Nenhuma.</div>
   </div>
 
-  <p-divider />
+  <hr class="hr" />
 
   <div class="section">
     <div class="section__title">Incorretas</div>
@@ -30,13 +40,13 @@
     <div class="empty" *ngIf="incorrect().length === 0">Nenhuma.</div>
   </div>
 
-  <p-divider />
+  <hr class="hr" />
 
   <div class="section">
     <div class="section__title">Não respondidas</div>
     <div class="q" *ngFor="let q of unanswered()">{{ q.statement }}</div>
     <div class="empty" *ngIf="unanswered().length === 0">Nenhuma.</div>
   </div>
-</p-card>
+</div>
 
 
