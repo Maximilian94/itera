@@ -1,8 +1,9 @@
 import { CommonModule } from '@angular/common';
 import { Component, computed, inject, signal } from '@angular/core';
-import { NavigationEnd, Router, RouterLink, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../auth/auth.service';
 import { filter } from 'rxjs';
+import { SideBar } from "../../components/side-bar/side-bar.component";
 
 @Component({
   selector: 'app-app-page',
@@ -10,8 +11,8 @@ import { filter } from 'rxjs';
   imports: [
     CommonModule,
     RouterOutlet,
-    RouterLink,
-  ],
+    SideBar
+],
   templateUrl: './app.page.html',
   styleUrls: ['./app.page.scss'],
 })

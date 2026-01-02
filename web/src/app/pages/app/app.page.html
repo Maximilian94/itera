@@ -1,23 +1,5 @@
-  <header class="topbar">
-    <div class="topbar__start">
-      <a class="btn" [class.btn--primary]="isHomeActive()" [class.btn--secondary]="!isHomeActive()" routerLink="/app">
-        Home
-      </a>
-      <a
-        class="btn"
-        [class.btn--primary]="isHistoryActive()"
-        [class.btn--secondary]="!isHistoryActive()"
-        routerLink="/app/history"
-      >
-        Histórico
-      </a>
-    </div>
 
-    <div class="topbar__center">Itera</div>
 
-    <div class="topbar__end">
-      <button class="btn btn--secondary" type="button" (click)="logout()">Sair</button>
-    </div>
-  </header>
+    <app-side-bar></app-side-bar>
 
-  <router-outlet />
+    <router-outlet />

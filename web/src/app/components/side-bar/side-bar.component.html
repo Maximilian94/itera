@@ -1,0 +1,29 @@
+<nav class="side-bar" aria-label="Navegação principal">
+  <div class="side-bar-header">
+    <div>Icon</div>
+  </div>
+  <div class="side-bar-content">
+    <a
+      class="side-bar-item"
+      routerLink="/app"
+      routerLinkActive="selected"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      <div class="side-bar-item-icon">
+        <fa-icon [icon]="faHome"/>
+      </div>
+      
+      <span>Home</span>
+    </a>
+
+    <a class="side-bar-item" routerLink="/app/history" routerLinkActive="selected">
+      <div class="side-bar-item-icon">
+        <fa-icon [icon]="faClockRotateLeft"/>
+      </div>
+      
+      <span>History</span>
+    </a>
+
+  </div>
+  <div class="side-bar-footer"></div>
+</nav>

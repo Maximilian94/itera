@@ -1,5 +1,45 @@
+:root {
+  --brand-primary-rgb: 108 124 255;
+  --brand-primary: rgb(var(--brand-primary-rgb));
+
+  --fill-default: #262A4A;
+  /* Selected state: subtle neutral fill + brand accent handled in component */
+  --fill-selected: rgba(var(--white-rgb), 0.06);
+
+  --text-strong: #F1F2FF;
+  --text-weak: #B6B9E3;
+  --background: #1C1F3A;
+  --overlay-hover: 0.06;
+  --overlay-press: 0.12;
+  --white-rgb: 255 255 255;
+  --border-radius: 4px;
+  --focus-outline: var(--brand-primary);
+
+  /* Elevation (shared shadows) */
+  --elevation-0: none;
+  --elevation-1: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 14px rgba(0, 0, 0, 0.22);
+  --elevation-2: 0 2px 4px rgba(0, 0, 0, 0.35), 0 10px 22px rgba(0, 0, 0, 0.28);
+  --elevation-3: 0 4px 10px rgba(0, 0, 0, 0.38), 0 18px 40px rgba(0, 0, 0, 0.30);
+
+  /* Stroke */
+  --stroke-strong: #343866;
+  --stroke-weak: #2D3160;
+
+  /* Layout */
+  --sidebar-collapsed-width: 64px;
+  --sidebar-expanded-width: 160px;
+}
+
 html, body {
   height: 100%;
+  background: var(--background);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 //
