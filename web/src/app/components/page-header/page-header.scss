@@ -1,0 +1,16 @@
+.page-header {
+    background-color: var(--fill-default);
+    padding: 16px;
+    border-radius: var(--border-radius);
+
+    .title {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--text-strong);
+    }
+
+    .subtitle {
+        font-size: 16px;
+        color: var(--text-weak);
+    }
+}

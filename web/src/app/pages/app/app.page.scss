@@ -3,14 +3,14 @@
   flex-direction: row;
   width: 100%;
   height: 100vh;
-  gap: 16px;
 }
 
 app-side-bar {
   flex: 0 0 auto;
 }
 
-router-outlet {
+.content {
+padding: 16px;
   flex: 1 1 auto;
   min-width: 0;
 }

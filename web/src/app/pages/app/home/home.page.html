@@ -1,0 +1,65 @@
+<app-page-header title="Home"/>
+
+<!--<div class="grid">-->
+<!--  <div class="card">-->
+<!--    <div class="card__header">-->
+<!--      <div class="card__title">Criar prova</div>-->
+<!--    </div>-->
+<!--    <div class="form">-->
+<!--      <div class="field">-->
+<!--        <label>Skills</label>-->
+<!--        <select [formControl]="form.controls.skillIds" class="select" multiple>-->
+<!--          <option *ngFor="let s of skillsSig()" [value]="s.id">{{ s.name }}</option>-->
+<!--        </select>-->
+<!--        <div *ngIf="loadingSkillsSig()" class="muted">Carregando skills...</div>-->
+<!--      </div>-->
+
+<!--      <div class="row">-->
+<!--        <div class="field field&#45;&#45;inline">-->
+<!--          <label>Somente não resolvidas</label>-->
+<!--          <input [formControl]="form.controls.onlyUnsolved" class="checkbox" type="checkbox"/>-->
+<!--        </div>-->
+
+<!--        <div class="field field&#45;&#45;inline">-->
+<!--          <label>Qtd. questões</label>-->
+<!--          <input [formControl]="form.controls.questionCount" class="input" min="1" type="number"/>-->
+<!--        </div>-->
+<!--      </div>-->
+
+<!--      <div class="actions">-->
+<!--        <button (click)="createExam()" [disabled]="creatingSig()" class="btn btn&#45;&#45;primary" type="button">-->
+<!--          {{ creatingSig() ? 'Criando...' : 'Criar prova' }}-->
+<!--        </button>-->
+<!--      </div>-->
+
+<!--      <div *ngIf="errorSig() as err" class="error">{{ err }}</div>-->
+<!--    </div>-->
+<!--  </div>-->
+
+<!--  <div *ngIf="examSig() as exam" class="card">-->
+<!--    <div class="card__header">-->
+<!--      <div class="card__title">Prova criada</div>-->
+<!--    </div>-->
+<!--    <div class="examHeader">-->
+<!--      <div>-->
+<!--        <div class="muted">Exam ID</div>-->
+<!--        <div class="mono">{{ exam.exam.id }}</div>-->
+<!--      </div>-->
+<!--      <button (click)="startExam()" class="btn btn&#45;&#45;primary" type="button">Começar</button>-->
+<!--    </div>-->
+
+<!--    <hr class="hr"/>-->
+
+<!--    <div class="questions">-->
+<!--      <div *ngFor="let q of exam.questions; index as i" class="question">-->
+<!--        <div class="question__left">-->
+<!--          <div class="muted">#{{ i + 1 }}</div>-->
+<!--          <div class="statement">{{ q.statement }}</div>-->
+<!--        </div>-->
+<!--        <button (click)="openQuestion(q.id)" class="btn btn&#45;&#45;secondary" type="button">Abrir</button>-->
+<!--      </div>-->
+<!--    </div>-->
+<!--  </div>-->
+<!--</div>-->
+
+

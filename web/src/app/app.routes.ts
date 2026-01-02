@@ -1,6 +1,6 @@
-import { Routes } from '@angular/router';
-import { authGuard } from './auth/auth.guard';
-import { guestGuard } from './auth/guest.guard';
+import {Routes} from '@angular/router';
+import {authGuard} from './auth/auth.guard';
+import {guestGuard} from './auth/guest.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'login' },
@@ -20,9 +20,13 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/app/app.page').then((m) => m.AppPage),
     children: [
       {
-        path: '',
-        pathMatch: 'full',
-        loadComponent: () => import('./pages/app/practice/practice.page').then((m) => m.PracticePage),
+        path: "",
+        pathMatch: "full",
+        redirectTo: "home"
+      },
+      {
+        path: 'home',
+        loadComponent: () => import('./pages/app/home/home.page').then((m) => m.HomePage),
       },
       {
         path: 'history',

@@ -18,7 +18,7 @@ export class GetQuestionsQueryDto {
   /**
    * When true, returns only questions the user has attempted AND has not solved yet
    * (i.e. no correct attempts so far). This supports the iteration loop:
-   * “practice what I still get wrong”.
+   * “home what I still get wrong”.
    *
    * In query string:
    * - `?onlyUnsolved=true`
@@ -35,5 +35,3 @@ export class GetQuestionsQueryDto {
   @IsBoolean()
   onlyUnsolved?: boolean;
 }
-
-

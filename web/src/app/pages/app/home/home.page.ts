@@ -1,34 +1,34 @@
-import { CommonModule } from '@angular/common';
-import { Component, inject, signal } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
-import { finalize } from 'rxjs';
-import { ExamsService, type ExamResponse } from '../../../api/exams.service';
-import { SkillsService } from '../../../api/skills.service';
-import type { Skill } from '../../../api/api.types';
+import {CommonModule} from '@angular/common';
+import {Component, inject, signal} from '@angular/core';
+import {FormBuilder, ReactiveFormsModule} from '@angular/forms';
+import {Router} from '@angular/router';
+import {finalize} from 'rxjs';
+import {type ExamResponse, ExamsService} from '../../../api/exams.service';
+import {SkillsService} from '../../../api/skills.service';
+import type {Skill} from '../../../api/api.types';
+import {PageHeader} from '../../../components/page-header/page-header';
 
 @Component({
-  selector: 'app-practice-page',
+  selector: 'app-home-page',
   standalone: true,
   imports: [
     CommonModule,
     ReactiveFormsModule,
+    PageHeader,
   ],
-  templateUrl: './practice.page.html',
-  styleUrls: ['./practice.page.scss'],
+  templateUrl: './home.page.html',
+  styleUrls: ['./home.page.scss'],
 })
-export class PracticePage {
-  private readonly skillsApi = inject(SkillsService);
-  private readonly examsApi = inject(ExamsService);
-  private readonly router = inject(Router);
-  private readonly fb = inject(FormBuilder);
-
+export class HomePage {
   readonly skillsSig = signal<Skill[]>([]);
   readonly loadingSkillsSig = signal(false);
   readonly creatingSig = signal(false);
   readonly examSig = signal<ExamResponse | null>(null);
   readonly errorSig = signal<string | null>(null);
-
+  private readonly skillsApi = inject(SkillsService);
+  private readonly examsApi = inject(ExamsService);
+  private readonly router = inject(Router);
+  private readonly fb = inject(FormBuilder);
   readonly form = this.fb.group({
     skillIds: this.fb.control<string[]>([]),
     onlyUnsolved: this.fb.control<boolean>(false),
@@ -37,17 +37,6 @@ export class PracticePage {
 
   constructor() {
     this.loadSkills();
-  }
-
-  private loadSkills() {
-    this.loadingSkillsSig.set(true);
-    this.skillsApi
-      .list$()
-      .pipe(finalize(() => this.loadingSkillsSig.set(false)))
-      .subscribe({
-        next: (res) => this.skillsSig.set(res.skills),
-        error: () => this.errorSig.set('Falha ao carregar skills'),
-      });
   }
 
   createExam() {
@@ -82,5 +71,16 @@ export class PracticePage {
     const first = this.examSig()?.questions?.[0];
     if (!first) return;
     await this.openQuestion(first.id);
+  }
+
+  private loadSkills() {
+    this.loadingSkillsSig.set(true);
+    this.skillsApi
+      .list$()
+      .pipe(finalize(() => this.loadingSkillsSig.set(false)))
+      .subscribe({
+        next: (res) => this.skillsSig.set(res.skills),
+        error: () => this.errorSig.set('Falha ao carregar skills'),
+      });
   }
 }
