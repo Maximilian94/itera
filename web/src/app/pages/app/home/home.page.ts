@@ -1,12 +1,16 @@
 import {CommonModule} from '@angular/common';
 import {Component, inject, signal} from '@angular/core';
 import {FormBuilder, ReactiveFormsModule} from '@angular/forms';
-import {Router} from '@angular/router';
+import {Router, RouterLink} from '@angular/router';
 import {finalize} from 'rxjs';
 import {type ExamResponse, ExamsService} from '../../../api/exams.service';
-import {SkillsService} from '../../../api/skills.service';
 import type {Skill} from '../../../api/api.types';
 import {PageHeader} from '../../../components/page-header/page-header';
+import {FontAwesomeModule} from "@fortawesome/angular-fontawesome";
+import {faPlus} from '@fortawesome/free-solid-svg-icons';
+import {ButtonComponent} from "../../../ui/button/button.component";
+import {ChipComponent} from "../../../ui/chip/chip.component";
+import {LINK} from '../../../app.routes';
 
 @Component({
   selector: 'app-home-page',
@@ -15,7 +19,11 @@ import {PageHeader} from '../../../components/page-header/page-header';
     CommonModule,
     ReactiveFormsModule,
     PageHeader,
-  ],
+    FontAwesomeModule,
+    ButtonComponent,
+    ChipComponent,
+    RouterLink
+],
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
 })
@@ -25,7 +33,9 @@ export class HomePage {
   readonly creatingSig = signal(false);
   readonly examSig = signal<ExamResponse | null>(null);
   readonly errorSig = signal<string | null>(null);
-  private readonly skillsApi = inject(SkillsService);
+  protected readonly faPlus = faPlus;
+  protected readonly LINK = LINK;
+  // private readonly skillsApi = inject(SkillsService);
   private readonly examsApi = inject(ExamsService);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
@@ -75,12 +85,12 @@ export class HomePage {
 
   private loadSkills() {
     this.loadingSkillsSig.set(true);
-    this.skillsApi
-      .list$()
-      .pipe(finalize(() => this.loadingSkillsSig.set(false)))
-      .subscribe({
-        next: (res) => this.skillsSig.set(res.skills),
-        error: () => this.errorSig.set('Falha ao carregar skills'),
-      });
+    // this.skillsApi
+    //   .list$()
+    //   .pipe(finalize(() => this.loadingSkillsSig.set(false)))
+    //   .subscribe({
+    //     next: (res) => this.skillsSig.set(res.skills),
+    //     error: () => this.errorSig.set('Falha ao carregar skills'),
+    //   });
   }
 }

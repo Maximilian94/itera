@@ -5,6 +5,8 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 
 import { routes } from './app.routes';
 import { authInterceptor } from './auth/auth.interceptor';
+import { SKILL_REPOSITORY_TOKEN } from './services/skills/domain/skill.interface';
+import { SkillsHttp } from './services/skills/data/skills-http';
 
 
 
@@ -14,5 +16,9 @@ export const appConfig: ApplicationConfig = {
     provideHttpClient(withInterceptors([authInterceptor])),
     provideAnimationsAsync(),
     provideRouter(routes),
+    {
+      provide: SKILL_REPOSITORY_TOKEN,
+      useClass: SkillsHttp,
+    },
   ],
 };

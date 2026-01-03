@@ -1,4 +1,15 @@
-<app-page-header title="Home"/>
+<app-page-header title="Home">
+  <button [routerLink]="LINK.createExam()" app-button class="btn btn--primary">
+    <fa-icon [icon]="faPlus"/>
+    Criar prova
+  </button>
+
+  <app-chip>
+    <span chipLabel>
+      Prova 1
+    </span>
+  </app-chip>
+</app-page-header>
 
 <!--<div class="grid">-->
 <!--  <div class="card">-->

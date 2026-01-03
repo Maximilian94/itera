@@ -1,0 +1,32 @@
+<app-page-header title="Create Exam"></app-page-header>
+
+
+<form [formGroup]="formGroup">
+  <mat-form-field class="example-chip-list">
+    <mat-label>Skills</mat-label>
+    <mat-chip-grid #chipGrid formControlName="skills">
+      @for (skill of (chipGrid.value ?? []); track skill.id) {
+        <mat-chip-row (removed)="remove(skill)">
+          {{ skill.name }}
+          <button matChipRemove>
+            <mat-icon>cancel</mat-icon>
+          </button>
+        </mat-chip-row>
+      }
+    </mat-chip-grid>
+    <input
+      #skillInput
+      (matChipInputTokenEnd)="add($event)"
+      [matAutocomplete]="auto"
+      [matChipInputFor]="chipGrid"
+      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+      name="currentSkill"
+      placeholder="New Skill..."
+    />
+    <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selected($event); skillInput.value = ''">
+      @for (skill of skills$ | async; track skill) {
+        <mat-option [value]="skill">{{ skill.name }}</mat-option>
+      }
+    </mat-autocomplete>
+  </mat-form-field>
+</form>
