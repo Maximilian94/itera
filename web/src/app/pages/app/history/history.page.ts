@@ -8,6 +8,9 @@ import { environment } from '../../../../environments/environment';
 type ExamListItem = {
   id: string;
   createdAt: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  status: 'not_started' | 'in_progress' | 'finished';
   questionCount: number;
   correctCount: number;
   incorrectCount: number;
@@ -29,6 +32,7 @@ export class HistoryPage {
   readonly loadingSig = signal(false);
   readonly errorSig = signal<string | null>(null);
   readonly examsSig = signal<ExamListItem[]>([]);
+  readonly actionLoadingIdSig = signal<string | null>(null);
 
   readonly hasExams = computed(() => this.examsSig().length > 0);
 
@@ -49,6 +53,28 @@ export class HistoryPage {
             [...res.exams].sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0)),
           ),
         error: () => this.errorSig.set('Falha ao carregar histórico'),
+      });
+  }
+
+  start(examId: string) {
+    this.actionLoadingIdSig.set(examId);
+    this.http
+      .post(`${this.baseUrl}/exams/${examId}/start`, {})
+      .pipe(finalize(() => this.actionLoadingIdSig.set(null)))
+      .subscribe({
+        next: () => this.load(),
+        error: () => this.errorSig.set('Falha ao iniciar prova'),
+      });
+  }
+
+  finish(examId: string) {
+    this.actionLoadingIdSig.set(examId);
+    this.http
+      .post(`${this.baseUrl}/exams/${examId}/finish`, {})
+      .pipe(finalize(() => this.actionLoadingIdSig.set(null)))
+      .subscribe({
+        next: () => this.load(),
+        error: () => this.errorSig.set('Falha ao finalizar prova'),
       });
   }
 

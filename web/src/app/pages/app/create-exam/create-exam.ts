@@ -1,69 +1,125 @@
-import {ChangeDetectionStrategy, Component, computed, inject, model, signal} from '@angular/core';
-import {PageHeader} from "../../../components/page-header/page-header";
-import {MatFormFieldModule} from '@angular/material/form-field';
-import {MatAutocompleteModule, MatAutocompleteSelectedEvent} from '@angular/material/autocomplete';
-import {MatChipInputEvent, MatChipsModule} from '@angular/material/chips';
-import {MatIconModule} from '@angular/material/icon';
-import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from '@angular/forms';
-import {COMMA, ENTER} from '@angular/cdk/keycodes';
-import {LiveAnnouncer} from '@angular/cdk/a11y';
-import {Observable} from 'rxjs';
-import {Skill} from '../../../api/api.types';
-import {SkillsService} from '../../../services/skills/skills';
-import {AsyncPipe} from '@angular/common';
+import {ChangeDetectionStrategy, Component, inject, signal} from '@angular/core';
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {FormControl, FormGroup, ReactiveFormsModule} from '@angular/forms';
+import {Router} from '@angular/router';
+import {finalize, Observable} from 'rxjs';
+import {CommonModule} from '@angular/common';
+import {AutoCompleteCompleteEvent, AutoCompleteModule} from 'primeng/autocomplete';
+import {ButtonModule} from 'primeng/button';
+import {CheckboxModule} from 'primeng/checkbox';
+import {InputNumberModule} from 'primeng/inputnumber';
+import {TooltipModule} from 'primeng/tooltip';
 
-export interface Fruit {
-  name: string;
-}
+import {PageHeader} from '../../../components/page-header/page-header';
+import {type Skill} from '../../../api/api.types';
+import {type ExamResponse, ExamsService} from '../../../api/exams.service';
+import {SkillsService} from '../../../services/skills/skills';
+import {FloatLabel} from 'primeng/floatlabel';
+import {FaIconComponent} from '@fortawesome/angular-fontawesome';
+import {faMinus, faPlus} from '@fortawesome/free-solid-svg-icons';
+import {Card} from 'primeng/card';
+
 
 @Component({
   selector: 'app-create-exam',
-  imports: [PageHeader, MatFormFieldModule, MatAutocompleteModule, MatChipsModule, MatIconModule, FormsModule, AsyncPipe, ReactiveFormsModule],
+  imports: [
+    CommonModule,
+    PageHeader,
+    ReactiveFormsModule,
+    AutoCompleteModule,
+    ButtonModule,
+    CheckboxModule,
+    InputNumberModule,
+    TooltipModule,
+    FloatLabel,
+    FaIconComponent,
+    Card,
+  ],
   templateUrl: './create-exam.html',
   styleUrl: './create-exam.scss',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class CreateExam {
-  readonly formGroup = new FormGroup({
-    skills: new FormControl<Skill[]>([])
-  })
-
-  readonly separatorKeysCodes: number[] = [ENTER, COMMA];
-  readonly currentFruit = model('');
-  readonly fruits = signal(['Lemon']);
-  readonly allFruits: string[] = ['Apple', 'Lemon', 'Lime', 'Orange', 'Strawberry'];
-  readonly filteredFruits = computed(() => {
-    const currentFruit = this.currentFruit().toLowerCase();
-    return currentFruit
-      ? this.allFruits.filter(fruit => fruit.toLowerCase().includes(currentFruit))
-      : this.allFruits.slice();
+  readonly form = new FormGroup({
+    skills: new FormControl<Skill[]>([], { nonNullable: true }),
+    onlyUnsolved: new FormControl<boolean>(false, { nonNullable: true }),
+    questionCount: new FormControl<number>(10, { nonNullable: true }),
   });
-
-  readonly announcer = inject(LiveAnnouncer);
+  readonly loadingSig = signal(false);
+  readonly errorSig = signal<string | null>(null);
+  readonly examSig = signal<ExamResponse | null>(null);
+  readonly suggestionsSig = signal<Skill[]>([]);
+  readonly selectedSkillsSig = signal<Skill[]>([]);
+  protected readonly faPlus = faPlus;
+  protected readonly faMinus = faMinus;
   private readonly skillsService = inject(SkillsService);
-  readonly skills$: Observable<Skill[]> = this.skillsService.skills$
+  readonly skills$: Observable<Skill[]> = this.skillsService.skills$;
+  private readonly examsApi = inject(ExamsService);
+  private readonly router = inject(Router);
+  private readonly allSkillsSig = signal<Skill[]>([]);
+  private readonly lastQuerySig = signal<string>('');
 
   constructor() {
-    this.skillsService.fetchSkills()
+    this.skillsService.fetchSkills();
+
+    this.skills$
+      .pipe(takeUntilDestroyed())
+      .subscribe((skills) => this.allSkillsSig.set(skills));
+
+    // Recompute suggestions when selection changes so we don't show already-selected items.
+    this.form.controls.skills.valueChanges.pipe(takeUntilDestroyed()).subscribe((value) => {
+      this.selectedSkillsSig.set(value ?? []);
+      this.recomputeSuggestions();
+    });
+
+    // Ensure initial state is consistent (e.g. if form is prefilled later).
+    this.selectedSkillsSig.set(this.form.controls.skills.value ?? []);
   }
 
-  add(event: MatChipInputEvent): void {
-    // If you want "free solo" typing, you need a way to map the typed string to a Skill.
-    // For now we only add via autocomplete selection.
-    event.chipInput?.clear();
+  search(event: AutoCompleteCompleteEvent) {
+    const q = (event.query ?? '').trim().toLowerCase();
+    this.lastQuerySig.set(q);
+    this.recomputeSuggestions();
   }
 
-  remove(skill: Skill): void {
-    const current = this.formGroup.controls.skills.value ?? [];
-    this.formGroup.controls.skills.patchValue(current.filter((s) => s.id !== skill.id));
+  createExam() {
+    this.errorSig.set(null);
+    this.examSig.set(null);
+    this.loadingSig.set(true);
+
+    const { onlyUnsolved, questionCount } = this.form.getRawValue();
+    const skills = this.selectedSkillsSig();
+
+    this.examsApi
+      .createExam$({
+        skillIds: skills?.length ? skills.map((s) => s.id) : undefined,
+        onlyUnsolved: onlyUnsolved ?? false,
+        questionCount: questionCount ?? 10,
+      })
+      .pipe(finalize(() => this.loadingSig.set(false)))
+      .subscribe({
+        next: (res) => {
+          this.examSig.set(res);
+        },
+        error: () => this.errorSig.set('Falha ao criar prova'),
+      });
   }
 
-  selected(event: MatAutocompleteSelectedEvent): void {
-    const picked = event.option.value as Skill;
-    const current = this.formGroup.controls.skills.value ?? [];
-    const next = current.some((s) => s.id === picked.id) ? current : [...current, picked];
-    this.formGroup.controls.skills.patchValue(next);
-    event.option.deselect();
+  async startExam() {
+    const first = this.examSig()?.questions?.[0];
+    const exam = this.examSig()?.exam;
+    if (!first || !exam) return;
+    await this.router.navigateByUrl(`/app/exams/${exam.id}/questions/${first.id}`);
+  }
+
+  private recomputeSuggestions() {
+    const q = this.lastQuerySig();
+    const selected = new Set(this.selectedSkillsSig().map((s) => s.id));
+    const all = this.allSkillsSig().filter((s) => !selected.has(s.id));
+
+    this.suggestionsSig.set(
+      q ? all.filter((s) => s.name.toLowerCase().includes(q)).slice(0, 20) : all.slice(0, 20),
+    );
   }
 }

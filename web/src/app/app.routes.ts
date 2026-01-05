@@ -9,6 +9,7 @@ export const PATH = {
   exams: 'exams',
   questions: 'questions',
   createExam: 'create-exam',
+  exam: 'exam',
 } as const;
 
 export const LINK = {
@@ -18,6 +19,7 @@ export const LINK = {
   question: (examId: string, questionId: string) =>
     ['/', PATH.app, PATH.exams, examId, PATH.questions, questionId] as const,
   createExam: () => ['/', PATH.app, PATH.createExam] as const,
+  exam: (examId: string) => ['/', PATH.app, PATH.exams, examId] as const,
 };
 
 export const routes: Routes = [
@@ -57,6 +59,10 @@ export const routes: Routes = [
       {
         path: 'exams/:examId/questions/:questionId',
         loadComponent: () => import('./pages/app/question/question.page').then((m) => m.QuestionPage),
+      },
+      {
+        path: 'exams/:examId',
+        loadComponent: () => import('./pages/app/exam/exam.page').then((m) => m.ExamPage),
       },
       {
         path: 'create-exam',

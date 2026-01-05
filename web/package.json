@@ -35,6 +35,8 @@
     "@fortawesome/angular-fontawesome": "^4.0.0",
     "@fortawesome/free-regular-svg-icons": "^7.1.0",
     "@fortawesome/free-solid-svg-icons": "^7.1.0",
+    "@primeuix/themes": "^2.0.2",
+    "primeng": "^21.0.2",
     "rxjs": "~7.8.0",
     "tslib": "^2.3.0"
   },

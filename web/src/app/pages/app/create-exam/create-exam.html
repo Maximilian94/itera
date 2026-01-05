@@ -1,32 +1,67 @@
 <app-page-header title="Create Exam"></app-page-header>
 
+<div class="container">
+  <p-card header="Set up your exam">
+    <form [formGroup]="form" class="create-exam">
+      <p-floatlabel variant="on">
+        <p-auto-complete
+          (completeMethod)="search($event)"
+          [dropdown]="true"
+          [forceSelection]="true"
+          [multiple]="true"
+          [showClear]="true"
+          [suggestions]="suggestionsSig()"
+          fluid
+          formControlName="skills"
+          inputId="skillInputId"
+          optionLabel="name"
+          placeholder="Search and select..."
+        />
+        <label for="skillInputId">Skill</label>
+      </p-floatlabel>
+  
+      <p-floatlabel variant="on">
+        <p-inputNumber
+          [max]="50"
+          [min]="1"
+          [showButtons]="true"
+          buttonLayout="horizontal"
+          fluid
+          formControlName="questionCount"
+          inputId="questionCount"
+        >
+          <ng-template #incrementbuttonicon>
+            <fa-icon [icon]="faPlus"/>
+          </ng-template>
+          <ng-template #decrementbuttonicon>
+            <fa-icon [icon]="faMinus"/>
+          </ng-template>
+        </p-inputNumber>
+        <label for="questionCount">Questions</label>
+      </p-floatlabel>
+  
+      <div class="checkbox-container">
+        <p-checkbox [binary]="true" formControlName="onlyUnsolved" inputId="onlyUnsolved"></p-checkbox>
+        <label for="onlyUnsolved">Only unsolved questions</label>
+      </div>
 
-<form [formGroup]="formGroup">
-  <mat-form-field class="example-chip-list">
-    <mat-label>Skills</mat-label>
-    <mat-chip-grid #chipGrid formControlName="skills">
-      @for (skill of (chipGrid.value ?? []); track skill.id) {
-        <mat-chip-row (removed)="remove(skill)">
-          {{ skill.name }}
-          <button matChipRemove>
-            <mat-icon>cancel</mat-icon>
-          </button>
-        </mat-chip-row>
-      }
-    </mat-chip-grid>
-    <input
-      #skillInput
-      (matChipInputTokenEnd)="add($event)"
-      [matAutocomplete]="auto"
-      [matChipInputFor]="chipGrid"
-      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
-      name="currentSkill"
-      placeholder="New Skill..."
-    />
-    <mat-autocomplete #auto="matAutocomplete" (optionSelected)="selected($event); skillInput.value = ''">
-      @for (skill of skills$ | async; track skill) {
-        <mat-option [value]="skill">{{ skill.name }}</mat-option>
-      }
-    </mat-autocomplete>
-  </mat-form-field>
-</form>
+      <div class="actions">
+        <span
+          class="tooltip-wrap"
+          [pTooltip]="selectedSkillsSig().length === 0 ? 'Select at least one skill to create the exam' : ''"
+          [tooltipDisabled]="selectedSkillsSig().length > 0"
+          tooltipPosition="top"
+        >
+          <p-button
+            label="Create exam"
+            (onClick)="createExam()"
+            [loading]="loadingSig()"
+            [disabled]="loadingSig() || selectedSkillsSig().length === 0"
+          />
+        </span>
+      </div>
+    </form>
+  </p-card>
+  
+</div>
+

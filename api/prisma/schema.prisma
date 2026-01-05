@@ -88,6 +88,8 @@ model Attempt {
 model Exam {
   id           String   @id @default(uuid()) @db.Uuid
   createdAt    DateTime @default(now())
+  startedAt    DateTime?
+  finishedAt   DateTime?
   questionCount Int
   onlyUnsolved Boolean  @default(false)
   filterSkillIds String[]

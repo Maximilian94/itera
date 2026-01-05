@@ -25,7 +25,34 @@
         <td><span class="tag tag--danger">{{ row.incorrectCount }}</span></td>
         <td><span class="tag tag--secondary">{{ row.unansweredCount }}</span></td>
         <td class="actions">
-          <button class="btn btn--secondary" type="button" (click)="open(row.id)">Ver</button>
+          <button
+            *ngIf="row.status === 'not_started'"
+            class="btn btn--primary"
+            type="button"
+            [disabled]="actionLoadingIdSig() === row.id"
+            (click)="start(row.id)"
+          >
+            Iniciar
+          </button>
+
+          <button
+            *ngIf="row.status === 'in_progress'"
+            class="btn btn--secondary"
+            type="button"
+            [disabled]="actionLoadingIdSig() === row.id"
+            (click)="finish(row.id)"
+          >
+            Finalizar
+          </button>
+
+          <button
+            *ngIf="row.status === 'finished'"
+            class="btn btn--secondary"
+            type="button"
+            (click)="open(row.id)"
+          >
+            Ver
+          </button>
         </td>
       </tr>
     </tbody>

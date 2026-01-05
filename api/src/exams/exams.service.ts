@@ -6,6 +6,12 @@ import { PrismaService } from '../prisma/prisma.service';
 export class ExamsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private toExamStatus(exam: { startedAt: Date | null; finishedAt: Date | null }) {
+    if (exam.finishedAt) return 'finished' as const;
+    if (exam.startedAt) return 'in_progress' as const;
+    return 'not_started' as const;
+  }
+
   async listExams(input: { userId: string }) {
     const exams = await this.prisma.exam.findMany({
       where: { userId: input.userId },
@@ -13,6 +19,8 @@ export class ExamsService {
       select: {
         id: true,
         createdAt: true,
+        startedAt: true,
+        finishedAt: true,
         questionCount: true,
         attempts: {
           select: { questionId: true, isCorrect: true },
@@ -32,6 +40,9 @@ export class ExamsService {
         return {
           id: e.id,
           createdAt: e.createdAt,
+          startedAt: e.startedAt,
+          finishedAt: e.finishedAt,
+          status: this.toExamStatus(e),
           questionCount: e.questionCount,
           correctCount,
           incorrectCount,
@@ -97,7 +108,7 @@ export class ExamsService {
           },
         },
       },
-      select: { id: true, createdAt: true, questionCount: true },
+      select: { id: true, createdAt: true, startedAt: true, finishedAt: true, questionCount: true },
     });
 
     const questions = await this.getExamQuestions({
@@ -105,13 +116,16 @@ export class ExamsService {
       examId: exam.id,
     });
 
-    return { exam, questions: questions.questions };
+    return {
+      exam: { ...exam, status: this.toExamStatus(exam) },
+      questions: questions.questions,
+    };
   }
 
   async getExamQuestions(input: { userId: string; examId: string }) {
     const exam = await this.prisma.exam.findUnique({
       where: { id: input.examId },
-      select: { id: true, userId: true, createdAt: true, questionCount: true },
+      select: { id: true, userId: true, createdAt: true, startedAt: true, finishedAt: true, questionCount: true },
     });
     if (!exam) throw new NotFoundException('exam not found');
     if (exam.userId !== input.userId) throw new ForbiddenException('exam does not belong to user');
@@ -136,9 +150,58 @@ export class ExamsService {
     });
 
     return {
-      exam: { id: exam.id, createdAt: exam.createdAt, questionCount: exam.questionCount },
+      exam: {
+        id: exam.id,
+        createdAt: exam.createdAt,
+        startedAt: exam.startedAt,
+        finishedAt: exam.finishedAt,
+        status: this.toExamStatus(exam),
+        questionCount: exam.questionCount,
+      },
       questions: rows.map((r) => r.question),
     };
+  }
+
+  async startExam(input: { userId: string; examId: string }) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: input.examId },
+      select: { id: true, userId: true, startedAt: true, finishedAt: true },
+    });
+    if (!exam) throw new NotFoundException('exam not found');
+    if (exam.userId !== input.userId) throw new ForbiddenException('exam does not belong to user');
+    if (exam.finishedAt) throw new BadRequestException('exam already finished');
+    if (exam.startedAt) {
+      return { exam: { ...exam, status: this.toExamStatus(exam) } };
+    }
+
+    const updated = await this.prisma.exam.update({
+      where: { id: input.examId },
+      data: { startedAt: new Date() },
+      select: { id: true, startedAt: true, finishedAt: true },
+    });
+
+    return { exam: { ...updated, status: this.toExamStatus(updated) } };
+  }
+
+  async finishExam(input: { userId: string; examId: string }) {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: input.examId },
+      select: { id: true, userId: true, startedAt: true, finishedAt: true },
+    });
+    if (!exam) throw new NotFoundException('exam not found');
+    if (exam.userId !== input.userId) throw new ForbiddenException('exam does not belong to user');
+    if (!exam.startedAt) throw new BadRequestException('exam not started');
+    if (exam.finishedAt) {
+      return { exam: { ...exam, status: this.toExamStatus(exam) } };
+    }
+
+    const updated = await this.prisma.exam.update({
+      where: { id: input.examId },
+      data: { finishedAt: new Date() },
+      select: { id: true, startedAt: true, finishedAt: true },
+    });
+
+    return { exam: { ...updated, status: this.toExamStatus(updated) } };
   }
 
   async getExamResults(input: { userId: string; examId: string }) {
