@@ -1,0 +1,41 @@
+<p-tabs [value]="activeTab">
+  <p-tablist>
+    <p-tab (click)="setTab('question')" value="question">
+      <fa-icon [icon]="faPlay"/>
+      <span>Question</span>
+    </p-tab>
+    <p-tab (click)="setTab('explanation')" value="explanation">
+      <fa-icon [icon]="faPersonChalkboard"/>
+      <span>Explanation</span>
+    </p-tab>
+    <p-tab (click)="setTab('stats')" value="stats">
+      <fa-icon [icon]="faChartLine"/>
+      <span>Statistics</span>
+    </p-tab>
+    <p-tab (click)="setTab('comments')" value="comments">
+      <fa-icon [icon]="faComments"/>
+      <span>Comments</span>
+    </p-tab>
+    <p-tab (click)="setTab('notes')" value="notes">
+      <fa-icon [icon]="faNoteSticky"/>
+      <span>Notes</span>
+    </p-tab>
+  </p-tablist>
+  <p-tabpanels>
+    <p-tabpanel value="question">
+      <ng-content select="[questionTab]"></ng-content>
+    </p-tabpanel>
+    <p-tabpanel value="explanation">
+      <ng-content select="[explanationTab]"></ng-content>
+    </p-tabpanel>
+    <p-tabpanel value="stats">
+      <ng-content select="[statsTab]"></ng-content>
+    </p-tabpanel>
+    <p-tabpanel value="comments">
+      <ng-content select="[commentsTab]"></ng-content>
+    </p-tabpanel>
+    <p-tabpanel value="notes">
+      <ng-content select="[notesTab]"></ng-content>
+    </p-tabpanel>
+  </p-tabpanels>
+</p-tabs>

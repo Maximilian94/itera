@@ -56,15 +56,8 @@ export class HistoryPage {
       });
   }
 
-  start(examId: string) {
-    this.actionLoadingIdSig.set(examId);
-    this.http
-      .post(`${this.baseUrl}/exams/${examId}/start`, {})
-      .pipe(finalize(() => this.actionLoadingIdSig.set(null)))
-      .subscribe({
-        next: () => this.load(),
-        error: () => this.errorSig.set('Falha ao iniciar prova'),
-      });
+  async start(examId: string) {
+    await this.router.navigateByUrl(`/app/exams/${examId}`);
   }
 
   finish(examId: string) {

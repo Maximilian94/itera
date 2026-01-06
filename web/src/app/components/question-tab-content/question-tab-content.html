@@ -1,0 +1,19 @@
+<div class="question-tab">
+  <div class="statement">{{ question.statement }}</div>
+
+  <div class="options">
+    @for (opt of question.options; track opt.id) {
+      <p-button
+        (click)="onButtonClick(opt.id)"
+        [raised]="true"
+        [severity]="opt.id === selectedOptionId ? 'primary' : 'secondary'"
+        fluid
+      >
+        <span aria-hidden="true" class="option-btn-badge">
+          {{ alphabet[$index] }}
+        </span>
+        <span class="option-btn-text">{{ opt.text }}</span>
+      </p-button>
+    }
+  </div>
+</div>

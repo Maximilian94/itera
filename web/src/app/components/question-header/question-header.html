@@ -1,0 +1,40 @@
+<div class="question-header">
+  <div class="left">
+    <p-button (click)="prev.emit()" [disabled]="disablePrev" [text]="true" rounded>
+      <ng-template #icon>
+        <fa-icon [icon]="faPrev"/>
+      </ng-template>
+    </p-button>
+
+    <span>{{ current }} / {{ total }}</span>
+
+    <div>
+      <p-button (click)="save.emit()" [text]="true" rounded severity="secondary">
+        <ng-template #icon>
+          <fa-icon [icon]="faThumbtack"></fa-icon>
+        </ng-template>
+      </p-button>
+
+      <p-button (click)="watch.emit()" [text]="true" rounded severity="secondary">
+        <ng-template #icon>
+          <fa-icon [icon]="faWatch"></fa-icon>
+        </ng-template>
+      </p-button>
+    </div>
+  </div>
+
+  <div class="right">
+    <div class="timer">
+      <fa-icon [icon]="faClock"></fa-icon>
+      <span class="timer-text">{{ elapsedText }}</span>
+    </div>
+
+    <p-button (click)="next.emit()" [disabled]="disableNext" [text]="true" rounded>
+      <ng-template #icon>
+        <fa-icon [icon]="faNext"></fa-icon>
+      </ng-template>
+    </p-button>
+  </div>
+</div>
+
+

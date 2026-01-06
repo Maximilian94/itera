@@ -1,7 +1,6 @@
-import {ChangeDetectionStrategy, Component, inject, signal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
 import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
 import {FormControl, FormGroup, ReactiveFormsModule} from '@angular/forms';
-import {Router} from '@angular/router';
 import {finalize, Observable} from 'rxjs';
 import {CommonModule} from '@angular/common';
 import {AutoCompleteCompleteEvent, AutoCompleteModule} from 'primeng/autocomplete';
@@ -56,9 +55,11 @@ export class CreateExam {
   private readonly skillsService = inject(SkillsService);
   readonly skills$: Observable<Skill[]> = this.skillsService.skills$;
   private readonly examsApi = inject(ExamsService);
-  private readonly router = inject(Router);
   private readonly allSkillsSig = signal<Skill[]>([]);
   private readonly lastQuerySig = signal<string>('');
+  protected readonly disableCreateExam = computed(() =>
+    this.loadingSig() || this.selectedSkillsSig().length === 0
+  );
 
   constructor() {
     this.skillsService.fetchSkills();
@@ -102,15 +103,8 @@ export class CreateExam {
         next: (res) => {
           this.examSig.set(res);
         },
-        error: () => this.errorSig.set('Falha ao criar prova'),
+        error: () => this.errorSig.set('Failed to create exam'),
       });
-  }
-
-  async startExam() {
-    const first = this.examSig()?.questions?.[0];
-    const exam = this.examSig()?.exam;
-    if (!first || !exam) return;
-    await this.router.navigateByUrl(`/app/exams/${exam.id}/questions/${first.id}`);
   }
 
   private recomputeSuggestions() {

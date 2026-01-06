@@ -17,12 +17,14 @@ In the MVP, only **one vertical** is active, but the architecture must support m
 ## 2. MVP Goal
 
 Validate that users:
+
 - Learn effectively through question practice
 - Value immediate feedback with explanations
 - Use simple metrics to guide what to practice next
 - Return to retry incorrect questions (iteration loop)
 
 Not validating in MVP:
+
 - Open contributions / community content
 - Royalties / marketplace
 - Video explanations
@@ -34,12 +36,13 @@ Not validating in MVP:
 ## 3. Core Iteration Loop
 
 The MVP must support the loop:
+
 1) User selects exam filters
-2) System creates an Exam (a “prova”) and freezes the selected questions
-3) User answers a question inside the Exam
+2) System creates an ExamService (a “prova”) and freezes the selected questions
+3) User answers a question inside the ExamService
 4) System evaluates correctness
 5) System returns feedback + explanation
-6) User retries incorrect questions (often by creating a new Exam with onlyUnsolved=true)
+6) User retries incorrect questions (often by creating a new ExamService with onlyUnsolved=true)
 7) User checks progress (simple)
 
 Every MVP feature must reinforce this loop.
@@ -49,21 +52,27 @@ Every MVP feature must reinforce this loop.
 ## 4. MVP Scope (Features)
 
 ### 4.1 Questions
+
 Each question has:
+
 - statement
 - multiple choice options (exactly one correct)
 - primary skill
 - one general explanation (text only)
 
 ### 4.2 Answering
+
 Users can:
+
 - create an exam (with filters)
 - fetch the exam questions
 - answer questions
 - get immediate feedback (correctness + correct option + explanation)
 
 ### 4.3 Attempts
+
 For each answer, store:
+
 - user_id
 - exam_id (when answering inside an exam)
 - question_id
@@ -74,24 +83,30 @@ For each answer, store:
 Multiple attempts per question are allowed.
 
 ### 4.4 History & Iteration
+
 Users can:
+
 - create exams using history filter: all / only incorrect (attempted but not yet solved)
 - retry incorrect questions
 
 ### 4.5 Metrics (simple)
+
 Show:
+
 - overall accuracy
 - accuracy per skill
 
 ---
 
 ## 5. Minimal User Management
+
 - email + password authentication
 - protected API routes
 
 ---
 
 ## 6. Explicitly Out of Scope (MVP)
+
 - explanation per option
 - video explanations
 - comments/community features
@@ -105,6 +120,7 @@ Show:
 ---
 
 ## 7. Architecture Principles
+
 - Backend is the source of truth for business rules.
 - Frontend is a thin client consuming the API.
 - Keep business logic reusable for future mobile clients.
@@ -113,7 +129,9 @@ Show:
 ---
 
 ## 8. MVP Definition of Done
+
 A user can:
+
 1) Register and log in
 2) Create an exam with filters (skillIds, onlyUnsolved)
 3) Answer exam questions and see feedback + explanation

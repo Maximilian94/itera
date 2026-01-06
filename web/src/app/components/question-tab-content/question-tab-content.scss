@@ -1,0 +1,34 @@
+:host {
+  display: block;
+}
+
+.question-tab {
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.statement {
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.options {
+  display: grid;
+  gap: 12px;
+}
+
+.option-btn-badge {
+  text-align: left;
+}
+
+.option-btn-badge:after {
+  content: ")";
+}
+
+.option-btn-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+}

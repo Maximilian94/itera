@@ -29,7 +29,6 @@
             *ngIf="row.status === 'not_started'"
             class="btn btn--primary"
             type="button"
-            [disabled]="actionLoadingIdSig() === row.id"
             (click)="start(row.id)"
           >
             Iniciar

@@ -1,4 +1,4 @@
-<app-page-header title="Create Exam"></app-page-header>
+<app-page-header title="Create ExamService"></app-page-header>
 
 <div class="container">
   <p-card header="Set up your exam">
@@ -19,7 +19,7 @@
         />
         <label for="skillInputId">Skill</label>
       </p-floatlabel>
-  
+
       <p-floatlabel variant="on">
         <p-inputNumber
           [max]="50"
@@ -39,7 +39,7 @@
         </p-inputNumber>
         <label for="questionCount">Questions</label>
       </p-floatlabel>
-  
+
       <div class="checkbox-container">
         <p-checkbox [binary]="true" formControlName="onlyUnsolved" inputId="onlyUnsolved"></p-checkbox>
         <label for="onlyUnsolved">Only unsolved questions</label>
@@ -47,21 +47,21 @@
 
       <div class="actions">
         <span
-          class="tooltip-wrap"
           [pTooltip]="selectedSkillsSig().length === 0 ? 'Select at least one skill to create the exam' : ''"
           [tooltipDisabled]="selectedSkillsSig().length > 0"
+          class="tooltip-wrap"
           tooltipPosition="top"
         >
           <p-button
-            label="Create exam"
             (onClick)="createExam()"
+            [disabled]="disableCreateExam()"
             [loading]="loadingSig()"
-            [disabled]="loadingSig() || selectedSkillsSig().length === 0"
+            label="Create exam"
           />
         </span>
       </div>
     </form>
   </p-card>
-  
+
 </div>
 

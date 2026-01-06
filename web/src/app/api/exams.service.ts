@@ -27,6 +27,10 @@ export class ExamsService {
   getExam$(examId: Uuid): Observable<ExamResponse> {
     return this.http.get<ExamResponse>(`${this.baseUrl}/exams/${examId}`);
   }
+
+  finishExam$(examId: Uuid): Observable<void> {
+    return this.http.post<void>(`${this.baseUrl}/exams/${examId}/finish`, {});
+  }
 }
 
 

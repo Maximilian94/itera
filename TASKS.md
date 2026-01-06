@@ -1,11 +1,13 @@
 # ITERA MVP — TASKS (No Nx, Single Repo)
 
 Repo structure:
+
 - domain/  (pure business rules + types)
 - api/     (NestJS + Prisma + Postgres; source of truth)
 - web/     (Angular UI; thin client)
 
 Rules:
+
 - Follow SPEC.md strictly.
 - Do not add out-of-scope features.
 - Keep tasks small and independently testable.
@@ -21,6 +23,7 @@ Rules:
 - [x] Verify both apps run locally
 
 Acceptance:
+
 - API and Web run locally and can communicate (simple health endpoint).
 
 ---
@@ -34,6 +37,7 @@ Acceptance:
 - [x] Add seed script with 2–3 skills and 10–20 questions
 
 Acceptance:
+
 - DB tables exist, seed works, questions exist in DB.
 
 ---
@@ -45,6 +49,7 @@ Acceptance:
 - [x] Add auth guard for protected endpoints
 
 Acceptance:
+
 - User can register, login, and access protected routes.
 
 ---
@@ -57,12 +62,13 @@ Goal: get an end-to-end loop early (Web → API auth → protected routes) with 
 - [x] Configure PrimeNG theme preset: Aura
 - [x] Create /login and /register pages (PrimeNG)
 - [x] Implement web AuthService calling API:
-  - POST /auth/register
-  - POST /auth/login
+    - POST /auth/register
+    - POST /auth/login
 - [x] Store token in localStorage (MVP) and attach Authorization header via HttpInterceptor
 - [x] Add simple route guard for protected pages
 
 Acceptance:
+
 - User can register/login in the Web UI, token is stored, and protected route access works.
 
 ---
@@ -77,6 +83,7 @@ Acceptance:
 - [x] Implement POST /attempts (evaluate correctness, store attempt, return feedback)
 
 Acceptance:
+
 - User can create an exam, fetch its questions, answer one, receive feedback, attempt stored (linked to exam).
 
 ---
@@ -85,32 +92,34 @@ Acceptance:
 
 - [x] Login/Register pages
 - [x] Practice page:
-  - filters (skillIds, onlyUnsolved)
-  - create exam
-  - list/select question
+    - filters (skillIds, onlyUnsolved)
+    - create exam
+    - list/select question
 - [x] Question page:
-  - options selection
-  - submit answer (with examId)
-  - show feedback + explanation
-  - next question / finish
+    - options selection
+    - submit answer (with examId)
+    - show feedback + explanation
+    - next question / finish
 
 Acceptance:
+
 - End-to-end: login → practice → answer → feedback → retry.
 
 ---
 
-## Phase 6 — Exam History / Review (API + Web)
+## Phase 6 — ExamService History / Review (API + Web)
 
 - [ ] API: List exams for the current user (newest first) with:
-  - total questions
-  - correct count
-  - incorrect count
+    - total questions
+    - correct count
+    - incorrect count
 - [ ] API: Get exam details + per-question result (correct/incorrect/unanswered)
 - [ ] Web: History page
-  - list exams with counts
-  - click exam → show questions grouped by correct/incorrect/unanswered
+    - list exams with counts
+    - click exam → show questions grouped by correct/incorrect/unanswered
 
 Acceptance:
+
 - User can review past exams and see which questions were correct/incorrect.
 
 ---
@@ -121,6 +130,7 @@ Acceptance:
 - [ ] Create Progress page (simple metrics view)
 
 Acceptance:
+
 - Metrics match attempts stored in DB.
 
 ---
@@ -131,9 +141,11 @@ Acceptance:
 - [ ] Improve iteration CTAs (retry incorrect, continue practicing)
 
 Acceptance:
+
 - UX clearly reinforces “intelligent attempts”.
 
 ---
 
 ## Explicitly Out of Scope
+
 No admin CRUD, no videos, no per-option explanations, no marketplace, no community, no AI.
