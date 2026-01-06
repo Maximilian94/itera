@@ -1,0 +1,22 @@
+.button-nav-content {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  gap: 8px;
+
+  .icon {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 20px;
+    height: 20px;
+  }
+}
+
+/* Driven by the parent sidebar (CSS variables inherit into this component). */
+.expanded-content {
+  display: var(--sidebar-expanded-display, none);
+}
+
+

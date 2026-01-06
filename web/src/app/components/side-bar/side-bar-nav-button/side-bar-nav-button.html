@@ -1,0 +1,16 @@
+<p-button
+  #rla="routerLinkActive"
+  [variant]="rla.isActive ? undefined : 'text'"
+  [severity]="rla.isActive ? undefined : 'secondary'"
+  [routerLink]="link"
+  size="small"
+  fluid
+  routerLinkActive
+>
+  <div class="button-nav-content">
+    <div class="icon">
+      <fa-icon [icon]="iconDefinition" />
+    </div>
+    <span class="expanded-content">{{ label }}</span>
+  </div>
+</p-button>

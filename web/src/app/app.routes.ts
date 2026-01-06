@@ -13,8 +13,8 @@ export const PATH = {
 } as const;
 
 export const LINK = {
-  home: () => ['/', PATH.app, PATH.home] as const,
-  history: () => ['/', PATH.app, PATH.history] as const,
+  home: ['/', PATH.app, PATH.home] as const,
+  history:  ['/', PATH.app, PATH.history] as const,
   examResults: (examId: string) => ['/', PATH.app, PATH.history, examId] as const,
   question: (examId: string, questionId: string) =>
     ['/', PATH.app, PATH.exams, examId, PATH.questions, questionId] as const,
