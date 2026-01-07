@@ -29,7 +29,7 @@
             *ngIf="row.status === 'not_started'"
             class="btn btn--primary"
             type="button"
-            (click)="start(row.id)"
+            [routerLink]="LINK.exam(row.id)"
           >
             Iniciar
           </button>

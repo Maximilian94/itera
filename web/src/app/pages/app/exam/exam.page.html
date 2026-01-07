@@ -1,62 +1,72 @@
 @if (!loading()) {
-  <div class="exam">
-    <section class="left">
-      <!-- Row 1: header -->
+  @if (exam(); as exam){
+    @if (exam.exam.status === "not_started"){
       <div>
-        <app-question-header
-          (next)="next()"
-          (prev)="prev()"
-          [current]="activeQuestionIndex() + 1"
-          [disableNext]="disableNextQuestionButton()"
-          [disablePrev]="disablePreviousQuestionButton()"
-          [total]="questionsAmount()"
-        />
-
-        <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
+        <p-button (onClick)="start()">Start Exam</p-button>
       </div>
+    }
 
-      <!-- Row 3: tabs -->
-      <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
-        @if (activeQuestion(); as question) {
-            <app-question-tab-content
-              questionTab
-              (optionSelected)="selectOption(question.id, $event)"
-              (uncheckedOption)="uncheckOption(question.id)"
-              [question]="question"
-              [selectedOptionId]="question.selectedOptionId"
+    @if (exam.exam.status === "in_progress"){
+      <div class="exam">
+        <section class="left">
+          <!-- Row 1: header -->
+          <div>
+            <app-question-header
+              (next)="next()"
+              (prev)="prev()"
+              [current]="activeQuestionIndex() + 1"
+              [disableNext]="disableNextQuestionButton()"
+              [disablePrev]="disablePreviousQuestionButton()"
+              [total]="questionsAmount()"
             />
-        }
 
-        <div explanationTab>Explanation (coming soon)</div>
-        <div statsTab>Statistics (coming soon)</div>
-        <div commentsTab>Comments (coming soon)</div>
-        <div notesTab>Notes (coming soon)</div>
-      </app-exam-tabs>
-    </section>
+            <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
+          </div>
 
-    <aside class="right">
-      <div class="nav-title">Questions</div>
-      <div class="nav">
-        @for (q of exam()?.questions; track q.id; let i = $index) {
+          <!-- Row 3: tabs -->
+          <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
+            @if (activeQuestion(); as question) {
+              <app-question-tab-content
+                questionTab
+                (optionSelected)="selectOption(question.id, $event)"
+                (uncheckedOption)="uncheckOption(question.id)"
+                [question]="question"
+                [selectedOptionId]="question.selectedOptionId"
+              />
+            }
+
+            <div explanationTab>Explanation (coming soon)</div>
+            <div statsTab>Statistics (coming soon)</div>
+            <div commentsTab>Comments (coming soon)</div>
+            <div notesTab>Notes (coming soon)</div>
+          </app-exam-tabs>
+        </section>
+
+        <aside class="right">
+          <div class="nav-title">Questions</div>
+          <div class="nav">
+            @for (q of exam.questions; track q.id; let i = $index) {
+              <p-button
+                (click)="goTo(i)"
+                [ngClass]="{ active: q.isCurrentQuestion, answered: q.answered }"
+                [severity]="q.isCurrentQuestion | questionNavSeverity : q.answered"
+                fluid
+              >
+                {{ i + 1 }}
+              </p-button>
+            }
+          </div>
+
           <p-button
-            (click)="goTo(i)"
-            [ngClass]="{ active: q.isCurrentQuestion, answered: q.answered }"
-            [severity]="q.isCurrentQuestion | questionNavSeverity : q.answered"
-            fluid
+            (click)="finish()"
+            [disabled]="finishingSig()"
           >
-            {{ i + 1 }}
+            {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
           </p-button>
-        }
+        </aside>
       </div>
-
-      <p-button
-        (click)="finish()"
-        [disabled]="finishingSig()"
-      >
-        {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
-      </p-button>
-    </aside>
-  </div>
+    }
+  }
 } @else {
   <div class="state">Loading...</div>
 }

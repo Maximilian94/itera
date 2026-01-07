@@ -17,12 +17,6 @@ export interface Question {
   options: QuestionOption[];
 }
 
-export interface Exam {
-  id: Uuid;
-  createdAt: string;
-  questionCount: number;
-}
-
 export interface Attempt {
   id: Uuid;
   examId: Uuid | null;

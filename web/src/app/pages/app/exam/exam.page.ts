@@ -66,6 +66,10 @@ export class ExamPage {
     this.goTo(this.activeQuestionIndex() - 1);
   }
 
+  start() {
+    this.examService.startExam()
+  }
+
   finish() {
     this.examService.finishExam();
   }

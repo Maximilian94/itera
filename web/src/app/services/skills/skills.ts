@@ -11,6 +11,7 @@ import {finalize, take} from 'rxjs';
 export class SkillsService {
   private readonly skillsSig = signal<Skill[]>([]);
   public skills$ = toObservable<Skill[]>(this.skillsSig);
+  public readonly skills = this.skillsSig.asReadonly();
   private readonly isLoading = signal<boolean>(false);
 
   constructor(@Inject(SKILL_REPOSITORY_TOKEN) private repository: SkillsHttp) {}

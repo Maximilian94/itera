@@ -2,7 +2,8 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import type { Exam, Question, Uuid } from './api.types';
+import type { Question, Uuid } from './api.types';
+import type { APIExam } from '../services/exam/domain/exam.interface';
 
 export interface CreateExamInput {
   skillIds?: Uuid[];
@@ -11,7 +12,7 @@ export interface CreateExamInput {
 }
 
 export interface ExamResponse {
-  exam: Exam;
+  exam: APIExam;
   questions: Question[];
 }
 

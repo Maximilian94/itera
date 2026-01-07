@@ -1,5 +1,6 @@
-import type { ExamResponse } from '../../../../api/exams.service';
-import type { Exam, Question, Uuid } from '../../../../api/api.types';
+import type { Question, Uuid } from '../../../../api/api.types';
+import type { APIExam } from '../../domain/exam.interface';
+import { APIExamResponse } from '../../domain/exam.interface';
 
 export type AnswerMap = Partial<Record<Uuid, Uuid>>;
 
@@ -10,13 +11,13 @@ export interface QuestionInExecution extends Question {
 }
 
 export interface ExamInExecution {
-  exam: Exam;
+  exam: APIExam;
   questions: QuestionInExecution[];
 }
 
 export interface ToExamInExecutionInput {
   /** Raw API payload. */
-  examResponse: ExamResponse;
+  examResponse: APIExamResponse;
   /**
    * questionId that should be marked as the current question.
    * Defaults to the first question id (if any).

@@ -1,16 +1,14 @@
 import {Inject, Injectable, Signal, signal} from '@angular/core';
-import {EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
+import {APIExamResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface} from '../domain/exam.interface';
 import {finalize, take} from 'rxjs';
-import {ExamResponse} from '../../../api/exams.service';
 import {ExamInExecution, toExamInExecution} from './adapters/exam.adapter';
-import { Observable } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
 })
 export class ExamService {
   private _loading = signal(false);
-  private _originalExam = signal<ExamResponse | null>(null);
+  private _originalExam = signal<APIExamResponse | null>(null);
   private _examInExecution = signal<ExamInExecution | null>(null);
 
   public loading: Signal<boolean> = this._loading.asReadonly();
@@ -26,7 +24,7 @@ export class ExamService {
       take(1),
       finalize(() => this._loading.set(false))).
       subscribe({
-        next: (examResponse: ExamResponse) => {
+       next: (examResponse: APIExamResponse) => {
           this._originalExam.set(examResponse);
           const firstId = examResponse.questions[0]?.id ?? null;
           this._examInExecution.set(
@@ -137,9 +135,23 @@ export class ExamService {
     });
   }
 
-  startExam$(examId: Uuid):Observable<void> {
-    return this.repository.startExam$(examId).pipe(
-      take(1),
-    )
+  startExam():void {
+    const examInExecution = this._examInExecution();
+    // TODO -> handle error
+    if(!examInExecution) return;
+
+    const examId = examInExecution.exam.id;
+
+    this.repository.startExam$(examId).subscribe({
+      next: () => {
+        this._examInExecution.set({ ...examInExecution, exam: { ...examInExecution.exam, status: 'in_progress' } });
+      },
+      error: (error: Error) => {
+        console.error('Error starting exam', error);
+      },
+      complete: () => {
+        console.log('Exam started');
+      },
+    });
   }
 }

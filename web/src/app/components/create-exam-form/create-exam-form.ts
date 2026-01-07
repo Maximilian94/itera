@@ -1,45 +1,43 @@
-import {ChangeDetectionStrategy, Component, computed, inject, signal} from '@angular/core';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
-import {FormControl, FormGroup, ReactiveFormsModule} from '@angular/forms';
+import { Component, computed, EventEmitter, inject, Output, output, signal} from '@angular/core';
+import {AutoComplete, AutoCompleteCompleteEvent} from "primeng/autocomplete";
+import {Button, ButtonIcon, ButtonLabel} from "primeng/button";
+import {Checkbox} from "primeng/checkbox";
+import {FaIconComponent} from "@fortawesome/angular-fontawesome";
+import {FloatLabel} from "primeng/floatlabel";
+import {InputNumber} from "primeng/inputnumber";
+import {FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
+import {faMinus, faPlay, faPlus, faTriangleExclamation} from '@fortawesome/free-solid-svg-icons';
+import type {Skill} from '../../api/api.types';
+import {ExamsService} from '../../api/exams.service';
+import {SkillsService} from '../../services/skills/skills';
 import {finalize, Observable} from 'rxjs';
-import {CommonModule} from '@angular/common';
-import {AutoCompleteCompleteEvent, AutoCompleteModule} from 'primeng/autocomplete';
-import {ButtonModule} from 'primeng/button';
-import {CheckboxModule} from 'primeng/checkbox';
-import {InputNumberModule} from 'primeng/inputnumber';
-import {TooltipModule} from 'primeng/tooltip';
-
-import {PageHeader} from '../../../components/page-header/page-header';
-import {type Skill} from '../../../api/api.types';
-import {type ExamResponse, ExamsService} from '../../../api/exams.service';
-import {SkillsService} from '../../../services/skills/skills';
-import {FloatLabel} from 'primeng/floatlabel';
-import {FaIconComponent} from '@fortawesome/angular-fontawesome';
-import {faMinus, faPlus} from '@fortawesome/free-solid-svg-icons';
-import {Card} from 'primeng/card';
-
+import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {Tooltip} from 'primeng/tooltip';
+import {Message} from 'primeng/message';
+import {CapitalizePipe} from '../../pipes/capitalize-pipe';
 
 @Component({
-  selector: 'app-create-exam',
+  selector: 'app-create-exam-form',
   imports: [
-    CommonModule,
-    PageHeader,
-    ReactiveFormsModule,
-    AutoCompleteModule,
-    ButtonModule,
-    CheckboxModule,
-    InputNumberModule,
-    TooltipModule,
-    FloatLabel,
-    FaIconComponent,
-    Card,
+      AutoComplete,
+      Button,
+      Checkbox,
+      FaIconComponent,
+      FloatLabel,
+      InputNumber,
+      ReactiveFormsModule,
+    Tooltip,
+    ButtonIcon,
+    ButtonLabel,
+    Message,
+    CapitalizePipe
   ],
-  templateUrl: './create-exam.html',
-  styleUrl: './create-exam.scss',
-  standalone: true,
-  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './create-exam-form.html',
+  styleUrl: './create-exam-form.scss',
 })
-export class CreateExam {
+export class CreateExamForm {
+  protected readonly faPlay = faPlay;
+  protected readonly faTriangleExclamation = faTriangleExclamation;
   readonly form = new FormGroup({
     skills: new FormControl<Skill[]>([], { nonNullable: true }),
     onlyUnsolved: new FormControl<boolean>(false, { nonNullable: true }),
@@ -47,7 +45,6 @@ export class CreateExam {
   });
   readonly loadingSig = signal(false);
   readonly errorSig = signal<string | null>(null);
-  readonly examSig = signal<ExamResponse | null>(null);
   readonly suggestionsSig = signal<Skill[]>([]);
   readonly selectedSkillsSig = signal<Skill[]>([]);
   protected readonly faPlus = faPlus;
@@ -60,6 +57,8 @@ export class CreateExam {
   protected readonly disableCreateExam = computed(() =>
     this.loadingSig() || this.selectedSkillsSig().length === 0
   );
+
+  @Output() examCreated = new EventEmitter<string>();
 
   constructor() {
     this.skillsService.fetchSkills();
@@ -86,7 +85,6 @@ export class CreateExam {
 
   createExam() {
     this.errorSig.set(null);
-    this.examSig.set(null);
     this.loadingSig.set(true);
 
     const { onlyUnsolved, questionCount } = this.form.getRawValue();
@@ -101,9 +99,11 @@ export class CreateExam {
       .pipe(finalize(() => this.loadingSig.set(false)))
       .subscribe({
         next: (res) => {
-          this.examSig.set(res);
+          this.examCreated.next(res.exam.id);
         },
-        error: () => this.errorSig.set('Failed to create exam'),
+        error: (res) => {
+          this.errorSig.set(res?.error?.message || "Error")
+        }
       });
   }
 

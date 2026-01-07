@@ -15,9 +15,12 @@ export interface APIExamResponse {
 }
 
 export interface APIExam {
-  id: Uuid;
   createdAt: string;
+  finishedAt: string | null;
+  id: Uuid;
   questionCount: number;
+  startedAt: string | null;
+  status: 'not_started' | 'in_progress' | 'finished';
 }
 
 export interface APIQuestion {

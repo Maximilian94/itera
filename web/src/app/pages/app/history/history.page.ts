@@ -1,10 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
 import { ExamService } from '../../../services/exam/ui/exam.service';
+import {LINK} from '../../../app.routes';
 
 type ExamListItem = {
   id: string;
@@ -21,7 +22,7 @@ type ExamListItem = {
 @Component({
   selector: 'app-history-page',
   standalone: true,
-  imports: [CommonModule, DatePipe],
+  imports: [CommonModule, DatePipe, RouterLink],
   templateUrl: './history.page.html',
   styleUrls: ['./history.page.scss'],
 })
@@ -58,15 +59,6 @@ export class HistoryPage {
       });
   }
 
-  async start(examId: string) {
-    this.examService.startExam$(examId).pipe(
-      finalize(() => this.actionLoadingIdSig.set(null))
-    ).subscribe({
-      next: () => this.router.navigateByUrl(`/app/exams/${examId}`),
-      error: () => this.errorSig.set('Falha ao iniciar prova'),
-    });
-  }
-
   finish(examId: string) {
     this.actionLoadingIdSig.set(examId);
     this.http
@@ -81,6 +73,8 @@ export class HistoryPage {
   async open(examId: string) {
     await this.router.navigateByUrl(`/app/history/${examId}`);
   }
+
+  protected readonly LINK = LINK;
 }
 
 
