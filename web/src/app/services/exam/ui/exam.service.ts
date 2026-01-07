@@ -1,8 +1,9 @@
 import {Inject, Injectable, Signal, signal} from '@angular/core';
-import {EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface} from '../domain/exam.interface';
+import {EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
 import {finalize, take} from 'rxjs';
 import {ExamResponse} from '../../../api/exams.service';
 import {ExamInExecution, toExamInExecution} from './adapters/exam.adapter';
+import { Observable } from 'rxjs';
 
 @Injectable({
   providedIn: 'root',
@@ -111,5 +112,34 @@ export class ExamService {
 
       return { ...previous, questions: questionsNext };
     });
+  }
+
+  finishExam():void {
+    this._loading.set(true);
+
+    const answers = this._examInExecution()?.questions.map((q) => ({
+      questionId: q.id,
+      selectedOptionId: q.selectedOptionId ?? '',
+    })) ?? null;
+
+    if(!answers) return;
+
+    const examId = this._examInExecution()?.exam.id;
+    if(!examId) return;
+
+    this.repository.finishExam$(examId, {
+      answers,
+    }).pipe(
+      take(1),
+      finalize(() => this._loading.set(false))
+    ).subscribe((response: any) => {
+      console.log('Exam finished', response);
+    });
+  }
+
+  startExam$(examId: Uuid):Observable<void> {
+    return this.repository.startExam$(examId).pipe(
+      take(1),
+    )
   }
 }

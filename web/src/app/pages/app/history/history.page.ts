@@ -4,6 +4,7 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
+import { ExamService } from '../../../services/exam/ui/exam.service';
 
 type ExamListItem = {
   id: string;
@@ -27,6 +28,7 @@ type ExamListItem = {
 export class HistoryPage {
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly examService = inject(ExamService);
   private readonly baseUrl = environment.apiBaseUrl;
 
   readonly loadingSig = signal(false);
@@ -57,7 +59,12 @@ export class HistoryPage {
   }
 
   async start(examId: string) {
-    await this.router.navigateByUrl(`/app/exams/${examId}`);
+    this.examService.startExam$(examId).pipe(
+      finalize(() => this.actionLoadingIdSig.set(null))
+    ).subscribe({
+      next: () => this.router.navigateByUrl(`/app/exams/${examId}`),
+      error: () => this.errorSig.set('Falha ao iniciar prova'),
+    });
   }
 
   finish(examId: string) {

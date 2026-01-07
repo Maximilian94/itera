@@ -67,7 +67,7 @@ export class ExamPage {
   }
 
   finish() {
-    alert("Work in progress");
+    this.examService.finishExam();
   }
 
   selectOption(questionId: string, selectedOptionId: string) {
