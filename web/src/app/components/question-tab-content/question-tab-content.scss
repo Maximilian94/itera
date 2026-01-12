@@ -20,15 +20,84 @@
 }
 
 .option-btn-badge {
+  border-radius: 4px;
+  width: 24px;
+  height: 24px;
   text-align: left;
-}
-
-.option-btn-badge:after {
-  content: ")";
+  background: var(--p-tabs-tabpanel-background);
+  color: var(--p-tabs-tabpanel-color);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 14px;
 }
 
 .option-btn-text {
   flex: 1 1 auto;
   min-width: 0;
   text-align: left;
+  font-size: 14px;
+  font-weight: 200;
+}
+
+.option-card {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  background-color: var(--p-button-secondary-background);
+  padding: 4px;
+}
+
+.option-card.is-disabled {
+  cursor: not-allowed;
+}
+
+.option-card.selected {
+  outline-width: 2px;
+  outline-style: solid;
+  outline-offset: 4px;
+  background-color: var(--p-button-secondary-active-background);
+
+  .option-btn-text {
+    font-weight: 500;
+  }
+}
+
+.option-card.selected.in-progress {
+  outline-color: var(--p-button-primary-border-color);
+
+  .option-btn-badge {
+    background-color: var(--p-button-primary-background);
+  }
+}
+
+.option-card.selected.is-correct {
+  outline-color: var(--p-button-success-border-color);
+
+  .option-btn-badge {
+    background-color: var(--p-button-success-border-color);
+  }
+}
+
+.option-card.selected.is-incorrect {
+  outline-color: var(--p-button-danger-border-color);
+
+  .option-btn-badge {
+    background-color: var(--p-button-danger-border-color);
+    color: var(--p-content-background);
+  }
+}
+
+.option-card.is-correct {
+  .option-btn-badge {
+    background-color: var(--p-button-success-border-color);
+    color: var(--p-content-background);
+  }
+
+  .option-btn-text {
+    font-weight: 500;
+  }
 }

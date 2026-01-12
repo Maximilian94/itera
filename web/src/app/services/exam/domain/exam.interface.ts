@@ -3,16 +3,26 @@ import {InjectionToken} from '@angular/core';
 
 export interface ExamRepositoryInterface {
   getExam$(examId: Uuid): Observable<APIExamResponse>;
-  finishExam$(examId: Uuid, answers: APIFinishExameRequest): Observable<void>;
+  getAttempts$(examId: Uuid): Observable<AttemptsResponse[]>;
+  finishExam$(examId: Uuid, answers: APIFinishExameRequest): Observable<APIExamResponse>;
   startExam$(examId: Uuid): Observable<void>;
 }
 
-export type Uuid = string;
-
-export interface APIExamResponse {
-  exam: APIExam;
-  questions: APIQuestion[];
+export interface AttemptsInProgressResponse {
+  questionId: Uuid;
+  selectedOptionId: Uuid | null;
+  isCorrect: undefined;
+  correctOptionId: null;
 }
+
+export interface AttemptsResponse {
+  questionId: Uuid;
+  selectedOptionId: Uuid | null;
+  isCorrect: boolean;
+  correctOptionId: Uuid;
+}
+
+export type Uuid = string;
 
 export interface APIExam {
   createdAt: string;
@@ -33,6 +43,11 @@ export interface APIQuestion {
 export interface APIQuestionOption {
   id: Uuid;
   text: string;
+}
+
+export interface APIExamResponse {
+  exam: APIExam;
+  questions: APIQuestion[];
 }
 
 export interface APIFinishExameRequest {

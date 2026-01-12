@@ -6,6 +6,10 @@ import {
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import type {
+  ExamQuestionsResponseDto,
+  ExamQuestionDto,
+} from './dto/exam-questions.response';
 
 @Injectable()
 export class ExamsService {
@@ -67,7 +71,7 @@ export class ExamsService {
     skillIds?: string[];
     onlyUnsolved?: boolean;
     questionCount?: number;
-  }) {
+  }): Promise<ExamQuestionsResponseDto> {
     const where: Prisma.QuestionWhereInput = {};
 
     if (input.skillIds?.length) where.skillId = { in: input.skillIds };
@@ -133,18 +137,13 @@ export class ExamsService {
       },
     });
 
-    const questions = await this.getExamQuestions({
-      userId: input.userId,
-      examId: exam.id,
-    });
-
-    return {
-      exam: { ...exam, status: this.toExamStatus(exam) },
-      questions: questions.questions,
-    };
+    return this.getExamQuestions({ userId: input.userId, examId: exam.id });
   }
 
-  async getExamQuestions(input: { userId: string; examId: string }) {
+  async getExamQuestions(input: {
+    userId: string;
+    examId: string;
+  }): Promise<ExamQuestionsResponseDto> {
     const exam = await this.prisma.exam.findUnique({
       where: { id: input.examId },
       select: {
@@ -179,17 +178,23 @@ export class ExamsService {
       },
     });
 
-    return {
-      exam: {
-        id: exam.id,
-        createdAt: exam.createdAt,
-        startedAt: exam.startedAt,
-        finishedAt: exam.finishedAt,
-        status: this.toExamStatus(exam),
-        questionCount: exam.questionCount,
-      },
-      questions: rows.map((r) => r.question),
+    const questionsBase: ExamQuestionDto[] = rows.map((r) => ({
+      id: r.question.id,
+      statement: r.question.statement,
+      skillId: r.question.skillId,
+      options: r.question.options.map((o) => ({ id: o.id, text: o.text })),
+    }));
+
+    const examDto = {
+      id: exam.id,
+      createdAt: exam.createdAt,
+      startedAt: exam.startedAt,
+      finishedAt: exam.finishedAt,
+      status: this.toExamStatus(exam),
+      questionCount: exam.questionCount,
     };
+
+    return { exam: examDto, questions: questionsBase };
   }
 
   async startExam(input: { userId: string; examId: string }) {
@@ -218,7 +223,7 @@ export class ExamsService {
     userId: string;
     examId: string;
     answers?: { questionId: string; selectedOptionId: string }[];
-  }) {
+  }): Promise<ExamQuestionsResponseDto> {
     const exam = await this.prisma.exam.findUnique({
       where: { id: input.examId },
       select: { id: true, userId: true, startedAt: true, finishedAt: true },
@@ -228,120 +233,92 @@ export class ExamsService {
       throw new ForbiddenException('exam does not belong to user');
     if (!exam.startedAt) throw new BadRequestException('exam not started');
     if (exam.finishedAt) {
-      return { exam: { ...exam, status: this.toExamStatus(exam) } };
+      return this.getExamQuestions({
+        userId: input.userId,
+        examId: input.examId,
+      });
     }
 
     const now = new Date();
 
-    // If answers are provided, persist final attempts for this exam before finishing.
-    if (input.answers?.length) {
-      // Ensure each questionId appears once.
-      const questionIds = input.answers.map((a) => a.questionId);
-      const uniqueQuestionIds = new Set(questionIds);
-      if (uniqueQuestionIds.size !== questionIds.length) {
-        throw new BadRequestException('duplicate questionId in answers');
-      }
-
-      // Ensure each selectedOptionId appears once.
-      const optionIds = input.answers.map((a) => a.selectedOptionId);
-      const uniqueOptionIds = new Set(optionIds);
-      if (uniqueOptionIds.size !== optionIds.length) {
-        throw new BadRequestException('duplicate selectedOptionId in answers');
-      }
-
-      const examQuestions = await this.prisma.examQuestion.findMany({
-        where: { examId: input.examId },
-        select: { questionId: true },
-      });
-      const allowedQuestionIds = new Set(
-        examQuestions.map((q) => q.questionId),
-      );
-
-      // Require all questions to be answered when finishing with answers.
-      if (allowedQuestionIds.size !== uniqueQuestionIds.size) {
-        throw new BadRequestException(
-          'must provide answers for all questions to finish exam',
-        );
-      }
-
-      for (const qid of uniqueQuestionIds) {
-        if (!allowedQuestionIds.has(qid))
-          throw new BadRequestException('answer contains question not in exam');
-      }
-
-      const options = await this.prisma.option.findMany({
-        where: { id: { in: optionIds } },
-        select: { id: true, questionId: true, isCorrect: true },
-      });
-      if (options.length !== optionIds.length)
-        throw new BadRequestException('invalid selectedOptionId in answers');
-
-      const optionById = new Map(options.map((o) => [o.id, o]));
-
-      const attemptsData = input.answers.map((a) => {
-        const opt = optionById.get(a.selectedOptionId);
-        if (!opt)
-          throw new BadRequestException('invalid selectedOptionId in answers');
-        if (opt.questionId !== a.questionId) {
-          throw new BadRequestException(
-            'selectedOptionId does not belong to questionId',
-          );
-        }
-        return {
-          userId: input.userId,
-          examId: input.examId,
-          questionId: a.questionId,
-          selectedOptionId: a.selectedOptionId,
-          isCorrect: opt.isCorrect,
-        };
-      });
-
-      await this.prisma.$transaction([
-        this.prisma.attempt.deleteMany({
-          where: { userId: input.userId, examId: input.examId },
-        }),
-        this.prisma.attempt.createMany({
-          data: attemptsData,
-        }),
-        this.prisma.exam.update({
-          where: { id: input.examId },
-          data: { finishedAt: now },
-          select: { id: true, startedAt: true, finishedAt: true },
-        }),
-      ]);
-    } else {
-      // Backwards-compatible finish: mark as finished without attempts payload.
-      await this.prisma.exam.update({
-        where: { id: input.examId },
-        data: { finishedAt: now },
-        select: { id: true, startedAt: true, finishedAt: true },
-      });
+    if (!input.answers?.length) {
+      throw new BadRequestException('answers are required to finish exam');
     }
 
-    const updated = await this.prisma.exam.findUnique({
-      where: { id: input.examId },
-      select: {
-        id: true,
-        startedAt: true,
-        finishedAt: true,
-        questions: {
-          select: {
-            questionId: true,
-            question: {
-              select: {
-                id: true,
-                statement: true,
-                skillId: true,
-                options: { select: { id: true, text: true } },
-              },
-            },
-          },
-        },
-      },
-    });
-    if (!updated) throw new NotFoundException('exam not found');
+    // Ensure each questionId appears once.
+    const questionIds = input.answers.map((a) => a.questionId);
+    const uniqueQuestionIds = new Set(questionIds);
+    if (uniqueQuestionIds.size !== questionIds.length) {
+      throw new BadRequestException('duplicate questionId in answers');
+    }
 
-    return { exam: { ...updated, status: this.toExamStatus(updated) } };
+    // Ensure each selectedOptionId appears once.
+    const optionIds = input.answers.map((a) => a.selectedOptionId);
+    const uniqueOptionIds = new Set(optionIds);
+    if (uniqueOptionIds.size !== optionIds.length) {
+      throw new BadRequestException('duplicate selectedOptionId in answers');
+    }
+
+    const examQuestions = await this.prisma.examQuestion.findMany({
+      where: { examId: input.examId },
+      select: { questionId: true },
+    });
+    const allowedQuestionIds = new Set(examQuestions.map((q) => q.questionId));
+
+    // Require all questions to be answered when finishing.
+    if (allowedQuestionIds.size !== uniqueQuestionIds.size) {
+      throw new BadRequestException(
+        'must provide answers for all questions to finish exam',
+      );
+    }
+
+    for (const qid of uniqueQuestionIds) {
+      if (!allowedQuestionIds.has(qid))
+        throw new BadRequestException('answer contains question not in exam');
+    }
+
+    const options = await this.prisma.option.findMany({
+      where: { id: { in: optionIds } },
+      select: { id: true, questionId: true, isCorrect: true },
+    });
+    if (options.length !== optionIds.length)
+      throw new BadRequestException('invalid selectedOptionId in answers');
+
+    const optionById = new Map(options.map((o) => [o.id, o]));
+
+    const attemptsData = input.answers.map((a) => {
+      const opt = optionById.get(a.selectedOptionId);
+      if (!opt)
+        throw new BadRequestException('invalid selectedOptionId in answers');
+      if (opt.questionId !== a.questionId) {
+        throw new BadRequestException(
+          'selectedOptionId does not belong to questionId',
+        );
+      }
+      return {
+        userId: input.userId,
+        examId: input.examId,
+        questionId: a.questionId,
+        selectedOptionId: a.selectedOptionId,
+        isCorrect: opt.isCorrect,
+      };
+    });
+
+    await this.prisma.$transaction([
+      this.prisma.attempt.deleteMany({
+        where: { userId: input.userId, examId: input.examId },
+      }),
+      this.prisma.attempt.createMany({
+        data: attemptsData,
+      }),
+      this.prisma.exam.update({
+        where: { id: input.examId },
+        data: { finishedAt: now },
+        select: { id: true },
+      }),
+    ]);
+
+    return this.getExamQuestions({ userId: input.userId, examId: input.examId });
   }
 
   async getExamResults(input: { userId: string; examId: string }) {

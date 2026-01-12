@@ -2,8 +2,11 @@ import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { environment } from '../../environments/environment';
-import type { Question, Uuid } from './api.types';
-import type { APIExam } from '../services/exam/domain/exam.interface';
+import type { Uuid } from './api.types';
+import type {
+  APIExamResponse,
+  APIFinishExameRequest,
+} from '../services/exam/domain/exam.interface';
 
 export interface CreateExamInput {
   skillIds?: Uuid[];
@@ -11,10 +14,7 @@ export interface CreateExamInput {
   questionCount?: number;
 }
 
-export interface ExamResponse {
-  exam: APIExam;
-  questions: Question[];
-}
+export type ExamResponse = APIExamResponse;
 
 @Injectable({ providedIn: 'root' })
 export class ExamsService {
@@ -29,8 +29,14 @@ export class ExamsService {
     return this.http.get<ExamResponse>(`${this.baseUrl}/exams/${examId}`);
   }
 
-  finishExam$(examId: Uuid): Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/exams/${examId}/finish`, {});
+  finishExam$(
+    examId: Uuid,
+    input: APIFinishExameRequest,
+  ): Observable<APIExamResponse> {
+    return this.http.post<APIExamResponse>(
+      `${this.baseUrl}/exams/${examId}/finish`,
+      input,
+    );
   }
 }
 

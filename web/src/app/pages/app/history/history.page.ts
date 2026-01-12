@@ -1,11 +1,13 @@
 import { CommonModule, DatePipe } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { environment } from '../../../../environments/environment';
-import { ExamService } from '../../../services/exam/ui/exam.service';
 import {LINK} from '../../../app.routes';
+import {Button, ButtonIcon} from 'primeng/button';
+import {FaIconComponent} from '@fortawesome/angular-fontawesome';
+import {faListCheck, faPlay} from '@fortawesome/free-solid-svg-icons';
 
 type ExamListItem = {
   id: string;
@@ -22,14 +24,12 @@ type ExamListItem = {
 @Component({
   selector: 'app-history-page',
   standalone: true,
-  imports: [CommonModule, DatePipe, RouterLink],
+  imports: [CommonModule, DatePipe, RouterLink, Button, FaIconComponent, ButtonIcon],
   templateUrl: './history.page.html',
   styleUrls: ['./history.page.scss'],
 })
 export class HistoryPage {
   private readonly http = inject(HttpClient);
-  private readonly router = inject(Router);
-  private readonly examService = inject(ExamService);
   private readonly baseUrl = environment.apiBaseUrl;
 
   readonly loadingSig = signal(false);
@@ -70,11 +70,9 @@ export class HistoryPage {
       });
   }
 
-  async open(examId: string) {
-    await this.router.navigateByUrl(`/app/history/${examId}`);
-  }
-
   protected readonly LINK = LINK;
+  protected readonly faPlay = faPlay;
+  protected readonly faListCheck = faListCheck;
 }
 
 

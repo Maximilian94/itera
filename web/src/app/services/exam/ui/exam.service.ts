@@ -1,7 +1,10 @@
 import {Inject, Injectable, Signal, signal} from '@angular/core';
-import {APIExamResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface} from '../domain/exam.interface';
-import {finalize, take} from 'rxjs';
+import {APIExamResponse, APIFinishExameAnswerRequest, AttemptsInProgressResponse, AttemptsResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
+import {finalize, take, tap} from 'rxjs';
 import {ExamInExecution, toExamInExecution} from './adapters/exam.adapter';
+
+type questionId = string;
+export type AttemptsObject = Record<questionId, AttemptsResponse | AttemptsInProgressResponse>;
 
 @Injectable({
   providedIn: 'root',
@@ -10,20 +13,36 @@ export class ExamService {
   private _loading = signal(false);
   private _originalExam = signal<APIExamResponse | null>(null);
   private _examInExecution = signal<ExamInExecution | null>(null);
+  private _attempts = signal<AttemptsObject>({});
 
   public loading: Signal<boolean> = this._loading.asReadonly();
   public examInExecution: Signal<ExamInExecution | null> = this._examInExecution.asReadonly();
+  public attempts = this._attempts.asReadonly();
+  public errorMessage = signal<string | null>(null);
+
+
 
   constructor(@Inject(EXAM_REPOSITORY_TOKEN) private repository: ExamRepositoryInterface) {}
 
   loadExam(examId: string) {
     this._loading.set(true);
-    console.log("repository",this.repository);
 
     this.repository.getExam$(examId).pipe(
       take(1),
-      finalize(() => this._loading.set(false))).
-      subscribe({
+      finalize(() => this._loading.set(false)),
+      tap((res) => {
+        if(res.exam.status !== "finished"){
+          this._attempts.set(this.generateAttemptsData(res));
+        } else {
+          this.repository.getAttempts$(examId).subscribe((attempts) => {
+            this._attempts.set(attempts.reduce((acc, attempt) => {
+              acc[attempt.questionId] = attempt;
+              return acc;
+            }, {} as AttemptsObject));
+          });
+        }
+      }),
+    ).subscribe({
        next: (examResponse: APIExamResponse) => {
           this._originalExam.set(examResponse);
           const firstId = examResponse.questions[0]?.id ?? null;
@@ -35,55 +54,25 @@ export class ExamService {
             }),
           );
         },
-        error: (error: Error) => {
-          console.error('Error loading exam', error);
-        },
-        complete: () => {
-          console.log('Exam loaded');
-        },
+        error: (_error: Error) => {},
+        complete: () => {},
     })
   }
 
   answerQuestion({questionId, selectedOptionId}:{questionId: string, selectedOptionId: string}):void {
-    this._examInExecution.update((prev) => {
-      if(!prev) return null;
-      const questionIndex = prev.questions.findIndex((q) => q.id === questionId);
-      if(questionIndex < 0) return prev;
 
-      const previousQuestion = prev.questions[questionIndex];
+    const oldAttempt = this._attempts()[questionId];
+    const newAttemptsObject:AttemptsObject = {...this._attempts()};
+    newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId };
+    this._attempts.update(() => newAttemptsObject)
 
-      const newQuestion = {
-        ...previousQuestion,
-        answered: true,
-        selectedOptionId,
-      };
-
-      const newQuestions = prev.questions.slice();
-      newQuestions[questionIndex] = newQuestion;
-
-      return { ...prev, questions: newQuestions };
-    });
   }
 
   unselectAnsweredQuestion(questionId: string):void {
-    this._examInExecution.update((prev) => {
-      if(!prev) return null;
-      const questionIndex = prev.questions.findIndex((q) => q.id === questionId);
-      if(questionIndex < 0) return prev;
-
-      const previousQuestion = prev.questions[questionIndex];
-
-      const newQuestion = {
-        ...previousQuestion,
-        answered: false,
-        selectedOptionId: null
-      };
-
-      const newQuestions = prev.questions.slice();
-      newQuestions[questionIndex] = newQuestion;
-
-      return { ...prev, questions: newQuestions };
-    });
+    const oldAttempt = this._attempts()[questionId];
+    const newAttemptsObject:AttemptsObject = {...this._attempts()};
+    newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId: null };
+    this._attempts.update(() => newAttemptsObject)
   }
 
   setCurrentQuestion(questionId: string): void {
@@ -115,23 +104,43 @@ export class ExamService {
   finishExam():void {
     this._loading.set(true);
 
-    const answers = this._examInExecution()?.questions.map((q) => ({
-      questionId: q.id,
-      selectedOptionId: q.selectedOptionId ?? '',
-    })) ?? null;
-
-    if(!answers) return;
-
+    const attempts = this.attempts();
     const examId = this._examInExecution()?.exam.id;
-    if(!examId) return;
+
+    if(!examId) {
+      this.errorMessage.set('Exam not found');
+      return;
+    }
+
+    const answers: APIFinishExameAnswerRequest[] = Object.entries(attempts).map(([questionId, selectedOptionId]) => ({
+      questionId: questionId as Uuid,
+      selectedOptionId: selectedOptionId.selectedOptionId as Uuid,
+    }));
+
+    if(!answers.length) {
+      this.errorMessage.set('You must answer all questions to finish the exam');
+      return;
+    }
+
+    if(answers.some((answer) => answer.selectedOptionId === null)) {
+      this.errorMessage.set('You must select an option for each question');
+      return;
+    }
 
     this.repository.finishExam$(examId, {
       answers,
     }).pipe(
       take(1),
-      finalize(() => this._loading.set(false))
-    ).subscribe((response: any) => {
-      console.log('Exam finished', response);
+      finalize(() => this._loading.set(false)),
+    ).subscribe({
+      next: () => {
+        this.errorMessage.set(null);
+      },
+      error: (_error: Error) => {
+        this.errorMessage.set('Error finishing exam');
+      },
+      complete: () => {
+      },
     });
   }
 
@@ -153,5 +162,18 @@ export class ExamService {
         console.log('Exam started');
       },
     });
+  }
+
+  private generateAttemptsData(exam:APIExamResponse):AttemptsObject {
+    const attempts: AttemptsObject = {};
+    exam.questions.forEach((q) => {
+      attempts[q.id] = {
+        questionId: q.id,
+        selectedOptionId: null,
+        isCorrect: undefined,
+        correctOptionId: null,
+      };
+    });
+    return attempts;
   }
 }

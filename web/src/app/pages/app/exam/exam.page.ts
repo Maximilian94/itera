@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, computed, inject, Signal, signal, WritableSignal} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
-import { take} from 'rxjs';
+import {take} from 'rxjs';
 import {CommonModule} from '@angular/common';
 import {ExamsService} from '../../../api/exams.service';
 import {QuestionHeader} from '../../../components/question-header/question-header';
@@ -8,14 +8,14 @@ import {ProgressBar} from 'primeng/progressbar';
 import {type ExamTab, ExamTabs} from '../../../components/exam-tabs/exam-tabs';
 import {QuestionTabContent} from '../../../components/question-tab-content/question-tab-content';
 import {Button} from 'primeng/button';
-import {ExamService} from '../../../services/exam/ui/exam.service';
+import {AttemptsObject, ExamService} from '../../../services/exam/ui/exam.service';
 import {ExamInExecution, QuestionInExecution} from '../../../services/exam/ui/adapters/exam.adapter';
-import {QuestionNavSeverityPipe} from '../../../services/exam/ui/pipes/question-nav-severity.pipe';
+import {ExamNavButtonDirective} from '../../../services/exam/ui/directives/exam-nav-button.directive';
 
 @Component({
   selector: 'app-exam-page',
   standalone: true,
-  imports: [CommonModule, QuestionHeader, ProgressBar, ExamTabs, QuestionTabContent, Button, QuestionNavSeverityPipe],
+  imports: [CommonModule, QuestionHeader, ProgressBar, ExamTabs, QuestionTabContent, Button, ExamNavButtonDirective],
   templateUrl: './exam.page.html',
   styleUrls: ['./exam.page.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -40,8 +40,8 @@ export class ExamPage {
 
   // Tabs
   readonly activeTab = signal<ExamTab>('question');
-
-
+  readonly errorMessage:Signal<string | null> = this.examService.errorMessage;
+  readonly attempts = this.examService.attempts;
   readonly finishingSig = signal(false);
 
   constructor() {
@@ -82,6 +82,10 @@ export class ExamPage {
     this.examService.unselectAnsweredQuestion(questionId);
   }
 
+  getSelectedOptionId(attempts: AttemptsObject, questionId: string):string | null {
+    return attempts[questionId]?.selectedOptionId;
+  }
+
   private loadExam():void {
     this.route.paramMap.pipe(take(1)).subscribe(params => {
       const examId = params.get('examId');
@@ -116,8 +120,6 @@ export class ExamPage {
     return computed<QuestionInExecution | null>(() => {
       const exam = this.exam();
       const activeQuestionIndex = this.activeQuestionIndex();
-      console.log("activeQuestionIndex", activeQuestionIndex);
-      console.log("exam", exam);
       if (!exam) return null;
       return exam.questions[activeQuestionIndex];
     });

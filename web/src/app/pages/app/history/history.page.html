@@ -34,24 +34,30 @@
             Iniciar
           </button>
 
-          <button
+          <p-button
             *ngIf="row.status === 'in_progress'"
             class="btn btn--secondary"
             type="button"
             [disabled]="actionLoadingIdSig() === row.id"
             (click)="finish(row.id)"
+            [routerLink]="LINK.exam(row.id)"
+            size="small"
           >
-            Finalizar
-          </button>
+            <fa-icon [icon]="faPlay" pButtonIcon></fa-icon>
+            Continue
+          </p-button>
 
-          <button
+          <p-button
             *ngIf="row.status === 'finished'"
             class="btn btn--secondary"
             type="button"
-            (click)="open(row.id)"
+            [routerLink]="LINK.exam(row.id)"
+            size="small"
           >
-            Ver
-          </button>
+<!--            (click)="open(row.id)"-->
+            <fa-icon [icon]="faListCheck" pButtonIcon></fa-icon>
+            Results
+          </p-button>
         </td>
       </tr>
     </tbody>

@@ -10,9 +10,8 @@ export class FinishExamAnswerDto {
 }
 
 export class FinishExamDto {
-  @IsOptional()
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => FinishExamAnswerDto)
-  answers?: FinishExamAnswerDto[];
+  answers!: FinishExamAnswerDto[];
 }
