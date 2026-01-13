@@ -5,7 +5,7 @@ export interface ExamRepositoryInterface {
   getExam$(examId: Uuid): Observable<APIExamResponse>;
   getAttempts$(examId: Uuid): Observable<AttemptsResponse[]>;
   finishExam$(examId: Uuid, answers: APIFinishExameRequest): Observable<APIExamResponse>;
-  startExam$(examId: Uuid): Observable<void>;
+  startExam$(examId: Uuid): Observable<APIExamResponse>;
 }
 
 export interface AttemptsInProgressResponse {

@@ -25,8 +25,8 @@ export class ExamRepository implements ExamRepositoryInterface {
     return this.http.post<APIExamResponse>(`${this.baseUrl}/exams/${examId}/finish`, answers);
   }
 
-  startExam$(examId:Uuid):Observable<void> {
-    return this.http.post<void>(`${this.baseUrl}/exams/${examId}/start`, {});
+  startExam$(examId:Uuid):Observable<APIExamResponse> {
+    return this.http.post<APIExamResponse>(`${this.baseUrl}/exams/${examId}/start`, {});
   }
 
   getAttempts$(examId:Uuid):Observable<AttemptsResponse[]> {

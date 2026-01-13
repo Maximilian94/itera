@@ -1,7 +1,8 @@
-import {Inject, Injectable, Signal, signal} from '@angular/core';
-import {APIExamResponse, APIFinishExameAnswerRequest, AttemptsInProgressResponse, AttemptsResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
-import {finalize, take, tap} from 'rxjs';
-import {ExamInExecution, toExamInExecution} from './adapters/exam.adapter';
+import {computed, Inject, Injectable, Signal, signal} from '@angular/core';
+import {
+  APIExamResponse, APIFinishExameAnswerRequest,
+  APIQuestion, AttemptsInProgressResponse, AttemptsResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
+import {finalize, map, of, switchMap, take, tap} from 'rxjs';
 
 type questionId = string;
 export type AttemptsObject = Record<questionId, AttemptsResponse | AttemptsInProgressResponse>;
@@ -12,13 +13,16 @@ export type AttemptsObject = Record<questionId, AttemptsResponse | AttemptsInPro
 export class ExamService {
   private _loading = signal(false);
   private _originalExam = signal<APIExamResponse | null>(null);
-  private _examInExecution = signal<ExamInExecution | null>(null);
   private _attempts = signal<AttemptsObject>({});
+  private _currentQuestionIndex = signal<number | null>(null);
 
   public loading: Signal<boolean> = this._loading.asReadonly();
-  public examInExecution: Signal<ExamInExecution | null> = this._examInExecution.asReadonly();
+  public examInExecution: Signal<APIExamResponse | null> = this._originalExam.asReadonly();
   public attempts = this._attempts.asReadonly();
   public errorMessage = signal<string | null>(null);
+  public currentQuestion = this.setCurrentQuestionByIndex();
+  // TODO -> We should consider add index on question
+  public currentQuestionIndex = this._currentQuestionIndex.asReadonly();
 
 
 
@@ -35,24 +39,13 @@ export class ExamService {
           this._attempts.set(this.generateAttemptsData(res));
         } else {
           this.repository.getAttempts$(examId).subscribe((attempts) => {
-            this._attempts.set(attempts.reduce((acc, attempt) => {
-              acc[attempt.questionId] = attempt;
-              return acc;
-            }, {} as AttemptsObject));
+            this._attempts.set(this.transformAttemptsData(attempts));
           });
         }
       }),
     ).subscribe({
        next: (examResponse: APIExamResponse) => {
           this._originalExam.set(examResponse);
-          const firstId = examResponse.questions[0]?.id ?? null;
-          this._examInExecution.set(
-            toExamInExecution({
-              examResponse,
-              currentQuestionId: firstId,
-              answers: {},
-            }),
-          );
         },
         error: (_error: Error) => {},
         complete: () => {},
@@ -75,37 +68,11 @@ export class ExamService {
     this._attempts.update(() => newAttemptsObject)
   }
 
-  setCurrentQuestion(questionId: string): void {
-    this._examInExecution.update((previous) => {
-      if (!previous) return null;
-
-      const nextIdx = previous.questions.findIndex((q) => q.id === questionId);
-      if (nextIdx < 0) return previous;
-
-      const prevIdx = previous.questions.findIndex((q) => q.isCurrentQuestion);
-
-      let questionsNext = previous.questions;
-
-      // previous current -> false
-      if (prevIdx >= 0 && prevIdx !== nextIdx) {
-        const qPrev = previous.questions[prevIdx];
-        questionsNext = questionsNext.slice();
-        questionsNext[prevIdx] = { ...qPrev, isCurrentQuestion: false };
-      }
-
-      // new current -> true
-      if (questionsNext === previous.questions) questionsNext = questionsNext.slice();
-      questionsNext[nextIdx] = { ...questionsNext[nextIdx], isCurrentQuestion: true };
-
-      return { ...previous, questions: questionsNext };
-    });
-  }
-
   finishExam():void {
     this._loading.set(true);
 
     const attempts = this.attempts();
-    const examId = this._examInExecution()?.exam.id;
+    const examId = this.examInExecution()?.exam.id;
 
     if(!examId) {
       this.errorMessage.set('Exam not found');
@@ -131,29 +98,55 @@ export class ExamService {
       answers,
     }).pipe(
       take(1),
+      switchMap((res) => {
+        if(res.exam.status !== "finished"){
+          return of({examResponse: res, attempts: []});
+        } else {
+          return this.repository.getAttempts$(examId).pipe(map((attempts) => {
+            return {examResponse: res, attempts}
+          }));
+        }
+      }),
       finalize(() => this._loading.set(false)),
     ).subscribe({
-      next: () => {
-        this.errorMessage.set(null);
+      next: (res) => {
+        if(res.examResponse.exam.status === "finished"){
+          this.errorMessage.set(null);
+          this._originalExam.set({...res.examResponse})
+          this._attempts.set(this.transformAttemptsData(res.attempts));
+        }
       },
       error: (_error: Error) => {
         this.errorMessage.set('Error finishing exam');
       },
       complete: () => {
+
       },
     });
   }
 
   startExam():void {
-    const examInExecution = this._examInExecution();
+    const examInExecution = this.examInExecution();
     // TODO -> handle error
     if(!examInExecution) return;
 
     const examId = examInExecution.exam.id;
 
     this.repository.startExam$(examId).subscribe({
-      next: () => {
-        this._examInExecution.set({ ...examInExecution, exam: { ...examInExecution.exam, status: 'in_progress' } });
+      next: (exam) => {
+        this._originalExam.update((prev) => {
+          const newData = {...prev};
+          if(prev){
+            newData.exam = {...prev.exam}
+          }
+
+          newData.exam = {...newData.exam, ...exam.exam}
+          const questions = prev?.questions || []
+          return {
+            exam: {...newData.exam, ...exam.exam},
+            questions
+          };
+        });
       },
       error: (error: Error) => {
         console.error('Error starting exam', error);
@@ -162,6 +155,30 @@ export class ExamService {
         console.log('Exam started');
       },
     });
+  }
+
+  setCurrentQuestionIndex(index:number){
+    if(index === null) return;
+    if(index < 0) return;
+
+    const exam = this._originalExam();
+    if(!exam) return;
+    if(!exam.questions || !exam.questions.length) return;
+    if(index >= exam.questions.length) return;
+
+    this._currentQuestionIndex.set(index);
+  }
+
+  nextQuestion(){
+    const currentQuestionIndex = this.currentQuestionIndex();
+    if(typeof currentQuestionIndex !== 'number') return;
+    this.setCurrentQuestionIndex(currentQuestionIndex + 1)
+  }
+
+  prevQuestion(){
+    const currentQuestionIndex = this.currentQuestionIndex();
+    if(typeof currentQuestionIndex !== 'number') return;
+    this.setCurrentQuestionIndex(currentQuestionIndex - 1)
   }
 
   private generateAttemptsData(exam:APIExamResponse):AttemptsObject {
@@ -175,5 +192,27 @@ export class ExamService {
       };
     });
     return attempts;
+  }
+
+  private setCurrentQuestionByIndex(): Signal<APIQuestion | null> {
+    return computed(() => {
+      const currentQuestionIndex = this.currentQuestionIndex();
+      if(currentQuestionIndex === null) return null;
+      if(currentQuestionIndex < 0) return null;
+
+      const exam = this._originalExam();
+      if(!exam) return null;
+      if(!exam.questions || !exam.questions.length) return null;
+      if(currentQuestionIndex >= exam.questions.length) return null;
+
+      return exam.questions[currentQuestionIndex];
+    })
+  }
+
+  private transformAttemptsData(attempts:AttemptsResponse[]): AttemptsObject {
+    return attempts.reduce((acc, attempt) => {
+      acc[attempt.questionId] = attempt;
+      return acc;
+    }, {} as AttemptsObject)
   }
 }

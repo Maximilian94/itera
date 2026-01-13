@@ -7,74 +7,79 @@
     }
 
     @else if(attempts(); as attemptsV2) {
-      @if(activeQuestion(); as question){
-        <div class="exam">
-          <section class="left">
-            <!-- Row 1: header -->
-            <div>
-              <app-question-header
-                (next)="next()"
-                (prev)="prev()"
-                [current]="activeQuestionIndex() + 1"
-                [disableNext]="disableNextQuestionButton()"
-                [disablePrev]="disablePreviousQuestionButton()"
-                [total]="questionsAmount()"
-              />
+      @let questionIndex = currentQuestionIndex();
+      @if(currentQuestion(); as currentQuestion){
+        @if (questionIndex !== null) {
+          <div class="exam">
+            <section class="left">
+              <!-- Row 1: header -->
+              <div>
+                <app-question-header
+                  (next)="nextQuestion()"
+                  (prev)="prevQuestion()"
+                  [currentQuestionIndex]="questionIndex + 1"
+                  [disableNext]="disableNextQuestionButton()"
+                  [disablePrev]="disablePreviousQuestionButton()"
+                  [total]="questionsAmount()"
+                />
 
-              @if(exam.exam.status === "in_progress") {
-                <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
-              }
-            </div>
+                @if(exam.exam.status === "in_progress") {
+                  <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
+                }
+              </div>
 
-            <!-- Row 3: tabs -->
-            <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
-              <app-question-tab-content
-                questionTab
-                (optionSelected)="selectOption(question.id, $event)"
-                (uncheckedOption)="uncheckOption(question.id)"
-                [question]="question"
-                [selectedOptionId]="getSelectedOptionId(attempts(), question.id)"
-                [disableSelection]="exam.exam.status === 'finished'"
-                [examStatus]="exam.exam.status"
-                [attempt]="attemptsV2[question.id]"
-              />
-
-              <div explanationTab>Explanation (coming soon)</div>
-              <div statsTab>Statistics (coming soon)</div>
-              <div commentsTab>Comments (coming soon)</div>
-              <div notesTab>Notes (coming soon)</div>
-            </app-exam-tabs>
-          </section>
-
-          <aside class="right">
-            <p-button
-              (click)="finish()"
-              [disabled]="finishingSig()"
-              size="small"
-              fluid
-            >
-              {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
-            </p-button>
-
-            <div class="nav">
-              @for (q of exam.questions; track q.id; let i = $index) {
-                <p-button
-                  class="teste"
-                  (click)="goTo(i)"
+              <!-- Row 3: tabs -->
+              <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
+                <app-question-tab-content
+                  questionTab
+                  (optionSelected)="selectOption(currentQuestion.id, $event)"
+                  (uncheckedOption)="uncheckOption(currentQuestion.id)"
+                  [question]="currentQuestion"
+                  [selectedOptionId]="getSelectedOptionId(attempts(), currentQuestion.id)"
+                  [disableSelection]="exam.exam.status === 'finished'"
                   [examStatus]="exam.exam.status"
-                  [attempt]="attemptsV2[q.id]"
-                  [isCurrent]="activeQuestion()?.id === q.id"
-                  size="small"
-                  iteraExamNavButton
-                  fluid
-                >
-                  {{ i + 1 }}
-                </p-button>
-              }
-            </div>
-          </aside>
-        </div>
+                  [attempt]="attemptsV2[currentQuestion.id]"
+                />
+
+                <div explanationTab>Explanation (coming soon)</div>
+                <div statsTab>Statistics (coming soon)</div>
+                <div commentsTab>Comments (coming soon)</div>
+                <div notesTab>Notes (coming soon)</div>
+              </app-exam-tabs>
+            </section>
+
+            <aside class="right">
+              <p-button
+                (click)="finish()"
+                [disabled]="finishingSig()"
+                size="small"
+                fluid
+              >
+                {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
+              </p-button>
+
+              <div class="nav">
+                @for (q of exam.questions; track q.id; let i = $index) {
+                  <p-button
+                    class="teste"
+                    (click)="setCurrentQuestionByIndex(i)"
+                    [examStatus]="exam.exam.status"
+                    [attempt]="attemptsV2[q.id]"
+                    [isCurrent]="currentQuestion?.id === q.id"
+                    size="small"
+                    iteraExamNavButton
+                    fluid
+                  >
+                    {{ i + 1 }}
+                  </p-button>
+                }
+              </div>
+            </aside>
+          </div>
+        }
       }
+    } @else {
+      Caiu no else
     }
   }
 } @else {

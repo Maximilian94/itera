@@ -1,4 +1,4 @@
-import {ChangeDetectionStrategy, Component, computed, inject, Signal, signal, WritableSignal} from '@angular/core';
+import {ChangeDetectionStrategy, Component, computed, inject, Signal, signal} from '@angular/core';
 import {ActivatedRoute} from '@angular/router';
 import {take} from 'rxjs';
 import {CommonModule} from '@angular/common';
@@ -9,8 +9,9 @@ import {type ExamTab, ExamTabs} from '../../../components/exam-tabs/exam-tabs';
 import {QuestionTabContent} from '../../../components/question-tab-content/question-tab-content';
 import {Button} from 'primeng/button';
 import {AttemptsObject, ExamService} from '../../../services/exam/ui/exam.service';
-import {ExamInExecution, QuestionInExecution} from '../../../services/exam/ui/adapters/exam.adapter';
 import {ExamNavButtonDirective} from '../../../services/exam/ui/directives/exam-nav-button.directive';
+import {APIExamResponse, APIQuestion} from '../../../services/exam/domain/exam.interface';
+import {toObservable} from '@angular/core/rxjs-interop';
 
 @Component({
   selector: 'app-exam-page',
@@ -28,13 +29,14 @@ export class ExamPage {
   readonly loading: Signal<boolean> = this.examService.loading;
 
   // Exam Data
-  readonly exam: Signal<ExamInExecution | null> = this.examService.examInExecution;
+  readonly exam: Signal<APIExamResponse | null> = this.examService.examInExecution;
   readonly progressValue:Signal<number> = this.createProgressSignal();
   readonly questionsAmount:Signal<number> = computed(() => this.exam()?.questions?.length || 0);
 
   // Active Question
-  readonly activeQuestionIndex:WritableSignal<number> = signal(0);
-  readonly activeQuestion:Signal<QuestionInExecution | null> = this.activeQuestionSignal();
+  readonly currentQuestion:Signal<APIQuestion | null> = this.examService.currentQuestion;
+  readonly currentQuestionIndex: Signal<number | null> = this.examService.currentQuestionIndex;
+
   readonly disableNextQuestionButton:Signal<boolean> = this.disableNextQuestionSignal();
   readonly disablePreviousQuestionButton:Signal<boolean> = this.disablePreviousQuestionSignal();
 
@@ -48,22 +50,16 @@ export class ExamPage {
     this.loadExam();
   }
 
-  goTo(questionIndex: number) {
-    const exam:ExamInExecution | null = this.exam();
-    if(!exam) return;
-    if (questionIndex < 0 || questionIndex >= exam.questions?.length) return;
-
-    this.activeQuestionIndex.set(questionIndex);
-    this.activeTab.set('question');
-    this.examService.setCurrentQuestion(exam.questions[questionIndex].id);
+  setCurrentQuestionByIndex(index:number):void {
+    this.examService.setCurrentQuestionIndex(index)
   }
 
-  next() {
-    this.goTo(this.activeQuestionIndex() + 1);
+  nextQuestion() {
+    this.examService.nextQuestion();
   }
 
-  prev() {
-    this.goTo(this.activeQuestionIndex() - 1);
+  prevQuestion() {
+    this.examService.prevQuestion();
   }
 
   start() {
@@ -87,19 +83,29 @@ export class ExamPage {
   }
 
   private loadExam():void {
-    this.route.paramMap.pipe(take(1)).subscribe(params => {
+    this.route.paramMap.pipe(
+      take(1),
+    ).subscribe(params => {
       const examId = params.get('examId');
       if(!examId) return;
-      this.examService.loadExam(examId)
+      this.examService.loadExam(examId);
+    })
+
+    toObservable(this.exam).pipe(take(2)).subscribe(exam => {
+      if(exam?.questions && exam?.questions.length) {
+        this.examService.setCurrentQuestionIndex(0)
+      }
     })
   }
 
   private createProgressSignal():Signal<number> {
     return computed<number>(() => {
-      const exam = this.exam()
+      const exam = this.exam();
+      const attempts = this.examService.attempts();
       if (!exam) return 0
-      const totalQuestions:number = exam.questions.length
-      const answeredQuestions:number = exam.questions.filter((e) => e.answered).length
+      const totalQuestions:number = exam.questions.length;
+      const answeredQuestions: number = Object.values(attempts).filter(x => x.selectedOptionId).length;
+
       return Math.round((answeredQuestions / totalQuestions) * 100);
     })
   }
@@ -107,21 +113,17 @@ export class ExamPage {
   private disableNextQuestionSignal(): Signal<boolean> {
     return computed<boolean>(() => {
       const exam = this.exam()
-      if(!exam) return true;
-      return this.activeQuestionIndex() >= exam.questions.length - 1
+      const currentQuestionIndex = this.currentQuestionIndex()
+      if(!exam || currentQuestionIndex === null) return true;
+      return currentQuestionIndex >= exam.questions.length - 1;
     })
   }
 
   private disablePreviousQuestionSignal(): Signal<boolean> {
-    return computed<boolean>(() => this.activeQuestionIndex() <= 0);
-  }
-
-  private activeQuestionSignal():Signal<QuestionInExecution | null> {
-    return computed<QuestionInExecution | null>(() => {
-      const exam = this.exam();
-      const activeQuestionIndex = this.activeQuestionIndex();
-      if (!exam) return null;
-      return exam.questions[activeQuestionIndex];
+    return computed<boolean>(() => {
+      const currentQuestionIndex = this.currentQuestionIndex()
+      if(currentQuestionIndex === null) return true;
+      return currentQuestionIndex <= 0
     });
   }
 }
