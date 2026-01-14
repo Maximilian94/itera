@@ -39,6 +39,10 @@
                   [disableSelection]="exam.exam.status === 'finished'"
                   [examStatus]="exam.exam.status"
                   [attempt]="attemptsV2[currentQuestion.id]"
+                  (next)="nextQuestion()"
+                  (prev)="prevQuestion()"
+                  [disableNext]="disableNextQuestionButton()"
+                  [disablePrev]="disablePreviousQuestionButton()"
                 />
 
                 <div explanationTab>Explanation (coming soon)</div>

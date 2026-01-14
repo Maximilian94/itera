@@ -17,22 +17,17 @@
           </span>
           <span pButtonLabel class="option-btn-text">{{ opt.text }}</span>
         </div>
-
-<!--      <p-button-->
-<!--        iteraExamButton="option"-->
-<!--        #examButton-->
-<!--        (click)="onButtonClick(opt.id)"-->
-<!--        [examStatus]="examStatus"-->
-<!--        [attempt]="attempt"-->
-<!--        [selectedOptionId]="selectedOptionId"-->
-<!--        [optionId]="opt.id"-->
-<!--        fluid-->
-<!--      >-->
-<!--        <span pButtonLabel aria-hidden="true" class="option-btn-badge">-->
-<!--          {{ alphabet[$index] }}-->
-<!--        </span>-->
-<!--        <span pButtonLabel class="option-btn-text">{{ opt.text }}</span>-->
-<!--      </p-button>-->
     }
+  </div>
+
+  <div class="action-buttons">
+    <p-button size="small" (onClick)="prev.emit()" [disabled]="disablePrev">
+      <fa-icon [icon]="faChevronLeft" pButtonIcon />
+      <span pButtonLabel>Previous</span>
+    </p-button>
+    <p-button size="small" (onClick)="next.emit()" [disabled]="disableNext">
+      <span pButtonLabel>Next</span>
+      <fa-icon [icon]="faChevronRight" pButtonIcon />
+    </p-button>
   </div>
 </div>
