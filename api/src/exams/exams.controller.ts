@@ -30,6 +30,14 @@ export class ExamsController {
     return this.exams.getExamQuestions({ userId: req.user.userId, examId });
   }
 
+  @Get('v2/:id')
+  getExam(
+    @Req() req: { user: { userId: string } },
+    @Param('id') examId: string,
+  ) {
+    return this.exams.getExam({ userId: req.user.userId, examId });
+  }
+
   @Post(':id/start')
   start(@Req() req: { user: { userId: string } }, @Param('id') examId: string) {
     return this.exams.startExam({ userId: req.user.userId, examId });

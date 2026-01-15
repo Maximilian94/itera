@@ -7,22 +7,14 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
-  ExamQuestionsResponseDto,
   ExamQuestionDto,
+  ExamQuestionsResponseDto,
 } from './dto/exam-questions.response';
+import { Exam } from '@domain/exam/exam.interface';
 
 @Injectable()
 export class ExamsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private toExamStatus(exam: {
-    startedAt: Date | null;
-    finishedAt: Date | null;
-  }) {
-    if (exam.finishedAt) return 'finished' as const;
-    if (exam.startedAt) return 'in_progress' as const;
-    return 'not_started' as const;
-  }
 
   async listExams(input: { userId: string }) {
     const exams = await this.prisma.exam.findMany({
@@ -318,7 +310,10 @@ export class ExamsService {
       }),
     ]);
 
-    return this.getExamQuestions({ userId: input.userId, examId: input.examId });
+    return this.getExamQuestions({
+      userId: input.userId,
+      examId: input.examId,
+    });
   }
 
   async getExamResults(input: { userId: string; examId: string }) {
@@ -371,5 +366,50 @@ export class ExamsService {
       },
       questions,
     };
+  }
+
+  async getExam(input: { userId: string; examId: string }): Promise<Exam> {
+    const examFromDb = await this.prisma.exam.findUnique({
+      where: { id: input.examId },
+    });
+
+    if (!examFromDb) throw new NotFoundException('exam not found');
+
+    if (examFromDb.userId !== input.userId)
+      throw new ForbiddenException('exam does not belong to user');
+
+    if (!examFromDb.startedAt) {
+      return {
+        ...examFromDb,
+        status: 'not_started',
+        startedAt: null,
+        finishedAt: null,
+      };
+    }
+
+    if (!examFromDb.finishedAt) {
+      return {
+        ...examFromDb,
+        status: 'in_progress',
+        startedAt: examFromDb.startedAt,
+        finishedAt: null,
+      };
+    }
+
+    return {
+      ...examFromDb,
+      status: 'finished',
+      startedAt: examFromDb.startedAt,
+      finishedAt: examFromDb.finishedAt,
+    };
+  }
+
+  private toExamStatus(exam: {
+    startedAt: Date | null;
+    finishedAt: Date | null;
+  }) {
+    if (exam.finishedAt) return 'finished' as const;
+    if (exam.startedAt) return 'in_progress' as const;
+    return 'not_started' as const;
   }
 }

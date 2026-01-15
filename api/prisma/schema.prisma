@@ -14,7 +14,7 @@ model User {
   createdAt    DateTime  @default(now())
 
   attempts Attempt[]
-  exams    ExamService[]
+  exams    Exam[]
 
   @@map("users")
 }
@@ -70,7 +70,7 @@ model Attempt {
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   examId String? @db.Uuid
-  exam   ExamService?   @relation(fields: [examId], references: [id], onDelete: SetNull)
+  exam   Exam?   @relation(fields: [examId], references: [id], onDelete: SetNull)
 
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
@@ -85,7 +85,7 @@ model Attempt {
   @@map("attempts")
 }
 
-model ExamService {
+model Exam {
   id           String   @id @default(uuid()) @db.Uuid
   createdAt    DateTime @default(now())
   startedAt    DateTime?
@@ -108,7 +108,7 @@ model ExamQuestion {
   order Int
 
   examId     String @db.Uuid
-  exam       ExamService   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  exam       Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
