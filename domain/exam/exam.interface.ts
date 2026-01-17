@@ -1,4 +1,18 @@
+import {APIQuestionOption, Uuid} from "../../web/src/app/services/exam/domain/exam.interface";
+
 export type Exam = ExamNotStarted | ExamInProgress | ExamFinished;
+
+export interface Option {
+    id: string;
+    text: string;
+}
+
+export interface Question {
+    id: Uuid;
+    statement: string;
+    // skillId: Uuid;
+    options: Option[];
+}
 
 interface ExamBase {
     id: string;
@@ -7,6 +21,7 @@ interface ExamBase {
     finishedAt: Date | null;
     status: ExamStatus;
     questionCount: number;
+    questions: Question[]; // TODO
     //    score: number; // TODO: add score
     //    correctCount: number; // TODO: add correct count
     //    incorrectCount: number; // TODO: add incorrect count

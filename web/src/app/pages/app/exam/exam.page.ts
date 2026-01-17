@@ -8,15 +8,16 @@ import {ProgressBar} from 'primeng/progressbar';
 import {type ExamTab, ExamTabs} from '../../../components/exam-tabs/exam-tabs';
 import {QuestionTabContent} from '../../../components/question-tab-content/question-tab-content';
 import {Button} from 'primeng/button';
-import {AttemptsObject, ExamService} from '../../../services/exam/ui/exam.service';
+import {AttemptsObject, ExamService, QuestionWithAttempt} from '../../../services/exam/ui/exam.service';
 import {ExamNavButtonDirective} from '../../../services/exam/ui/directives/exam-nav-button.directive';
-import {APIExamResponse, APIQuestion} from '../../../services/exam/domain/exam.interface';
+import {APIQuestion} from '../../../services/exam/domain/exam.interface';
 import {toObservable} from '@angular/core/rxjs-interop';
+import {Exam, Question} from '@domain/exam/exam.interface';
 
 @Component({
   selector: 'app-exam-page',
   standalone: true,
-  imports: [CommonModule, QuestionHeader, ProgressBar, ExamTabs, QuestionTabContent, Button, ExamNavButtonDirective],
+  imports: [CommonModule, QuestionHeader, ProgressBar, ExamTabs, Button, ExamNavButtonDirective, QuestionTabContent],
   templateUrl: './exam.page.html',
   styleUrls: ['./exam.page.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,12 +30,13 @@ export class ExamPage {
   readonly loading: Signal<boolean> = this.examService.loading;
 
   // Exam Data
-  readonly exam: Signal<APIExamResponse | null> = this.examService.examInExecution;
+  readonly exam: Signal<Exam | null> = this.examService.examInExecution;
   readonly progressValue:Signal<number> = this.createProgressSignal();
   readonly questionsAmount:Signal<number> = computed(() => this.exam()?.questions?.length || 0);
+  readonly questionsWithAttempt:Signal<QuestionWithAttempt[]> = this.examService.questionsWithAttempt;
 
   // Active Question
-  readonly currentQuestion:Signal<APIQuestion | null> = this.examService.currentQuestion;
+  readonly currentQuestion:Signal<QuestionWithAttempt | null> = this.examService.currentQuestion;
   readonly currentQuestionIndex: Signal<number | null> = this.examService.currentQuestionIndex;
 
   readonly disableNextQuestionButton:Signal<boolean> = this.disableNextQuestionSignal();
@@ -70,8 +72,19 @@ export class ExamPage {
     this.examService.finishExam();
   }
 
-  selectOption(questionId: string, selectedOptionId: string) {
-    this.examService.answerQuestion({questionId, selectedOptionId})
+  selectOption(attemptId: string | undefined, optionSelectedId: string) {
+    console.log("selectOption", attemptId, optionSelectedId);
+    if(!attemptId) return;
+    // const attempts = this.attempts();
+    // const attempt = attempts[questionId];
+    // if(!attempt) return;
+    // console.log(attempt)
+    // this.examService.answerQuestion({questionId, selectedOptionId})
+
+    this.examService.answerQuestionV2({
+      attemptId,
+      optionSelectedId
+    });
   }
 
   uncheckOption(questionId: string) {
@@ -125,5 +138,9 @@ export class ExamPage {
       if(currentQuestionIndex === null) return true;
       return currentQuestionIndex <= 0
     });
+  }
+
+  log(e:any) {
+    console.log("Aqui via o log", e)
   }
 }

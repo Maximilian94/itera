@@ -12,6 +12,8 @@ import Aura from '@primeuix/themes/aura';
 import {definePreset, palette} from '@primeuix/themes';
 import {EXAM_REPOSITORY_TOKEN} from './services/exam/domain/exam.interface';
 import {ExamRepository} from './services/exam/data/exam.repository';
+import {ATTEMPT_REPOSITORY_TOKEN} from './services/exam/domain/attempt.interface';
+import {AttemptRepository} from './services/exam/data/attempt.repository';
 
 const IteraTheme = definePreset(Aura, {
   semantic: {
@@ -38,6 +40,7 @@ export const appConfig: ApplicationConfig = {
       useClass: SkillsHttp,
     },
     { provide: EXAM_REPOSITORY_TOKEN, useClass: ExamRepository },
+    { provide: ATTEMPT_REPOSITORY_TOKEN, useClass: AttemptRepository },
     providePrimeNG({
       theme: {
         preset: IteraTheme,

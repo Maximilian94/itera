@@ -2,6 +2,7 @@ import { Directive, Input, OnChanges, SimpleChanges} from '@angular/core';
 import type { ExamInExecution } from '../adapters/exam.adapter';
 import type { AttemptsInProgressResponse, AttemptsResponse } from '../../domain/exam.interface';
 import {Button, ButtonSeverity} from 'primeng/button';
+import {AttemptAnswer} from '@domain/exam/exam.interface';
 
 type ExamStatus = ExamInExecution['exam']['status'];
 type Attempt = AttemptsInProgressResponse | AttemptsResponse | null | undefined;
@@ -13,7 +14,7 @@ type Attempt = AttemptsInProgressResponse | AttemptsResponse | null | undefined;
 })
 export class ExamNavButtonDirective implements OnChanges {
   @Input({ required: true }) examStatus!: ExamStatus;
-  @Input() attempt: Attempt = null;
+  @Input() attempt: AttemptAnswer | undefined;
   @Input() selectedOptionId: string | null = null;
 
   /** For nav buttons. */

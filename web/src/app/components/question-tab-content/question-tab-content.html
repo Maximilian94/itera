@@ -1,8 +1,10 @@
 <div class="question-tab">
-  <div class="statement">{{ question.statement }}</div>
+<!--  TODO-->
+  <div class="statement">{{ question.questionData.statement }}</div>
 
   <div class="options">
-    @for (opt of question.options; track opt.id) {
+<!--    TODO-->
+    @for (opt of question.questionData.options; track opt.id) {
 
         <div
           iteraExamOptionCard="option"

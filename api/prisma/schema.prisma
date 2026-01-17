@@ -63,7 +63,6 @@ model Option {
 
 model Attempt {
   id        String   @id @default(uuid()) @db.Uuid
-  isCorrect Boolean
   createdAt DateTime @default(now())
 
   userId String @db.Uuid
@@ -75,8 +74,8 @@ model Attempt {
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
-  selectedOptionId String @db.Uuid
-  selectedOption   Option @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
+  selectedOptionId String? @db.Uuid
+  selectedOption   Option? @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
   @@index([examId, createdAt])

@@ -1,83 +1,122 @@
-import {computed, Inject, Injectable, Signal, signal} from '@angular/core';
+import {computed, effect, Inject, Injectable, Signal, signal} from '@angular/core';
 import {
   APIExamResponse, APIFinishExameAnswerRequest,
   APIQuestion, AttemptsInProgressResponse, AttemptsResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
-import {finalize, map, of, switchMap, take, tap} from 'rxjs';
+import {finalize, forkJoin, map, of, switchMap, take, tap} from 'rxjs';
+import {ATTEMPT_REPOSITORY_TOKEN, AttemptRepositoryInterface} from '../domain/attempt.interface';
+import {AttemptAnswer, Exam, Question} from '@domain/exam/exam.interface';
 
 type questionId = string;
 export type AttemptsObject = Record<questionId, AttemptsResponse | AttemptsInProgressResponse>;
+export type QuestionWithAttempt = {
+  questionData: Question,
+  attemptData: AttemptAnswer | undefined,
+}
 
 @Injectable({
   providedIn: 'root',
 })
 export class ExamService {
   private _loading = signal(false);
-  private _originalExam = signal<APIExamResponse | null>(null);
-  private _attempts = signal<AttemptsObject>({});
+  private _originalExam = signal<Exam | null>(null);
+  private _attempts = signal<AttemptAnswer[]>([]);
   private _currentQuestionIndex = signal<number | null>(null);
 
   public loading: Signal<boolean> = this._loading.asReadonly();
-  public examInExecution: Signal<APIExamResponse | null> = this._originalExam.asReadonly();
-  public attempts = this._attempts.asReadonly();
+  public examInExecution: Signal<Exam | null> = this._originalExam.asReadonly();
+  public attempts:Signal<AttemptAnswer[]> = this._attempts.asReadonly();
+  public questionsWithAttempt:Signal<QuestionWithAttempt[]> = this.questionWithAttemptComputed();
+
   public errorMessage = signal<string | null>(null);
-  public currentQuestion = this.setCurrentQuestionByIndex();
+  public currentQuestion:Signal<QuestionWithAttempt | null> = this.computeCurrentQuestionByIndex();
   // TODO -> We should consider add index on question
   public currentQuestionIndex = this._currentQuestionIndex.asReadonly();
 
 
 
-  constructor(@Inject(EXAM_REPOSITORY_TOKEN) private repository: ExamRepositoryInterface) {}
+  constructor(
+    @Inject(EXAM_REPOSITORY_TOKEN) private repository: ExamRepositoryInterface,
+    @Inject(ATTEMPT_REPOSITORY_TOKEN) private attemptRepository: AttemptRepositoryInterface,
+  ) {
+//     effect(() => {
+// const exam = this.examInExecution();
+// if (!exam) return;
+//       this.repository.getAttemptsV2$(exam.id).subscribe((attemptAnswers) => {
+//         console.log("Vai resetar o attempt");
+//         this._attempts.set(attemptAnswers)
+//       })
+//
+//     });
+  }
 
   loadExam(examId: string) {
     this._loading.set(true);
 
-    this.repository.getExam$(examId).pipe(
+    const getExamObservable = this.repository.getExamV2$(examId);
+    const getAttemptsObservable = this.repository.getAttemptsV2$(examId);
+
+    forkJoin([getExamObservable, getAttemptsObservable]).pipe(
       take(1),
       finalize(() => this._loading.set(false)),
-      tap((res) => {
-        if(res.exam.status !== "finished"){
-          this._attempts.set(this.generateAttemptsData(res));
-        } else {
-          this.repository.getAttempts$(examId).subscribe((attempts) => {
-            this._attempts.set(this.transformAttemptsData(attempts));
-          });
-        }
-      }),
     ).subscribe({
-       next: (examResponse: APIExamResponse) => {
-          this._originalExam.set(examResponse);
-        },
-        error: (_error: Error) => {},
-        complete: () => {},
+      error: () => {},
+      next: ([exam, attemptAnswers]) => {
+        this._originalExam.set(exam)
+        this._attempts.set(attemptAnswers)
+        this.setCurrentQuestionIndex(0)
+      },
     })
+
+    // this.repository.getExam$(examId).pipe(
+    //   take(1),
+    //   // finalize(() => this._loading.set(false)),
+    //   tap((res) => {
+    //     if(res.exam.status !== "finished"){
+    //       this._attempts.set(this.generateAttemptsData(res));
+    //     } else {
+    //       this.repository.getAttempts$(examId).subscribe((attempts) => {
+    //         this._attempts.set(this.transformAttemptsData(attempts));
+    //       });
+    //     }
+    //   }),
+    // ).subscribe({
+    //    next: (examResponse: APIExamResponse) => {
+    //       this._originalExam.set(examResponse);
+    //     },
+    //     error: (_error: Error) => {},
+    //     complete: () => {},
+    // })
   }
 
   answerQuestion({questionId, selectedOptionId}:{questionId: string, selectedOptionId: string}):void {
+    // const oldAttempt = this._attempts()[questionId];
+    // const newAttemptsObject:AttemptsObject = {...this._attempts()};
+    // newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId };
+    // this._attempts.update(() => newAttemptsObject)
+  }
 
-    const oldAttempt = this._attempts()[questionId];
-    const newAttemptsObject:AttemptsObject = {...this._attempts()};
-    newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId };
-    this._attempts.update(() => newAttemptsObject)
-
+  answerQuestionV2(input: { attemptId: string, optionSelectedId: string }){
+    this.attemptRepository.answerAttempt$({ attemptId: input.attemptId, optionSelectedId: input.optionSelectedId }).subscribe();
   }
 
   unselectAnsweredQuestion(questionId: string):void {
-    const oldAttempt = this._attempts()[questionId];
-    const newAttemptsObject:AttemptsObject = {...this._attempts()};
-    newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId: null };
-    this._attempts.update(() => newAttemptsObject)
+    // const oldAttempt = this._attempts()[questionId];
+    // const newAttemptsObject:AttemptsObject = {...this._attempts()};
+    // newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId: null };
+    // this._attempts.update(() => newAttemptsObject)
   }
 
   finishExam():void {
     this._loading.set(true);
 
     const attempts = this.attempts();
-    const examId = this.examInExecution()?.exam.id;
+    // TODO
+    // const examId = this.examInExecution()?.exam.id;
 
-    if(!examId) {
-      this.errorMessage.set('Exam not found');
-      return;
-    }
+    // if(!examId) {
+    //   this.errorMessage.set('Exam not found');
+    //   return;
+    // }
 
     const answers: APIFinishExameAnswerRequest[] = Object.entries(attempts).map(([questionId, selectedOptionId]) => ({
       questionId: questionId as Uuid,
@@ -94,70 +133,59 @@ export class ExamService {
       return;
     }
 
-    this.repository.finishExam$(examId, {
-      answers,
-    }).pipe(
-      take(1),
-      switchMap((res) => {
-        if(res.exam.status !== "finished"){
-          return of({examResponse: res, attempts: []});
-        } else {
-          return this.repository.getAttempts$(examId).pipe(map((attempts) => {
-            return {examResponse: res, attempts}
-          }));
-        }
-      }),
-      finalize(() => this._loading.set(false)),
-    ).subscribe({
-      next: (res) => {
-        if(res.examResponse.exam.status === "finished"){
-          this.errorMessage.set(null);
-          this._originalExam.set({...res.examResponse})
-          this._attempts.set(this.transformAttemptsData(res.attempts));
-        }
-      },
-      error: (_error: Error) => {
-        this.errorMessage.set('Error finishing exam');
-      },
-      complete: () => {
-
-      },
-    });
+    // TODO
+    // this.repository.finishExam$(examId, {
+    //   answers,
+    // }).pipe(
+    //   take(1),
+    //   switchMap((res) => {
+    //     if(res.exam.status !== "finished"){
+    //       return of({examResponse: res, attempts: []});
+    //     } else {
+    //       return this.repository.getAttempts$(examId).pipe(map((attempts) => {
+    //         return {examResponse: res, attempts}
+    //       }));
+    //     }
+    //   }),
+    //   finalize(() => this._loading.set(false)),
+    // ).subscribe({
+    //   next: (res) => {
+    //     if(res.examResponse.exam.status === "finished"){
+    //       this.errorMessage.set(null);
+    //       // TODO
+    //       // this._originalExam.set({...res.examResponse})
+    //       // this._attempts.set(this.transformAttemptsData(res.attempts));
+    //     }
+    //   },
+    //   error: (_error: Error) => {
+    //     this.errorMessage.set('Error finishing exam');
+    //   },
+    //   complete: () => {
+    //
+    //   },
+    // });
   }
 
   startExam():void {
+    // TODO
     const examInExecution = this.examInExecution();
     // TODO -> handle error
     if(!examInExecution) return;
 
-    const examId = examInExecution.exam.id;
+    const examId = examInExecution.id;
 
     this.repository.startExam$(examId).subscribe({
       next: (exam) => {
-        this._originalExam.update((prev) => {
-          const newData = {...prev};
-          if(prev){
-            newData.exam = {...prev.exam}
-          }
-
-          newData.exam = {...newData.exam, ...exam.exam}
-          const questions = prev?.questions || []
-          return {
-            exam: {...newData.exam, ...exam.exam},
-            questions
-          };
-        });
+        this._originalExam.set(exam)
       },
       error: (error: Error) => {
         console.error('Error starting exam', error);
-      },
-      complete: () => {
-        console.log('Exam started');
       },
     });
   }
 
   setCurrentQuestionIndex(index:number){
+    // TODO
     if(index === null) return;
     if(index < 0) return;
 
@@ -194,18 +222,20 @@ export class ExamService {
     return attempts;
   }
 
-  private setCurrentQuestionByIndex(): Signal<APIQuestion | null> {
+  private computeCurrentQuestionByIndex(): Signal<QuestionWithAttempt | null> {
     return computed(() => {
+      // TODO
+      const questionsWithAttempt = this.questionsWithAttempt();
+      console.log("questionsWithAttempt ", questionsWithAttempt)
       const currentQuestionIndex = this.currentQuestionIndex();
+      if(!questionsWithAttempt) return null;
       if(currentQuestionIndex === null) return null;
       if(currentQuestionIndex < 0) return null;
 
-      const exam = this._originalExam();
-      if(!exam) return null;
-      if(!exam.questions || !exam.questions.length) return null;
-      if(currentQuestionIndex >= exam.questions.length) return null;
+      const currentQuestion = questionsWithAttempt[currentQuestionIndex];
+      console.log("currentQuestion", currentQuestion);
 
-      return exam.questions[currentQuestionIndex];
+      return currentQuestion;
     })
   }
 
@@ -214,5 +244,38 @@ export class ExamService {
       acc[attempt.questionId] = attempt;
       return acc;
     }, {} as AttemptsObject)
+  }
+
+  private questionWithAttemptComputed():Signal<QuestionWithAttempt[]> {
+    return computed(() => {
+      const exam = this._originalExam();
+      const attempts = this._attempts();
+
+      console.log("Computed", exam, attempts)
+
+      const questions = exam?.questions;
+      console.log("Novo Questions", questions);
+
+      if (!questions) {
+        return [];
+      }
+
+      const findAttemptData = (questionId:string) => {
+        const attempt = attempts.find((a) => a.questionId === questionId);
+        console.log("questionId", questionId)
+        console.log("Attempt", attempt)
+        return attempt;
+      }
+
+      const response:QuestionWithAttempt[] = questions.map((question) => {
+        return {
+          questionData: question,
+          attemptData: findAttemptData(question.id)
+        }
+      })
+
+      console.log("Response", response)
+      return response;
+    })
   }
 }
