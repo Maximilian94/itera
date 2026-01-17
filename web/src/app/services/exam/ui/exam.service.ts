@@ -1,13 +1,9 @@
-import {computed, effect, Inject, Injectable, Signal, signal} from '@angular/core';
-import {
-  APIExamResponse, APIFinishExameAnswerRequest,
-  APIQuestion, AttemptsInProgressResponse, AttemptsResponse, EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface, Uuid} from '../domain/exam.interface';
-import {finalize, forkJoin, map, of, switchMap, take, tap} from 'rxjs';
+import {computed, Inject, Injectable, Signal, signal} from '@angular/core';
+import {EXAM_REPOSITORY_TOKEN, ExamRepositoryInterface} from '../domain/exam.interface';
+import {finalize, forkJoin, take} from 'rxjs';
 import {ATTEMPT_REPOSITORY_TOKEN, AttemptRepositoryInterface} from '../domain/attempt.interface';
 import {AttemptAnswer, Exam, Question} from '@domain/exam/exam.interface';
 
-type questionId = string;
-export type AttemptsObject = Record<questionId, AttemptsResponse | AttemptsInProgressResponse>;
 export type QuestionWithAttempt = {
   questionData: Question,
   attemptData: AttemptAnswer | undefined,
@@ -24,7 +20,6 @@ export class ExamService {
 
   public loading: Signal<boolean> = this._loading.asReadonly();
   public examInExecution: Signal<Exam | null> = this._originalExam.asReadonly();
-  public attempts:Signal<AttemptAnswer[]> = this._attempts.asReadonly();
   public questionsWithAttempt:Signal<QuestionWithAttempt[]> = this.questionWithAttemptComputed();
 
   public errorMessage = signal<string | null>(null);
@@ -37,17 +32,7 @@ export class ExamService {
   constructor(
     @Inject(EXAM_REPOSITORY_TOKEN) private repository: ExamRepositoryInterface,
     @Inject(ATTEMPT_REPOSITORY_TOKEN) private attemptRepository: AttemptRepositoryInterface,
-  ) {
-//     effect(() => {
-// const exam = this.examInExecution();
-// if (!exam) return;
-//       this.repository.getAttemptsV2$(exam.id).subscribe((attemptAnswers) => {
-//         console.log("Vai resetar o attempt");
-//         this._attempts.set(attemptAnswers)
-//       })
-//
-//     });
-  }
+  ) {}
 
   loadExam(examId: string) {
     this._loading.set(true);
@@ -88,28 +73,61 @@ export class ExamService {
     // })
   }
 
-  answerQuestion({questionId, selectedOptionId}:{questionId: string, selectedOptionId: string}):void {
-    // const oldAttempt = this._attempts()[questionId];
-    // const newAttemptsObject:AttemptsObject = {...this._attempts()};
-    // newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId };
-    // this._attempts.update(() => newAttemptsObject)
-  }
+  answerQuestionV2(input: { attemptId: string, optionSelectedId: string | null }){
+    const originalAttempts = this._attempts();
 
-  answerQuestionV2(input: { attemptId: string, optionSelectedId: string }){
-    this.attemptRepository.answerAttempt$({ attemptId: input.attemptId, optionSelectedId: input.optionSelectedId }).subscribe();
-  }
+    const optimisticAttempts = originalAttempts.map(attempt => {
+      if (attempt.id === input.attemptId) {
+        return {
+          ...attempt,
+          selectedOptionId: input.optionSelectedId,
+          status: 'pending'
+        };
+      }
+      return attempt;
+    });
 
-  unselectAnsweredQuestion(questionId: string):void {
-    // const oldAttempt = this._attempts()[questionId];
-    // const newAttemptsObject:AttemptsObject = {...this._attempts()};
-    // newAttemptsObject[questionId] = { ...oldAttempt, selectedOptionId: null };
-    // this._attempts.update(() => newAttemptsObject)
+    this._attempts.set(optimisticAttempts);
+
+    this.attemptRepository.answerAttempt$({ attemptId: input.attemptId, optionSelectedId: input.optionSelectedId })
+      .subscribe({
+        next: (confirmedAttemptAnswer) => {
+          const finalAttempts = this._attempts().map(attempt => {
+            if (attempt.id === input.attemptId) {
+              return confirmedAttemptAnswer;
+            }
+            return attempt;
+          });
+
+          this._attempts.set(finalAttempts);
+        },
+        error: (_) => {
+          // TODO Show error to the user
+          this._attempts.set(originalAttempts);
+        }
+        }
+      );
   }
 
   finishExam():void {
     this._loading.set(true);
 
-    const attempts = this.attempts();
+    const exam= this._originalExam()
+    // TODO -> Handle Error
+    if(!exam) return;
+
+    this.repository.finishExam$(exam.id).subscribe({
+      next: (exam) => {
+        this._originalExam.set(exam)
+        this.repository.getAttemptsV2$(exam.id).subscribe({
+          next: (attempts) => {
+            this._attempts.set(attempts);
+            this._loading.set(false);
+          }
+        })
+      }
+    })
+
     // TODO
     // const examId = this.examInExecution()?.exam.id;
 
@@ -117,21 +135,6 @@ export class ExamService {
     //   this.errorMessage.set('Exam not found');
     //   return;
     // }
-
-    const answers: APIFinishExameAnswerRequest[] = Object.entries(attempts).map(([questionId, selectedOptionId]) => ({
-      questionId: questionId as Uuid,
-      selectedOptionId: selectedOptionId.selectedOptionId as Uuid,
-    }));
-
-    if(!answers.length) {
-      this.errorMessage.set('You must answer all questions to finish the exam');
-      return;
-    }
-
-    if(answers.some((answer) => answer.selectedOptionId === null)) {
-      this.errorMessage.set('You must select an option for each question');
-      return;
-    }
 
     // TODO
     // this.repository.finishExam$(examId, {
@@ -209,19 +212,6 @@ export class ExamService {
     this.setCurrentQuestionIndex(currentQuestionIndex - 1)
   }
 
-  private generateAttemptsData(exam:APIExamResponse):AttemptsObject {
-    const attempts: AttemptsObject = {};
-    exam.questions.forEach((q) => {
-      attempts[q.id] = {
-        questionId: q.id,
-        selectedOptionId: null,
-        isCorrect: undefined,
-        correctOptionId: null,
-      };
-    });
-    return attempts;
-  }
-
   private computeCurrentQuestionByIndex(): Signal<QuestionWithAttempt | null> {
     return computed(() => {
       // TODO
@@ -237,13 +227,6 @@ export class ExamService {
 
       return currentQuestion;
     })
-  }
-
-  private transformAttemptsData(attempts:AttemptsResponse[]): AttemptsObject {
-    return attempts.reduce((acc, attempt) => {
-      acc[attempt.questionId] = attempt;
-      return acc;
-    }, {} as AttemptsObject)
   }
 
   private questionWithAttemptComputed():Signal<QuestionWithAttempt[]> {

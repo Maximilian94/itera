@@ -7,11 +7,12 @@ import {faChevronLeft, faChevronRight} from '@fortawesome/free-solid-svg-icons';
 import {QuestionWithAttempt} from '../../services/exam/ui/exam.service';
 import {AttemptAnswerFinished, AttemptAnswerInProgress} from '@domain/exam/exam.interface';
 import {ExamOptionCardDirective} from '../../services/exam/ui/directives/exam-option-card.directive';
+import {Tooltip} from 'primeng/tooltip';
 
 @Component({
   selector: 'app-question-tab-content',
   standalone: true,
-  imports: [CommonModule, ButtonModule, FaIconComponent, ExamOptionCardDirective],
+  imports: [CommonModule, ButtonModule, FaIconComponent, ExamOptionCardDirective, Tooltip],
   templateUrl: './question-tab-content.html',
   styleUrl: './question-tab-content.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -8,11 +8,10 @@ import {ProgressBar} from 'primeng/progressbar';
 import {type ExamTab, ExamTabs} from '../../../components/exam-tabs/exam-tabs';
 import {QuestionTabContent} from '../../../components/question-tab-content/question-tab-content';
 import {Button} from 'primeng/button';
-import {AttemptsObject, ExamService, QuestionWithAttempt} from '../../../services/exam/ui/exam.service';
+import {ExamService, QuestionWithAttempt} from '../../../services/exam/ui/exam.service';
 import {ExamNavButtonDirective} from '../../../services/exam/ui/directives/exam-nav-button.directive';
-import {APIQuestion} from '../../../services/exam/domain/exam.interface';
 import {toObservable} from '@angular/core/rxjs-interop';
-import {Exam, Question} from '@domain/exam/exam.interface';
+import {Exam} from '@domain/exam/exam.interface';
 
 @Component({
   selector: 'app-exam-page',
@@ -45,7 +44,6 @@ export class ExamPage {
   // Tabs
   readonly activeTab = signal<ExamTab>('question');
   readonly errorMessage:Signal<string | null> = this.examService.errorMessage;
-  readonly attempts = this.examService.attempts;
   readonly finishingSig = signal(false);
 
   constructor() {
@@ -72,27 +70,13 @@ export class ExamPage {
     this.examService.finishExam();
   }
 
-  selectOption(attemptId: string | undefined, optionSelectedId: string) {
-    console.log("selectOption", attemptId, optionSelectedId);
+  selectOption(attemptId: string | undefined, optionSelectedId: string | null) {
     if(!attemptId) return;
-    // const attempts = this.attempts();
-    // const attempt = attempts[questionId];
-    // if(!attempt) return;
-    // console.log(attempt)
-    // this.examService.answerQuestion({questionId, selectedOptionId})
 
     this.examService.answerQuestionV2({
       attemptId,
       optionSelectedId
     });
-  }
-
-  uncheckOption(questionId: string) {
-    this.examService.unselectAnsweredQuestion(questionId);
-  }
-
-  getSelectedOptionId(attempts: AttemptsObject, questionId: string):string | null {
-    return attempts[questionId]?.selectedOptionId;
   }
 
   private loadExam():void {
@@ -113,11 +97,9 @@ export class ExamPage {
 
   private createProgressSignal():Signal<number> {
     return computed<number>(() => {
-      const exam = this.exam();
-      const attempts = this.examService.attempts();
-      if (!exam) return 0
-      const totalQuestions:number = exam.questions.length;
-      const answeredQuestions: number = Object.values(attempts).filter(x => x.selectedOptionId).length;
+      const questionsWithAttempts = this.examService.questionsWithAttempt();
+      const totalQuestions:number = questionsWithAttempts.length;
+      const answeredQuestions: number = questionsWithAttempts.filter((q: QuestionWithAttempt) => q.attemptData?.selectedOptionId).length;
 
       return Math.round((answeredQuestions / totalQuestions) * 100);
     })
@@ -138,9 +120,5 @@ export class ExamPage {
       if(currentQuestionIndex === null) return true;
       return currentQuestionIndex <= 0
     });
-  }
-
-  log(e:any) {
-    console.log("Aqui via o log", e)
   }
 }

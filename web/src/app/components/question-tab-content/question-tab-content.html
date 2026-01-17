@@ -23,11 +23,11 @@
   </div>
 
   <div class="action-buttons">
-    <p-button size="small" (onClick)="prev.emit()" [disabled]="disablePrev">
+    <p-button size="small" (onClick)="prev.emit()" [disabled]="disablePrev" pTooltip="You’re already on the first question." [tooltipOptions]="{disabled: !disablePrev}">
       <fa-icon [icon]="faChevronLeft" pButtonIcon />
       <span pButtonLabel>Previous</span>
     </p-button>
-    <p-button size="small" (onClick)="next.emit()" [disabled]="disableNext">
+    <p-button size="small" (onClick)="next.emit()" [disabled]="disableNext" pTooltip="You’re already on the last question." [tooltipOptions]="{disabled: !disableNext}">
       <span pButtonLabel>Next</span>
       <fa-icon [icon]="faChevronRight" pButtonIcon />
     </p-button>

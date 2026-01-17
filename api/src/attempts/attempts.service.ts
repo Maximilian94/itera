@@ -146,8 +146,8 @@ export class AttemptsService {
             question: {
               include: {
                 options: {
-                  orderBy: { createdAt: 'asc' }, // ou por "text" etc.
-                  select: { id: true, text: true, isCorrect: true }, // pega a correta
+                  orderBy: { createdAt: 'asc' },
+                  select: { id: true, text: true, isCorrect: true },
                 },
               },
             },
@@ -175,37 +175,37 @@ export class AttemptsService {
     });
 
     if (exam.finishedAt) {
-      const attempts: AttemptAnswerFinished[] = attemptsFromDB.map(
-        (attemptFromDB) => {
-          const correctOptionId =
-            questionIdVsCorrectOptionIdMap.get(attemptFromDB.questionId) ?? '';
+      let attempts: AttemptAnswerFinished[];
+      // eslint-disable-next-line prefer-const
+      attempts = attemptsFromDB.map((attemptFromDB) => {
+        const correctOptionId =
+          questionIdVsCorrectOptionIdMap.get(attemptFromDB.questionId) ?? '';
 
-          return {
-            id: attemptFromDB.id,
-            createdAt: attemptFromDB.createdAt,
-            questionId: attemptFromDB.questionId,
-            selectedOptionId: attemptFromDB.selectedOptionId,
-            isCorrect: correctOptionId === attemptFromDB.selectedOptionId,
-            correctOptionId: correctOptionId,
-          };
-        },
-      );
-
-      return attempts;
-    }
-
-    const attempts: AttemptAnswerInProgress[] = attemptsFromDB.map(
-      (attemptFromDB) => {
         return {
           id: attemptFromDB.id,
           createdAt: attemptFromDB.createdAt,
           questionId: attemptFromDB.questionId,
           selectedOptionId: attemptFromDB.selectedOptionId,
-          isCorrect: null,
-          correctOptionId: null,
+          isCorrect: correctOptionId === attemptFromDB.selectedOptionId,
+          correctOptionId: correctOptionId,
         };
-      },
-    );
+      });
+
+      return attempts;
+    }
+
+    let attempts: AttemptAnswerInProgress[];
+    // eslint-disable-next-line prefer-const
+    attempts = attemptsFromDB.map((attemptFromDB) => {
+      return {
+        id: attemptFromDB.id,
+        createdAt: attemptFromDB.createdAt,
+        questionId: attemptFromDB.questionId,
+        selectedOptionId: attemptFromDB.selectedOptionId,
+        isCorrect: null,
+        correctOptionId: null,
+      };
+    });
 
     return attempts;
   }
@@ -213,12 +213,36 @@ export class AttemptsService {
   async answer(input: {
     userId: string;
     attemptId: string;
-    optionSelectedId: string;
-  }) {
+    optionSelectedId: string | null;
+  }): Promise<AttemptAnswerInProgress> {
     const attemptsFromDB = await this.prisma.attempt.findUnique({
       where: { id: input.attemptId, userId: input.userId },
     });
 
-    console.log("attemptsFromDB", attemptsFromDB);
+    if (!attemptsFromDB) throw new NotFoundException('attempt not found');
+
+    const updatedAttempt = await this.prisma.attempt.update({
+      where: { id: input.attemptId, userId: input.userId },
+      data: {
+        selectedOptionId: input.optionSelectedId,
+      },
+    });
+
+    if (!updatedAttempt.createdAt) {
+      throw new BadRequestException('attempt not started');
+    }
+
+    if (!updatedAttempt.questionId) {
+      throw new BadRequestException('question not found');
+    }
+
+    return {
+      id: updatedAttempt.id,
+      createdAt: updatedAttempt.createdAt,
+      questionId: updatedAttempt.questionId,
+      selectedOptionId: updatedAttempt.selectedOptionId,
+      isCorrect: null,
+      correctOptionId: null,
+    };
   }
 }

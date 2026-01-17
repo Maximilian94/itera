@@ -5,7 +5,7 @@ import {AttemptAnswer} from "@domain/exam/exam.interface";
 export interface AttemptRepositoryInterface {
   answerAttempt$(body: {
     attemptId: string;
-    optionSelectedId: string;
+    optionSelectedId: string | null;
   }): Observable<AttemptAnswer>;
 }
 

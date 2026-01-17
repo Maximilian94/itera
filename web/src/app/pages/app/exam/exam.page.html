@@ -1,20 +1,14 @@
 @if (!loading()) {
-  {{ log(questionsWithAttempt()) }}
   @if (exam(); as exam){
-    {{ log("Entrou no Exam") }}
     @if (exam.status === "not_started"){
       <div>
         <p-button (onClick)="start()">Start Exam</p-button>
       </div>
     }
 
-    @else if(attempts(); as attemptsV2) {
-      {{ log("Entrou no Attemps") }}
+    @if (exam.status === 'in_progress' || exam.status === 'finished') {
       @let questionIndex = currentQuestionIndex();
-      {{ log("Current Question") }}
-      {{ log(currentQuestion()) }}
       @if(currentQuestion(); as currentQuestion){
-        {{ log("Entrou no Current Question") }}
         @if (questionIndex !== null) {
           <div class="exam">
             <section class="left">
@@ -38,7 +32,7 @@
               <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
                 <app-question-tab-content
                   questionTab
-                  (uncheckedOption)="uncheckOption(currentQuestion.questionData.id)"
+                  (uncheckedOption)="selectOption(currentQuestion.attemptData?.id, null)"
                   [question]="currentQuestion"
                   [selectedOptionId]="currentQuestion.attemptData?.selectedOptionId"
                   [disableSelection]="exam.status === 'finished'"
@@ -69,10 +63,7 @@
               </p-button>
 
               <div class="nav">
-                {{ log(questionsWithAttempt()) }}
                 @if (questionsWithAttempt(); as list) {
-                  {{ log(list) }}
-
                   @for (q of list; track q.questionData.id; let i = $index) {
                     <p-button
                       class="teste"
@@ -93,8 +84,6 @@
           </div>
         }
       }
-    } @else {
-      Caiu no else
     }
   }
 } @else {

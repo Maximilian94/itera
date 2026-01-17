@@ -46,7 +46,7 @@ export class AttemptsController {
     @Req() req: { user: { userId: string } },
     @Body() dto: AnswerAttemptDto,
   ) {
-    this.attempts.answer({
+    return this.attempts.answer({
       userId: req.user.userId,
       attemptId: dto.attemptId,
       optionSelectedId: dto.optionSelectedId,

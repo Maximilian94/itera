@@ -7,7 +7,7 @@ export interface ExamRepositoryInterface {
   getExamV2$(examId: Uuid): Observable<Exam>;
   getAttempts$(examId: Uuid): Observable<AttemptsResponse[]>;
   getAttemptsV2$(examId: Uuid): Observable<AttemptAnswer[]>;
-  finishExam$(examId: Uuid, answers: APIFinishExameRequest): Observable<APIExamResponse>;
+  finishExam$(examId: Uuid): Observable<Exam>;
   startExam$(examId: Uuid): Observable<Exam>;
 }
 

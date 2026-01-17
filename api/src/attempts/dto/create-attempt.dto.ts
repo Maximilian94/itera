@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsOptional, IsString, IsUUID, ValidateIf } from 'class-validator';
 
 export class CreateAttemptDto {
   @IsOptional()
@@ -16,6 +16,7 @@ export class AnswerAttemptDto {
   @IsString()
   attemptId: string;
 
+  @ValidateIf((_, value) => value !== null)
   @IsString()
   optionSelectedId: string;
 }

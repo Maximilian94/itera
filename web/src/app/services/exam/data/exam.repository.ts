@@ -1,6 +1,4 @@
 import {
-  APIFinishExameRequest,
-  APIExamResponse,
   ExamRepositoryInterface,
   AttemptsResponse,
 } from '../domain/exam.interface';
@@ -26,8 +24,8 @@ export class ExamRepository implements ExamRepositoryInterface {
     return this.http.get<Exam>(`${this.baseUrl}/exams/v2/${examId}`);
   }
 
-  finishExam$(examId:Uuid, answers: APIFinishExameRequest):Observable<APIExamResponse> {
-    return this.http.post<APIExamResponse>(`${this.baseUrl}/exams/${examId}/finish`, answers);
+  finishExam$(examId:Uuid):Observable<Exam> {
+    return this.http.patch<Exam>(`${this.baseUrl}/exams/finish`, {examId});
   }
 
   startExam$(examId:Uuid):Observable<Exam> {
