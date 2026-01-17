@@ -24,9 +24,18 @@ model Skill {
   name      String     @unique
   createdAt DateTime   @default(now())
 
-  questions Question[]
+  // Path Enumeration (Materialized Path)
+  // Stores the complete hierarchy (ex: "uuid1/uuid2/uuid3")
+  path String @unique
 
+  parentId  String?    @db.Uuid
+  parent    Skill?     @relation("SkillHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Skill[]    @relation("SkillHierarchy")
+
+  questions Question[]
+  
   @@map("skills")
+  @@index([path])
 }
 
 model Question {
