@@ -9,15 +9,16 @@ export const PATH = {
   exams: 'exams',
   questions: 'questions',
   exam: 'exam',
+  tags: 'tags',
 } as const;
 
 export const LINK = {
   home: ['/', PATH.app, PATH.home] as const,
   history:  ['/', PATH.app, PATH.history] as const,
-  examResults: (examId: string) => ['/', PATH.app, PATH.history, examId] as const,
   question: (examId: string, questionId: string) =>
     ['/', PATH.app, PATH.exams, examId, PATH.questions, questionId] as const,
   exam: (examId: string) => ['/', PATH.app, PATH.exams, examId] as const,
+  tags: ['/', PATH.app, PATH.tags] as const,
 };
 
 export const routes: Routes = [
@@ -62,6 +63,10 @@ export const routes: Routes = [
         path: 'exams/:examId',
         loadComponent: () => import('./pages/app/exam/exam.page').then((m) => m.ExamPage),
       },
+      {
+        path: 'tags',
+        loadComponent: () => import('./pages/app/skills/skills').then((m) => m.Skills),
+      }
     ],
   },
 ];

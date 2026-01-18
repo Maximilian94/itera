@@ -1,16 +1,16 @@
 import {CommonModule, isPlatformBrowser} from '@angular/common';
-import {ChangeDetectorRef, Component, inject, PLATFORM_ID, signal} from '@angular/core';
+import {ChangeDetectorRef, Component, inject, OnInit, PLATFORM_ID, signal} from '@angular/core';
 import {ReactiveFormsModule} from '@angular/forms';
 import {Router} from '@angular/router';
 import {PageHeader} from '../../../components/page-header/page-header';
 import {FontAwesomeModule} from "@fortawesome/angular-fontawesome";
 import {faPlay} from '@fortawesome/free-solid-svg-icons';
 import {LINK} from '../../../app.routes';
-import {Dialog} from 'primeng/dialog';
 import {Button, ButtonIcon, ButtonLabel} from 'primeng/button';
 import {CreateExamForm} from '../../../components/create-exam-form/create-exam-form';
 import {TableModule} from 'primeng/table';
 import {Badge} from 'primeng/badge';
+import {Drawer} from 'primeng/drawer';
 
 @Component({
   selector: 'app-home-page',
@@ -20,18 +20,18 @@ import {Badge} from 'primeng/badge';
     ReactiveFormsModule,
     PageHeader,
     FontAwesomeModule,
-    Dialog,
     Button,
     CreateExamForm,
     ButtonLabel,
     ButtonIcon,
     TableModule,
-    Badge
+    Badge,
+    Drawer
   ],
   templateUrl: './home.page.html',
   styleUrls: ['./home.page.scss'],
 })
-export class HomePage {
+export class HomePage implements OnInit {
   private router = inject(Router);
   protected readonly faPlay = faPlay;
   visible = signal(false);

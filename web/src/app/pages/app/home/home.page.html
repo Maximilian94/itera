@@ -26,6 +26,10 @@
   </ng-template>
 </p-table>
 
-<p-dialog header="Setup exam" [modal]="true" [(visible)]="visible">
+<p-drawer header="Left Drawer" [(visible)]="visible" position="right">
   <app-create-exam-form (examCreated)="redirectToExam($event)" />
-</p-dialog>
+</p-drawer>
+
+<!--<p-dialog header="Setup exam" [modal]="true" [(visible)]="visible">-->
+<!--  <app-create-exam-form (examCreated)="redirectToExam($event)" />-->
+<!--</p-dialog>-->

@@ -1,0 +1,34 @@
+<app-page-header title="Skills">
+  <p-button (click)="showDialog()">
+    <fa-icon [icon]="faTag" pButtonIcon/>
+    <span pButtonLabel>Create skill</span>
+  </p-button>
+</app-page-header>
+
+<p-tree-table [value]="treeNode()" [scrollable]="true" [tableStyle]="{'min-width':'50rem'}">
+  <ng-template #header>
+    <tr>
+      <th>Name</th>
+      <th>Size</th>
+      <th>Type</th>
+    </tr>
+  </ng-template>
+  <ng-template #body let-rowNode let-rowData="rowData">
+    <tr [ttRow]="rowNode">
+      <td>
+        <div class="flex items-center gap-2">
+          <p-treetable-toggler [rowNode]="rowNode" />
+          <span>{{ rowData.name }}</span>
+        </div>
+      </td>
+      <td>{{ rowData.size }}</td>
+      <td>{{ rowData.type }}</td>
+    </tr>
+  </ng-template>
+</p-tree-table>
+
+<app-create-skill-dialog
+  [visible]="isDialogOpen"
+  (visibleChange)="visibleChanged($event)"
+  (createSkill)="createSkill($event)"
+/>

@@ -1,25 +1,28 @@
-import { Component, computed, EventEmitter, inject, Output, output, signal} from '@angular/core';
-import {AutoComplete, AutoCompleteCompleteEvent} from "primeng/autocomplete";
+import { Component, computed, effect, EventEmitter, inject, Output, signal} from '@angular/core';
+import {AutoCompleteCompleteEvent} from "primeng/autocomplete";
 import {Button, ButtonIcon, ButtonLabel} from "primeng/button";
 import {Checkbox} from "primeng/checkbox";
 import {FaIconComponent} from "@fortawesome/angular-fontawesome";
 import {FloatLabel} from "primeng/floatlabel";
 import {InputNumber} from "primeng/inputnumber";
-import {FormControl, FormGroup, ReactiveFormsModule} from "@angular/forms";
+import {FormControl, FormGroup, FormsModule, ReactiveFormsModule} from "@angular/forms";
 import {faMinus, faPlay, faPlus, faTriangleExclamation} from '@fortawesome/free-solid-svg-icons';
 import type {Skill} from '../../api/api.types';
 import {ExamsService} from '../../api/exams.service';
 import {SkillsService} from '../../services/skills/skills';
 import {finalize, Observable} from 'rxjs';
-import {takeUntilDestroyed} from '@angular/core/rxjs-interop';
+import {takeUntilDestroyed, toObservable} from '@angular/core/rxjs-interop';
 import {Tooltip} from 'primeng/tooltip';
 import {Message} from 'primeng/message';
 import {CapitalizePipe} from '../../pipes/capitalize-pipe';
+import {SkillNode} from '@domain/skill/skill.interface';
+import {TreeSelect} from 'primeng/treeselect';
+import {TreeNode} from 'primeng/api';
+import {transformSkillsToTreeNodes} from '../../services/skills/utils/skills.utils';
 
 @Component({
   selector: 'app-create-exam-form',
   imports: [
-      AutoComplete,
       Button,
       Checkbox,
       FaIconComponent,
@@ -30,7 +33,9 @@ import {CapitalizePipe} from '../../pipes/capitalize-pipe';
     ButtonIcon,
     ButtonLabel,
     Message,
-    CapitalizePipe
+    CapitalizePipe,
+    TreeSelect,
+    FormsModule
   ],
   templateUrl: './create-exam-form.html',
   styleUrl: './create-exam-form.scss',
@@ -50,13 +55,15 @@ export class CreateExamForm {
   protected readonly faPlus = faPlus;
   protected readonly faMinus = faMinus;
   private readonly skillsService = inject(SkillsService);
-  readonly skills$: Observable<Skill[]> = this.skillsService.skills$;
+  readonly skills$: Observable<SkillNode[]> = toObservable(this.skillsService.skills);
   private readonly examsApi = inject(ExamsService);
   private readonly allSkillsSig = signal<Skill[]>([]);
   private readonly lastQuerySig = signal<string>('');
   protected readonly disableCreateExam = computed(() =>
     this.loadingSig() || this.selectedSkillsSig().length === 0
   );
+
+  skillsOptions:TreeNode[] = [];
 
   @Output() examCreated = new EventEmitter<string>();
 
@@ -75,6 +82,11 @@ export class CreateExamForm {
 
     // Ensure initial state is consistent (e.g. if form is prefilled later).
     this.selectedSkillsSig.set(this.form.controls.skills.value ?? []);
+
+    effect(() => {
+      const skills:SkillNode[] = this.skillsService.skills();
+      this.skillsOptions = transformSkillsToTreeNodes(skills);
+    });
   }
 
   search(event: AutoCompleteCompleteEvent) {

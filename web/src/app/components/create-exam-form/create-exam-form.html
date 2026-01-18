@@ -1,19 +1,16 @@
 <form [formGroup]="form" class="create-exam">
   <p-floatlabel variant="on">
-    <p-auto-complete
-      (completeMethod)="search($event)"
-      [dropdown]="true"
-      [forceSelection]="true"
-      [multiple]="true"
-      [showClear]="true"
-      [suggestions]="suggestionsSig()"
-      fluid
+    <p-tree-select
+      class="w-full md:w-80"
       formControlName="skills"
-      inputId="skillInputId"
-      optionLabel="name"
-      placeholder="Search and select..."
+      [options]="skillsOptions"
+      display="chip"
+      [metaKeySelection]="false"
+      selectionMode="checkbox"
+      placeholder="Select Item"
+      showClear
+      fluid
     />
-    <label for="skillInputId">Skill</label>
   </p-floatlabel>
 
   <p-floatlabel variant="on">

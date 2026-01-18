@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component} from '@angular/core';
 import { FontAwesomeModule, IconDefinition} from '@fortawesome/angular-fontawesome';
-import { faHome, faClockRotateLeft } from '@fortawesome/free-solid-svg-icons';
+import { faHome, faClockRotateLeft, faTags } from '@fortawesome/free-solid-svg-icons';
 import {Divider} from 'primeng/divider';
 import {LINK} from '../../app.routes';
 import {SideBarNavButton} from './side-bar-nav-button/side-bar-nav-button';
@@ -34,6 +34,11 @@ export class SideBar {
       path: [...LINK.history] as string[],
       label: 'History',
       icon: faClockRotateLeft,
+    },
+    {
+      path: [...LINK.tags] as string[],
+      label: 'Skills',
+      icon: faTags,
     }
   ];
 }
