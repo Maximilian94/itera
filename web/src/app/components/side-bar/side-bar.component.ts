@@ -4,6 +4,7 @@ import { faHome, faClockRotateLeft, faTags } from '@fortawesome/free-solid-svg-i
 import {Divider} from 'primeng/divider';
 import {LINK} from '../../app.routes';
 import {SideBarNavButton} from './side-bar-nav-button/side-bar-nav-button';
+import {faDatabase} from '@fortawesome/free-solid-svg-icons/faDatabase';
 
 interface NavButtonData {
   path: string[],
@@ -39,6 +40,11 @@ export class SideBar {
       path: [...LINK.tags] as string[],
       label: 'Skills',
       icon: faTags,
+    },
+    {
+      path: [...LINK.questions] as string[],
+      label: 'Questions',
+      icon: faDatabase
     }
   ];
 }
