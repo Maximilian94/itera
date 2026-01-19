@@ -3,7 +3,7 @@
     <p-tree-select
       class="w-full md:w-80"
       formControlName="skills"
-      [options]="skillsOptions"
+      [options]="skillsOptions()"
       display="chip"
       [metaKeySelection]="false"
       selectionMode="checkbox"
@@ -40,14 +40,14 @@
 
   <div class="actions">
         <span
-          [pTooltip]="selectedSkillsSig().length === 0 ? 'Select at least one skill to create the exam' : ''"
-          [tooltipDisabled]="selectedSkillsSig().length > 0"
+          pTooltip='Select at least one skill to create the exam'
+          [tooltipDisabled]="!isCreateExamBtnDisabled"
           class="tooltip-wrap"
           tooltipPosition="top"
         >
           <p-button
             (onClick)="createExam()"
-            [disabled]="disableCreateExam()"
+            [disabled]="isCreateExamBtnDisabled"
             [loading]="loadingSig()"
           >
             <fa-icon [icon]="faPlay" pButtonIcon/>
