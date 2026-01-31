@@ -1,29 +1,34 @@
 import {Inject, Injectable, signal} from '@angular/core';
-import {Skill} from '../../api/api.types';
-import {toObservable} from '@angular/core/rxjs-interop';
 import {SKILL_REPOSITORY_TOKEN} from './domain/skill.interface';
 import {SkillsHttp} from './data/skills-http';
 import {finalize, take} from 'rxjs';
+import {CreateSkill, SkillNode} from '@domain/skill/skill.interface';
 
 @Injectable({
   providedIn: 'root'
 })
 export class SkillsService {
-  private readonly skillsSig = signal<Skill[]>([]);
-  public skills$ = toObservable<Skill[]>(this.skillsSig);
-  public readonly skills = this.skillsSig.asReadonly();
-  private readonly isLoading = signal<boolean>(false);
+  private readonly _skillsSig = signal<SkillNode[]>([]);
+  private readonly _isLoading = signal<boolean>(false);
+
+  public readonly skills = this._skillsSig.asReadonly();
 
   constructor(@Inject(SKILL_REPOSITORY_TOKEN) private repository: SkillsHttp) {}
 
 
   fetchSkills(){
-    this.isLoading.update(() => true)
+    this._isLoading.update(() => true)
 
     this.repository.getAll$().pipe(take(1), finalize(() => {
-      this.isLoading.update(() => false)
-    })).subscribe((res) => {
-      this.skillsSig.update(() => res.skills)
+      this._isLoading.update(() => false)
+    })).subscribe((skillNode) => {
+      this._skillsSig.set(skillNode)
+    })
+  }
+
+  createSkill(createSkill: CreateSkill) : void {
+    this.repository.create$(createSkill).pipe(take(1)).subscribe((skillNode) => {
+      this._skillsSig.set(skillNode)
     })
   }
 }

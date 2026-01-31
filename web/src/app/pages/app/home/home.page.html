@@ -5,6 +5,31 @@
   </p-button>
 </app-page-header>
 
-<p-dialog header="Setup exam" [modal]="true" [(visible)]="visible">
+<p-table [value]="products" [tableStyle]="{ 'min-width': '50rem' }">
+  <ng-template #header>
+    <tr>
+      <th>Subject</th>
+      <th>Your Level</th>
+      <th>Goal Level</th>
+      <th>Score</th>
+    </tr>
+  </ng-template>
+  <ng-template #body let-product>
+    <tr [ngClass]="rowClass(product)" [ngStyle]="rowStyle(product)">
+      <td>{{ product.code }}</td>
+      <td>{{ product.name }}</td>
+      <td>{{ product.category }}</td>
+      <td>
+        <p-badge [value]="product.quantity" [severity]="stockSeverity(product)" />
+      </td>
+    </tr>
+  </ng-template>
+</p-table>
+
+<p-drawer header="Left Drawer" [(visible)]="visible" position="right">
   <app-create-exam-form (examCreated)="redirectToExam($event)" />
-</p-dialog>
+</p-drawer>
+
+<!--<p-dialog header="Setup exam" [modal]="true" [(visible)]="visible">-->
+<!--  <app-create-exam-form (examCreated)="redirectToExam($event)" />-->
+<!--</p-dialog>-->

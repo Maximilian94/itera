@@ -1,6 +1,7 @@
 import { Directive, HostBinding, HostListener, Input } from '@angular/core';
 import type { ExamInExecution } from '../adapters/exam.adapter';
 import type { AttemptsInProgressResponse, AttemptsResponse } from '../../domain/exam.interface';
+import {AttemptAnswerFinished, AttemptAnswerInProgress} from '@domain/exam/exam.interface';
 
 type ExamStatus = ExamInExecution['exam']['status'];
 type Attempt = AttemptsInProgressResponse | AttemptsResponse | null | undefined;
@@ -12,7 +13,7 @@ type Attempt = AttemptsInProgressResponse | AttemptsResponse | null | undefined;
 })
 export class ExamOptionCardDirective {
   @Input({ required: true }) examStatus!: ExamStatus;
-  @Input() attempt: Attempt = null;
+  @Input() attempt: AttemptAnswerInProgress | AttemptAnswerFinished | undefined;
 
   /** For option/badge buttons. */
   @Input() optionId?: string;

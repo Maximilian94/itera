@@ -1,14 +1,10 @@
-import {Uuid} from '../../../api/api.types';
 import {Observable} from 'rxjs';
 import {InjectionToken} from '@angular/core';
-
-export interface Skill {
-  id: Uuid;
-  name: string;
-}
+import {CreateSkill, SkillNode} from '@domain/skill/skill.interface';
 
 export interface SkillRepository {
-  getAll$(): Observable<{ skills: Skill[] }>
+  getAll$(): Observable<SkillNode[]>,
+  create$(createSkill:CreateSkill): Observable<SkillNode[]>,
 }
 
 export const SKILL_REPOSITORY_TOKEN = new InjectionToken<SkillRepository>('SKILL_REPOSITORY_TOKEN')

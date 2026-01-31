@@ -6,7 +6,11 @@ import { PrismaService } from '../prisma/prisma.service';
 export class QuestionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listQuestions(input: { userId: string; skillIds?: string[]; onlyUnsolved?: boolean }) {
+  async listQuestions(input: {
+    userId: string;
+    skillIds?: string[];
+    onlyUnsolved?: boolean;
+  }) {
     const where: Prisma.QuestionWhereInput = {};
 
     if (input.skillIds?.length) where.skillId = { in: input.skillIds };
@@ -14,7 +18,7 @@ export class QuestionsService {
     if (input.onlyUnsolved) {
       where.AND = [
         { attempts: { some: { userId: input.userId } } },
-        { attempts: { none: { userId: input.userId, isCorrect: true } } },
+        { attempts: { none: { userId: input.userId } } },
       ];
     }
 
@@ -35,5 +39,3 @@ export class QuestionsService {
     return { questions };
   }
 }
-
-

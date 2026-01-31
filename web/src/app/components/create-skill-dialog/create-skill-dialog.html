@@ -1,0 +1,27 @@
+<p-drawer header="Left Drawer" [(visible)]="visible" (onHide)="visibleChange.emit(false)" position="right">
+    <div class="content">
+      <p>create-skill-dialog works!</p>
+      <p-tree-select
+        [(ngModel)]="selectedNodes"
+        [options]="nodes"
+        placeholder="Select Item"
+        [filter]="true"
+        [filterInputAutoFocus]="true"
+        showClear
+        fluid
+      />
+
+      <p-floatlabel variant="on">
+        <input pInputText id="on_label" [(ngModel)]="skillName" autocomplete="off" fluid />
+        <label for="on_label">On Label</label>
+      </p-floatlabel>
+    </div>
+
+    <ng-template #footer>
+      <div class="footer">
+        <p-button (onClick)="create()">
+          Create
+        </p-button>
+      </div>
+    </ng-template>
+</p-drawer>

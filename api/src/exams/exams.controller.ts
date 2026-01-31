@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { FinishExamDto } from './dto/finish-exam.dto';
 import { ExamsService } from './exams.service';
@@ -30,21 +30,24 @@ export class ExamsController {
     return this.exams.getExamQuestions({ userId: req.user.userId, examId });
   }
 
+  @Get('v2/:id')
+  getExam(
+    @Req() req: { user: { userId: string } },
+    @Param('id') examId: string,
+  ) {
+    return this.exams.getExam({ userId: req.user.userId, examId });
+  }
+
   @Post(':id/start')
   start(@Req() req: { user: { userId: string } }, @Param('id') examId: string) {
     return this.exams.startExam({ userId: req.user.userId, examId });
   }
 
-  @Post(':id/finish')
-  finish(
-    @Req() req: { user: { userId: string } },
-    @Param('id') examId: string,
-    @Body() dto: FinishExamDto,
-  ) {
+  @Patch('finish')
+  finish(@Req() req: { user: { userId: string } }, @Body() dto: FinishExamDto) {
     return this.exams.finishExam({
       userId: req.user.userId,
-      examId,
-      answers: dto.answers,
+      examId: dto.examId,
     });
   }
 

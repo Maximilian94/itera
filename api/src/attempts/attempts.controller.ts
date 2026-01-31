@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Post, Query, Req } from '@nestjs/common';
-import { CreateAttemptDto } from './dto/create-attempt.dto';
+import { AnswerAttemptDto, CreateAttemptDto } from './dto/create-attempt.dto';
 import { AttemptsService } from './attempts.service';
 
 @Controller('attempts')
@@ -27,6 +27,29 @@ export class AttemptsController {
     return this.attempts.getAttempts({
       userId: req.user.userId,
       examId: examId ?? undefined,
+    });
+  }
+
+  @Get('v2')
+  getV2(
+    @Req() req: { user: { userId: string } },
+    @Query('examId') examId: string,
+  ) {
+    return this.attempts.getAttemptsV2({
+      userId: req.user.userId,
+      examId: examId ?? undefined,
+    });
+  }
+
+  @Post('answer')
+  answer(
+    @Req() req: { user: { userId: string } },
+    @Body() dto: AnswerAttemptDto,
+  ) {
+    return this.attempts.answer({
+      userId: req.user.userId,
+      attemptId: dto.attemptId,
+      optionSelectedId: dto.optionSelectedId,
     });
   }
 }

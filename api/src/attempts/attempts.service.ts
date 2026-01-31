@@ -5,6 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import {
+  AttemptAnswer,
+  AttemptAnswerFinished,
+  AttemptAnswerInProgress,
+} from '@domain/exam/exam.interface';
 
 @Injectable()
 export class AttemptsService {
@@ -65,13 +70,11 @@ export class AttemptsService {
         ...(input.examId ? { exam: { connect: { id: input.examId } } } : {}),
         question: { connect: { id: input.questionId } },
         selectedOption: { connect: { id: input.selectedOptionId } },
-        isCorrect: option.isCorrect,
       },
       select: {
         id: true,
         questionId: true,
         selectedOptionId: true,
-        isCorrect: true,
         createdAt: true,
       },
     });
@@ -82,11 +85,9 @@ export class AttemptsService {
         examId: input.examId ?? null,
         questionId: attempt.questionId,
         selectedOptionId: attempt.selectedOptionId,
-        isCorrect: attempt.isCorrect,
         createdAt: attempt.createdAt,
       },
       feedback: {
-        isCorrect: attempt.isCorrect,
         correctOptionId: correctOption.id,
         explanationText: question.explanationText,
       },
@@ -107,7 +108,6 @@ export class AttemptsService {
       select: {
         questionId: true,
         selectedOptionId: true,
-        isCorrect: true,
       },
     });
 
@@ -128,9 +128,121 @@ export class AttemptsService {
       return {
         questionId: a.questionId,
         selectedOptionId: a.selectedOptionId,
-        isCorrect: a.isCorrect,
         correctOptionId,
       };
     });
+  }
+
+  async getAttemptsV2(input: {
+    userId: string;
+    examId: string;
+  }): Promise<AttemptAnswer[]> {
+    const exam = await this.prisma.exam.findUnique({
+      where: { id: input.examId },
+      include: {
+        questions: {
+          orderBy: { order: 'asc' },
+          include: {
+            question: {
+              include: {
+                options: {
+                  orderBy: { createdAt: 'asc' },
+                  select: { id: true, text: true, isCorrect: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!exam) throw new NotFoundException('exam not found');
+    if (exam.userId !== input.userId)
+      throw new ForbiddenException('exam does not belong to user');
+
+    const attemptsFromDB = await this.prisma.attempt.findMany({
+      where: { userId: input.userId, examId: input.examId },
+    });
+
+    // QuestionID vs CorrectOptionId
+    const questionIdVsCorrectOptionIdMap = new Map<string, string>();
+
+    exam.questions.forEach((question) => {
+      const options = question.question.options;
+      const correctOption = options.find((o) => o.isCorrect);
+      if (!options.length || !correctOption) return;
+      questionIdVsCorrectOptionIdMap.set(question.questionId, correctOption.id);
+    });
+
+    if (exam.finishedAt) {
+      let attempts: AttemptAnswerFinished[];
+      // eslint-disable-next-line prefer-const
+      attempts = attemptsFromDB.map((attemptFromDB) => {
+        const correctOptionId =
+          questionIdVsCorrectOptionIdMap.get(attemptFromDB.questionId) ?? '';
+
+        return {
+          id: attemptFromDB.id,
+          createdAt: attemptFromDB.createdAt,
+          questionId: attemptFromDB.questionId,
+          selectedOptionId: attemptFromDB.selectedOptionId,
+          isCorrect: correctOptionId === attemptFromDB.selectedOptionId,
+          correctOptionId: correctOptionId,
+        };
+      });
+
+      return attempts;
+    }
+
+    let attempts: AttemptAnswerInProgress[];
+    // eslint-disable-next-line prefer-const
+    attempts = attemptsFromDB.map((attemptFromDB) => {
+      return {
+        id: attemptFromDB.id,
+        createdAt: attemptFromDB.createdAt,
+        questionId: attemptFromDB.questionId,
+        selectedOptionId: attemptFromDB.selectedOptionId,
+        isCorrect: null,
+        correctOptionId: null,
+      };
+    });
+
+    return attempts;
+  }
+
+  async answer(input: {
+    userId: string;
+    attemptId: string;
+    optionSelectedId: string | null;
+  }): Promise<AttemptAnswerInProgress> {
+    const attemptsFromDB = await this.prisma.attempt.findUnique({
+      where: { id: input.attemptId, userId: input.userId },
+    });
+
+    if (!attemptsFromDB) throw new NotFoundException('attempt not found');
+
+    const updatedAttempt = await this.prisma.attempt.update({
+      where: { id: input.attemptId, userId: input.userId },
+      data: {
+        selectedOptionId: input.optionSelectedId,
+      },
+    });
+
+    if (!updatedAttempt.createdAt) {
+      throw new BadRequestException('attempt not started');
+    }
+
+    if (!updatedAttempt.questionId) {
+      throw new BadRequestException('question not found');
+    }
+
+    return {
+      id: updatedAttempt.id,
+      createdAt: updatedAttempt.createdAt,
+      questionId: updatedAttempt.questionId,
+      selectedOptionId: updatedAttempt.selectedOptionId,
+      isCorrect: null,
+      correctOptionId: null,
+    };
   }
 }

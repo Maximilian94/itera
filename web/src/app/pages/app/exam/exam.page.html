@@ -1,79 +1,88 @@
 @if (!loading()) {
   @if (exam(); as exam){
-    @if (exam.exam.status === "not_started"){
+    @if (exam.status === "not_started"){
       <div>
         <p-button (onClick)="start()">Start Exam</p-button>
       </div>
     }
 
-    @else if(attempts(); as attemptsV2) {
-      @if(activeQuestion(); as question){
-        <div class="exam">
-          <section class="left">
-            <!-- Row 1: header -->
-            <div>
-              <app-question-header
-                (next)="next()"
-                (prev)="prev()"
-                [current]="activeQuestionIndex() + 1"
-                [disableNext]="disableNextQuestionButton()"
-                [disablePrev]="disablePreviousQuestionButton()"
-                [total]="questionsAmount()"
-              />
+    @if (exam.status === 'in_progress' || exam.status === 'finished') {
+      @let questionIndex = currentQuestionIndex();
+      @if(currentQuestion(); as currentQuestion){
+        @if (questionIndex !== null) {
+          <div class="exam">
+            <section class="left">
+              <!-- Row 1: header -->
+              <div>
+                <app-question-header
+                  (next)="nextQuestion()"
+                  (prev)="prevQuestion()"
+                  [currentQuestionIndex]="questionIndex + 1"
+                  [disableNext]="disableNextQuestionButton()"
+                  [disablePrev]="disablePreviousQuestionButton()"
+                  [total]="questionsAmount()"
+                />
 
-              @if(exam.exam.status === "in_progress") {
-                <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
-              }
-            </div>
+                @if(exam.status === "in_progress") {
+                  <p-progress-bar [showValue]="false" [style]="{ height: '4px' }" [value]="progressValue()"/>
+                }
+              </div>
 
-            <!-- Row 3: tabs -->
-            <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
-              <app-question-tab-content
-                questionTab
-                (optionSelected)="selectOption(question.id, $event)"
-                (uncheckedOption)="uncheckOption(question.id)"
-                [question]="question"
-                [selectedOptionId]="getSelectedOptionId(attempts(), question.id)"
-                [disableSelection]="exam.exam.status === 'finished'"
-                [examStatus]="exam.exam.status"
-                [attempt]="attemptsV2[question.id]"
-              />
+              <!-- Row 3: tabs -->
+              <app-exam-tabs (tabChange)="activeTab.set($event)" [activeTab]="activeTab()">
+                <app-question-tab-content
+                  questionTab
+                  (uncheckedOption)="selectOption(currentQuestion.attemptData?.id, null)"
+                  [question]="currentQuestion"
+                  [selectedOptionId]="currentQuestion.attemptData?.selectedOptionId"
+                  [disableSelection]="exam.status === 'finished'"
+                  [examStatus]="exam.status"
+                  [attempt]="currentQuestion.attemptData"
+                  (next)="nextQuestion()"
+                  (prev)="prevQuestion()"
+                  [disableNext]="disableNextQuestionButton()"
+                  [disablePrev]="disablePreviousQuestionButton()"
+                  (optionSelected)="selectOption(currentQuestion.attemptData?.id, $event)"
+                />
 
-              <div explanationTab>Explanation (coming soon)</div>
-              <div statsTab>Statistics (coming soon)</div>
-              <div commentsTab>Comments (coming soon)</div>
-              <div notesTab>Notes (coming soon)</div>
-            </app-exam-tabs>
-          </section>
+                <div explanationTab>Explanation (coming soon)</div>
+                <div statsTab>Statistics (coming soon)</div>
+                <div commentsTab>Comments (coming soon)</div>
+                <div notesTab>Notes (coming soon)</div>
+              </app-exam-tabs>
+            </section>
 
-          <aside class="right">
-            <p-button
-              (click)="finish()"
-              [disabled]="finishingSig()"
-              size="small"
-              fluid
-            >
-              {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
-            </p-button>
+            <aside class="right">
+              <p-button
+                (click)="finish()"
+                [disabled]="finishingSig()"
+                size="small"
+                fluid
+              >
+                {{ finishingSig() ? 'Finishing...' : 'Finish exam' }}
+              </p-button>
 
-            <div class="nav">
-              @for (q of exam.questions; track q.id; let i = $index) {
-                <p-button
-                  class="teste"
-                  (click)="goTo(i)"
-                  [examStatus]="exam.exam.status"
-                  [attempt]="attemptsV2[q.id]"
-                  [isCurrent]="activeQuestion()?.id === q.id"
-                  size="small"
-                  iteraExamNavButton
-                  fluid
-                >
-                  {{ i + 1 }}
-                </p-button>
-              }
-            </div>
-          </aside>
-        </div>
+              <div class="nav">
+                @if (questionsWithAttempt(); as list) {
+                  @for (q of list; track q.questionData.id; let i = $index) {
+                    <p-button
+                      class="teste"
+                      (click)="setCurrentQuestionByIndex(i)"
+                      [examStatus]="exam.status"
+                      [attempt]="q.attemptData"
+                      [isCurrent]="currentQuestion?.questionData?.id === q.questionData.id"
+                      size="small"
+                      iteraExamNavButton
+                      fluid
+                    >
+                      {{ i + 1 }}
+                    </p-button>
+                  }
+                }
+              </div>
+            </aside>
+          </div>
+        }
       }
     }
   }

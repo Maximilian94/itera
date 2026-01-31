@@ -1,8 +1,10 @@
 <div class="question-tab">
-  <div class="statement">{{ question.statement }}</div>
+<!--  TODO-->
+  <div class="statement">{{ question.questionData.statement }}</div>
 
   <div class="options">
-    @for (opt of question.options; track opt.id) {
+<!--    TODO-->
+    @for (opt of question.questionData.options; track opt.id) {
 
         <div
           iteraExamOptionCard="option"
@@ -17,22 +19,17 @@
           </span>
           <span pButtonLabel class="option-btn-text">{{ opt.text }}</span>
         </div>
-
-<!--      <p-button-->
-<!--        iteraExamButton="option"-->
-<!--        #examButton-->
-<!--        (click)="onButtonClick(opt.id)"-->
-<!--        [examStatus]="examStatus"-->
-<!--        [attempt]="attempt"-->
-<!--        [selectedOptionId]="selectedOptionId"-->
-<!--        [optionId]="opt.id"-->
-<!--        fluid-->
-<!--      >-->
-<!--        <span pButtonLabel aria-hidden="true" class="option-btn-badge">-->
-<!--          {{ alphabet[$index] }}-->
-<!--        </span>-->
-<!--        <span pButtonLabel class="option-btn-text">{{ opt.text }}</span>-->
-<!--      </p-button>-->
     }
+  </div>
+
+  <div class="action-buttons">
+    <p-button size="small" (onClick)="prev.emit()" [disabled]="disablePrev" pTooltip="You’re already on the first question." [tooltipOptions]="{disabled: !disablePrev}">
+      <fa-icon [icon]="faChevronLeft" pButtonIcon />
+      <span pButtonLabel>Previous</span>
+    </p-button>
+    <p-button size="small" (onClick)="next.emit()" [disabled]="disableNext" pTooltip="You’re already on the last question." [tooltipOptions]="{disabled: !disableNext}">
+      <span pButtonLabel>Next</span>
+      <fa-icon [icon]="faChevronRight" pButtonIcon />
+    </p-button>
   </div>
 </div>

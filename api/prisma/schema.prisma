@@ -14,19 +14,28 @@ model User {
   createdAt    DateTime  @default(now())
 
   attempts Attempt[]
-  exams    ExamService[]
+  exams    Exam[]
 
   @@map("users")
 }
 
 model Skill {
   id        String     @id @default(uuid()) @db.Uuid
-  name      String     @unique
+  name      String
   createdAt DateTime   @default(now())
 
-  questions Question[]
+  // Path Enumeration (Materialized Path)
+  // Stores the complete hierarchy (ex: "uuid1/uuid2/uuid3")
+  path String @unique
 
+  parentId  String?    @db.Uuid
+  parent    Skill?     @relation("SkillHierarchy", fields: [parentId], references: [id], onDelete: Cascade)
+  children  Skill[]    @relation("SkillHierarchy")
+
+  questions Question[]
+  
   @@map("skills")
+  @@index([path])
 }
 
 model Question {
@@ -63,20 +72,19 @@ model Option {
 
 model Attempt {
   id        String   @id @default(uuid()) @db.Uuid
-  isCorrect Boolean
   createdAt DateTime @default(now())
 
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   examId String? @db.Uuid
-  exam   ExamService?   @relation(fields: [examId], references: [id], onDelete: SetNull)
+  exam   Exam?   @relation(fields: [examId], references: [id], onDelete: SetNull)
 
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
 
-  selectedOptionId String @db.Uuid
-  selectedOption   Option @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
+  selectedOptionId String? @db.Uuid
+  selectedOption   Option? @relation(fields: [selectedOptionId], references: [id], onDelete: Restrict)
 
   @@index([userId, createdAt])
   @@index([examId, createdAt])
@@ -85,7 +93,7 @@ model Attempt {
   @@map("attempts")
 }
 
-model ExamService {
+model Exam {
   id           String   @id @default(uuid()) @db.Uuid
   createdAt    DateTime @default(now())
   startedAt    DateTime?
@@ -108,7 +116,7 @@ model ExamQuestion {
   order Int
 
   examId     String @db.Uuid
-  exam       ExamService   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  exam       Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Restrict)

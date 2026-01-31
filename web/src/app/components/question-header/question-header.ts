@@ -13,7 +13,7 @@ import {faThumbtack} from '@fortawesome/free-solid-svg-icons/faThumbtack';
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class QuestionHeader {
-  @Input({ required: true }) current!: number; // 1-based
+  @Input({ required: true }) currentQuestionIndex!: number; // 1-based
   @Input({ required: true }) total!: number;
 
   @Input() disablePrev = false;

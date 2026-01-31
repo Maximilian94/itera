@@ -7,17 +7,17 @@ export const PATH = {
   home: 'home',
   history: 'history',
   exams: 'exams',
-  questions: 'questions',
   exam: 'exam',
+  tags: 'tags',
+  questions: 'questions',
 } as const;
 
 export const LINK = {
   home: ['/', PATH.app, PATH.home] as const,
   history:  ['/', PATH.app, PATH.history] as const,
-  examResults: (examId: string) => ['/', PATH.app, PATH.history, examId] as const,
-  question: (examId: string, questionId: string) =>
-    ['/', PATH.app, PATH.exams, examId, PATH.questions, questionId] as const,
   exam: (examId: string) => ['/', PATH.app, PATH.exams, examId] as const,
+  tags: ['/', PATH.app, PATH.tags] as const,
+  questions: ['/', PATH.app, PATH.questions] as const,
 };
 
 export const routes: Routes = [
@@ -55,13 +55,17 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/app/history/exam-results.page').then((m) => m.ExamResultsPage),
       },
       {
-        path: 'exams/:examId/questions/:questionId',
-        loadComponent: () => import('./pages/app/question/question.page').then((m) => m.QuestionPage),
-      },
-      {
         path: 'exams/:examId',
         loadComponent: () => import('./pages/app/exam/exam.page').then((m) => m.ExamPage),
       },
+      {
+        path: 'tags',
+        loadComponent: () => import('./pages/app/skills/skills').then((m) => m.Skills),
+      },
+      {
+        path: 'questions',
+        loadComponent: () => import('./pages/app/question-bank/question-bank').then((m) => m.QuestionBank)
+      }
     ],
   },
 ];

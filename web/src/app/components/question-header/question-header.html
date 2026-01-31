@@ -6,14 +6,14 @@
       </ng-template>
     </p-button>
 
-    <span>{{ current }} / {{ total }}</span>
+    <span>{{ currentQuestionIndex }} / {{ total }}</span>
 
     <div>
-      <p-button (click)="save.emit()" [text]="true" rounded severity="secondary">
-        <ng-template #icon>
-          <fa-icon [icon]="faThumbtack"></fa-icon>
-        </ng-template>
-      </p-button>
+        <p-button (click)="save.emit()" [text]="true" rounded severity="secondary">
+          <ng-template #icon>
+            <fa-icon [icon]="faThumbtack"></fa-icon>
+          </ng-template>
+        </p-button>
 
       <p-button (click)="watch.emit()" [text]="true" rounded severity="secondary">
         <ng-template #icon>

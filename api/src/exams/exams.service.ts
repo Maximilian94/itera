@@ -7,22 +7,14 @@ import {
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import type {
-  ExamQuestionsResponseDto,
   ExamQuestionDto,
+  ExamQuestionsResponseDto,
 } from './dto/exam-questions.response';
+import { Exam, ExamInProgress } from '@domain/exam/exam.interface';
 
 @Injectable()
 export class ExamsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  private toExamStatus(exam: {
-    startedAt: Date | null;
-    finishedAt: Date | null;
-  }) {
-    if (exam.finishedAt) return 'finished' as const;
-    if (exam.startedAt) return 'in_progress' as const;
-    return 'not_started' as const;
-  }
 
   async listExams(input: { userId: string }) {
     const exams = await this.prisma.exam.findMany({
@@ -35,16 +27,36 @@ export class ExamsService {
         finishedAt: true,
         questionCount: true,
         attempts: {
-          select: { questionId: true, isCorrect: true },
+          select: { questionId: true, selectedOptionId: true },
+        },
+        questions: {
+          select: {
+            question: {
+              select: {
+                options: true,
+                id: true,
+              },
+            },
+          },
         },
       },
     });
 
     return {
       exams: exams.map((e) => {
+        const questions = e.questions.map((q) => q.question);
+        const attempts = e.attempts;
         const correct = new Set(
-          e.attempts.filter((a) => a.isCorrect).map((a) => a.questionId),
+          attempts.filter((a) => {
+            return (
+              a.selectedOptionId &&
+              questions
+                .find((q) => q.id === a.questionId)
+                ?.options.find((o) => o.id === a.selectedOptionId)?.isCorrect
+            );
+          }),
         );
+
         const attempted = new Set(e.attempts.map((a) => a.questionId));
         const correctCount = correct.size;
         const attemptedCount = attempted.size;
@@ -79,7 +91,7 @@ export class ExamsService {
     if (input.onlyUnsolved) {
       where.AND = [
         { attempts: { some: { userId: input.userId } } },
-        { attempts: { none: { userId: input.userId, isCorrect: true } } },
+        { attempts: { none: { userId: input.userId } } },
       ];
     }
 
@@ -125,6 +137,17 @@ export class ExamsService {
               questionId,
               order: idx + 1,
             })),
+          },
+        },
+        attempts: {
+          createMany: {
+            data: chosen.map((questionId) => {
+              return {
+                userId: input.userId,
+                questionId: questionId,
+                selectedOptionId: undefined,
+              };
+            }),
           },
         },
       },
@@ -197,7 +220,10 @@ export class ExamsService {
     return { exam: examDto, questions: questionsBase };
   }
 
-  async startExam(input: { userId: string; examId: string }) {
+  async startExam(input: {
+    userId: string;
+    examId: string;
+  }): Promise<ExamInProgress> {
     const exam = await this.prisma.exam.findUnique({
       where: { id: input.examId },
       select: { id: true, userId: true, startedAt: true, finishedAt: true },
@@ -207,23 +233,43 @@ export class ExamsService {
       throw new ForbiddenException('exam does not belong to user');
     if (exam.finishedAt) throw new BadRequestException('exam already finished');
     if (exam.startedAt) {
-      return { exam: { ...exam, status: this.toExamStatus(exam) } };
+      throw new BadRequestException('exam already started');
     }
 
-    const updated = await this.prisma.exam.update({
+    const examV2 = await this.prisma.exam.update({
       where: { id: input.examId },
       data: { startedAt: new Date() },
-      select: { id: true, startedAt: true, finishedAt: true },
+      include: {
+        questions: {
+          include: {
+            question: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    return { exam: { ...updated, status: this.toExamStatus(updated) } };
+    return {
+      id: examV2.id,
+      createdAt: examV2.createdAt,
+      questionCount: examV2.questionCount,
+      status: 'in_progress',
+      startedAt: examV2.startedAt!,
+      finishedAt: null,
+      questions: examV2.questions.map((q) => {
+        return {
+          id: q.questionId,
+          statement: q.question.statement,
+          options: q.question.options,
+        };
+      }),
+    };
   }
 
-  async finishExam(input: {
-    userId: string;
-    examId: string;
-    answers?: { questionId: string; selectedOptionId: string }[];
-  }): Promise<ExamQuestionsResponseDto> {
+  async finishExam(input: { userId: string; examId: string }): Promise<Exam> {
     const exam = await this.prisma.exam.findUnique({
       where: { id: input.examId },
       select: { id: true, userId: true, startedAt: true, finishedAt: true },
@@ -232,103 +278,22 @@ export class ExamsService {
     if (exam.userId !== input.userId)
       throw new ForbiddenException('exam does not belong to user');
     if (!exam.startedAt) throw new BadRequestException('exam not started');
-    if (exam.finishedAt) {
-      return this.getExamQuestions({
-        userId: input.userId,
-        examId: input.examId,
-      });
-    }
 
-    const now = new Date();
-
-    if (!input.answers?.length) {
-      throw new BadRequestException('answers are required to finish exam');
-    }
-
-    // Ensure each questionId appears once.
-    const questionIds = input.answers.map((a) => a.questionId);
-    const uniqueQuestionIds = new Set(questionIds);
-    if (uniqueQuestionIds.size !== questionIds.length) {
-      throw new BadRequestException('duplicate questionId in answers');
-    }
-
-    // Ensure each selectedOptionId appears once.
-    const optionIds = input.answers.map((a) => a.selectedOptionId);
-    const uniqueOptionIds = new Set(optionIds);
-    if (uniqueOptionIds.size !== optionIds.length) {
-      throw new BadRequestException('duplicate selectedOptionId in answers');
-    }
-
-    const examQuestions = await this.prisma.examQuestion.findMany({
-      where: { examId: input.examId },
-      select: { questionId: true },
-    });
-    const allowedQuestionIds = new Set(examQuestions.map((q) => q.questionId));
-
-    // Require all questions to be answered when finishing.
-    if (allowedQuestionIds.size !== uniqueQuestionIds.size) {
-      throw new BadRequestException(
-        'must provide answers for all questions to finish exam',
-      );
-    }
-
-    for (const qid of uniqueQuestionIds) {
-      if (!allowedQuestionIds.has(qid))
-        throw new BadRequestException('answer contains question not in exam');
-    }
-
-    const options = await this.prisma.option.findMany({
-      where: { id: { in: optionIds } },
-      select: { id: true, questionId: true, isCorrect: true },
-    });
-    if (options.length !== optionIds.length)
-      throw new BadRequestException('invalid selectedOptionId in answers');
-
-    const optionById = new Map(options.map((o) => [o.id, o]));
-
-    const attemptsData = input.answers.map((a) => {
-      const opt = optionById.get(a.selectedOptionId);
-      if (!opt)
-        throw new BadRequestException('invalid selectedOptionId in answers');
-      if (opt.questionId !== a.questionId) {
-        throw new BadRequestException(
-          'selectedOptionId does not belong to questionId',
-        );
-      }
-      return {
-        userId: input.userId,
-        examId: input.examId,
-        questionId: a.questionId,
-        selectedOptionId: a.selectedOptionId,
-        isCorrect: opt.isCorrect,
-      };
+    await this.prisma.exam.update({
+      where: { id: input.examId },
+      data: {
+        finishedAt: new Date().toISOString(),
+      },
     });
 
-    await this.prisma.$transaction([
-      this.prisma.attempt.deleteMany({
-        where: { userId: input.userId, examId: input.examId },
-      }),
-      this.prisma.attempt.createMany({
-        data: attemptsData,
-      }),
-      this.prisma.exam.update({
-        where: { id: input.examId },
-        data: { finishedAt: now },
-        select: { id: true },
-      }),
-    ]);
-
-    return this.getExamQuestions({ userId: input.userId, examId: input.examId });
+    return this.getExam({
+      examId: input.examId,
+      userId: input.userId,
+    });
   }
 
   async getExamResults(input: { userId: string; examId: string }) {
     const base = await this.getExamQuestions(input);
-
-    const attempts = await this.prisma.attempt.findMany({
-      where: { userId: input.userId, examId: input.examId },
-      select: { questionId: true, isCorrect: true, createdAt: true },
-      orderBy: { createdAt: 'desc' },
-    });
 
     // status per question:
     // - correct: any correct attempt inside this exam
@@ -338,38 +303,105 @@ export class ExamsService {
       string,
       'correct' | 'incorrect' | 'unanswered'
     >();
-    const anyAttempt = new Set(attempts.map((a) => a.questionId));
-    const anyCorrect = new Set(
-      attempts.filter((a) => a.isCorrect).map((a) => a.questionId),
-    );
-
-    for (const q of base.questions) {
-      if (anyCorrect.has(q.id)) statusByQuestionId.set(q.id, 'correct');
-      else if (anyAttempt.has(q.id)) statusByQuestionId.set(q.id, 'incorrect');
-      else statusByQuestionId.set(q.id, 'unanswered');
-    }
 
     const questions = base.questions.map((q) => ({
       ...q,
       status: statusByQuestionId.get(q.id) ?? 'unanswered',
     }));
 
-    const correctCount = questions.filter((q) => q.status === 'correct').length;
-    const incorrectCount = questions.filter(
-      (q) => q.status === 'incorrect',
-    ).length;
-    const unansweredCount = questions.filter(
-      (q) => q.status === 'unanswered',
-    ).length;
-
     return {
       exam: {
         ...base.exam,
-        correctCount,
-        incorrectCount,
-        unansweredCount,
       },
       questions,
     };
+  }
+
+  async getExam(input: { userId: string; examId: string }): Promise<Exam> {
+    const examFromDb = await this.prisma.exam.findUnique({
+      where: { id: input.examId },
+      include: {
+        questions: {
+          include: {
+            question: {
+              include: {
+                options: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    console.log(examFromDb);
+
+    if (!examFromDb) throw new NotFoundException('exam not found');
+
+    if (examFromDb.userId !== input.userId)
+      throw new ForbiddenException('exam does not belong to user');
+
+    if (!examFromDb.startedAt) {
+      return {
+        id: examFromDb.id,
+        createdAt: examFromDb.createdAt,
+        questionCount: examFromDb.questionCount,
+        status: 'not_started',
+        startedAt: null,
+        finishedAt: null,
+        // TODO
+        questions: examFromDb.questions.map((q) => {
+          return {
+            id: q.questionId,
+            statement: q.question.statement,
+            options: q.question.options,
+          };
+        }),
+      };
+    }
+
+    if (!examFromDb.finishedAt) {
+      return {
+        id: examFromDb.id,
+        createdAt: examFromDb.createdAt,
+        questionCount: examFromDb.questionCount,
+        status: 'in_progress',
+        startedAt: examFromDb.startedAt,
+        finishedAt: null,
+        // TODO
+        questions: examFromDb.questions.map((q) => {
+          return {
+            id: q.questionId,
+            statement: q.question.statement,
+            options: q.question.options,
+          };
+        }),
+      };
+    }
+
+    return {
+      id: examFromDb.id,
+      createdAt: examFromDb.createdAt,
+      questionCount: examFromDb.questionCount,
+      status: 'finished',
+      startedAt: examFromDb.startedAt,
+      finishedAt: examFromDb.finishedAt,
+      // TODO
+      questions: examFromDb.questions.map((q) => {
+        return {
+          id: q.questionId,
+          statement: q.question.statement,
+          options: q.question.options,
+        };
+      }),
+    };
+  }
+
+  private toExamStatus(exam: {
+    startedAt: Date | null;
+    finishedAt: Date | null;
+  }) {
+    if (exam.finishedAt) return 'finished' as const;
+    if (exam.startedAt) return 'in_progress' as const;
+    return 'not_started' as const;
   }
 }
