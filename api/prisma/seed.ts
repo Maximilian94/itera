@@ -1,5 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
+import { seedQuestions } from './seed/questions/questions';
+import { QUESTION_BANK } from './seed/questions/questions.seed';
 
 const prisma = new PrismaClient();
 
@@ -334,6 +336,7 @@ async function main() {
   };
 
   await createSkillTree(roadmap);
+  await seedQuestions(prisma, QUESTION_BANK);
 
   console.log('✅ Seed de skills do Angular concluído.');
 }
