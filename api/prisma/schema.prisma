@@ -176,8 +176,8 @@ model ExamBaseQuestion {
   examBaseId String   @db.Uuid
   examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
 
-  subject   String
-  topic     String
+  subject   String?
+  topic     String?
   subtopics String[] @default([])
 
   statement String
