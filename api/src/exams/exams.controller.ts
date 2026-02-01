@@ -16,6 +16,7 @@ export class ExamsController {
   create(@Req() req: { user: { userId: string } }, @Body() dto: CreateExamDto) {
     return this.exams.createExam({
       userId: req.user.userId,
+      examBoardId: dto.examBoardId,
       skillIds: dto.skillIds,
       onlyUnsolved: dto.onlyUnsolved,
       questionCount: dto.questionCount,

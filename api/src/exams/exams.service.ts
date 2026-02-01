@@ -80,6 +80,7 @@ export class ExamsService {
 
   async createExam(input: {
     userId: string;
+    examBoardId?: string;
     skillIds?: string[];
     onlyUnsolved?: boolean;
     questionCount?: number;
@@ -128,6 +129,7 @@ export class ExamsService {
     const exam = await this.prisma.exam.create({
       data: {
         userId: input.userId,
+        examBoardId: input.examBoardId,
         questionCount: count,
         onlyUnsolved: input.onlyUnsolved ?? false,
         filterSkillIds: input.skillIds ?? [],

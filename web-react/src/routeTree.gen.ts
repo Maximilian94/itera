@@ -13,6 +13,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedExamBoardsRouteImport } from './routes/_authenticated/exam-boards'
+import { Route as AuthenticatedExamBasesRouteImport } from './routes/_authenticated/exam-bases'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedExamsIndexRouteImport } from './routes/_authenticated/exams/index'
@@ -37,6 +38,11 @@ const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
 const AuthenticatedExamBoardsRoute = AuthenticatedExamBoardsRouteImport.update({
   id: '/exam-boards',
   path: '/exam-boards',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedExamBasesRoute = AuthenticatedExamBasesRouteImport.update({
+  id: '/exam-bases',
+  path: '/exam-bases',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
@@ -77,6 +83,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/exam-bases': typeof AuthenticatedExamBasesRoute
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/exams/': typeof AuthenticatedExamsIndexRoute
@@ -88,6 +95,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/exam-bases': typeof AuthenticatedExamBasesRoute
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/history': typeof AuthenticatedHistoryRoute
   '/exams': typeof AuthenticatedExamsIndexRoute
@@ -101,6 +109,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
+  '/_authenticated/exam-bases': typeof AuthenticatedExamBasesRoute
   '/_authenticated/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/exams/': typeof AuthenticatedExamsIndexRoute
@@ -114,6 +123,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/database'
+    | '/exam-bases'
     | '/exam-boards'
     | '/history'
     | '/exams/'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/database'
+    | '/exam-bases'
     | '/exam-boards'
     | '/history'
     | '/exams'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
+    | '/_authenticated/exam-bases'
     | '/_authenticated/exam-boards'
     | '/_authenticated/history'
     | '/_authenticated/exams/'
@@ -178,6 +190,13 @@ declare module '@tanstack/react-router' {
       path: '/exam-boards'
       fullPath: '/exam-boards'
       preLoaderRoute: typeof AuthenticatedExamBoardsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/exam-bases': {
+      id: '/_authenticated/exam-bases'
+      path: '/exam-bases'
+      fullPath: '/exam-bases'
+      preLoaderRoute: typeof AuthenticatedExamBasesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/database': {
@@ -228,6 +247,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
+  AuthenticatedExamBasesRoute: typeof AuthenticatedExamBasesRoute
   AuthenticatedExamBoardsRoute: typeof AuthenticatedExamBoardsRoute
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedExamsIndexRoute: typeof AuthenticatedExamsIndexRoute
@@ -239,6 +259,7 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
+  AuthenticatedExamBasesRoute: AuthenticatedExamBasesRoute,
   AuthenticatedExamBoardsRoute: AuthenticatedExamBoardsRoute,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedExamsIndexRoute: AuthenticatedExamsIndexRoute,
