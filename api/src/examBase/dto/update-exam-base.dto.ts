@@ -1,4 +1,5 @@
-import { IsDateString, IsOptional, IsString, IsUUID } from 'class-validator';
+import { GovernmentScope } from '@prisma/client';
+import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
 
 export class UpdateExamBaseDto {
   @IsOptional()
@@ -16,6 +17,22 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsString()
   role?: string;
+
+  @IsOptional()
+  @IsEnum(GovernmentScope)
+  governmentScope?: GovernmentScope;
+
+  @IsOptional()
+  @IsString()
+  state?: string | null;
+
+  @IsOptional()
+  @IsString()
+  city?: string | null;
+
+  @IsOptional()
+  @IsDecimal({ decimal_digits: '0,2' })
+  salaryBase?: string | null;
 
   @IsOptional()
   @IsDateString()

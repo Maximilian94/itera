@@ -58,6 +58,12 @@ function RouteComponent() {
   const [createName, setCreateName] = useState('')
   const [createRole, setCreateRole] = useState('')
   const [createInstitution, setCreateInstitution] = useState('')
+  const [createGovernmentScope, setCreateGovernmentScope] = useState<
+    'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  >('FEDERAL')
+  const [createState, setCreateState] = useState('')
+  const [createCity, setCreateCity] = useState('')
+  const [createSalaryBase, setCreateSalaryBase] = useState('')
   const [createExamDate, setCreateExamDate] = useState('')
   const [createExamBoardId, setCreateExamBoardId] = useState<string>('')
 
@@ -66,18 +72,36 @@ function RouteComponent() {
   const [editName, setEditName] = useState('')
   const [editRole, setEditRole] = useState('')
   const [editInstitution, setEditInstitution] = useState('')
+  const [editGovernmentScope, setEditGovernmentScope] = useState<
+    'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  >('FEDERAL')
+  const [editState, setEditState] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [editSalaryBase, setEditSalaryBase] = useState('')
   const [editExamDate, setEditExamDate] = useState('')
   const [editExamBoardId, setEditExamBoardId] = useState<string>('')
 
   const canCreate = useMemo(() => {
-    return (
-      !!createName.trim() && !!createRole.trim() && !!createExamDate.trim()
-    )
-  }, [createName, createRole, createExamDate])
+    if (!createName.trim() || !createRole.trim() || !createExamDate.trim()) return false
+    if (createGovernmentScope === 'MUNICIPAL') {
+      return !!createState.trim() && !!createCity.trim()
+    }
+    if (createGovernmentScope === 'STATE') {
+      return !!createState.trim() && !createCity.trim()
+    }
+    return !createState.trim() && !createCity.trim()
+  }, [createName, createRole, createExamDate, createGovernmentScope, createState, createCity])
 
   const canSaveEdit = useMemo(() => {
-    return !!editName.trim() && !!editRole.trim() && !!editExamDate.trim()
-  }, [editName, editRole, editExamDate])
+    if (!editName.trim() || !editRole.trim() || !editExamDate.trim()) return false
+    if (editGovernmentScope === 'MUNICIPAL') {
+      return !!editState.trim() && !!editCity.trim()
+    }
+    if (editGovernmentScope === 'STATE') {
+      return !!editState.trim() && !editCity.trim()
+    }
+    return !editState.trim() && !editCity.trim()
+  }, [editName, editRole, editExamDate, editGovernmentScope, editState, editCity])
 
   async function refetchExamBases() {
     await queryClient.invalidateQueries({ queryKey: ['examBases'] })
@@ -87,6 +111,10 @@ function RouteComponent() {
     setCreateName('')
     setCreateRole('')
     setCreateInstitution('')
+    setCreateGovernmentScope('FEDERAL')
+    setCreateState('')
+    setCreateCity('')
+    setCreateSalaryBase('')
     setCreateExamDate('')
     setCreateExamBoardId('')
   }
@@ -98,6 +126,10 @@ function RouteComponent() {
         name: createName.trim(),
         role: createRole.trim(),
         institution: createInstitution.trim() || undefined,
+        governmentScope: createGovernmentScope,
+        state: createState.trim() ? createState.trim() : null,
+        city: createCity.trim() ? createCity.trim() : null,
+        salaryBase: createSalaryBase.trim() ? createSalaryBase.trim() : null,
         examDate: dateInputToIso(createExamDate.trim()),
         examBoardId: createExamBoardId || undefined,
       })
@@ -114,6 +146,10 @@ function RouteComponent() {
     setEditName(row.name ?? '')
     setEditRole(row.role ?? '')
     setEditInstitution(row.institution ?? '')
+    setEditGovernmentScope(row.governmentScope)
+    setEditState(row.state ?? '')
+    setEditCity(row.city ?? '')
+    setEditSalaryBase(row.salaryBase ?? '')
     setEditExamDate(isoToDateInput(row.examDate))
     setEditExamBoardId(row.examBoardId ?? '')
     setEditOpen(true)
@@ -125,6 +161,10 @@ function RouteComponent() {
     setEditName('')
     setEditRole('')
     setEditInstitution('')
+    setEditGovernmentScope('FEDERAL')
+    setEditState('')
+    setEditCity('')
+    setEditSalaryBase('')
     setEditExamDate('')
     setEditExamBoardId('')
   }
@@ -137,6 +177,10 @@ function RouteComponent() {
         name: editName.trim(),
         role: editRole.trim(),
         institution: editInstitution.trim() || null,
+        governmentScope: editGovernmentScope,
+        state: editState.trim() ? editState.trim() : null,
+        city: editCity.trim() ? editCity.trim() : null,
+        salaryBase: editSalaryBase.trim() ? editSalaryBase.trim() : null,
         examDate: dateInputToIso(editExamDate.trim()),
         examBoardId: editExamBoardId || null,
       })
@@ -171,6 +215,9 @@ function RouteComponent() {
               <TableCell>Name</TableCell>
               <TableCell>Role</TableCell>
               <TableCell>Institution</TableCell>
+              <TableCell>Scope</TableCell>
+              <TableCell>Location</TableCell>
+              <TableCell>Salary base</TableCell>
               <TableCell>Exam date</TableCell>
               <TableCell>Exam board</TableCell>
               <TableCell align="right" width={80}>
@@ -180,11 +227,19 @@ function RouteComponent() {
           </TableHead>
           <TableBody>
             {examBases?.map((row) => {
+              const location = row.governmentScope === 'MUNICIPAL'
+                ? `${row.city ?? ''}/${row.state ?? ''}`.replace(/^\/|\/$/g, '')
+                : row.governmentScope === 'STATE'
+                  ? row.state ?? '—'
+                  : '—'
               return (
                 <TableRow key={row.id}>
                   <TableCell>{row.name}</TableCell>
                   <TableCell>{row.role}</TableCell>
                   <TableCell>{row.institution ?? '—'}</TableCell>
+                  <TableCell>{row.governmentScope}</TableCell>
+                  <TableCell>{location || '—'}</TableCell>
+                  <TableCell>{row.salaryBase ?? '—'}</TableCell>
                   <TableCell>{isoToDateInput(row.examDate) || '—'}</TableCell>
                   <TableCell>{row.examBoard?.name ?? '—'}</TableCell>
                   <TableCell align="right">
@@ -237,6 +292,55 @@ function RouteComponent() {
               label="Institution"
               value={createInstitution}
               onChange={(e) => setCreateInstitution(e.target.value)}
+              fullWidth
+            />
+
+            <FormControl fullWidth>
+              <InputLabel id="create-scope-label">Government scope</InputLabel>
+              <Select
+                labelId="create-scope-label"
+                value={createGovernmentScope}
+                label="Government scope"
+                onChange={(e) => {
+                  const v = e.target.value as 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+                  setCreateGovernmentScope(v)
+                  if (v === 'FEDERAL') {
+                    setCreateState('')
+                    setCreateCity('')
+                  } else if (v === 'STATE') {
+                    setCreateCity('')
+                  }
+                }}
+              >
+                <MenuItem value="MUNICIPAL">Municipal</MenuItem>
+                <MenuItem value="STATE">State</MenuItem>
+                <MenuItem value="FEDERAL">Federal</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Stack direction="row" gap={2}>
+              <TextField
+                label="State"
+                value={createState}
+                onChange={(e) => setCreateState(e.target.value)}
+                disabled={createGovernmentScope === 'FEDERAL'}
+                fullWidth
+              />
+              <TextField
+                label="City"
+                value={createCity}
+                onChange={(e) => setCreateCity(e.target.value)}
+                disabled={createGovernmentScope !== 'MUNICIPAL'}
+                fullWidth
+              />
+            </Stack>
+
+            <TextField
+              label="Salary base"
+              type="number"
+              value={createSalaryBase}
+              onChange={(e) => setCreateSalaryBase(e.target.value)}
+              inputProps={{ step: '0.01', min: 0 }}
               fullWidth
             />
 
@@ -298,6 +402,55 @@ function RouteComponent() {
               label="Institution"
               value={editInstitution}
               onChange={(e) => setEditInstitution(e.target.value)}
+              fullWidth
+            />
+
+            <FormControl fullWidth>
+              <InputLabel id="edit-scope-label">Government scope</InputLabel>
+              <Select
+                labelId="edit-scope-label"
+                value={editGovernmentScope}
+                label="Government scope"
+                onChange={(e) => {
+                  const v = e.target.value as 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+                  setEditGovernmentScope(v)
+                  if (v === 'FEDERAL') {
+                    setEditState('')
+                    setEditCity('')
+                  } else if (v === 'STATE') {
+                    setEditCity('')
+                  }
+                }}
+              >
+                <MenuItem value="MUNICIPAL">Municipal</MenuItem>
+                <MenuItem value="STATE">State</MenuItem>
+                <MenuItem value="FEDERAL">Federal</MenuItem>
+              </Select>
+            </FormControl>
+
+            <Stack direction="row" gap={2}>
+              <TextField
+                label="State"
+                value={editState}
+                onChange={(e) => setEditState(e.target.value)}
+                disabled={editGovernmentScope === 'FEDERAL'}
+                fullWidth
+              />
+              <TextField
+                label="City"
+                value={editCity}
+                onChange={(e) => setEditCity(e.target.value)}
+                disabled={editGovernmentScope !== 'MUNICIPAL'}
+                fullWidth
+              />
+            </Stack>
+
+            <TextField
+              label="Salary"
+              type="number"
+              value={editSalaryBase}
+              onChange={(e) => setEditSalaryBase(e.target.value)}
+              inputProps={{ step: '0.01', min: 0 }}
               fullWidth
             />
 

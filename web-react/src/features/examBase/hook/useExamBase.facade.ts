@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
 import { useExamBaseQueries } from '../queries/examBase.queries'
 
-export function useExamBaseFacade() {
-  const { data: examBases, isLoading: isLoadingExamBases } = useExamBaseQueries()
+export function useExamBaseFacade(input?: { examBoardId?: string }) {
+  const { data: examBases, isLoading: isLoadingExamBases } = useExamBaseQueries(input ?? {})
 
   return useMemo(() => {
     return {

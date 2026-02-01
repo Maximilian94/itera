@@ -19,9 +19,9 @@ function RouteComponent() {
     <div className='p-4'>
       <Grid container spacing={2}>
         {examBoards?.map((examBoard) => (
-          <Grid size={1.5} key={examBoard.id}>
-            <Link to="/exams/$examBoard" params={{ examBoard: examBoard.name.toLowerCase().replace(' ', '-') }}>
-            <div className='w-full h-16'>
+          <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={examBoard.id}>
+            <Link to="/exams/$examBoard" params={{ examBoard: examBoard.id }}>
+            <div className='w-full h-40'>
          <Button sx={{ height: '100%' }}>
                 <Paper sx={{ height: '100%' }}>
                   <img src={examBoard.logoUrl} alt={examBoard.name} className="w-full h-full object-contain" />

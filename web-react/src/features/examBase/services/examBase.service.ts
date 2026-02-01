@@ -1,15 +1,19 @@
-import { apiFetch } from '@/lib/api'
 import type {
   CreateExamBaseInput,
   ExamBase,
   UpdateExamBaseInput,
 } from '../domain/examBase.types'
+import { apiFetch } from '@/lib/api'
 
 class ExamBaseService {
   private urlPath = '/exam-bases'
 
-  async list() {
-    return await apiFetch<ExamBase[]>(this.urlPath, { method: 'GET' })
+  async list(input?: { examBoardId?: string }) {
+    const params = new URLSearchParams()
+    if (input?.examBoardId) {
+      params.set('examBoardId', input.examBoardId)
+    }
+    return await apiFetch<Array<ExamBase>>(`${this.urlPath}?${params.toString()}`, { method: 'GET' })
   }
 
   async getOne(id: string) {

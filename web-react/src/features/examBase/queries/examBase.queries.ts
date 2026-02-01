@@ -5,10 +5,11 @@ export const examBaseKeys = {
   examBases: ['examBases'] as const,
 }
 
-export function useExamBaseQueries() {
+export function useExamBaseQueries(input?: { examBoardId?: string }) {
   return useQuery({
     queryKey: examBaseKeys.examBases,
-    queryFn: () => examBaseService.list(),
+    queryFn: () => examBaseService.list(input),
+    enabled: input?.examBoardId != null && input.examBoardId !== '',
   })
 }
 

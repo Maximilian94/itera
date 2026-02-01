@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { GovernmentScope, Prisma, PrismaClient } from '@prisma/client';
 import { randomUUID } from 'crypto';
 import { seedQuestions } from './seed/questions/questions';
 import { QUESTION_BANK } from './seed/questions/questions.seed';
@@ -40,9 +40,12 @@ async function main() {
   await prisma.$transaction([
     prisma.attempt.deleteMany(),
     prisma.examQuestion.deleteMany(),
+    prisma.exam.deleteMany(),
     prisma.option.deleteMany(),
     prisma.question.deleteMany(),
     prisma.skill.deleteMany(),
+    prisma.examBase.deleteMany(),
+    prisma.examBoard.deleteMany(),
   ]);
 
   const roadmap: SkillNode = {
@@ -337,6 +340,65 @@ async function main() {
 
   await createSkillTree(roadmap);
   await seedQuestions(prisma, QUESTION_BANK);
+
+  // Seed minimal exam boards + exam bases (public service positions)
+  const [cespe, fgv] = await prisma.$transaction([
+    prisma.examBoard.create({
+      data: {
+        id: randomUUID(),
+        name: 'CEBRASPE',
+        logoUrl: 'https://example.com/logos/cebraspe.png',
+      },
+    }),
+    prisma.examBoard.create({
+      data: {
+        id: randomUUID(),
+        name: 'FGV',
+        logoUrl: 'https://example.com/logos/fgv.png',
+      },
+    }),
+  ]);
+
+  await prisma.examBase.createMany({
+    data: [
+      {
+        id: randomUUID(),
+        name: 'Prefeitura - Analista de Sistemas',
+        institution: 'Prefeitura Municipal',
+        role: 'Analista de Sistemas',
+        governmentScope: GovernmentScope.MUNICIPAL,
+        state: 'SP',
+        city: 'São Paulo',
+        salaryBase: new Prisma.Decimal('8500.00'),
+        examDate: new Date('2026-06-15T00:00:00.000Z'),
+        examBoardId: cespe.id,
+      },
+      {
+        id: randomUUID(),
+        name: 'Secretaria Estadual - Desenvolvedor',
+        institution: 'Governo do Estado',
+        role: 'Desenvolvedor',
+        governmentScope: GovernmentScope.STATE,
+        state: 'MG',
+        city: null,
+        salaryBase: new Prisma.Decimal('10500.50'),
+        examDate: new Date('2026-08-20T00:00:00.000Z'),
+        examBoardId: fgv.id,
+      },
+      {
+        id: randomUUID(),
+        name: 'Órgão Federal - Engenheiro de Software',
+        institution: 'Administração Federal',
+        role: 'Engenheiro de Software',
+        governmentScope: GovernmentScope.FEDERAL,
+        state: null,
+        city: null,
+        salaryBase: new Prisma.Decimal('14500.00'),
+        examDate: new Date('2026-10-05T00:00:00.000Z'),
+        examBoardId: cespe.id,
+      },
+    ],
+  });
 
   console.log('✅ Seed de skills do Angular concluído.');
 }
