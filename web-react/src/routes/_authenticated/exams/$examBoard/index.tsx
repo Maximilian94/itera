@@ -130,6 +130,7 @@ function RouteComponent() {
             {/* {isLoadingExams ? <Typography>Loading exams...</Typography> : null} */}
 
             {(examBases ?? []).map((examBase) => (
+                <Link to="/exams/$examBoard/$examId" params={{ examBoard: examBoardSlug, examId: examBase.id }}>
                 <Paper key={examBase.id} className='w-full overflow-hidden pr-4 h-min'>
                     <Grid container spacing={2}>
                         <Grid size={1}>
@@ -168,6 +169,7 @@ function RouteComponent() {
                         </Grid>
                     </Grid>
                 </Paper>
+                </Link>
                 // <Link
                 //   key={examBase.id}
                 //   to="/exams/$examBoard/$examId"

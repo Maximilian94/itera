@@ -1,0 +1,429 @@
+import {
+  Alert,
+  Box,
+  Button,
+  FormControl,
+  IconButton,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Typography,
+} from '@mui/material'
+import DeleteIcon from '@mui/icons-material/Delete'
+import EditIcon from '@mui/icons-material/Edit'
+import SaveIcon from '@mui/icons-material/Save'
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+} from '@mui/material'
+import { useState, useEffect } from 'react'
+import type { ExamBaseQuestion } from '@/features/examBaseQuestion/domain/examBaseQuestion.types'
+import {
+  useUpdateExamBaseQuestionMutation,
+  useDeleteExamBaseQuestionMutation,
+  useCreateAlternativeMutation,
+  useUpdateAlternativeMutation,
+  useDeleteAlternativeMutation,
+  getApiMessage,
+  isConflictError,
+} from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+
+function stringListToArray(s: string): string[] {
+  return s
+    .split(',')
+    .map((x) => x.trim())
+    .filter(Boolean)
+}
+
+function arrayToStringList(arr: string[]): string {
+  return arr.join(', ')
+}
+
+const sortedAlternatives = (q: ExamBaseQuestion) =>
+  [...q.alternatives].sort((a, b) => a.key.localeCompare(b.key))
+
+export interface QuestionEditorProps {
+  examBaseId: string
+  question: ExamBaseQuestion
+  onDeleted?: () => void
+}
+
+export function QuestionEditor({
+  examBaseId,
+  question,
+  onDeleted,
+}: QuestionEditorProps) {
+  const [subject, setSubject] = useState(question.subject)
+  const [topic, setTopic] = useState(question.topic)
+  const [subtopicsStr, setSubtopicsStr] = useState(
+    arrayToStringList(question.subtopics ?? []),
+  )
+  const [statement, setStatement] = useState(question.statement)
+  const [skillsStr, setSkillsStr] = useState(
+    arrayToStringList(question.skills ?? []),
+  )
+  const [correctAlternative, setCorrectAlternative] = useState<string>(
+    question.correctAlternative ?? '',
+  )
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [editingAltId, setEditingAltId] = useState<string | null>(null)
+  const [newAltKey, setNewAltKey] = useState('')
+  const [newAltText, setNewAltText] = useState('')
+  const [newAltExplanation, setNewAltExplanation] = useState('')
+  const [altError, setAltError] = useState<string | null>(null)
+  const [editAltKey, setEditAltKey] = useState('')
+  const [editAltText, setEditAltText] = useState('')
+  const [editAltExplanation, setEditAltExplanation] = useState('')
+
+  useEffect(() => {
+    setSubject(question.subject)
+    setTopic(question.topic)
+    setSubtopicsStr(arrayToStringList(question.subtopics ?? []))
+    setStatement(question.statement)
+    setSkillsStr(arrayToStringList(question.skills ?? []))
+    setCorrectAlternative(question.correctAlternative ?? '')
+  }, [question.id, question.subject, question.topic, question.subtopics, question.statement, question.skills, question.correctAlternative])
+
+  const updateQuestion = useUpdateExamBaseQuestionMutation(examBaseId)
+  const deleteQuestion = useDeleteExamBaseQuestionMutation(examBaseId)
+  const createAlternative = useCreateAlternativeMutation(examBaseId, question.id)
+  const updateAlternative = useUpdateAlternativeMutation(examBaseId, question.id)
+  const deleteAlternative = useDeleteAlternativeMutation(examBaseId, question.id)
+
+  const alternatives = sortedAlternatives(question)
+  const alternativeKeys = alternatives.map((a) => a.key)
+
+  const handleSave = async () => {
+    setSaveError(null)
+    const correct =
+      correctAlternative && alternativeKeys.includes(correctAlternative)
+        ? correctAlternative
+        : ''
+    try {
+      await updateQuestion.mutateAsync({
+        questionId: question.id,
+        input: {
+          subject,
+          topic,
+          subtopics: stringListToArray(subtopicsStr),
+          statement,
+          skills: stringListToArray(skillsStr),
+          correctAlternative: correct,
+        },
+      })
+    } catch (err) {
+      setSaveError(getApiMessage(err))
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    setSaveError(null)
+    try {
+      await deleteQuestion.mutateAsync(question.id)
+      setDeleteDialogOpen(false)
+      onDeleted?.()
+    } catch (err) {
+      setSaveError(getApiMessage(err))
+    }
+  }
+
+  const handleAddAlternative = async () => {
+    setAltError(null)
+    if (!newAltKey.trim() || !newAltText.trim() || !newAltExplanation.trim()) {
+      setAltError('Key, text and explanation are required.')
+      return
+    }
+    try {
+      await createAlternative.mutateAsync({
+        key: newAltKey.trim(),
+        text: newAltText.trim(),
+        explanation: newAltExplanation.trim(),
+      })
+      setNewAltKey('')
+      setNewAltText('')
+      setNewAltExplanation('')
+    } catch (err) {
+      const msg = isConflictError(err)
+        ? 'An alternative with this key already exists for this question.'
+        : getApiMessage(err)
+      setAltError(msg)
+    }
+  }
+
+  const startEditAlt = (alt: ExamBaseQuestion['alternatives'][0]) => {
+    setEditingAltId(alt.id)
+    setEditAltKey(alt.key)
+    setEditAltText(alt.text)
+    setEditAltExplanation(alt.explanation)
+    setAltError(null)
+  }
+
+  const handleUpdateAlternative = async () => {
+    if (!editingAltId) return
+    setAltError(null)
+    try {
+      await updateAlternative.mutateAsync({
+        alternativeId: editingAltId,
+        input: {
+          key: editAltKey.trim(),
+          text: editAltText.trim(),
+          explanation: editAltExplanation.trim(),
+        },
+      })
+      setEditingAltId(null)
+    } catch (err) {
+      const msg = isConflictError(err)
+        ? 'An alternative with this key already exists for this question.'
+        : getApiMessage(err)
+      setAltError(msg)
+    }
+  }
+
+  const handleDeleteAlt = async (alternativeId: string) => {
+    setAltError(null)
+    try {
+      await deleteAlternative.mutateAsync(alternativeId)
+      if (correctAlternative && alternatives.find((a) => a.id === alternativeId)?.key === correctAlternative) {
+        setCorrectAlternative('')
+      }
+    } catch (err) {
+      setAltError(getApiMessage(err))
+    }
+  }
+
+  return (
+    <Box sx={{ pt: 1, pb: 2 }}>
+      <Stack spacing={2}>
+        {saveError && (
+          <Alert severity="error" onClose={() => setSaveError(null)}>
+            {saveError}
+          </Alert>
+        )}
+        {altError && (
+          <Alert severity="error" onClose={() => setAltError(null)}>
+            {altError}
+          </Alert>
+        )}
+
+        <TextField
+          label="Subject"
+          size="small"
+          fullWidth
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+        />
+        <TextField
+          label="Topic"
+          size="small"
+          fullWidth
+          value={topic}
+          onChange={(e) => setTopic(e.target.value)}
+        />
+        <TextField
+          label="Subtopics (comma-separated)"
+          size="small"
+          fullWidth
+          value={subtopicsStr}
+          onChange={(e) => setSubtopicsStr(e.target.value)}
+        />
+        <TextField
+          label="Statement"
+          size="small"
+          fullWidth
+          multiline
+          minRows={3}
+          value={statement}
+          onChange={(e) => setStatement(e.target.value)}
+        />
+        <TextField
+          label="Skills (comma-separated)"
+          size="small"
+          fullWidth
+          value={skillsStr}
+          onChange={(e) => setSkillsStr(e.target.value)}
+        />
+
+        <FormControl size="small" fullWidth>
+          <InputLabel>Correct alternative</InputLabel>
+          <Select
+            value={correctAlternative}
+            label="Correct alternative"
+            onChange={(e) => setCorrectAlternative(e.target.value)}
+          >
+            <MenuItem value="">
+              <em>None</em>
+            </MenuItem>
+            {alternativeKeys.map((key) => (
+              <MenuItem key={key} value={key}>
+                {key}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+
+        <Typography variant="subtitle2" sx={{ mt: 1 }}>
+          Alternatives (sorted by key)
+        </Typography>
+        {alternatives.map((alt) => (
+          <Box
+            key={alt.id}
+            sx={{
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 1.5,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 1,
+            }}
+          >
+            {editingAltId === alt.id ? (
+              <>
+                <TextField
+                  size="small"
+                  label="Key"
+                  value={editAltKey}
+                  onChange={(e) => setEditAltKey(e.target.value)}
+                />
+                <TextField
+                  size="small"
+                  label="Text"
+                  multiline
+                  value={editAltText}
+                  onChange={(e) => setEditAltText(e.target.value)}
+                />
+                <TextField
+                  size="small"
+                  label="Explanation"
+                  multiline
+                  value={editAltExplanation}
+                  onChange={(e) => setEditAltExplanation(e.target.value)}
+                />
+                <Stack direction="row" spacing={1}>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={<SaveIcon />}
+                    onClick={handleUpdateAlternative}
+                    disabled={updateAlternative.isPending}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => setEditingAltId(null)}
+                  >
+                    Cancel
+                  </Button>
+                </Stack>
+              </>
+            ) : (
+              <>
+                <Stack direction="row" alignItems="center" justifyContent="space-between">
+                  <Typography variant="body2" fontWeight="medium">
+                    {alt.key}: {alt.text}
+                  </Typography>
+                  <Stack direction="row">
+                    <IconButton
+                      size="small"
+                      onClick={() => startEditAlt(alt)}
+                      aria-label="Edit alternative"
+                    >
+                      <EditIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleDeleteAlt(alt.id)}
+                      disabled={deleteAlternative.isPending}
+                      aria-label="Delete alternative"
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Stack>
+                </Stack>
+                <Typography variant="caption" color="text.secondary">
+                  Explanation: {alt.explanation}
+                </Typography>
+              </>
+            )}
+          </Box>
+        ))}
+
+        <Typography variant="subtitle2">Add alternative</Typography>
+        <Stack spacing={1}>
+          <TextField
+            size="small"
+            label="Key (e.g. A, B, C)"
+            value={newAltKey}
+            onChange={(e) => setNewAltKey(e.target.value)}
+            placeholder="A"
+          />
+          <TextField
+            size="small"
+            label="Text"
+            multiline
+            value={newAltText}
+            onChange={(e) => setNewAltText(e.target.value)}
+          />
+          <TextField
+            size="small"
+            label="Explanation"
+            multiline
+            value={newAltExplanation}
+            onChange={(e) => setNewAltExplanation(e.target.value)}
+          />
+          <Button
+            variant="outlined"
+            size="small"
+            onClick={handleAddAlternative}
+            disabled={createAlternative.isPending}
+          >
+            Add alternative
+          </Button>
+        </Stack>
+
+        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+          <Button
+            variant="contained"
+            startIcon={<SaveIcon />}
+            onClick={handleSave}
+            disabled={updateQuestion.isPending}
+          >
+            Save question
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            startIcon={<DeleteIcon />}
+            onClick={() => setDeleteDialogOpen(true)}
+            disabled={deleteQuestion.isPending}
+          >
+            Delete question
+          </Button>
+        </Stack>
+      </Stack>
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
+        <DialogTitle>Delete question?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            This will permanently delete this question and all its alternatives. This action cannot be undone.
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={handleDeleteConfirm} autoFocus>
+            Delete
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  )
+}

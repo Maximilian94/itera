@@ -39,7 +39,7 @@ model Skill {
   children  Skill[]    @relation("SkillHierarchy")
 
   questions Question[]
-  
+
   @@map("skills")
   @@index([path])
 }
@@ -53,8 +53,8 @@ model Question {
   skillId String @db.Uuid
   skill   Skill  @relation(fields: [skillId], references: [id], onDelete: Restrict)
 
-  options  Option[]
-  attempts Attempt[]
+  options       Option[]
+  attempts      Attempt[]
   examQuestions ExamQuestion[]
 
   @@index([skillId])
@@ -100,18 +100,18 @@ model Attempt {
 }
 
 model Exam {
-  id           String   @id @default(uuid()) @db.Uuid
-  createdAt    DateTime @default(now())
-  startedAt    DateTime?
-  finishedAt   DateTime?
+  id            String   @id @default(uuid()) @db.Uuid
+  createdAt     DateTime @default(now())
+  startedAt     DateTime?
+  finishedAt    DateTime?
   questionCount Int
-  onlyUnsolved Boolean  @default(false)
+  onlyUnsolved  Boolean  @default(false)
   filterSkillIds String[]
 
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  examBoardId String? @db.Uuid
+  examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
 
   questions ExamQuestion[]
@@ -125,8 +125,8 @@ model Exam {
 model ExamQuestion {
   order Int
 
-  examId     String @db.Uuid
-  exam       Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
+  examId String @db.Uuid
+  exam   Exam   @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   questionId String   @db.Uuid
   question   Question @relation(fields: [questionId], references: [id], onDelete: Restrict)
@@ -141,27 +141,76 @@ model ExamBoard {
   name    String
   logoUrl String
 
-  exams Exam[]
-  examBases ExamBase[]
+  exams      Exam[]
+  examBases  ExamBase[]
 
   @@map("exam_boards")
 }
 
 model ExamBase {
-  id          String   @id @default(uuid()) @db.Uuid
-  name        String
-  institution String?
-  role        String
+  id              String           @id @default(uuid()) @db.Uuid
+  name            String
+  institution     String?
+  role            String
   governmentScope GovernmentScope
-  state       String?
-  city        String?
-  salaryBase  Decimal? @db.Decimal(10,2)
-  examDate    DateTime
+  state           String?
+  city            String?
+  salaryBase      Decimal?         @db.Decimal(10,2)
+  examDate        DateTime
 
-  examBoardId String?   @db.Uuid
+  examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
+
+  questions ExamBaseQuestion[]
 
   @@index([examBoardId])
   @@map("exam_bases")
 }
 
+model ExamBaseQuestion {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ligação com a base (prova)
+  examBaseId String   @db.Uuid
+  examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  subject   String
+  topic     String
+  subtopics String[] @default([])
+
+  statement String
+
+  // Ex: "A", "B", "C", "D"
+  correctAlternative String?
+
+  // habilidades cobradas (string por enquanto)
+  skills String[] @default([])
+
+  alternatives ExamBaseQuestionAlternative[]
+
+  @@index([examBaseId])
+  @@index([examBaseId, subject])
+  @@index([examBaseId, topic])
+  @@map("exam_base_questions")
+}
+
+model ExamBaseQuestionAlternative {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examBaseQuestionId String           @db.Uuid
+  examBaseQuestion   ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
+
+  // "A", "B", "C", "D"...
+  key String
+
+  text        String
+  explanation String
+
+  @@unique([examBaseQuestionId, key])
+  @@index([examBaseQuestionId])
+  @@map("exam_base_question_alternatives")
+}

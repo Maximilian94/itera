@@ -1,8 +1,32 @@
-import { Button, Paper, Tab, Tabs } from '@mui/material'
+import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
+  Alert,
+  Box,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Paper,
+  Stack,
+  Tab,
+  Tabs,
+  TextField,
+  Typography,
+} from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import { useState } from 'react';
-import { CustomTabPanel } from '@/ui/customTabPanel';
+import { useState } from 'react'
+import { CustomTabPanel } from '@/ui/customTabPanel'
+import { QuestionEditor } from '@/components/QuestionEditor'
+import {
+  useExamBaseQuestionsQuery,
+  useCreateExamBaseQuestionMutation,
+  getApiMessage,
+} from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -10,37 +34,195 @@ export const Route = createFileRoute(
   component: RouteComponent,
 })
 
+const QUESTIONS_TAB_INDEX = 3
+
 function RouteComponent() {
   const { examBoard, examId } = Route.useParams()
   const [value, setValue] = useState(0)
+  const [addQuestionOpen, setAddQuestionOpen] = useState(false)
+  const [addSubject, setAddSubject] = useState('')
+  const [addTopic, setAddTopic] = useState('')
+  const [addStatement, setAddStatement] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+  const examBaseId = examId
+  const { data: questions = [], isLoading, error } = useExamBaseQuestionsQuery(
+    value === QUESTIONS_TAB_INDEX ? examBaseId : undefined,
+  )
+  const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
+
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue)
+  }
+
+  const handleAddQuestionOpen = () => {
+    setAddSubject('')
+    setAddTopic('')
+    setAddStatement('')
+    setAddError(null)
+    setAddQuestionOpen(true)
+  }
+
+  const handleAddQuestionSubmit = async () => {
+    if (!addSubject.trim() || !addTopic.trim() || !addStatement.trim()) {
+      setAddError('Subject, topic and statement are required.')
+      return
+    }
+    setAddError(null)
+    try {
+      await createQuestion.mutateAsync({
+        subject: addSubject.trim(),
+        topic: addTopic.trim(),
+        statement: addStatement.trim(),
+      })
+      setAddQuestionOpen(false)
+    } catch (err) {
+      setAddError(getApiMessage(err))
+    }
   }
 
   return (
     <div className="p-4">
       <Paper>
-      <Tabs value={value} onChange={handleChange} aria-label="basic tabs example">
-      <Tab label="Detalhes" value={0} />
-    <Tab label="Tentativas" value={1} />
-    <Tab label="Estatísticas" value={2} />
-  </Tabs>
-  <CustomTabPanel value={value} hidden={value !== 0}>
-        Detalhes da prova
-      </CustomTabPanel>
+        <Tabs value={value} onChange={handleChange} aria-label="exam tabs">
+          <Tab label="Detalhes" value={0} />
+          <Tab label="Tentativas" value={1} />
+          <Tab label="Estatísticas" value={2} />
+          <Tab label="Questions" value={QUESTIONS_TAB_INDEX} id="questions" />
+        </Tabs>
 
-      <CustomTabPanel value={value} hidden={value !== 1}>
-        Suas tentativas
-      </CustomTabPanel>
+        <CustomTabPanel value={value} hidden={value !== 0}>
+          Detalhes da prova
+        </CustomTabPanel>
 
-      <CustomTabPanel value={value} hidden={value !== 2}>
-        Estatísticas
-      </CustomTabPanel>
-        <Link to="/exams/$examBoard/$examId/$attemptId" params={{ examBoard: examBoard, examId: examId, attemptId: '1' }}>
-          <Button variant="contained" color="primary" startIcon={<PlayArrowIcon />}>Iniciar prova</Button>
+        <CustomTabPanel value={value} hidden={value !== 1}>
+          Suas tentativas
+        </CustomTabPanel>
+
+        <CustomTabPanel value={value} hidden={value !== 2}>
+          Estatísticas
+        </CustomTabPanel>
+
+        <CustomTabPanel value={value} hidden={value !== QUESTIONS_TAB_INDEX}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 1,
+              }}
+            >
+              <Typography variant="h6">Exam base questions</Typography>
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleAddQuestionOpen}
+                disabled={createQuestion.isPending}
+              >
+                Add Question
+              </Button>
+            </Box>
+
+            {isLoading && (
+              <Typography color="text.secondary">Loading questions…</Typography>
+            )}
+            {error && (
+              <Alert severity="error">
+                {error instanceof Error ? error.message : 'Failed to load questions'}
+              </Alert>
+            )}
+            {!isLoading && !error && questions.length === 0 && (
+              <Typography color="text.secondary">
+                No questions yet. Click &quot;Add Question&quot; to create one.
+              </Typography>
+            )}
+            {!isLoading && !error && questions.length > 0 && (
+              <Box>
+                {questions.map((q) => (
+                  <Accordion key={q.id}>
+                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                      <Typography variant="body1">
+                        {q.subject} — {q.topic}
+                        {q.statement ? `: ${q.statement.slice(0, 60)}${q.statement.length > 60 ? '…' : ''}` : ''}
+                      </Typography>
+                    </AccordionSummary>
+                    <AccordionDetails>
+                      <QuestionEditor
+                        examBaseId={examBaseId}
+                        question={q}
+                      />
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
+              </Box>
+            )}
+          </Box>
+        </CustomTabPanel>
+
+        <Link
+          to="/exams/$examBoard/$examId/$attemptId"
+          params={{ examBoard, examId, attemptId: '1' }}
+        >
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PlayArrowIcon />}
+          >
+            Iniciar prova
+          </Button>
         </Link>
       </Paper>
+
+      <Dialog open={addQuestionOpen} onClose={() => setAddQuestionOpen(false)}>
+        <DialogTitle>Add question</DialogTitle>
+        <DialogContent>
+          {addError && (
+            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setAddError(null)}>
+              {addError}
+            </Alert>
+          )}
+          <Stack spacing={2} sx={{ mt: 1, minWidth: 360 }}>
+            <TextField
+              label="Subject"
+              size="small"
+              fullWidth
+              required
+              value={addSubject}
+              onChange={(e) => setAddSubject(e.target.value)}
+            />
+            <TextField
+              label="Topic"
+              size="small"
+              fullWidth
+              required
+              value={addTopic}
+              onChange={(e) => setAddTopic(e.target.value)}
+            />
+            <TextField
+              label="Statement"
+              size="small"
+              fullWidth
+              required
+              multiline
+              minRows={2}
+              value={addStatement}
+              onChange={(e) => setAddStatement(e.target.value)}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddQuestionOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={handleAddQuestionSubmit}
+            disabled={createQuestion.isPending}
+          >
+            Create
+          </Button>
+        </DialogActions>
+      </Dialog>
     </div>
   )
 }
