@@ -7,7 +7,10 @@ export class QuestionsController {
   constructor(private readonly questions: QuestionsService) {}
 
   @Get()
-  list(@Req() req: { user: { userId: string } }, @Query() query: GetQuestionsQueryDto) {
+  list(
+    @Req() req: { user: { userId: string } },
+    @Query() query: GetQuestionsQueryDto,
+  ) {
     return this.questions.listQuestions({
       userId: req.user.userId,
       skillIds: query.skillIds,

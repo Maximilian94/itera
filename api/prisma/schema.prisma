@@ -7,6 +7,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+enum GovernmentScope {
+  MUNICIPAL
+  STATE
+  FEDERAL
+}
+
 model User {
   id           String    @id @default(uuid()) @db.Uuid
   email        String    @unique
@@ -105,10 +111,14 @@ model Exam {
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+  examBoardId String? @db.Uuid
+  examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
+
   questions ExamQuestion[]
   attempts  Attempt[]
 
   @@index([userId, createdAt])
+  @@index([examBoardId])
   @@map("exams")
 }
 
@@ -124,5 +134,34 @@ model ExamQuestion {
   @@id([examId, questionId])
   @@index([examId, order])
   @@map("exam_questions")
+}
+
+model ExamBoard {
+  id      String @id @default(uuid()) @db.Uuid
+  name    String
+  logoUrl String
+
+  exams Exam[]
+  examBases ExamBase[]
+
+  @@map("exam_boards")
+}
+
+model ExamBase {
+  id          String   @id @default(uuid()) @db.Uuid
+  name        String
+  institution String?
+  role        String
+  governmentScope GovernmentScope
+  state       String?
+  city        String?
+  salaryBase  Decimal? @db.Decimal(10,2)
+  examDate    DateTime
+
+  examBoardId String?   @db.Uuid
+  examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
+
+  @@index([examBoardId])
+  @@map("exam_bases")
 }
 

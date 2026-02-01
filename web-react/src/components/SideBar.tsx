@@ -3,15 +3,21 @@ import ListItem from '@mui/material/ListItem'
 import ListItemButton from '@mui/material/ListItemButton'
 import ListItemText from '@mui/material/ListItemText'
 import SchoolIcon from '@mui/icons-material/School'
-import { Link, useRouterState } from '@tanstack/react-router'
+import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import type { RegisteredRouter, ToPathOption } from '@tanstack/react-router'
+import type React from 'react'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
 import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
 import DashboardIcon from '@mui/icons-material/Dashboard'
 import HistoryIcon from '@mui/icons-material/History'
 import StorageIcon from '@mui/icons-material/Storage'
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as DatabaseRoute } from '@/routes/_authenticated/database'
+import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
+import { Route as ExamBasesRoute } from '@/routes/_authenticated/exam-bases'
+import LogoutIcon from '@mui/icons-material/Logout'
+import { clearAuthToken } from '@/lib/auth'
 
 interface NavItem {
   label: string
@@ -21,6 +27,7 @@ interface NavItem {
 
 export const SideBar = () => {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const navigate = useNavigate()
   
   const pages: Array<NavItem> = [
     {
@@ -43,8 +50,22 @@ export const SideBar = () => {
       href: DatabaseRoute.to,
       icon: StorageIcon,
     },
+    {
+      label: 'Exam Boards',
+      href: ExamBoardsRoute.to,
+      icon: AccountBalanceIcon,
+    },
+    {
+      label: 'Exam Base',
+      href: ExamBasesRoute.to,
+      icon: SchoolIcon,
+    },
   ]
 
+  async function logout() {
+    clearAuthToken()
+    await navigate({ to: '/' })
+  }
 
   return (
     <div className="group flex flex-col gap-2 h-full text-slate-50 bg-slate-800">
@@ -85,6 +106,26 @@ export const SideBar = () => {
           </Link> */}
         </List>
       </nav>
+
+      <div className="mt-auto border-t border-slate-700">
+        <List>
+          <ListItem disablePadding>
+            <ListItemButton onClick={logout}>
+              <div className="flex gap-2 items-center">
+                <LogoutIcon />
+                <ListItemText
+                  primary="Logout"
+                  className="
+                    max-w-0 overflow-hidden whitespace-nowrap opacity-0
+                    group-hover:max-w-[200px] group-hover:opacity-100
+                    transition-[max-width,opacity] duration-300 ease-in-out
+                  "
+                />
+              </div>
+            </ListItemButton>
+          </ListItem>
+        </List>
+      </div>
     </div>
   )
 }

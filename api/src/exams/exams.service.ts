@@ -16,9 +16,12 @@ import { Exam, ExamInProgress } from '@domain/exam/exam.interface';
 export class ExamsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async listExams(input: { userId: string }) {
+  async listExams(input: { userId: string; examBoardId?: string }) {
+    const where: Prisma.ExamWhereInput = { userId: input.userId };
+    if (input.examBoardId) where.examBoardId = input.examBoardId;
+
     const exams = await this.prisma.exam.findMany({
-      where: { userId: input.userId },
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         id: true,
@@ -26,6 +29,7 @@ export class ExamsService {
         startedAt: true,
         finishedAt: true,
         questionCount: true,
+        examBoardId: true,
         attempts: {
           select: { questionId: true, selectedOptionId: true },
         },
@@ -70,6 +74,7 @@ export class ExamsService {
           finishedAt: e.finishedAt,
           status: this.toExamStatus(e),
           questionCount: e.questionCount,
+          examBoardId: e.examBoardId,
           correctCount,
           incorrectCount,
           unansweredCount,
@@ -80,6 +85,7 @@ export class ExamsService {
 
   async createExam(input: {
     userId: string;
+    examBoardId?: string;
     skillIds?: string[];
     onlyUnsolved?: boolean;
     questionCount?: number;
@@ -128,6 +134,7 @@ export class ExamsService {
     const exam = await this.prisma.exam.create({
       data: {
         userId: input.userId,
+        examBoardId: input.examBoardId,
         questionCount: count,
         onlyUnsolved: input.onlyUnsolved ?? false,
         filterSkillIds: input.skillIds ?? [],

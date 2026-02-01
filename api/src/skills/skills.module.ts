@@ -7,5 +7,3 @@ import { SkillsService } from './skills.service';
   providers: [SkillsService],
 })
 export class SkillsModule {}
-
-

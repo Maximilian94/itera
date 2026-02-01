@@ -1,0 +1,41 @@
+import { GovernmentScope } from '@prisma/client';
+import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+
+export class UpdateExamBaseDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsUUID()
+  examBoardId?: string | null;
+
+  @IsOptional()
+  @IsString()
+  institution?: string | null;
+
+  @IsOptional()
+  @IsString()
+  role?: string;
+
+  @IsOptional()
+  @IsEnum(GovernmentScope)
+  governmentScope?: GovernmentScope;
+
+  @IsOptional()
+  @IsString()
+  state?: string | null;
+
+  @IsOptional()
+  @IsString()
+  city?: string | null;
+
+  @IsOptional()
+  @IsDecimal({ decimal_digits: '0,2' })
+  salaryBase?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  examDate?: string;
+}
+

@@ -25,5 +25,3 @@ export class AuthController {
     return { user: { id: req.user?.userId, email: req.user?.email } };
   }
 }
-
-

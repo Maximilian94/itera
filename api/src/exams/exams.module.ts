@@ -7,5 +7,3 @@ import { ExamsService } from './exams.service';
   providers: [ExamsService],
 })
 export class ExamsModule {}
-
-

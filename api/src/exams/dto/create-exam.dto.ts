@@ -3,6 +3,10 @@ import { IsBoolean, IsInt, IsOptional, IsUUID, Min } from 'class-validator';
 
 export class CreateExamDto {
   @IsOptional()
+  @IsUUID()
+  examBoardId?: string;
+
+  @IsOptional()
   @Transform(({ value }) => {
     if (value == null) return undefined;
     const raw = Array.isArray(value) ? value : [value];
@@ -40,5 +44,3 @@ export class CreateExamDto {
   @Min(1)
   questionCount?: number;
 }
-
-

@@ -11,11 +11,9 @@ import '@prisma/client';
  */
 declare module '@prisma/client' {
   // Match PrismaClient generic shape so declaration merging works.
-  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+
   interface PrismaClient<T = any, U = any, ExtArgs = any> {
     exam: any;
     examQuestion: any;
   }
 }
-
-

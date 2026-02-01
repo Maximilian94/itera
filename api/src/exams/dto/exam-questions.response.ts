@@ -25,5 +25,3 @@ export interface ExamQuestionsResponseDto {
   exam: ExamDto;
   questions: ExamQuestionDto[];
 }
-
-

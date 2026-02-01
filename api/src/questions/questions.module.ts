@@ -7,5 +7,3 @@ import { QuestionsService } from './questions.service';
   providers: [QuestionsService],
 })
 export class QuestionsModule {}
-
-

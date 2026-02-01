@@ -1,114 +1,187 @@
-import { Button, Card, IconButton } from '@mui/material'
+import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
+import { useExamsQuery } from '@/features/exams/queries/exams.queries'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import HourglassTopIcon from '@mui/icons-material/HourglassTop'
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
+import {
+    Alert,
+    Box,
+    Card,
+    Chip,
+    Grid,
+    Paper,
+    Stack,
+    Typography,
+} from '@mui/material'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { DeleteIcon, TrashIcon } from 'lucide-react'
-import BookmarkBorderIcon from '@mui/icons-material/BookmarkBorder';
-import PlayArrowIcon from '@mui/icons-material/PlayArrow';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
-import CancelIcon from '@mui/icons-material/Cancel';
-import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import BookmarkIcon from '@mui/icons-material/Bookmark';
+import { useEffect } from 'react'
+import dayjs from 'dayjs'
+import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 
-type ExamStatus = 'not_started' | 'bad_result' | 'good_result';
+function slugify(value: string) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, '-')
+        .replace(/[^a-z0-9-]/g, '')
+}
 
 export const Route = createFileRoute('/_authenticated/exams/$examBoard/')({
     component: RouteComponent,
 })
 
 function RouteComponent() {
-    const { examBoard } = Route.useParams()
-    console.log(examBoard)
+    const { examBoard: examBoardSlug } = Route.useParams()
 
-    const exams = [
-        {
-            id: 1,
-            name: 'FGV - 2026 - TJ-MS - Técnico de Nível Superior - Enfermagem - Tipo 1',
-            examBoard: 'FGV',
-            year: 2026,
-            state: 'MS',
-            level: 'Técnico de Nível Superior',
-            subject: 'Enfermagem',
-            type: 'Tipo 1',
-            status: 'not_started',
-            testScore: 0,
-            bookmarked: false,
-        },
-        {
-            id: 2,
-            name: 'FGV - 2026 - TJ-MS - Técnico de Nível Superior - Enfermagem - Tipo 2',
-            examBoard: 'FGV',
-            year: 2026,
-            state: 'MS',
-            level: 'Técnico de Nível Superior',
-            subject: 'Enfermagem',
-            type: 'Tipo 2',
-            status: 'bad_result',
-            testScore: 40,
-            bookmarked: false,
-        },
-        {
-            id: 3,
-            name: 'FGV - 2026 - TJ-MS - Técnico de Nível Superior - Enfermagem - Tipo 3',
-            examBoard: 'FGV',
-            year: 2026,
-            state: 'MS',
-            level: 'Técnico de Nível Superior',
-            subject: 'Enfermagem',
-            type: 'Tipo 3',
-            status: 'good_result',
-            testScore: 80,
-            bookmarked: false,
-        },
-        {
-            id: 4,
-            name: 'FGV - 2026 - TJ-MS - Técnico de Nível Superior - Enfermagem - Tipo 4',
-            examBoard: 'FGV',
-            year: 2026,
-            state: 'MS',
-            level: 'Técnico de Nível Superior',
-            subject: 'Enfermagem',
-            type: 'Tipo 4',
-            status: 'not_started',
-            testScore: 0,
-            bookmarked: true,
-        },
-    ]
+    const { examBases } = useExamBaseFacade({ examBoardId: examBoardSlug })
+
+    useEffect(() => {
+        console.log("examBoardSlug", examBoardSlug)
+
+        console.log("examBases", examBases)
+    }, [examBoardSlug])
+
+    const governmentScopeLabel = (scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') => {
+        let label = ''
+        if (scope === 'MUNICIPAL') {
+            label = 'Municipal'
+        } else if (scope === 'STATE') {
+            label = 'Estadual'
+        } else if (scope === 'FEDERAL') {
+            label = 'Federal'
+        }
+        return label
+    }
 
 
-    function examStatusIcon({ status }: { status: ExamStatus }) {
+    function statusChip(status: 'not_started' | 'in_progress' | 'finished') {
+        if (status === 'finished') {
+            return (
+                <Chip
+                    size="small"
+                    color="success"
+                    icon={<CheckCircleIcon />}
+                    label="Finished"
+                />
+            )
+        }
+        if (status === 'in_progress') {
+            return (
+                <Chip
+                    size="small"
+                    color="warning"
+                    icon={<HourglassTopIcon />}
+                    label="In progress"
+                />
+            )
+        }
         return (
-            <div className="flex items-center gap-2">
-                {status === 'not_started' && <RadioButtonUncheckedIcon color='info' />}
-                {status === 'bad_result' && <CancelIcon color='error' />}
-                {status === 'good_result' && <CheckCircleIcon color='success' />}
-            </div>
+            <Chip
+                size="small"
+                color="info"
+                icon={<RadioButtonUncheckedIcon />}
+                label="Not started"
+            />
         )
     }
-    return <div className="p-4 flex flex-col gap-2">
-        {exams.map((exam) => (
-            <Link to="/exams/$examBoard/$examId" params={{ examBoard: exam.examBoard, examId: exam.id.toString() }}>
-                <Button fullWidth>
-                <Card key={exam.id} className='group flex gap-6 justify-between h-8 items-center w-full'>
-                    <div className="flex items-center gap-2 w-16">
-                        {examStatusIcon({ status: exam.status as ExamStatus })}
-                        {exam.testScore}%
-                    </div>
-                    <div className="flex items-start gap-2">
-                        {exam.examBoard} - {exam.year} - {exam.state} - {exam.level} - {exam.subject} - {exam.type}
-                    </div>
 
-                    <div className="flex flex-1 justify-end">
-                        <div className={`${exam.bookmarked ? 'flex' : 'hidden'} group-hover:flex`}>
-                            <IconButton>
-                                {exam.bookmarked ? <BookmarkIcon color='primary' /> : <BookmarkBorderIcon color='primary' />}
-                            </IconButton>
-                        </div>
+    const locationLabel = (examBase: ExamBase) => {
+        if (examBase.governmentScope === 'MUNICIPAL') {
+            return `${examBase.city ?? ''} / ${examBase.state ?? ''}`
+        } else if (examBase.governmentScope === 'STATE') {
+            return examBase.state ?? ''
+        } else if (examBase.governmentScope === 'FEDERAL') {
+            return 'Federal'
+        }
+    }
 
-                    </div>
-                </Card>
-                </Button>
-            </Link>
+    function formatBRL(value: string | number) {
+        const number = typeof value === "string" ? Number(value) : value;
 
-        ))}
-    </div>
+        if (!Number.isFinite(number)) return "—";
+
+        return new Intl.NumberFormat("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+        }).format(number);
+    }
+
+    return (
+        <Box className="p-4 flex flex-col gap-3">
+            <Stack direction="row" alignItems="center" justifyContent="space-between">
+                <Typography variant="h4">
+                    {/* {examBoard ? `${examBoard.name} exams` : 'Exams'} */}
+                </Typography>
+            </Stack>
+
+            {/* {isLoadingExamBoards ? <Typography>Loading...</Typography> : null} */}
+
+            {/* {!isLoadingExamBoards && !examBoard ? (
+        <Alert severity="error">
+          Exam board not found for route: <strong>{examBoardSlug}</strong>
+        </Alert>
+      ) : null} */}
+
+            {/* {examsError instanceof Error ? (
+        <Alert severity="error">{examsError.message}</Alert>
+      ) : null} */}
+
+            {/* {isLoadingExams ? <Typography>Loading exams...</Typography> : null} */}
+
+            {(examBases ?? []).map((examBase) => (
+                <Paper key={examBase.id} className='w-full overflow-hidden pr-4 h-min'>
+                    <Grid container spacing={2}>
+                        <Grid size={1}>
+                            <div className='w-full h-12 flex items-center justify-start'>
+                                <img
+                                    src={examBase.examBoard?.logoUrl}
+                                    alt={examBase.examBoard?.name}
+                                    className="h-full w-full object-contain object-left"
+                                />
+                            </div>
+                        </Grid>
+                        <Grid size={1}>
+                            <div className='flex flex-col items-center justify-center h-full'>
+                                <Typography variant="body1">{dayjs(examBase.examDate).format('YYYY')}</Typography>
+                            </div>
+
+                        </Grid>
+                        <Grid size={3}>
+                            <div className='flex flex-col h-full w-full items-start justify-center'>
+                                <Typography variant="body1">{governmentScopeLabel(examBase.governmentScope)}</Typography>
+                                <Typography variant="body2">{locationLabel(examBase)}</Typography>
+                            </div>
+
+                        </Grid>
+                        <Grid size={5}>
+                            <div className='flex flex-col h-full w-full items-start justify-center'>
+                                <Typography variant="body1">{examBase.institution}</Typography>
+                                <Typography variant="body2">{examBase.role}</Typography>
+                            </div>
+
+                        </Grid>
+                        <Grid size={2}>
+                            <div className='flex flex-col h-full w-full items-end justify-center'>
+                                <Typography variant="body1">{formatBRL(examBase.salaryBase ?? 0)}</Typography>
+                            </div>
+                        </Grid>
+                    </Grid>
+                </Paper>
+                // <Link
+                //   key={examBase.id}
+                //   to="/exams/$examBoard/$examId"
+                //   params={{ examBoard: examBoardSlug, examId: examBase.id }}
+                // >
+                //   <Typography variant="body1">{examBase.name}</Typography>
+                // </Link>
+            ))}
+
+            {/* {!isLoadingExams && (examsRes?.exams?.length ?? 0) === 0 && examBoard ? (
+        <Typography color="text.secondary">
+          No exams are associated with this exam board yet.
+        </Typography>
+      ) : null} */}
+        </Box>
+    )
 }

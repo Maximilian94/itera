@@ -10,6 +10,8 @@ import { SkillsModule } from './skills/skills.module';
 import { QuestionsModule } from './questions/questions.module';
 import { AttemptsModule } from './attempts/attempts.module';
 import { ExamsModule } from './exams/exams.module';
+import { ExamBoardModule } from './examBoard/exam-board.module';
+import { ExamBaseModule } from './examBase/exam-base.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { ExamsModule } from './exams/exams.module';
     QuestionsModule,
     AttemptsModule,
     ExamsModule,
+    ExamBoardModule,
+    ExamBaseModule,
   ],
   controllers: [AppController],
   providers: [

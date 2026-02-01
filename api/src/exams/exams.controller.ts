@@ -1,6 +1,7 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query, Req } from '@nestjs/common';
 import { CreateExamDto } from './dto/create-exam.dto';
 import { FinishExamDto } from './dto/finish-exam.dto';
+import { GetExamsQueryDto } from './dto/get-exams.query';
 import { ExamsService } from './exams.service';
 
 @Controller('exams')
@@ -8,14 +9,21 @@ export class ExamsController {
   constructor(private readonly exams: ExamsService) {}
 
   @Get()
-  list(@Req() req: { user: { userId: string } }) {
-    return this.exams.listExams({ userId: req.user.userId });
+  list(
+    @Req() req: { user: { userId: string } },
+    @Query() query: GetExamsQueryDto,
+  ) {
+    return this.exams.listExams({
+      userId: req.user.userId,
+      examBoardId: query.examBoardId,
+    });
   }
 
   @Post()
   create(@Req() req: { user: { userId: string } }, @Body() dto: CreateExamDto) {
     return this.exams.createExam({
       userId: req.user.userId,
+      examBoardId: dto.examBoardId,
       skillIds: dto.skillIds,
       onlyUnsolved: dto.onlyUnsolved,
       questionCount: dto.questionCount,
