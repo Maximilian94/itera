@@ -2,6 +2,12 @@ import { StrictMode } from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
+import {
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query'
+import colors from 'tailwindcss/colors'
+import { converter, formatHex } from 'culori'
 
 // Import the generated route tree
 import { routeTree } from './routeTree.gen'
@@ -9,9 +15,22 @@ import { routeTree } from './routeTree.gen'
 import './styles.css'
 import reportWebVitals from './reportWebVitals.ts'
 
+
+const toHex = (color: string) => formatHex(converter('rgb')(color))
+
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
+    primary: {
+      main: toHex(colors.indigo[500]) ?? '',
+    },
+    // secondary: {
+    //   main: '#000000',
+    // },
+    background: {
+      default: toHex(colors.gray[900]) ?? '',
+      paper: toHex(colors.gray[800]) ?? '',
+    },
   },
 })
 
@@ -32,15 +51,19 @@ declare module '@tanstack/react-router' {
   }
 }
 
+const queryClient = new QueryClient()
+
 // Render the app
 const rootElement = document.getElementById('app')
 if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement)
   root.render(
     <StrictMode>
-      <ThemeProvider theme={darkTheme}>
-        <RouterProvider router={router} />
-      </ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <ThemeProvider theme={darkTheme}>
+          <RouterProvider router={router} />
+        </ThemeProvider>
+      </QueryClientProvider>
     </StrictMode>,
   )
 }

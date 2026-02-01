@@ -40,5 +40,3 @@ export class CreateExamDto {
   @Min(1)
   questionCount?: number;
 }
-
-

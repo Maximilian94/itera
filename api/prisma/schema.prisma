@@ -126,3 +126,11 @@ model ExamQuestion {
   @@map("exam_questions")
 }
 
+model ExamBoard {
+  id      String @id @default(uuid()) @db.Uuid
+  name    String
+  logoUrl String
+
+  @@map("exam_boards")
+}
+

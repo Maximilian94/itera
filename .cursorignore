@@ -1,0 +1,108 @@
+### =========================
+### Dependencies (always huge)
+### =========================
+node_modules/
+**/node_modules/
+
+# pnpm / yarn / npm caches (if present)
+**/.pnpm-store/
+**/.yarn/
+**/.pnp/
+**/.pnp.cjs
+
+### =========================
+### Build outputs
+### =========================
+# Generic
+**/dist/
+**/build/
+**/out/
+
+# Next/Vite/etc (in case web-react uses one)
+**/.next/
+**/.vite/
+**/.turbo/
+**/.parcel-cache/
+
+# Angular (web)
+web/.angular/
+web/dist/
+**/.angular/cache/
+
+# React apps often generate these
+**/coverage/
+**/storybook-static/
+
+### =========================
+### Caches / temp files
+### =========================
+**/.cache/
+**/.swc/
+**/.eslintcache
+**/.stylelintcache
+**/tsconfig.tsbuildinfo
+**/*.tsbuildinfo
+
+### =========================
+### Logs
+### =========================
+**/*.log
+**/logs/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/pnpm-debug.log*
+
+### =========================
+### NestJS (api) compiled output
+### =========================
+api/dist/
+api/coverage/
+
+### =========================
+### Test reports
+### =========================
+**/test-results/
+**/playwright-report/
+**/blob-report/
+**/.nyc_output/
+
+### =========================
+### OS / Editor
+### =========================
+**/.DS_Store
+**/Thumbs.db
+**/.idea/
+**/.vscode/
+
+### =========================
+### Secrets / env
+### =========================
+**/.env
+**/.env.*
+**/*.local
+**/*.pem
+**/*.key
+
+### =========================
+### Big binaries/media (usually useless for code help)
+### (Remove lines if you *want* Cursor to read these)
+### =========================
+**/*.png
+**/*.jpg
+**/*.jpeg
+**/*.gif
+**/*.webp
+**/*.ico
+**/*.mp4
+**/*.mov
+**/*.mp3
+**/*.wav
+**/*.pdf
+
+### =========================
+### Sourcemaps / minified
+### =========================
+**/*.map
+**/*.min.js
+**/*.min.css

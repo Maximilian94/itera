@@ -7,5 +7,3 @@ import { AttemptsService } from './attempts.service';
   providers: [AttemptsService],
 })
 export class AttemptsModule {}
-
-

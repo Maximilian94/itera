@@ -3,7 +3,9 @@
 # Node
 **/node_modules/
 **/dist/
+**/dist-ssr/
 **/.angular/
+**/.vite/
 **/.cache/
 **/coverage/
 **/*.log

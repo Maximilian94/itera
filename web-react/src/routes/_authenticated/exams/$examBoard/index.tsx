@@ -86,29 +86,30 @@ function RouteComponent() {
     }
     return <div className="p-4 flex flex-col gap-2">
         {exams.map((exam) => (
-            <Link to="/exams/$examBoard/$examId" params={{ examBoard: exam.examBoard, examId: exam.id.toString() }}>
-                <Button fullWidth>
-                <Card key={exam.id} className='group flex gap-6 justify-between h-8 items-center w-full'>
-                    <div className="flex items-center gap-2 w-16">
-                        {examStatusIcon({ status: exam.status as ExamStatus })}
-                        {exam.testScore}%
-                    </div>
-                    <div className="flex items-start gap-2">
-                        {exam.examBoard} - {exam.year} - {exam.state} - {exam.level} - {exam.subject} - {exam.type}
-                    </div>
+            <div key={exam.id}>
+                <Link to="/exams/$examBoard/$examId" params={{ examBoard: exam.examBoard, examId: exam.id.toString() }}>
+                    <div className='w-full h-16' key={exam.id + 'button'}>
+                        <Card className='group flex gap-6 justify-between h-8 items-center w-full'>
+                            <div className="flex items-center gap-2 w-16">
+                                {examStatusIcon({ status: exam.status as ExamStatus })}
+                                {exam.testScore}%
+                            </div>
+                            <div className="flex items-start gap-2">
+                                {exam.examBoard} - {exam.year} - {exam.state} - {exam.level} - {exam.subject} - {exam.type}
+                            </div>
 
-                    <div className="flex flex-1 justify-end">
-                        <div className={`${exam.bookmarked ? 'flex' : 'hidden'} group-hover:flex`}>
-                            <IconButton>
-                                {exam.bookmarked ? <BookmarkIcon color='primary' /> : <BookmarkBorderIcon color='primary' />}
-                            </IconButton>
-                        </div>
+                            <div className="flex flex-1 justify-end">
+                                <div className={`${exam.bookmarked ? 'flex' : 'hidden'} group-hover:flex`}>
+                                    <IconButton key={exam.id + 'iconbutton'}>
+                                        {exam.bookmarked ? <BookmarkIcon color='primary' /> : <BookmarkBorderIcon color='primary' />}
+                                    </IconButton>
+                                </div>
 
+                            </div>
+                        </Card>
                     </div>
-                </Card>
-                </Button>
-            </Link>
-
+                </Link>
+            </div>
         ))}
     </div>
 }

@@ -4,15 +4,15 @@ import ArrowBackIosNewIcon from '@mui/icons-material/ArrowBackIosNew';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import PushPinIcon from '@mui/icons-material/PushPin';
 import VisibilityIcon from '@mui/icons-material/Visibility';
-import { useState } from 'react';
+import React, { useState } from 'react';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import AutoStoriesIcon from '@mui/icons-material/AutoStories';
 import InsightsIcon from '@mui/icons-material/Insights';
 import ForumIcon from '@mui/icons-material/Forum';
 import HistoryIcon from '@mui/icons-material/History';
 import NoteIcon from '@mui/icons-material/Note';
-import { CustomTabPanel } from '@/ui/customTabPanel';
 import ContentCutIcon from '@mui/icons-material/ContentCut';
+import { CustomTabPanel } from '@/ui/customTabPanel';
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/$attemptId/',
@@ -49,12 +49,12 @@ const MOCK_OPTIONS = [
 function RouteComponent() {
   const [value, setValue] = useState(0)
   const questionAlternativeArray = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z"];
-  const [options, setOptions] = useState<{ id: number, label: string, isEliminated: boolean }[]>(MOCK_OPTIONS);
+  const [options, setOptions] = useState<Array<{ id: number, label: string, isEliminated: boolean }>>(MOCK_OPTIONS);
   const [optionSelected, setOptionSelected] = useState<number | null>(null);
   const questions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   const [currentQuestion, setCurrentQuestion] = useState<number>(1);
 
-  const handleChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue)
   }
 
@@ -126,7 +126,7 @@ function RouteComponent() {
                     {options.map((option) => (
                       <div key={option.id} className='flex items-center gap-2 relative'>
                         {option.isEliminated && (
-                          <span className="pointer-events-none absolute left-0 right-0 top-1/2 h-[2px] bg-slate-300/80" />
+                          <span className="pointer-events-none absolute left-0 right-0 top-1/2 h-0.5 bg-slate-300/80" />
                         )}
 
                         <IconButton size='small' onClick={() => eliminateOption(option.id, !option.isEliminated)}>
