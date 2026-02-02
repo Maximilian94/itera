@@ -8,6 +8,7 @@ import {
   getApiMessage,
   isConflictError,
 } from '../services/examBaseQuestions.service'
+import type { ParsedQuestionItem } from '../services/examBaseQuestions.service'
 import type {
   CreateAlternativeInput,
   CreateExamBaseQuestionInput,
@@ -38,6 +39,15 @@ export function useCreateExamBaseQuestionMutation(examBaseId: string) {
     },
   })
 }
+
+export function useParseQuestionsFromMarkdownMutation(examBaseId: string) {
+  return useMutation({
+    mutationFn: (markdown: string) =>
+      examBaseQuestionsService.parseFromMarkdown(examBaseId, markdown),
+  })
+}
+
+export type { ParsedQuestionItem }
 
 export function useUpdateExamBaseQuestionMutation(
   examBaseId: string,

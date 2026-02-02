@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { CreateExamBaseQuestionDto } from './dto/create-exam-base-question.dto';
+import { ParseQuestionsFromMarkdownDto } from './dto/parse-questions-from-markdown.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { ExamBaseQuestionService } from './exam-base-question.service';
@@ -28,6 +29,15 @@ export class ExamBaseQuestionController {
     @Body() dto: CreateExamBaseQuestionDto,
   ) {
     return this.service.create(examBaseId, dto);
+  }
+
+  @Post('parse-from-markdown')
+  parseFromMarkdown(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() dto: ParseQuestionsFromMarkdownDto,
+  ) {
+    console.log('dto', dto);
+    return this.service.parseQuestionsFromMarkdown(dto.markdown);
   }
 
   @Get(':questionId')

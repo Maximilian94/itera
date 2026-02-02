@@ -4,12 +4,21 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { CreateExamBaseQuestionDto } from './dto/create-exam-base-question.dto';
+import {
+  ParsedQuestionAlternative,
+  ParsedQuestionItem,
+  PARSED_QUESTION_EXAMPLE,
+} from './dto/parsed-question.types';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
+import { jsonrepair } from 'jsonrepair';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
 const alternativesOrderBy = { key: 'asc' as const };
 
@@ -82,9 +91,155 @@ function throwConflictIfUniqueKey(err: unknown): void {
   throw err;
 }
 
+function normalizeToParsedQuestionItem(item: unknown): ParsedQuestionItem {
+  if (
+    !item ||
+    typeof item !== 'object' ||
+    !('subject' in item) ||
+    !('statement' in item) ||
+    !('alternatives' in item)
+  ) {
+    return {
+      subject: '',
+      statement: String(item ?? ''),
+      alternatives: [],
+    };
+  }
+  const o = item as Record<string, unknown>;
+  const alternatives: ParsedQuestionAlternative[] = Array.isArray(o.alternatives)
+    ? (o.alternatives as unknown[])
+        .filter((a): a is Record<string, unknown> => a != null && typeof a === 'object')
+        .map((a) => ({
+          key: String(a?.key ?? ''),
+          text: String(a?.text ?? ''),
+        }))
+    : [];
+  return {
+    subject: String(o.subject ?? ''),
+    statement: String(o.statement ?? ''),
+    topic: o.topic != null ? String(o.topic) : undefined,
+    alternatives,
+  };
+}
+
 @Injectable()
 export class ExamBaseQuestionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  async parseQuestionsFromMarkdown(
+    markdown: string,
+  ): Promise<ParsedQuestionItem[]> {
+    const apiKey = this.config.get<string>('XAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'XAI_API_KEY is not configured. Set it in .env to use AI parsing.',
+      );
+    }
+
+    const systemPrompt = `You are an assistant that extracts exam questions from markdown text.
+Given the markdown content, identify EVERY question and its alternatives. Return ALL of them.
+Return ONLY a valid JSON array, no other text or markdown. Rules for valid JSON:
+- Each item: subject (string), statement (string), topic (string, optional), alternatives (array of { key: string, text: string }).
+- Inside any string value, escape double quotes with backslash: \\".
+- Do not put raw newlines inside string values; use \\n if needed.
+- Return the complete array with every question you find, not just the first.
+Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
+
+    const userPrompt = `Extract ALL questions from this markdown. Return only the JSON array (no code block, no explanation). Every question must appear in the array.\n\n${markdown}`;
+
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-reasoning',
+        max_tokens: 32768,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(
+        `xAI API error (${res.status}): ${errBody.slice(0, 500)}`,
+      );
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+
+    const content =
+      data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) {
+      return [];
+    }
+
+    console.log('content', content);
+    const debugPath = path.join(process.cwd(), 'meu_arquivo.txt');
+    await fs.writeFile(debugPath, content, 'utf8').catch(() => {});
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    if (
+      firstBracket !== -1 &&
+      lastBracket !== -1 &&
+      lastBracket > firstBracket
+    ) {
+      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
+    }
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+
+    let parsed: unknown;
+    let usedRepair = false;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        const repaired = jsonrepair(jsonStr);
+        parsed = JSON.parse(repaired);
+        usedRepair = true;
+      } catch (parseErr) {
+        const message =
+          parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(
+          `AI returned invalid JSON. Try again or use a shorter text. (${message})`,
+        );
+      }
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new BadRequestException(
+        'AI response must be a JSON array of questions.',
+      );
+    }
+
+    if (usedRepair && parsed.length === 1) {
+      const subjectCount = (jsonStr.match(/"subject"\s*:/g) ?? []).length;
+      if (subjectCount > 1) {
+        throw new BadRequestException(
+          'Only 1 question could be recovered (response may be truncated or invalid). Try with a shorter markdown text so the full JSON is returned.',
+        );
+      }
+    }
+
+    return parsed.map((item: unknown) =>
+      normalizeToParsedQuestionItem(item),
+    );
+  }
 
   list(examBaseId: string) {
     return this.prisma.examBaseQuestion.findMany({

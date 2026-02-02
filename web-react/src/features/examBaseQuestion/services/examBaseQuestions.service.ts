@@ -7,11 +7,31 @@ import type {
   UpdateExamBaseQuestionInput,
 } from '../domain/examBaseQuestion.types'
 
+export type ParsedQuestionItem = {
+  subject: string
+  statement: string
+  topic?: string
+  alternatives: { key: string; text: string }[]
+}
+
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/questions`
 
 export const examBaseQuestionsService = {
   list(examBaseId: string): Promise<ExamBaseQuestion[]> {
     return apiFetch<ExamBaseQuestion[]>(basePath(examBaseId), { method: 'GET' })
+  },
+
+  parseFromMarkdown(
+    examBaseId: string,
+    markdown: string,
+  ): Promise<ParsedQuestionItem[]> {
+    return apiFetch<ParsedQuestionItem[]>(
+      `${basePath(examBaseId)}/parse-from-markdown`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ markdown }),
+      },
+    )
   },
 
   create(

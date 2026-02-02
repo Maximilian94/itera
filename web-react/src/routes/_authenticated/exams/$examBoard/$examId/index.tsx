@@ -25,7 +25,9 @@ import { QuestionEditor } from '@/components/QuestionEditor'
 import {
   useExamBaseQuestionsQuery,
   useCreateExamBaseQuestionMutation,
+  useParseQuestionsFromMarkdownMutation,
   getApiMessage,
+  type ParsedQuestionItem,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 
 export const Route = createFileRoute(
@@ -44,12 +46,16 @@ function RouteComponent() {
   const [addTopic, setAddTopic] = useState('')
   const [addStatement, setAddStatement] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
+  const [markdownText, setMarkdownText] = useState('')
+  const [draftQuestions, setDraftQuestions] = useState<ParsedQuestionItem[]>([])
+  const [parseError, setParseError] = useState<string | null>(null)
 
   const examBaseId = examId
   const { data: questions = [], isLoading, error } = useExamBaseQuestionsQuery(
     value === QUESTIONS_TAB_INDEX ? examBaseId : undefined,
   )
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
+  const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue)
@@ -81,6 +87,39 @@ function RouteComponent() {
     }
   }
 
+  const handleParseMarkdown = async () => {
+    if (!markdownText.trim()) return
+    setParseError(null)
+    try {
+      const result = await parseFromMarkdown.mutateAsync(markdownText.trim())
+      setDraftQuestions(result)
+    } catch (err) {
+      setParseError(getApiMessage(err))
+    }
+  }
+
+  const handleCreateDraft = async (draft: ParsedQuestionItem, index: number) => {
+    setParseError(null)
+    try {
+      await createQuestion.mutateAsync({
+        subject: draft.subject || 'Sem assunto',
+        topic: draft.topic ?? '',
+        statement: draft.statement,
+        alternatives:
+          draft.alternatives.length > 0
+            ? draft.alternatives.map((a) => ({
+                key: a.key,
+                text: a.text,
+                explanation: '',
+              }))
+            : undefined,
+      })
+      setDraftQuestions((prev) => prev.filter((_, i) => i !== index))
+    } catch (err) {
+      setParseError(getApiMessage(err))
+    }
+  }
+
   return (
     <div className="p-4">
       <Paper>
@@ -105,6 +144,89 @@ function RouteComponent() {
 
         <CustomTabPanel value={value} hidden={value !== QUESTIONS_TAB_INDEX}>
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Typography variant="h6">Extrair perguntas com IA (Grok)</Typography>
+            <Typography variant="body2" color="text.secondary">
+              Cole aqui o texto em markdown. A IA irá identificar perguntas e alternativas.
+            </Typography>
+            <TextField
+              label="Texto em Markdown"
+              fullWidth
+              multiline
+              minRows={14}
+              maxRows={30}
+              value={markdownText}
+              onChange={(e) => setMarkdownText(e.target.value)}
+              placeholder="Cole o conteúdo da prova em markdown…"
+              sx={{ fontFamily: 'monospace' }}
+            />
+            <Button
+              variant="outlined"
+              color="primary"
+              onClick={handleParseMarkdown}
+              disabled={parseFromMarkdown.isPending || !markdownText.trim()}
+            >
+              {parseFromMarkdown.isPending ? 'Extraindo…' : 'Extrair perguntas com IA'}
+            </Button>
+            {parseError && (
+              <Alert severity="error" onClose={() => setParseError(null)}>
+                {parseError}
+              </Alert>
+            )}
+
+            {draftQuestions.length > 0 && (
+              <>
+                <Typography variant="h6" sx={{ mt: 2 }}>
+                  Perguntas em rascunho ({draftQuestions.length})
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Revise e clique em &quot;Criar&quot; para salvar cada pergunta na base.
+                </Typography>
+                <Box>
+                  {draftQuestions.map((draft, index) => (
+                    <Accordion key={index}>
+                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                        <Typography variant="body1">
+                          {draft.subject}
+                          {draft.topic ? ` — ${draft.topic}` : ''}
+                          {draft.statement
+                            ? `: ${draft.statement.slice(0, 50)}${draft.statement.length > 50 ? '…' : ''}`
+                            : ''}
+                        </Typography>
+                      </AccordionSummary>
+                      <AccordionDetails>
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle2">Enunciado</Typography>
+                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                            {draft.statement}
+                          </Typography>
+                          {draft.alternatives.length > 0 && (
+                            <>
+                              <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                                Alternativas
+                              </Typography>
+                              {draft.alternatives.map((alt, i) => (
+                                <Typography key={i} variant="body2">
+                                  <strong>{alt.key}.</strong> {alt.text}
+                                </Typography>
+                              ))}
+                            </>
+                          )}
+                          <Button
+                            variant="contained"
+                            size="small"
+                            onClick={() => handleCreateDraft(draft, index)}
+                            disabled={createQuestion.isPending}
+                          >
+                            Criar pergunta
+                          </Button>
+                        </Stack>
+                      </AccordionDetails>
+                    </Accordion>
+                  ))}
+                </Box>
+              </>
+            )}
+
             <Box
               sx={{
                 display: 'flex',
@@ -112,6 +234,7 @@ function RouteComponent() {
                 justifyContent: 'space-between',
                 flexWrap: 'wrap',
                 gap: 1,
+                mt: draftQuestions.length > 0 ? 2 : 0,
               }}
             >
               <Typography variant="h6">Exam base questions</Typography>
