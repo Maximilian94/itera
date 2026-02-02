@@ -21,6 +21,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
+import { Markdown } from '@/components/Markdown'
 import { QuestionEditor } from '@/components/QuestionEditor'
 import {
   useExamBaseQuestionsQuery,
@@ -48,6 +49,7 @@ function RouteComponent() {
   const [addError, setAddError] = useState<string | null>(null)
   const [markdownText, setMarkdownText] = useState('')
   const [draftQuestions, setDraftQuestions] = useState<ParsedQuestionItem[]>([])
+  const [rawResponseFromGrok, setRawResponseFromGrok] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
 
   const examBaseId = examId
@@ -92,7 +94,8 @@ function RouteComponent() {
     setParseError(null)
     try {
       const result = await parseFromMarkdown.mutateAsync(markdownText.trim())
-      setDraftQuestions(result)
+      setDraftQuestions(result.questions)
+      setRawResponseFromGrok(result.rawResponse)
     } catch (err) {
       setParseError(getApiMessage(err))
     }
@@ -196,18 +199,20 @@ function RouteComponent() {
                       <AccordionDetails>
                         <Stack spacing={1}>
                           <Typography variant="subtitle2">Enunciado</Typography>
-                          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                            {draft.statement}
-                          </Typography>
+                          <Markdown variant="body2">{draft.statement}</Markdown>
                           {draft.alternatives.length > 0 && (
                             <>
                               <Typography variant="subtitle2" sx={{ mt: 1 }}>
                                 Alternativas
                               </Typography>
                               {draft.alternatives.map((alt, i) => (
-                                <Typography key={i} variant="body2">
-                                  <strong>{alt.key}.</strong> {alt.text}
-                                </Typography>
+                                <Box key={i} sx={{ display: 'flex', gap: 0.5 }}>
+                                  <Typography component="span" variant="body2" fontWeight={600}>
+                                    {alt.key}.
+                                  </Typography>
+                                  <Markdown variant="body2">{alt.text}</Markdown>
+                                  |{console.log("alt.text", alt.text)}
+                                </Box>
                               ))}
                             </>
                           )}

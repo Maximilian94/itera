@@ -24,8 +24,8 @@ export const examBaseQuestionsService = {
   parseFromMarkdown(
     examBaseId: string,
     markdown: string,
-  ): Promise<ParsedQuestionItem[]> {
-    return apiFetch<ParsedQuestionItem[]>(
+  ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
+    return apiFetch<{ questions: ParsedQuestionItem[]; rawResponse: string }>(
       `${basePath(examBaseId)}/parse-from-markdown`,
       {
         method: 'POST',

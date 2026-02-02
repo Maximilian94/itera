@@ -131,7 +131,7 @@ export class ExamBaseQuestionService {
 
   async parseQuestionsFromMarkdown(
     markdown: string,
-  ): Promise<ParsedQuestionItem[]> {
+  ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
     const apiKey = this.config.get<string>('XAI_API_KEY');
     if (!apiKey) {
       throw new BadRequestException(
@@ -141,14 +141,18 @@ export class ExamBaseQuestionService {
 
     const systemPrompt = `You are an assistant that extracts exam questions from markdown text.
 Given the markdown content, identify EVERY question and its alternatives. Return ALL of them.
-Return ONLY a valid JSON array, no other text or markdown. Rules for valid JSON:
+Return ONLY a valid JSON array, no other text or markdown.
+
+Important: PRESERVE MARKDOWN in the extracted text. In \`statement\` and in each \`alternatives[].text\`, keep the same markdown as in the source: **bold**, *italic*, line breaks, etc. Do not strip formatting to plain text.
+
+JSON rules:
 - Each item: subject (string), statement (string), topic (string, optional), alternatives (array of { key: string, text: string }).
-- Inside any string value, escape double quotes with backslash: \\".
-- Do not put raw newlines inside string values; use \\n if needed.
+- Escape double quotes inside strings with backslash: \\".
+- Use \\n for newlines inside string values.
 - Return the complete array with every question you find, not just the first.
 Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
 
-    const userPrompt = `Extract ALL questions from this markdown. Return only the JSON array (no code block, no explanation). Every question must appear in the array.\n\n${markdown}`;
+    const userPrompt = `Extract ALL questions from this markdown. Return only the JSON array (no code block, no explanation). Preserve markdown formatting (bold, italic, line breaks) inside statement and each alternative text.\n\n${markdown}`;
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -181,7 +185,7 @@ Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
     const content =
       data.choices?.[0]?.message?.content?.trim() ?? '';
     if (!content) {
-      return [];
+      return { questions: [], rawResponse: '' };
     }
 
     console.log('content', content);
@@ -236,9 +240,10 @@ Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
       }
     }
 
-    return parsed.map((item: unknown) =>
+    const questions = parsed.map((item: unknown) =>
       normalizeToParsedQuestionItem(item),
     );
+    return { questions, rawResponse: content };
   }
 
   list(examBaseId: string) {
