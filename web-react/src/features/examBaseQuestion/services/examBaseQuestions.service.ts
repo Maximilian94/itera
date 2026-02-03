@@ -14,6 +14,12 @@ export type ParsedQuestionItem = {
   alternatives: { key: string; text: string }[]
 }
 
+export type GenerateExplanationsResponse = {
+  topic: string
+  subtopics: string[]
+  explanations: Array<{ key: string; explanation: string }>
+}
+
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/questions`
 
 export const examBaseQuestionsService = {
@@ -30,6 +36,21 @@ export const examBaseQuestionsService = {
       {
         method: 'POST',
         body: JSON.stringify({ markdown }),
+      },
+    )
+  },
+
+  extractFromPdf(
+    examBaseId: string,
+    file: File,
+  ): Promise<{ content: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiFetch<{ content: string }>(
+      `${basePath(examBaseId)}/extract-from-pdf`,
+      {
+        method: 'POST',
+        body: formData,
       },
     )
   },
@@ -101,6 +122,16 @@ export const examBaseQuestionsService = {
     return apiFetch<void>(
       `${basePath(examBaseId)}/${questionId}/alternatives/${alternativeId}`,
       { method: 'DELETE' },
+    )
+  },
+
+  generateExplanations(
+    examBaseId: string,
+    questionId: string,
+  ): Promise<GenerateExplanationsResponse> {
+    return apiFetch<GenerateExplanationsResponse>(
+      `${basePath(examBaseId)}/${questionId}/generate-explanations`,
+      { method: 'POST' },
     )
   },
 }

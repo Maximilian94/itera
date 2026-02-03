@@ -11,6 +11,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
 import SaveIcon from '@mui/icons-material/Save'
@@ -29,6 +30,7 @@ import {
   useCreateAlternativeMutation,
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
+  useGenerateExplanationsMutation,
   getApiMessage,
   isConflictError,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
@@ -77,6 +79,7 @@ export function QuestionEditor({
   const [newAltText, setNewAltText] = useState('')
   const [newAltExplanation, setNewAltExplanation] = useState('')
   const [altError, setAltError] = useState<string | null>(null)
+  const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
   const [editAltKey, setEditAltKey] = useState('')
   const [editAltText, setEditAltText] = useState('')
   const [editAltExplanation, setEditAltExplanation] = useState('')
@@ -95,6 +98,7 @@ export function QuestionEditor({
   const createAlternative = useCreateAlternativeMutation(examBaseId, question.id)
   const updateAlternative = useUpdateAlternativeMutation(examBaseId, question.id)
   const deleteAlternative = useDeleteAlternativeMutation(examBaseId, question.id)
+  const generateExplanations = useGenerateExplanationsMutation(examBaseId, question.id)
 
   const alternatives = sortedAlternatives(question)
   const alternativeKeys = alternatives.map((a) => a.key)
@@ -197,6 +201,30 @@ export function QuestionEditor({
     }
   }
 
+  const handleGenerateExplanations = async () => {
+    setGenerateExplainError(null)
+    try {
+      const result = await generateExplanations.mutateAsync()
+      setTopic(result.topic)
+      setSubtopicsStr(arrayToStringList(result.subtopics))
+      await updateQuestion.mutateAsync({
+        questionId: question.id,
+        input: { topic: result.topic, subtopics: result.subtopics },
+      })
+      for (const e of result.explanations) {
+        const alt = alternatives.find((a) => a.key === e.key)
+        if (alt) {
+          await updateAlternative.mutateAsync({
+            alternativeId: alt.id,
+            input: { explanation: e.explanation },
+          })
+        }
+      }
+    } catch (err) {
+      setGenerateExplainError(getApiMessage(err))
+    }
+  }
+
   return (
     <Box sx={{ pt: 1, pb: 2 }}>
       <Stack spacing={2}>
@@ -208,6 +236,11 @@ export function QuestionEditor({
         {altError && (
           <Alert severity="error" onClose={() => setAltError(null)}>
             {altError}
+          </Alert>
+        )}
+        {generateExplainError && (
+          <Alert severity="error" onClose={() => setGenerateExplainError(null)}>
+            {generateExplainError}
           </Alert>
         )}
 
@@ -389,7 +422,24 @@ export function QuestionEditor({
           </Button>
         </Stack>
 
-        <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
+        <Stack direction="row" spacing={1} sx={{ mt: 2 }} flexWrap="wrap">
+          <Button
+            variant="outlined"
+            startIcon={<AutoAwesomeIcon />}
+            onClick={handleGenerateExplanations}
+            disabled={
+              generateExplanations.isPending ||
+              alternatives.length === 0 ||
+              !correctAlternative
+            }
+            title={
+              !correctAlternative
+                ? 'Marque a alternativa correta para gerar explicações'
+                : undefined
+            }
+          >
+            {generateExplanations.isPending ? 'Gerando…' : 'Gerar explicações com IA'}
+          </Button>
           <Button
             variant="contained"
             startIcon={<SaveIcon />}

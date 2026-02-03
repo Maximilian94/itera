@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -6,7 +7,10 @@ import {
   Param,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express/multer';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { CreateExamBaseQuestionDto } from './dto/create-exam-base-question.dto';
 import { ParseQuestionsFromMarkdownDto } from './dto/parse-questions-from-markdown.dto';
@@ -40,12 +44,33 @@ export class ExamBaseQuestionController {
     return this.service.parseQuestionsFromMarkdown(dto.markdown);
   }
 
+  @Post('extract-from-pdf')
+  @UseInterceptors(FileInterceptor('file'))
+  async extractFromPdf(
+    @Param('examBaseId') _examBaseId: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string; originalname?: string } | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('file is required');
+    }
+    const content = await this.service.extractPdfToMarkdown(file);
+    return { content };
+  }
+
   @Get(':questionId')
   getOne(
     @Param('examBaseId') examBaseId: string,
     @Param('questionId') questionId: string,
   ) {
     return this.service.getOne(examBaseId, questionId);
+  }
+
+  @Post(':questionId/generate-explanations')
+  generateExplanations(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+  ) {
+    return this.service.generateExplanations(examBaseId, questionId);
   }
 
   @Patch(':questionId')

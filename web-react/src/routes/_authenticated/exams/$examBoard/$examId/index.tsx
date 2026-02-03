@@ -18,8 +18,9 @@ import {
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
+import UploadFileIcon from '@mui/icons-material/UploadFile'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { QuestionEditor } from '@/components/QuestionEditor'
@@ -27,9 +28,13 @@ import {
   useExamBaseQuestionsQuery,
   useCreateExamBaseQuestionMutation,
   useParseQuestionsFromMarkdownMutation,
+  useExtractFromPdfMutation,
   getApiMessage,
   type ParsedQuestionItem,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import QuestionCreator from '@/components/QuestionCreator'
+import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -38,9 +43,11 @@ export const Route = createFileRoute(
 })
 
 const QUESTIONS_TAB_INDEX = 3
+const CREATE_QUESTION_TAB_INDEX = 4
 
 function RouteComponent() {
   const { examBoard, examId } = Route.useParams()
+  const [examBase, setExamBase] = useState<ExamBase | null>(null)
   const [value, setValue] = useState(0)
   const [addQuestionOpen, setAddQuestionOpen] = useState(false)
   const [addSubject, setAddSubject] = useState('')
@@ -56,8 +63,11 @@ function RouteComponent() {
   const { data: questions = [], isLoading, error } = useExamBaseQuestionsQuery(
     value === QUESTIONS_TAB_INDEX ? examBaseId : undefined,
   )
+  const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
+  const extractFromPdf = useExtractFromPdfMutation(examBaseId)
+  const pdfInputRef = useRef<HTMLInputElement>(null)
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue)
@@ -101,6 +111,21 @@ function RouteComponent() {
     }
   }
 
+  const handlePdfFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setParseError(null)
+    try {
+      const result = await extractFromPdf.mutateAsync(file)
+      setMarkdownText(result.content)
+    } catch (err) {
+      setParseError(getApiMessage(err))
+    }
+  }
+
   const handleCreateDraft = async (draft: ParsedQuestionItem, index: number) => {
     setParseError(null)
     try {
@@ -123,6 +148,11 @@ function RouteComponent() {
     }
   }
 
+  useEffect(() => {
+    const examBase = examBases?.find((b) => b.id === examBaseId)
+    setExamBase(examBase ?? null)
+  }, [examBases, examBaseId])
+
   return (
     <div className="p-4">
       <Paper>
@@ -131,10 +161,16 @@ function RouteComponent() {
           <Tab label="Tentativas" value={1} />
           <Tab label="Estatísticas" value={2} />
           <Tab label="Questions" value={QUESTIONS_TAB_INDEX} id="questions" />
+          <Tab label="Criar pergunta" value={CREATE_QUESTION_TAB_INDEX} id="create-question" />
         </Tabs>
 
         <CustomTabPanel value={value} hidden={value !== 0}>
           Detalhes da prova
+          {examBase && (
+            <Typography variant="body1">
+              {examBase.name}
+            </Typography>
+          )}
         </CustomTabPanel>
 
         <CustomTabPanel value={value} hidden={value !== 1}>
@@ -149,8 +185,23 @@ function RouteComponent() {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <Typography variant="h6">Extrair perguntas com IA (Grok)</Typography>
             <Typography variant="body2" color="text.secondary">
-              Cole aqui o texto em markdown. A IA irá identificar perguntas e alternativas.
+              Envie um PDF para converter em markdown ou cole o texto em markdown. A IA irá identificar perguntas e alternativas.
             </Typography>
+            <input
+              ref={pdfInputRef}
+              type="file"
+              accept=".pdf,application/pdf"
+              style={{ display: 'none' }}
+              onChange={handlePdfFileChange}
+            />
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileIcon />}
+              onClick={() => pdfInputRef.current?.click()}
+              disabled={extractFromPdf.isPending}
+            >
+              {extractFromPdf.isPending ? 'Convertendo PDF…' : 'Enviar PDF'}
+            </Button>
             <TextField
               label="Texto em Markdown"
               fullWidth
@@ -211,7 +262,6 @@ function RouteComponent() {
                                     {alt.key}.
                                   </Typography>
                                   <Markdown variant="body2">{alt.text}</Markdown>
-                                  |{console.log("alt.text", alt.text)}
                                 </Box>
                               ))}
                             </>
@@ -269,7 +319,7 @@ function RouteComponent() {
             {!isLoading && !error && questions.length > 0 && (
               <Box>
                 {questions.map((q) => (
-                  <Accordion key={q.id}>
+                  <Accordion key={q.id} elevation={3}>
                     <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                       <Typography variant="body1">
                         {q.subject} — {q.topic}
@@ -287,6 +337,10 @@ function RouteComponent() {
               </Box>
             )}
           </Box>
+        </CustomTabPanel>
+
+        <CustomTabPanel value={value} hidden={value !== CREATE_QUESTION_TAB_INDEX}>
+          <QuestionCreator />
         </CustomTabPanel>
 
         <Link
