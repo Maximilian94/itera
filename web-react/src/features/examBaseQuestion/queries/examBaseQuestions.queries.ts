@@ -9,6 +9,10 @@ import {
   isConflictError,
 } from '../services/examBaseQuestions.service'
 import type {
+  ParsedQuestionItem,
+  GenerateExplanationsResponse,
+} from '../services/examBaseQuestions.service'
+import type {
   CreateAlternativeInput,
   CreateExamBaseQuestionInput,
   UpdateAlternativeInput,
@@ -38,6 +42,36 @@ export function useCreateExamBaseQuestionMutation(examBaseId: string) {
     },
   })
 }
+
+export function useParseQuestionsFromMarkdownMutation(examBaseId: string) {
+  return useMutation({
+    mutationFn: (markdown: string) =>
+      examBaseQuestionsService.parseFromMarkdown(examBaseId, markdown),
+  })
+}
+
+export function useExtractFromPdfMutation(examBaseId: string) {
+  return useMutation({
+    mutationFn: (file: File) =>
+      examBaseQuestionsService.extractFromPdf(examBaseId, file),
+  })
+}
+
+export function useGenerateExplanationsMutation(
+  examBaseId: string,
+  questionId: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      examBaseQuestionsService.generateExplanations(examBaseId, questionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
+
+export type { ParsedQuestionItem, GenerateExplanationsResponse }
 
 export function useUpdateExamBaseQuestionMutation(
   examBaseId: string,
