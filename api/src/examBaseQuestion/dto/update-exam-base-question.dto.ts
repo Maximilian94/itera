@@ -28,6 +28,11 @@ export class UpdateExamBaseQuestionDto {
   statementImageUrl?: string | null;
 
   @IsOptional()
+  @ValidateIf((_o, v) => v != null)
+  @IsString()
+  referenceText?: string | null;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   skills?: string[];

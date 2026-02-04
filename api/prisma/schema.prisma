@@ -185,6 +185,9 @@ model ExamBaseQuestion {
   // URL pública da imagem do enunciado (ex.: Google Cloud Storage)
   statementImageUrl String?
 
+  // Texto de referência da prova (ex.: texto base compartilhado por várias questões)
+  referenceText String?
+
   // Ex: "A", "B", "C", "D"
   correctAlternative String?
 

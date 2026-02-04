@@ -53,6 +53,7 @@ function RouteComponent() {
   const [addSubject, setAddSubject] = useState('')
   const [addTopic, setAddTopic] = useState('')
   const [addStatement, setAddStatement] = useState('')
+  const [addReferenceText, setAddReferenceText] = useState('')
   const [addError, setAddError] = useState<string | null>(null)
   const [markdownText, setMarkdownText] = useState('')
   const [draftQuestions, setDraftQuestions] = useState<ParsedQuestionItem[]>([])
@@ -77,6 +78,7 @@ function RouteComponent() {
     setAddSubject('')
     setAddTopic('')
     setAddStatement('')
+    setAddReferenceText('')
     setAddError(null)
     setAddQuestionOpen(true)
   }
@@ -92,6 +94,7 @@ function RouteComponent() {
         subject: addSubject.trim(),
         topic: addTopic.trim(),
         statement: addStatement.trim(),
+        referenceText: addReferenceText.trim() || undefined,
       })
       setAddQuestionOpen(false)
     } catch (err) {
@@ -133,6 +136,7 @@ function RouteComponent() {
         subject: draft.subject || 'Sem assunto',
         topic: draft.topic ?? '',
         statement: draft.statement,
+        referenceText: draft.referenceText?.trim() || undefined,
         alternatives:
           draft.alternatives.length > 0
             ? draft.alternatives.map((a) => ({
@@ -249,6 +253,12 @@ function RouteComponent() {
                       </AccordionSummary>
                       <AccordionDetails>
                         <Stack spacing={1}>
+                          {draft.referenceText && (
+                            <>
+                              <Typography variant="subtitle2">Texto de referência</Typography>
+                              <Markdown variant="body2">{draft.referenceText}</Markdown>
+                            </>
+                          )}
                           <Typography variant="subtitle2">Enunciado</Typography>
                           <Markdown variant="body2">{draft.statement}</Markdown>
                           {draft.alternatives.length > 0 && (
@@ -415,6 +425,16 @@ function RouteComponent() {
               minRows={2}
               value={addStatement}
               onChange={(e) => setAddStatement(e.target.value)}
+            />
+            <TextField
+              label="Texto de referência (opcional)"
+              size="small"
+              fullWidth
+              multiline
+              minRows={2}
+              value={addReferenceText}
+              onChange={(e) => setAddReferenceText(e.target.value)}
+              placeholder="Texto da prova ao qual a questão se refere"
             />
           </Stack>
         </DialogContent>

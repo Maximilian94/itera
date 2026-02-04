@@ -37,6 +37,7 @@ const questionSelect = {
   subtopics: true,
   statement: true,
   statementImageUrl: true,
+  referenceText: true,
   correctAlternative: true,
   skills: true,
   alternatives: {
@@ -124,6 +125,7 @@ function normalizeToParsedQuestionItem(item: unknown): ParsedQuestionItem {
     subject: String(o.subject ?? ''),
     statement: String(o.statement ?? ''),
     topic: o.topic != null ? String(o.topic) : undefined,
+    referenceText: o.referenceText != null ? String(o.referenceText) : undefined,
     alternatives,
   };
 }
@@ -172,7 +174,8 @@ Return ONLY a valid JSON array, no other text or markdown.
 Important: PRESERVE MARKDOWN in the extracted text. In \`statement\` and in each \`alternatives[].text\`, keep the same markdown as in the source: **bold**, *italic*, line breaks, etc. Do not strip formatting to plain text.
 
 JSON rules:
-- Each item: subject (string), statement (string), topic (string, optional), alternatives (array of { key: string, text: string }).
+- Each item: subject (string), statement (string), topic (string, optional), referenceText (string, optional), alternatives (array of { key: string, text: string }).
+- referenceText: when the exam has a shared passage/text that this question refers to (e.g. a text that 5 questions use), put that text here. Preserve markdown. Omit or leave empty when the question has no supporting text.
 - Escape double quotes inside strings with backslash: \\".
 - Use \\n for newlines inside string values.
 - Return the complete array with every question you find, not just the first.
@@ -580,6 +583,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
           subtopics: dto.subtopics ?? [],
           statement: dto.statement,
           statementImageUrl: dto.statementImageUrl?.trim() || null,
+          referenceText: dto.referenceText?.trim() || null,
           skills: dto.skills ?? [],
           correctAlternative: correctAlternative || null,
         },
@@ -642,6 +646,11 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         ? undefined
         : dto.statementImageUrl?.trim() || null;
 
+    const referenceText =
+      dto.referenceText === undefined
+        ? undefined
+        : dto.referenceText?.trim() || null;
+
     if (statementImageUrl === null) {
       const current = await this.prisma.examBaseQuestion.findUnique({
         where: { id: questionId },
@@ -660,6 +669,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         subtopics: dto.subtopics,
         statement: dto.statement,
         statementImageUrl,
+        referenceText,
         skills: dto.skills,
         correctAlternative,
       },

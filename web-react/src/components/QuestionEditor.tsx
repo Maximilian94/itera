@@ -71,6 +71,9 @@ export function QuestionEditor({
   const [statementImageUrl, setStatementImageUrl] = useState<string>(
     question.statementImageUrl ?? '',
   )
+  const [referenceText, setReferenceText] = useState<string>(
+    question.referenceText ?? '',
+  )
   const [skillsStr, setSkillsStr] = useState(
     arrayToStringList(question.skills ?? []),
   )
@@ -99,9 +102,10 @@ export function QuestionEditor({
     setSubtopicsStr(arrayToStringList(question.subtopics ?? []))
     setStatement(question.statement)
     setStatementImageUrl(question.statementImageUrl ?? '')
+    setReferenceText(question.referenceText ?? '')
     setSkillsStr(arrayToStringList(question.skills ?? []))
     setCorrectAlternative(question.correctAlternative ?? '')
-  }, [question.id, question.subject, question.topic, question.subtopics, question.statement, question.statementImageUrl, question.skills, question.correctAlternative])
+  }, [question.id, question.subject, question.topic, question.subtopics, question.statement, question.statementImageUrl, question.referenceText, question.skills, question.correctAlternative])
 
   const updateQuestion = useUpdateExamBaseQuestionMutation(examBaseId)
   const deleteQuestion = useDeleteExamBaseQuestionMutation(examBaseId)
@@ -128,6 +132,7 @@ export function QuestionEditor({
           subtopics: stringListToArray(subtopicsStr),
           statement,
           statementImageUrl: statementImageUrl?.trim() || null,
+          referenceText: referenceText?.trim() || null,
           skills: stringListToArray(skillsStr),
           correctAlternative: correct,
         },
@@ -301,6 +306,16 @@ export function QuestionEditor({
           value={statement}
           onChange={(e) => setStatement(e.target.value)}
         />
+        <TextField
+          label="Texto de referência (opcional)"
+          size="small"
+          fullWidth
+          multiline
+          minRows={2}
+          value={referenceText}
+          onChange={(e) => setReferenceText(e.target.value)}
+          placeholder="Texto da prova ao qual a questão se refere (ex.: texto base compartilhado por várias questões)"
+        />
 
         <Typography variant="subtitle2">Imagem do enunciado</Typography>
         <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
@@ -354,6 +369,7 @@ export function QuestionEditor({
                       subtopics: stringListToArray(subtopicsStr),
                       statement,
                       statementImageUrl: null,
+                      referenceText: referenceText?.trim() || null,
                       skills: stringListToArray(skillsStr),
                       correctAlternative: correct,
                     },

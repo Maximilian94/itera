@@ -17,6 +17,8 @@ export type ExamBaseQuestion = {
   subtopics: string[]
   statement: string
   statementImageUrl: string | null
+  /** Texto de referência da prova (ex.: texto base compartilhado por várias questões). */
+  referenceText: string | null
   correctAlternative: string | null
   skills: string[]
   alternatives: ExamBaseQuestionAlternative[]
@@ -28,6 +30,7 @@ export type CreateExamBaseQuestionInput = {
   subtopics?: string[]
   statement: string
   statementImageUrl?: string | null
+  referenceText?: string | null
   skills?: string[]
   correctAlternative?: string
   alternatives?: { key: string; text: string; explanation: string }[]
@@ -39,6 +42,7 @@ export type UpdateExamBaseQuestionInput = {
   subtopics?: string[]
   statement?: string
   statementImageUrl?: string | null
+  referenceText?: string | null
   skills?: string[]
   correctAlternative?: string
 }

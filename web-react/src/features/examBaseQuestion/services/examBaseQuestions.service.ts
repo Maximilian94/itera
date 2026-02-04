@@ -11,6 +11,8 @@ export type ParsedQuestionItem = {
   subject: string
   statement: string
   topic?: string
+  /** Texto de referência da prova (ex.: texto base compartilhado por várias questões). */
+  referenceText?: string
   alternatives: { key: string; text: string }[]
 }
 

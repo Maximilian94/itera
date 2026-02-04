@@ -15,6 +15,8 @@ export interface ParsedQuestionItem {
   subject: string;
   statement: string;
   topic?: string;
+  /** Texto de referência da prova (ex.: texto base usado por várias questões). Opcional. */
+  referenceText?: string;
   alternatives: ParsedQuestionAlternative[];
 }
 
@@ -27,6 +29,16 @@ export const PARSED_QUESTION_EXAMPLE: ParsedQuestionItem[] = [
     alternatives: [
       { key: 'A', text: '3' },
       { key: 'B', text: '4' },
+    ],
+  },
+  {
+    subject: 'Portuguese',
+    statement: 'De acordo com o texto, a principal crítica do autor é:',
+    topic: 'Interpretação',
+    referenceText: 'O Brasil enfrenta desafios históricos na área de educação. A qualidade do ensino varia muito entre regiões.',
+    alternatives: [
+      { key: 'A', text: 'a desigualdade regional.' },
+      { key: 'B', text: 'a falta de investimento.' },
     ],
   },
 ];
