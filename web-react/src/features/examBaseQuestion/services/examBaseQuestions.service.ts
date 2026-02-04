@@ -55,6 +55,21 @@ export const examBaseQuestionsService = {
     )
   },
 
+  uploadStatementImage(
+    examBaseId: string,
+    file: File,
+  ): Promise<{ url: string }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiFetch<{ url: string }>(
+      `${basePath(examBaseId)}/upload-statement-image`,
+      {
+        method: 'POST',
+        body: formData,
+      },
+    )
+  },
+
   create(
     examBaseId: string,
     input: CreateExamBaseQuestionInput,

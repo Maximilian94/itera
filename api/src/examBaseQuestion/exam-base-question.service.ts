@@ -20,6 +20,7 @@ import {
 } from './dto/parsed-question.types';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
+import { StorageService } from '../storage/storage.service';
 import { jsonrepair } from 'jsonrepair';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -35,6 +36,7 @@ const questionSelect = {
   topic: true,
   subtopics: true,
   statement: true,
+  statementImageUrl: true,
   correctAlternative: true,
   skills: true,
   alternatives: {
@@ -150,6 +152,7 @@ export class ExamBaseQuestionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async parseQuestionsFromMarkdown(
@@ -576,6 +579,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
           topic: dto.topic,
           subtopics: dto.subtopics ?? [],
           statement: dto.statement,
+          statementImageUrl: dto.statementImageUrl?.trim() || null,
           skills: dto.skills ?? [],
           correctAlternative: correctAlternative || null,
         },
@@ -633,6 +637,21 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         ? undefined
         : dto.correctAlternative?.trim() || null;
 
+    const statementImageUrl =
+      dto.statementImageUrl === undefined
+        ? undefined
+        : dto.statementImageUrl?.trim() || null;
+
+    if (statementImageUrl === null) {
+      const current = await this.prisma.examBaseQuestion.findUnique({
+        where: { id: questionId },
+        select: { statementImageUrl: true },
+      });
+      if (current?.statementImageUrl) {
+        await this.storage.deleteByPublicUrl(current.statementImageUrl);
+      }
+    }
+
     return this.prisma.examBaseQuestion.update({
       where: { id: questionId },
       data: {
@@ -640,6 +659,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         topic: dto.topic,
         subtopics: dto.subtopics,
         statement: dto.statement,
+        statementImageUrl,
         skills: dto.skills,
         correctAlternative,
       },
@@ -653,6 +673,13 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       examBaseId,
       questionId,
     );
+    const current = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: { statementImageUrl: true },
+    });
+    if (current?.statementImageUrl) {
+      await this.storage.deleteByPublicUrl(current.statementImageUrl);
+    }
     await this.prisma.examBaseQuestion.delete({
       where: { id: questionId },
     });

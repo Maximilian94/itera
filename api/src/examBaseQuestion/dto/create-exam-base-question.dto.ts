@@ -38,6 +38,10 @@ export class CreateExamBaseQuestionDto {
   statement: string;
 
   @IsOptional()
+  @IsString()
+  statementImageUrl?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   skills?: string[];

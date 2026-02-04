@@ -182,6 +182,9 @@ model ExamBaseQuestion {
 
   statement String
 
+  // URL pública da imagem do enunciado (ex.: Google Cloud Storage)
+  statementImageUrl String?
+
   // Ex: "A", "B", "C", "D"
   correctAlternative String?
 

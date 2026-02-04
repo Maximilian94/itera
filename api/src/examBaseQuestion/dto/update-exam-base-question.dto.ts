@@ -1,4 +1,4 @@
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsOptional, IsString, ValidateIf } from 'class-validator';
 
 /**
  * Example payload: { "subject": "Physics", "statement": "Updated statement." }
@@ -21,6 +21,11 @@ export class UpdateExamBaseQuestionDto {
   @IsOptional()
   @IsString()
   statement?: string;
+
+  @IsOptional()
+  @ValidateIf((_o, v) => v != null)
+  @IsString()
+  statementImageUrl?: string | null;
 
   @IsOptional()
   @IsArray()

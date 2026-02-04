@@ -327,10 +327,34 @@ function RouteComponent() {
                       </Typography>
                     </AccordionSummary>
                     <AccordionDetails>
-                      <QuestionEditor
-                        examBaseId={examBaseId}
-                        question={q}
-                      />
+                      <Stack spacing={2}>
+                        {q.statementImageUrl && (
+                          <Box
+                            sx={{
+                              maxWidth: 480,
+                              maxHeight: 360,
+                              border: '1px solid',
+                              borderColor: 'divider',
+                              borderRadius: 1,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            <img
+                              src={q.statementImageUrl}
+                              alt="Enunciado"
+                              style={{
+                                maxWidth: '100%',
+                                height: 'auto',
+                                display: 'block',
+                              }}
+                            />
+                          </Box>
+                        )}
+                        <QuestionEditor
+                          examBaseId={examBaseId}
+                          question={q}
+                        />
+                      </Stack>
                     </AccordionDetails>
                   </Accordion>
                 ))}

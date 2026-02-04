@@ -16,6 +16,7 @@ export type ExamBaseQuestion = {
   topic: string
   subtopics: string[]
   statement: string
+  statementImageUrl: string | null
   correctAlternative: string | null
   skills: string[]
   alternatives: ExamBaseQuestionAlternative[]
@@ -26,6 +27,7 @@ export type CreateExamBaseQuestionInput = {
   topic: string
   subtopics?: string[]
   statement: string
+  statementImageUrl?: string | null
   skills?: string[]
   correctAlternative?: string
   alternatives?: { key: string; text: string; explanation: string }[]
@@ -36,6 +38,7 @@ export type UpdateExamBaseQuestionInput = {
   topic?: string
   subtopics?: string[]
   statement?: string
+  statementImageUrl?: string | null
   skills?: string[]
   correctAlternative?: string
 }
