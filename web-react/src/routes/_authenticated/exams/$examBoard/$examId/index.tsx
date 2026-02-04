@@ -5,10 +5,14 @@ import {
   Alert,
   Box,
   Button,
+  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  List,
+  ListItem,
+  ListItemText,
   Paper,
   Stack,
   Tab,
@@ -19,7 +23,7 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import UploadFileIcon from '@mui/icons-material/UploadFile'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
@@ -35,6 +39,10 @@ import {
 import QuestionCreator from '@/components/QuestionCreator'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
+import {
+  useCreateExamBaseAttemptMutation,
+  useExamBaseAttemptsQuery,
+} from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -57,7 +65,7 @@ function RouteComponent() {
   const [addError, setAddError] = useState<string | null>(null)
   const [markdownText, setMarkdownText] = useState('')
   const [draftQuestions, setDraftQuestions] = useState<ParsedQuestionItem[]>([])
-  const [rawResponseFromGrok, setRawResponseFromGrok] = useState('')
+  const [, setRawResponseFromGrok] = useState('')
   const [parseError, setParseError] = useState<string | null>(null)
 
   const examBaseId = examId
@@ -65,10 +73,26 @@ function RouteComponent() {
     value === QUESTIONS_TAB_INDEX ? examBaseId : undefined,
   )
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
+  const navigate = useNavigate()
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
+  const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
+  const { data: attempts = [], isLoading: isLoadingAttempts } =
+    useExamBaseAttemptsQuery(value === 1 ? examBaseId : undefined)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
   const extractFromPdf = useExtractFromPdfMutation(examBaseId)
   const pdfInputRef = useRef<HTMLInputElement>(null)
+
+  const handleStartExam = async () => {
+    try {
+      const attempt = await createAttempt.mutateAsync()
+      await navigate({
+        to: '/exams/$examBoard/$examId/$attemptId',
+        params: { examBoard, examId, attemptId: attempt.id },
+      })
+    } catch {
+      // Error can be shown via createAttempt.error or a toast
+    }
+  }
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue)
@@ -169,16 +193,86 @@ function RouteComponent() {
         </Tabs>
 
         <CustomTabPanel value={value} hidden={value !== 0}>
-          Detalhes da prova
-          {examBase && (
-            <Typography variant="body1">
-              {examBase.name}
-            </Typography>
-          )}
+          <Stack spacing={2}>
+            <Typography variant="h6">Detalhes da prova</Typography>
+            {examBase && (
+              <Typography variant="body1">
+                {examBase.name}
+              </Typography>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              onClick={handleStartExam}
+              disabled={createAttempt.isPending}
+            >
+              {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
+            </Button>
+          </Stack>
         </CustomTabPanel>
 
         <CustomTabPanel value={value} hidden={value !== 1}>
-          Suas tentativas
+          <Stack spacing={2}>
+            <Typography variant="h6">Suas tentativas</Typography>
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<PlayArrowIcon />}
+              onClick={handleStartExam}
+              disabled={createAttempt.isPending}
+            >
+              {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
+            </Button>
+            {isLoadingAttempts && (
+              <Typography color="text.secondary">Carregando tentativas…</Typography>
+            )}
+            {!isLoadingAttempts && attempts.length === 0 && (
+              <Typography color="text.secondary">
+                Nenhuma tentativa ainda. Clique em &quot;Iniciar prova&quot; para começar.
+              </Typography>
+            )}
+            {!isLoadingAttempts && attempts.length > 0 && (
+              <List disablePadding>
+                {attempts.map((attempt) => {
+                  const startedAt = new Date(attempt.startedAt)
+                  const isFinished = attempt.finishedAt != null
+                  return (
+                    <ListItem
+                      key={attempt.id}
+                      disablePadding
+                      sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}
+                    >
+                      <ListItemText
+                        primary={startedAt.toLocaleString('pt-BR', {
+                          dateStyle: 'short',
+                          timeStyle: 'short',
+                        })}
+                      />
+                      <Chip
+                        label={isFinished ? 'Finalizada' : 'Em andamento'}
+                        size="small"
+                        color={isFinished ? 'success' : 'default'}
+                        variant="outlined"
+                      />
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() =>
+                          navigate({
+                            to: '/exams/$examBoard/$examId/$attemptId',
+                            params: { examBoard, examId, attemptId: attempt.id },
+                          })
+                        }
+                      >
+                        {isFinished ? 'Ver resultado' : 'Continuar'}
+                      </Button>
+                    </ListItem>
+                  )
+                })}
+              </List>
+            )}
+          </Stack>
         </CustomTabPanel>
 
         <CustomTabPanel value={value} hidden={value !== 2}>
@@ -376,19 +470,6 @@ function RouteComponent() {
         <CustomTabPanel value={value} hidden={value !== CREATE_QUESTION_TAB_INDEX}>
           <QuestionCreator />
         </CustomTabPanel>
-
-        <Link
-          to="/exams/$examBoard/$examId/$attemptId"
-          params={{ examBoard, examId, attemptId: '1' }}
-        >
-          <Button
-            variant="contained"
-            color="primary"
-            startIcon={<PlayArrowIcon />}
-          >
-            Iniciar prova
-          </Button>
-        </Link>
       </Paper>
 
       <Dialog open={addQuestionOpen} onClose={() => setAddQuestionOpen(false)}>
