@@ -97,6 +97,7 @@ function RouteComponent() {
   }
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
+    if (newValue === 1 && !isFinished) return
     setValue(newValue)
   }
 
@@ -231,7 +232,20 @@ function RouteComponent() {
                 aria-label="abas da questão"
               >
                 <Tab label="Questão" icon={<PlayArrowIcon />} iconPosition="start" />
-                <Tab label="Explanation" icon={<AutoStoriesIcon />} iconPosition="start" />
+                {isFinished ? (
+                  <Tab label="Explanation" icon={<AutoStoriesIcon />} iconPosition="start" />
+                ) : (
+                  <Tooltip title="As explicações ficam disponíveis após você finalizar a prova.">
+                    <span>
+                      <Tab
+                        label="Explanation"
+                        icon={<AutoStoriesIcon />}
+                        iconPosition="start"
+                        disabled
+                      />
+                    </span>
+                  </Tooltip>
+                )}
                 <Tab label="Statistics" icon={<InsightsIcon />} iconPosition="start" />
                 <Tab label="Comments" icon={<ForumIcon />} iconPosition="start" />
                 <Tab label="History" icon={<HistoryIcon />} iconPosition="start" />
@@ -280,12 +294,34 @@ function RouteComponent() {
                         (alt: ExamBaseQuestionAlternative) => {
                           const isEliminated = eliminatedSet.has(alt.id)
                           const isSelected = selectedAlternativeId === alt.id
+                          const isCorrect =
+                            currentQuestion.correctAlternative === alt.key
+                          const isWrong =
+                            isFinished && isSelected && !isCorrect
                           const keyLabel =
                             QUESTION_ALTERNATIVE_KEYS[
                               currentQuestion.alternatives.findIndex(
                                 (a) => a.id === alt.id,
                               )
                             ] ?? alt.key
+                          const buttonBgClass = isFinished
+                            ? isCorrect
+                              ? 'bg-green-500 hover:bg-green-500'
+                              : isWrong
+                                ? 'bg-red-500 hover:bg-red-500'
+                                : 'bg-slate-700'
+                            : isSelected
+                              ? 'bg-slate-500 outline-2 outline-violet-400 outline-offset-2'
+                              : 'bg-slate-700 hover:bg-slate-600'
+                          const keyBadgeClass = isFinished
+                            ? isCorrect
+                              ? 'bg-green-600 text-white'
+                              : isWrong
+                                ? 'bg-red-600 text-white'
+                                : 'bg-slate-900'
+                            : isSelected
+                              ? 'bg-violet-400 text-white'
+                              : 'bg-slate-900'
                           return (
                             <div
                               key={alt.id}
@@ -317,7 +353,7 @@ function RouteComponent() {
                                 className={`
                                   flex gap-2 items-center justify-start w-full h-full p-3 rounded-sm text-left
                                   ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                                  ${isSelected ? 'bg-slate-500 outline-2 outline-violet-400 outline-offset-2' : 'bg-slate-700 hover:bg-slate-600'}
+                                  ${buttonBgClass}
                                   ${isFinished ? 'cursor-default' : ''}`}
                                 onClick={() =>
                                   handleOptionSelected(
@@ -330,8 +366,8 @@ function RouteComponent() {
                               >
                                 <div
                                   className={`
-                                    flex shrink-0 items-center justify-center min-w-8 px-2 py-1 rounded-sm
-                                    ${isSelected ? 'bg-violet-400 text-white' : 'bg-slate-900'}`}
+                                    flex shrink-0 items-center justify-center min-w-8 px-2 py-1 rounded-sm text-white
+                                    ${keyBadgeClass}`}
                                 >
                                   {keyLabel}
                                 </div>
@@ -349,10 +385,82 @@ function RouteComponent() {
               </CustomTabPanel>
 
               <CustomTabPanel value={value} hidden={value !== 1}>
-                <div className="p-4">
-                  <Typography color="text.secondary">
-                    Explanation disponível após finalizar a prova.
-                  </Typography>
+                <div className="p-4 flex flex-col gap-4">
+                  {!isFinished && (
+                    <Typography color="text.secondary">
+                      As explicações ficam disponíveis após você finalizar a prova.
+                    </Typography>
+                  )}
+                  {isFinished && currentQuestion && (
+                    <>
+                      <Typography variant="subtitle1" fontWeight={600}>
+                        Resposta correta:{' '}
+                        {currentQuestion.correctAlternative ?? '—'}
+                      </Typography>
+                      <Box component="ul" sx={{ m: 0, pl: 0, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {currentQuestion.alternatives.map((alt, idx) => {
+                          const keyLabel =
+                            QUESTION_ALTERNATIVE_KEYS[idx] ?? alt.key
+                          const isCorrect =
+                            currentQuestion.correctAlternative === alt.key
+                          const wasSelected = selectedAlternativeId === alt.id
+                          const isWrong = wasSelected && !isCorrect
+                          const boxSx = {
+                            listStyle: 'none',
+                            pl: 0,
+                            p: 2,
+                            borderRadius: 1,
+                            border: '2px solid',
+                            ...(isCorrect && {
+                              bgcolor: 'success.light',
+                              borderColor: 'success.main',
+                            }),
+                            ...(isWrong && {
+                              bgcolor: 'error.light',
+                              borderColor: 'error.main',
+                            }),
+                            ...(!isCorrect && !isWrong && {
+                              bgcolor: 'action.hover',
+                              borderColor: 'divider',
+                            }),
+                          }
+                          return (
+                            <Box component="li" key={alt.id} sx={boxSx}>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mb: 0.5 }}>
+                                <Typography
+                                  variant="body2"
+                                  fontWeight={isCorrect ? 600 : 400}
+                                  color={isCorrect ? 'success.dark' : isWrong ? 'error.dark' : 'text.primary'}
+                                >
+                                  {keyLabel}.
+                                </Typography>
+                                {isCorrect && (
+                                  <Typography variant="caption" color="success.dark" fontWeight={600}>
+                                    Resposta correta
+                                  </Typography>
+                                )}
+                                {isWrong && (
+                                  <Typography variant="caption" color="error.dark">
+                                    Sua resposta
+                                  </Typography>
+                                )}
+                              </Box>
+                              <Typography variant="body2" component="div" sx={{ mb: 1 }}>
+                                <Markdown>{alt.text}</Markdown>
+                              </Typography>
+                              {alt.explanation ? (
+                                <Markdown variant="body2">{alt.explanation}</Markdown>
+                              ) : (
+                                <Typography variant="body2" color="text.secondary" fontStyle="italic">
+                                  Sem explicação cadastrada.
+                                </Typography>
+                              )}
+                            </Box>
+                          )
+                        })}
+                      </Box>
+                    </>
+                  )}
                 </div>
               </CustomTabPanel>
 
