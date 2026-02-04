@@ -34,5 +34,9 @@ export class CreateExamBaseDto {
 
   @IsDateString()
   examDate: string;
+
+  @IsOptional()
+  @IsDecimal({ decimal_digits: '0,2' })
+  minPassingGradeNonQuota?: string | null;
 }
 

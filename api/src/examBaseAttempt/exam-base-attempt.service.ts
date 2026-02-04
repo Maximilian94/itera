@@ -218,4 +218,91 @@ export class ExamBaseAttemptService {
     });
     return updated;
   }
+
+  async getFeedback(
+    examBaseId: string,
+    attemptId: string,
+    userId: string,
+  ) {
+    const data = await this.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+
+    const attempt = data.attempt;
+    if (attempt.finishedAt == null) {
+      throw new BadRequestException(
+        'feedback only available for finished attempts',
+      );
+    }
+
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: {
+        name: true,
+        minPassingGradeNonQuota: true,
+      },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+
+    const minPassing =
+      examBase.minPassingGradeNonQuota != null
+        ? Number(examBase.minPassingGradeNonQuota)
+        : 60;
+
+    const questions = data.questions;
+    const answers = data.answers;
+
+    let totalCorrect = 0;
+    const bySubject: Record<
+      string,
+      { correct: number; total: number }
+    > = {};
+
+    for (const q of questions) {
+      const subject = q.subject ?? 'Sem matéria';
+      if (!bySubject[subject]) {
+        bySubject[subject] = { correct: 0, total: 0 };
+      }
+      bySubject[subject].total += 1;
+
+      const selectedId = answers[q.id] ?? null;
+      if (selectedId == null) continue;
+
+      const correctAlt = q.alternatives.find(
+        (a) => a.key === q.correctAlternative,
+      );
+      const correctId = correctAlt?.id ?? null;
+      if (correctId != null && selectedId === correctId) {
+        bySubject[subject].correct += 1;
+        totalCorrect += 1;
+      }
+    }
+
+    const total = questions.length;
+    const overallPercentage = total > 0 ? (totalCorrect / total) * 100 : 0;
+    const passed = overallPercentage >= minPassing;
+
+    const subjectStats = Object.entries(bySubject).map(
+      ([subject, { correct, total: subTotal }]) => ({
+        subject,
+        correct,
+        total: subTotal,
+        percentage: subTotal > 0 ? (correct / subTotal) * 100 : 0,
+      }),
+    );
+
+    return {
+      examTitle: examBase.name,
+      minPassingGradeNonQuota: minPassing,
+      overall: {
+        correct: totalCorrect,
+        total,
+        percentage: overallPercentage,
+      },
+      passed,
+      subjectStats,
+    };
+  }
 }

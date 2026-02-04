@@ -6,6 +6,8 @@ export const examBaseAttemptKeys = {
   list: (examBaseId: string) => ['examBaseAttempts', examBaseId] as const,
   one: (examBaseId: string, attemptId: string) =>
     ['examBaseAttempt', examBaseId, attemptId] as const,
+  feedback: (examBaseId: string, attemptId: string) =>
+    ['examBaseAttemptFeedback', examBaseId, attemptId] as const,
 }
 
 export function useExamBaseAttemptsQuery(examBaseId: string | undefined) {
@@ -70,5 +72,17 @@ export function useFinishExamBaseAttemptMutation(
         queryKey: examBaseAttemptKeys.one(examBaseId, attemptId),
       })
     },
+  })
+}
+
+export function useExamBaseAttemptFeedbackQuery(
+  examBaseId: string | undefined,
+  attemptId: string | undefined,
+) {
+  return useQuery({
+    queryKey: examBaseAttemptKeys.feedback(examBaseId ?? '', attemptId ?? ''),
+    queryFn: () =>
+      examBaseAttemptService.getFeedback(examBaseId!, attemptId!),
+    enabled: Boolean(examBaseId && attemptId),
   })
 }

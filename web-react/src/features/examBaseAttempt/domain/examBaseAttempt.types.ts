@@ -17,3 +17,20 @@ export type UpsertAnswerInput = {
   questionId: string
   selectedAlternativeId: string | null
 }
+
+export type ExamAttemptFeedback = {
+  examTitle: string
+  minPassingGradeNonQuota: number
+  overall: {
+    correct: number
+    total: number
+    percentage: number
+  }
+  passed: boolean
+  subjectStats: Array<{
+    subject: string
+    correct: number
+    total: number
+    percentage: number
+  }>
+}

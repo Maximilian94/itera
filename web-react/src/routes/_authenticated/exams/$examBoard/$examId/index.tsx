@@ -260,12 +260,18 @@ function RouteComponent() {
                         size="small"
                         onClick={() =>
                           navigate({
-                            to: '/exams/$examBoard/$examId/$attemptId',
-                            params: { examBoard, examId, attemptId: attempt.id },
+                            to: isFinished
+                              ? '/exams/$examBoard/$examId/$attemptId/feedback'
+                              : '/exams/$examBoard/$examId/$attemptId',
+                            params: {
+                              examBoard,
+                              examId,
+                              attemptId: attempt.id,
+                            },
                           })
                         }
                       >
-                        {isFinished ? 'Ver resultado' : 'Continuar'}
+                        {isFinished ? 'Ver feedback' : 'Continuar'}
                       </Button>
                     </ListItem>
                   )

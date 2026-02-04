@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api'
 import type {
   ExamBaseAttempt,
   ExamBaseAttemptWithQuestionsAndAnswers,
+  ExamAttemptFeedback,
   UpsertAnswerInput,
 } from '../domain/examBaseAttempt.types'
 
@@ -42,6 +43,15 @@ export const examBaseAttemptService = {
   ): Promise<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt' | 'finishedAt'>> {
     return apiFetch(`${basePath(examBaseId)}/${attemptId}/finish`, {
       method: 'PATCH',
+    })
+  },
+
+  getFeedback(
+    examBaseId: string,
+    attemptId: string,
+  ): Promise<ExamAttemptFeedback> {
+    return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback`, {
+      method: 'GET',
     })
   },
 }

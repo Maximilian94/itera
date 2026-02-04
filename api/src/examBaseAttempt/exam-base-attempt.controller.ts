@@ -22,6 +22,15 @@ export class ExamBaseAttemptController {
     return this.service.create(examBaseId, req.user.userId);
   }
 
+  @Get(':attemptId/feedback')
+  getFeedback(
+    @Param('examBaseId') examBaseId: string,
+    @Param('attemptId') attemptId: string,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.service.getFeedback(examBaseId, attemptId, req.user.userId);
+  }
+
   @Get(':attemptId')
   getOne(
     @Param('examBaseId') examBaseId: string,
@@ -58,4 +67,5 @@ export class ExamBaseAttemptController {
   ) {
     return this.service.finish(examBaseId, attemptId, req.user.userId);
   }
+
 }
