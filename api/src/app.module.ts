@@ -13,6 +13,7 @@ import { ExamsModule } from './exams/exams.module';
 import { ExamBoardModule } from './examBoard/exam-board.module';
 import { ExamBaseModule } from './examBase/exam-base.module';
 import { ExamBaseQuestionModule } from './examBaseQuestion/exam-base-question.module';
+import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.module';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
@@ -29,6 +30,7 @@ import { StorageModule } from './storage/storage.module';
     ExamBoardModule,
     ExamBaseModule,
     ExamBaseQuestionModule,
+    ExamBaseAttemptModule,
     StorageModule,
   ],
   controllers: [AppController],
