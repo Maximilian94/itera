@@ -38,6 +38,15 @@ export class CreateExamBaseQuestionDto {
   statement: string;
 
   @IsOptional()
+  @IsString()
+  statementImageUrl?: string;
+
+  /** Texto de referência da prova (ex.: texto base compartilhado por várias questões). Opcional. */
+  @IsOptional()
+  @IsString()
+  referenceText?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   skills?: string[];

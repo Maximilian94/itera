@@ -17,10 +17,22 @@ import { ParseQuestionsFromMarkdownDto } from './dto/parse-questions-from-markdo
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { ExamBaseQuestionService } from './exam-base-question.service';
+import { StorageService } from '../storage/storage.service';
+
+const STATEMENT_IMAGE_MIMES = [
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+] as const;
+const STATEMENT_IMAGE_MAX_SIZE = 5 * 1024 * 1024; // 5MB
 
 @Controller('exam-bases/:examBaseId/questions')
 export class ExamBaseQuestionController {
-  constructor(private readonly service: ExamBaseQuestionService) {}
+  constructor(
+    private readonly service: ExamBaseQuestionService,
+    private readonly storage: StorageService,
+  ) {}
 
   @Get()
   list(@Param('examBaseId') examBaseId: string) {
@@ -55,6 +67,32 @@ export class ExamBaseQuestionController {
     }
     const content = await this.service.extractPdfToMarkdown(file);
     return { content };
+  }
+
+  @Post('upload-statement-image')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: STATEMENT_IMAGE_MAX_SIZE },
+    }),
+  )
+  async uploadStatementImage(
+    @Param('examBaseId') examBaseId: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!file) {
+      throw new BadRequestException('file is required');
+    }
+    if (!STATEMENT_IMAGE_MIMES.includes(file.mimetype as (typeof STATEMENT_IMAGE_MIMES)[number])) {
+      throw new BadRequestException(
+        `Invalid file type. Allowed: ${STATEMENT_IMAGE_MIMES.join(', ')}`,
+      );
+    }
+    const url = await this.storage.uploadStatementImage(
+      examBaseId,
+      file.buffer,
+      file.mimetype,
+    );
+    return { url };
   }
 
   @Get(':questionId')

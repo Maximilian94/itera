@@ -14,6 +14,7 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
+import ImageIcon from '@mui/icons-material/Image'
 import SaveIcon from '@mui/icons-material/Save'
 import {
   Dialog,
@@ -22,7 +23,7 @@ import {
   DialogContentText,
   DialogTitle,
 } from '@mui/material'
-import { useState, useEffect } from 'react'
+import { useRef, useState, useEffect } from 'react'
 import type { ExamBaseQuestion } from '@/features/examBaseQuestion/domain/examBaseQuestion.types'
 import {
   useUpdateExamBaseQuestionMutation,
@@ -34,6 +35,7 @@ import {
   getApiMessage,
   isConflictError,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 
 function stringListToArray(s: string): string[] {
   return s
@@ -66,6 +68,12 @@ export function QuestionEditor({
     arrayToStringList(question.subtopics ?? []),
   )
   const [statement, setStatement] = useState(question.statement)
+  const [statementImageUrl, setStatementImageUrl] = useState<string>(
+    question.statementImageUrl ?? '',
+  )
+  const [referenceText, setReferenceText] = useState<string>(
+    question.referenceText ?? '',
+  )
   const [skillsStr, setSkillsStr] = useState(
     arrayToStringList(question.skills ?? []),
   )
@@ -83,15 +91,21 @@ export function QuestionEditor({
   const [editAltKey, setEditAltKey] = useState('')
   const [editAltText, setEditAltText] = useState('')
   const [editAltExplanation, setEditAltExplanation] = useState('')
+  const [uploadImageError, setUploadImageError] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [statementImageLoadError, setStatementImageLoadError] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     setSubject(question.subject)
     setTopic(question.topic)
     setSubtopicsStr(arrayToStringList(question.subtopics ?? []))
     setStatement(question.statement)
+    setStatementImageUrl(question.statementImageUrl ?? '')
+    setReferenceText(question.referenceText ?? '')
     setSkillsStr(arrayToStringList(question.skills ?? []))
     setCorrectAlternative(question.correctAlternative ?? '')
-  }, [question.id, question.subject, question.topic, question.subtopics, question.statement, question.skills, question.correctAlternative])
+  }, [question.id, question.subject, question.topic, question.subtopics, question.statement, question.statementImageUrl, question.referenceText, question.skills, question.correctAlternative])
 
   const updateQuestion = useUpdateExamBaseQuestionMutation(examBaseId)
   const deleteQuestion = useDeleteExamBaseQuestionMutation(examBaseId)
@@ -117,12 +131,30 @@ export function QuestionEditor({
           topic,
           subtopics: stringListToArray(subtopicsStr),
           statement,
+          statementImageUrl: statementImageUrl?.trim() || null,
+          referenceText: referenceText?.trim() || null,
           skills: stringListToArray(skillsStr),
           correctAlternative: correct,
         },
       })
     } catch (err) {
       setSaveError(getApiMessage(err))
+    }
+  }
+
+  const handleStatementImageFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadImageError(null)
+    setUploadingImage(true)
+    try {
+      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
+      setStatementImageUrl(url)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    } catch (err) {
+      setUploadImageError(getApiMessage(err))
+    } finally {
+      setUploadingImage(false)
     }
   }
 
@@ -274,6 +306,117 @@ export function QuestionEditor({
           value={statement}
           onChange={(e) => setStatement(e.target.value)}
         />
+        <TextField
+          label="Texto de referência (opcional)"
+          size="small"
+          fullWidth
+          multiline
+          minRows={2}
+          value={referenceText}
+          onChange={(e) => setReferenceText(e.target.value)}
+          placeholder="Texto da prova ao qual a questão se refere (ex.: texto base compartilhado por várias questões)"
+        />
+
+        <Typography variant="subtitle2">Imagem do enunciado</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            onChange={handleStatementImageFile}
+            style={{ display: 'none' }}
+            id={`statement-image-${question.id}`}
+          />
+          <label htmlFor={`statement-image-${question.id}`}>
+            <Button
+              variant="outlined"
+              component="span"
+              size="small"
+              startIcon={<ImageIcon />}
+              disabled={uploadingImage}
+            >
+              {uploadingImage ? 'Enviando…' : 'Enviar imagem'}
+            </Button>
+          </label>
+          <TextField
+            size="small"
+            placeholder="Ou cole a URL da imagem"
+            value={statementImageUrl}
+            onChange={(e) => {
+              setStatementImageUrl(e.target.value)
+              setStatementImageLoadError(false)
+            }}
+            sx={{ minWidth: 280 }}
+          />
+          {statementImageUrl && (
+            <IconButton
+              size="small"
+              color="error"
+              onClick={async () => {
+                setStatementImageUrl('')
+                setStatementImageLoadError(false)
+                setSaveError(null)
+                const correct =
+                  correctAlternative && alternativeKeys.includes(correctAlternative)
+                    ? correctAlternative
+                    : ''
+                try {
+                  await updateQuestion.mutateAsync({
+                    questionId: question.id,
+                    input: {
+                      subject,
+                      topic,
+                      subtopics: stringListToArray(subtopicsStr),
+                      statement,
+                      statementImageUrl: null,
+                      referenceText: referenceText?.trim() || null,
+                      skills: stringListToArray(skillsStr),
+                      correctAlternative: correct,
+                    },
+                  })
+                } catch (err) {
+                  setSaveError(getApiMessage(err))
+                }
+              }}
+              disabled={updateQuestion.isPending}
+              aria-label="Remover imagem"
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Stack>
+        {uploadImageError && (
+          <Alert severity="error" onClose={() => setUploadImageError(null)}>
+            {uploadImageError}
+          </Alert>
+        )}
+        {statementImageUrl && (
+          <Box
+            sx={{
+              maxWidth: 400,
+              maxHeight: 300,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              overflow: 'hidden',
+            }}
+          >
+            {statementImageLoadError ? (
+              <Typography variant="body2" color="text.secondary" sx={{ p: 1 }}>
+                Não foi possível carregar a imagem.
+              </Typography>
+            ) : (
+              <img
+                src={statementImageUrl}
+                alt="Enunciado"
+                style={{ maxWidth: '100%', height: 'auto', display: 'block' }}
+                onError={() => setStatementImageLoadError(true)}
+                onLoad={() => setStatementImageLoadError(false)}
+              />
+            )}
+          </Box>
+        )}
+
         <TextField
           label="Skills (comma-separated)"
           size="small"

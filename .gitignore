@@ -10,6 +10,9 @@
 **/coverage/
 **/*.log
 
+# Secrets (credenciais GCP etc.; a pasta api/secret existe, o conteúdo não é commitado)
+api/secret/*
+
 # Env
 .env
 .env.*
