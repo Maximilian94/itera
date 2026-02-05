@@ -495,13 +495,19 @@ function RouteComponent() {
         <Grid size={2}>
           <div className="flex flex-col gap-3 w-full">
             {isFinished ? (
-              <Tooltip title="Prova finalizada. Você pode revisar suas respostas abaixo.">
-                <span>
-                  <Button variant="contained" color="primary" fullWidth disabled>
-                    Prova finalizada
-                  </Button>
-                </span>
-              </Tooltip>
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={() =>
+                  navigate({
+                    to: '/exams/$examBoard/$examId/$attemptId/feedback',
+                    params: { examBoard, examId, attemptId },
+                  } as any)
+                }
+              >
+                Ver feedback
+              </Button>
             ) : (
               <Button
                 variant="contained"
@@ -510,7 +516,9 @@ function RouteComponent() {
                 onClick={() => finishAttempt.mutate()}
                 disabled={finishAttempt.isPending}
               >
-                {finishAttempt.isPending ? 'Finalizando…' : 'Finalizar prova'}
+                {finishAttempt.isPending
+                  ? 'Finalizando prova e gerando feedback…'
+                  : 'Finalizar prova'}
               </Button>
             )}
             <Grid container spacing={1} className="w-full">

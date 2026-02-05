@@ -8,6 +8,7 @@ export type ExamBase = {
   city: string | null
   salaryBase: string | null
   examDate: string
+  minPassingGradeNonQuota: string | null
   examBoardId: string | null
   examBoard: { id: string; name: string; logoUrl: string } | null
 }
@@ -22,6 +23,7 @@ export type CreateExamBaseInput = {
   examDate: string
   institution?: string
   examBoardId?: string
+  minPassingGradeNonQuota?: string | null
 }
 
 export type UpdateExamBaseInput = {
@@ -34,5 +36,6 @@ export type UpdateExamBaseInput = {
   examDate?: string
   institution?: string | null
   examBoardId?: string | null
+  minPassingGradeNonQuota?: string | null
 }
 

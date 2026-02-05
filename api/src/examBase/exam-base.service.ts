@@ -62,6 +62,7 @@ export class ExamBaseService {
         city: true,
         salaryBase: true,
         examDate: true,
+        minPassingGradeNonQuota: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
@@ -81,6 +82,7 @@ export class ExamBaseService {
         city: true,
         salaryBase: true,
         examDate: true,
+        minPassingGradeNonQuota: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
@@ -99,6 +101,7 @@ export class ExamBaseService {
     city?: string | null;
     salaryBase?: string | number | null;
     examDate: string;
+    minPassingGradeNonQuota?: string | number | null;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -117,6 +120,7 @@ export class ExamBaseService {
         city: normalizeOptionalText(input.city),
         salaryBase: input.salaryBase ?? undefined,
         examDate: new Date(input.examDate),
+        minPassingGradeNonQuota: input.minPassingGradeNonQuota ?? undefined,
       },
       select: {
         id: true,
@@ -128,6 +132,7 @@ export class ExamBaseService {
         city: true,
         salaryBase: true,
         examDate: true,
+        minPassingGradeNonQuota: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
@@ -146,6 +151,7 @@ export class ExamBaseService {
       city?: string | null;
       salaryBase?: string | number | null;
       examDate?: string;
+      minPassingGradeNonQuota?: string | number | null;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -178,6 +184,10 @@ export class ExamBaseService {
         city: input.city === undefined ? undefined : mergedCity,
         salaryBase: input.salaryBase === undefined ? undefined : input.salaryBase,
         examDate: input.examDate ? new Date(input.examDate) : undefined,
+        minPassingGradeNonQuota:
+          input.minPassingGradeNonQuota === undefined
+            ? undefined
+            : input.minPassingGradeNonQuota,
       },
       select: {
         id: true,
@@ -189,6 +199,7 @@ export class ExamBaseService {
         city: true,
         salaryBase: true,
         examDate: true,
+        minPassingGradeNonQuota: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },

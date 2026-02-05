@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api'
 import type {
   ExamBaseAttempt,
   ExamBaseAttemptWithQuestionsAndAnswers,
+  ExamAttemptFeedback,
   UpsertAnswerInput,
 } from '../domain/examBaseAttempt.types'
 
@@ -42,6 +43,28 @@ export const examBaseAttemptService = {
   ): Promise<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt' | 'finishedAt'>> {
     return apiFetch(`${basePath(examBaseId)}/${attemptId}/finish`, {
       method: 'PATCH',
+    })
+  },
+
+  getFeedback(
+    examBaseId: string,
+    attemptId: string,
+  ): Promise<ExamAttemptFeedback> {
+    return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback`, {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Generates AI feedback per subject for a finished attempt (e.g. older attempts).
+   * Saves result in DB; refetch feedback to see it.
+   */
+  generateSubjectFeedback(
+    examBaseId: string,
+    attemptId: string,
+  ): Promise<{ generated: boolean; subjectFeedback?: Record<string, { evaluation: string; recommendations: string }> }> {
+    return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback/generate`, {
+      method: 'POST',
     })
   },
 }

@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
 
@@ -33,9 +34,26 @@ const questionSelect = {
   },
 } as const;
 
+/** Per-question detail for AI feedback (topic, subtopics, correctness). */
+type SubjectQuestionDetail = {
+  topic: string | null;
+  subtopics: string[];
+  correct: boolean;
+  answered: boolean;
+};
+
+/** AI-generated feedback for a subject (evaluation + recommendations). */
+type SubjectFeedbackFromAI = {
+  evaluation: string;
+  recommendations: string;
+};
+
 @Injectable()
 export class ExamBaseAttemptService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
 
   async list(examBaseId: string, userId: string) {
     const examBase = await this.prisma.examBase.findUnique({
@@ -91,6 +109,7 @@ export class ExamBaseAttemptService {
         userId: true,
         startedAt: true,
         finishedAt: true,
+        subjectFeedback: true,
         answers: {
           select: {
             examBaseQuestionId: true,
@@ -123,6 +142,10 @@ export class ExamBaseAttemptService {
         examBaseId: attempt.examBaseId,
         startedAt: attempt.startedAt,
         finishedAt: attempt.finishedAt,
+        subjectFeedback: attempt.subjectFeedback as Record<
+          string,
+          { evaluation: string; recommendations: string }
+        > | null,
       },
       questions,
       answers,
@@ -206,9 +229,50 @@ export class ExamBaseAttemptService {
     if (attempt.finishedAt != null)
       throw new BadRequestException('attempt is already finished');
 
-    const updated = await this.prisma.examBaseAttempt.update({
+    await this.prisma.examBaseAttempt.update({
       where: { id: attemptId },
       data: { finishedAt: new Date() },
+    });
+
+    const data = await this.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { minPassingGradeNonQuota: true },
+    });
+    const minPassing =
+      examBase?.minPassingGradeNonQuota != null
+        ? Number(examBase.minPassingGradeNonQuota)
+        : 60;
+
+    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
+      data.questions,
+      data.answers,
+    );
+
+    let subjectFeedback: Record<string, SubjectFeedbackFromAI> = {};
+    const apiKey = this.config.get<string>('XAI_API_KEY');
+    if (apiKey && subjectStats.length > 0) {
+      try {
+        subjectFeedback = await this.generateSubjectFeedbackWithAI(
+          subjectStats,
+          bySubjectDetails,
+          minPassing,
+        );
+        await this.prisma.examBaseAttempt.update({
+          where: { id: attemptId },
+          data: { subjectFeedback: subjectFeedback as object },
+        });
+      } catch (err) {
+        console.error('AI subject feedback generation failed:', err);
+      }
+    }
+
+    const updated = await this.prisma.examBaseAttempt.findUnique({
+      where: { id: attemptId },
       select: {
         id: true,
         examBaseId: true,
@@ -216,6 +280,319 @@ export class ExamBaseAttemptService {
         finishedAt: true,
       },
     });
-    return updated;
+    return updated!;
+  }
+
+  /**
+   * Computes per-subject correct/total/percentage and question details
+   * for AI feedback generation.
+   */
+  private computeSubjectStats(
+    questions: Array<{
+      id: string;
+      subject: string | null;
+      topic: string | null;
+      subtopics: string[];
+      correctAlternative: string | null;
+      alternatives: Array<{ id: string; key: string }>;
+    }>,
+    answers: Record<string, string | null>,
+  ): {
+    subjectStats: Array<{
+      subject: string;
+      correct: number;
+      total: number;
+      percentage: number;
+    }>;
+    bySubjectDetails: Record<string, SubjectQuestionDetail[]>;
+  } {
+    const bySubject: Record<string, { correct: number; total: number }> = {};
+    const bySubjectDetails: Record<string, SubjectQuestionDetail[]> = {};
+    let totalCorrect = 0;
+
+    for (const q of questions) {
+      const subject = q.subject ?? 'Sem matéria';
+      if (!bySubject[subject]) bySubject[subject] = { correct: 0, total: 0 };
+      bySubject[subject].total += 1;
+
+      const selectedId = answers[q.id] ?? null;
+      if (selectedId != null && selectedId !== '') {
+        const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+        const correctId = correctAlt?.id ?? null;
+        if (correctId != null && selectedId === correctId) {
+          bySubject[subject].correct += 1;
+          totalCorrect += 1;
+        }
+      }
+
+      if (!bySubjectDetails[subject]) bySubjectDetails[subject] = [];
+      const answered = selectedId != null && selectedId !== '';
+      let correct = false;
+      if (answered) {
+        const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+        const correctId = correctAlt?.id ?? null;
+        correct = correctId != null && selectedId === correctId;
+      }
+      bySubjectDetails[subject].push({
+        topic: q.topic ?? null,
+        subtopics: q.subtopics ?? [],
+        correct,
+        answered,
+      });
+    }
+
+    const subjectStats = Object.entries(bySubject).map(
+      ([subject, { correct, total }]) => ({
+        subject,
+        correct,
+        total,
+        percentage: total > 0 ? (correct / total) * 100 : 0,
+      }),
+    );
+    return { subjectStats, bySubjectDetails };
+  }
+
+  /**
+   * Generates AI feedback per subject for a finished attempt.
+   * Used for older attempts that don't have feedback, or to regenerate it.
+   * Requires XAI_API_KEY. Saves result to subjectFeedback column.
+   *
+   * @throws BadRequestException if attempt is not finished or XAI_API_KEY is missing
+   */
+  async generateSubjectFeedback(
+    examBaseId: string,
+    attemptId: string,
+    userId: string,
+  ) {
+    const data = await this.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+    const attempt = data.attempt;
+    if (attempt.finishedAt == null) {
+      throw new BadRequestException(
+        'feedback can only be generated for finished attempts',
+      );
+    }
+
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { minPassingGradeNonQuota: true },
+    });
+    const minPassing =
+      examBase?.minPassingGradeNonQuota != null
+        ? Number(examBase.minPassingGradeNonQuota)
+        : 60;
+
+    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
+      data.questions,
+      data.answers,
+    );
+
+    const apiKey = this.config.get<string>('XAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'XAI_API_KEY is not configured. Cannot generate AI feedback.',
+      );
+    }
+    if (subjectStats.length === 0) {
+      return { generated: false, message: 'No subjects to generate feedback for.' };
+    }
+
+    const subjectFeedback = await this.generateSubjectFeedbackWithAI(
+      subjectStats,
+      bySubjectDetails,
+      minPassing,
+    );
+
+    await this.prisma.examBaseAttempt.update({
+      where: { id: attemptId },
+      data: { subjectFeedback: subjectFeedback as object },
+    });
+
+    return { generated: true, subjectFeedback };
+  }
+
+  /**
+   * Returns full feedback for a finished attempt: overall stats, per-subject stats,
+   * and stored AI-generated subject feedback (if any).
+   */
+  async getFeedback(
+    examBaseId: string,
+    attemptId: string,
+    userId: string,
+  ) {
+    const data = await this.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+
+    const attempt = data.attempt;
+    if (attempt.finishedAt == null) {
+      throw new BadRequestException(
+        'feedback only available for finished attempts',
+      );
+    }
+
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: {
+        name: true,
+        minPassingGradeNonQuota: true,
+      },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+
+    const minPassing =
+      examBase.minPassingGradeNonQuota != null
+        ? Number(examBase.minPassingGradeNonQuota)
+        : 60;
+
+    const { subjectStats } = this.computeSubjectStats(
+      data.questions,
+      data.answers,
+    );
+    const total = data.questions.length;
+    const totalCorrect = subjectStats.reduce(
+      (sum, s) => sum + s.correct,
+      0,
+    );
+    const overallPercentage = total > 0 ? (totalCorrect / total) * 100 : 0;
+    const passed = overallPercentage >= minPassing;
+
+    const subjectFeedback =
+      (attempt.subjectFeedback as Record<
+        string,
+        { evaluation: string; recommendations: string }
+      >) ?? {};
+
+    return {
+      examTitle: examBase.name,
+      minPassingGradeNonQuota: minPassing,
+      overall: {
+        correct: totalCorrect,
+        total,
+        percentage: overallPercentage,
+      },
+      passed,
+      subjectStats,
+      subjectFeedback,
+    };
+  }
+
+  /**
+   * Calls xAI (Grok) to generate evaluation + recommendations per subject.
+   * Uses topic/subtopics and correct/answered per question for context.
+   */
+  private async generateSubjectFeedbackWithAI(
+    subjectStats: Array<{
+      subject: string;
+      correct: number;
+      total: number;
+      percentage: number;
+    }>,
+    bySubjectDetails: Record<string, SubjectQuestionDetail[]>,
+    minPassingGrade: number,
+  ): Promise<Record<string, SubjectFeedbackFromAI>> {
+    const apiKey = this.config.get<string>('XAI_API_KEY');
+    if (!apiKey) return {};
+
+    const payload = subjectStats.map((s) => ({
+      subject: s.subject,
+      correct: s.correct,
+      total: s.total,
+      percentage: s.percentage,
+      questions: bySubjectDetails[s.subject] ?? [],
+    }));
+
+    const systemPrompt = `Você é um tutor especializado em preparação para concursos e vestibulares. Sua tarefa é gerar feedback personalizado para o aluno sobre seu desempenho em cada matéria da prova.
+
+Cada questão tem: topic (assunto), subtopics (subassuntos), correct (acertou), answered (respondeu ou deixou em branco).
+
+Para cada matéria, retorne um objeto JSON com:
+- "evaluation": Avaliação HONESTA e CONSTRUTIVA. Reconheça pontos fortes e fracos. Use topic e subtopics para identificar padrões. Se houver questões em branco, mencione isso.
+- "recommendations": Recomendações APENAS sobre assuntos e subassuntos a estudar, com dicas sobre o conteúdo. NÃO sugira fontes (livros, sites, cursos), NÃO sugira horas de estudo. Foque em: quais assuntos/subassuntos priorizar e dicas sobre esses tópicos.
+
+REGRAS DE FORMATAÇÃO (obrigatório):
+1. NÃO use títulos em Markdown (nada de # ou ##). O título da matéria já existe na tela; títulos grandes no texto ficam maiores que ele e poluem a leitura.
+2. Use SEMPRE bullet points para listas: comece cada item com "- " (hífen e espaço). Exemplo: "- Primeiro item\\n- Segundo item".
+3. Pode usar **negrito** para destacar termos importantes (nomes de assuntos, subassuntos).
+4. Espaçamento: use exatamente uma linha em branco (\\n\\n) entre parágrafos. Não use múltiplas linhas em branco nem espaços extras no início/fim de linhas. Isso evita texto desalinhado.
+5. O feedback deve dar MUITO VALOR ao aluno. Seja encorajador, mas não falseie a avaliação.`;
+
+    const userPrompt = `Nota mínima para aprovação: ${minPassingGrade}%.
+
+Dados de desempenho por matéria:
+${JSON.stringify(payload, null, 2)}
+
+Retorne APENAS um JSON object: chaves = nomes das matérias (exatamente como no payload), valores = objetos com "evaluation" e "recommendations" (strings em português).
+
+Formato do texto:
+- Sem # ou ## (sem títulos grandes).
+- Listas em bullet points com "- ".
+- Parágrafos separados por \\n\\n.
+- Recomendações: só assuntos/subassuntos e dicas sobre o conteúdo; sem fontes de estudo, sem horas.
+
+Exemplo:
+{"Matemática":{"evaluation":"Você acertou bem **Geometria** e teve dificuldade em **Álgebra**.\\n\\n- Pontos fortes: triângulos e áreas.\\n- Atenção: equações e funções.","recommendations":"- **Equações do 1º grau**: revisar isolamento de incógnita.\\n- **Funções**: praticar leitura de gráficos.\\n- **Geometria plana**: manter o ritmo, reforçar áreas de figuras compostas."},"Português":{"evaluation":"...","recommendations":"..."}}`;
+
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-reasoning',
+        max_tokens: 4096,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new Error(`xAI API error (${res.status}): ${errBody.slice(0, 300)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) return {};
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsed: Record<string, { evaluation?: string; recommendations?: string }>;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      return {};
+    }
+
+    const result: Record<string, SubjectFeedbackFromAI> = {};
+    for (const s of subjectStats) {
+      const fb = parsed[s.subject];
+      if (fb && typeof fb.evaluation === 'string' && typeof fb.recommendations === 'string') {
+        result[s.subject] = {
+          evaluation: fb.evaluation,
+          recommendations: fb.recommendations,
+        };
+      }
+    }
+    return result;
   }
 }

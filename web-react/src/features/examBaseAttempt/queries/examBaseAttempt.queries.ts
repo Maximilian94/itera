@@ -6,6 +6,8 @@ export const examBaseAttemptKeys = {
   list: (examBaseId: string) => ['examBaseAttempts', examBaseId] as const,
   one: (examBaseId: string, attemptId: string) =>
     ['examBaseAttempt', examBaseId, attemptId] as const,
+  feedback: (examBaseId: string, attemptId: string) =>
+    ['examBaseAttemptFeedback', examBaseId, attemptId] as const,
 }
 
 export function useExamBaseAttemptsQuery(examBaseId: string | undefined) {
@@ -68,6 +70,41 @@ export function useFinishExamBaseAttemptMutation(
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: examBaseAttemptKeys.one(examBaseId, attemptId),
+      })
+    },
+  })
+}
+
+/**
+ * Fetches full feedback for a finished attempt (stats + AI subject feedback).
+ */
+export function useExamBaseAttemptFeedbackQuery(
+  examBaseId: string | undefined,
+  attemptId: string | undefined,
+) {
+  return useQuery({
+    queryKey: examBaseAttemptKeys.feedback(examBaseId ?? '', attemptId ?? ''),
+    queryFn: () =>
+      examBaseAttemptService.getFeedback(examBaseId!, attemptId!),
+    enabled: Boolean(examBaseId && attemptId),
+  })
+}
+
+/**
+ * Mutation to generate AI feedback per subject for a finished attempt.
+ * Invalidates feedback query on success so the page refetches.
+ */
+export function useGenerateSubjectFeedbackMutation(
+  examBaseId: string,
+  attemptId: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      examBaseAttemptService.generateSubjectFeedback(examBaseId, attemptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: examBaseAttemptKeys.feedback(examBaseId, attemptId),
       })
     },
   })
