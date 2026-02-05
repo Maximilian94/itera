@@ -4,10 +4,19 @@ import type { UpsertAnswerInput } from '../domain/examBaseAttempt.types'
 
 export const examBaseAttemptKeys = {
   list: (examBaseId: string) => ['examBaseAttempts', examBaseId] as const,
+  history: (examBaseId?: string) =>
+    ['examBaseAttempts', 'history', examBaseId ?? 'all'] as const,
   one: (examBaseId: string, attemptId: string) =>
     ['examBaseAttempt', examBaseId, attemptId] as const,
   feedback: (examBaseId: string, attemptId: string) =>
     ['examBaseAttemptFeedback', examBaseId, attemptId] as const,
+}
+
+export function useExamBaseAttemptHistoryQuery(examBaseId?: string) {
+  return useQuery({
+    queryKey: examBaseAttemptKeys.history(examBaseId),
+    queryFn: () => examBaseAttemptService.listHistory(examBaseId),
+  })
 }
 
 export function useExamBaseAttemptsQuery(examBaseId: string | undefined) {
@@ -22,12 +31,16 @@ export function useCreateExamBaseAttemptMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: () => examBaseAttemptService.create(examBaseId),
-    onSuccess: (_, __, ___) => {
+    onSuccess: () => {
       if (examBaseId) {
         queryClient.invalidateQueries({
           queryKey: examBaseAttemptKeys.list(examBaseId),
         })
+        queryClient.invalidateQueries({
+          queryKey: examBaseAttemptKeys.history(examBaseId),
+        })
       }
+      queryClient.invalidateQueries({ queryKey: examBaseAttemptKeys.history() })
     },
   })
 }
@@ -71,6 +84,7 @@ export function useFinishExamBaseAttemptMutation(
       queryClient.invalidateQueries({
         queryKey: examBaseAttemptKeys.one(examBaseId, attemptId),
       })
+      queryClient.invalidateQueries({ queryKey: examBaseAttemptKeys.history() })
     },
   })
 }

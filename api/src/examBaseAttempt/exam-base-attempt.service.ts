@@ -55,6 +55,105 @@ export class ExamBaseAttemptService {
     private readonly config: ConfigService,
   ) {}
 
+  /**
+   * Lists ExamBaseAttempts for the current user (for history page or attempts tab).
+   * When examBaseId is provided, only attempts for that exam base are returned.
+   * Ordered by when they were done (startedAt desc).
+   * Includes exam base info (banca, instituição, data da prova) and for finished
+   * attempts: score (percentage) and passed status.
+   */
+  async listHistory(userId: string, examBaseId?: string) {
+    const attempts = await this.prisma.examBaseAttempt.findMany({
+      where: { userId, ...(examBaseId != null ? { examBaseId } : {}) },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        id: true,
+        examBaseId: true,
+        startedAt: true,
+        finishedAt: true,
+        examBase: {
+          select: {
+            id: true,
+            name: true,
+            institution: true,
+            examDate: true,
+            minPassingGradeNonQuota: true,
+            examBoardId: true,
+            examBoard: { select: { id: true, name: true } },
+          },
+        },
+        answers: {
+          select: {
+            examBaseQuestionId: true,
+            selectedAlternativeId: true,
+          },
+        },
+      },
+    });
+
+    const examBaseIds = [...new Set(attempts.map((a) => a.examBaseId))];
+    const questionsByBase = await this.prisma.examBaseQuestion.findMany({
+      where: { examBaseId: { in: examBaseIds } },
+      select: {
+        id: true,
+        examBaseId: true,
+        correctAlternative: true,
+        alternatives: { select: { id: true, key: true } },
+      },
+    });
+
+    const correctAltByQuestion = new Map<string, string>();
+    for (const q of questionsByBase) {
+      const alt = q.alternatives.find((a) => a.key === q.correctAlternative);
+      if (alt) correctAltByQuestion.set(q.id, alt.id);
+    }
+
+    return attempts.map((a) => {
+      const examBase = a.examBase;
+      const minPassing =
+        examBase.minPassingGradeNonQuota != null
+          ? Number(examBase.minPassingGradeNonQuota)
+          : 60;
+
+      let percentage: number | null = null;
+      let passed: boolean | null = null;
+
+      if (a.finishedAt != null && examBase) {
+        const total = questionsByBase.filter(
+          (q) => q.examBaseId === a.examBaseId,
+        ).length;
+        let correct = 0;
+        for (const ans of a.answers) {
+          const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
+          if (
+            correctId != null &&
+            ans.selectedAlternativeId != null &&
+            ans.selectedAlternativeId === correctId
+          ) {
+            correct += 1;
+          }
+        }
+        percentage = total > 0 ? (correct / total) * 100 : 0;
+        passed = percentage >= minPassing;
+      }
+
+      return {
+        id: a.id,
+        examBaseId: a.examBaseId,
+        startedAt: a.startedAt,
+        finishedAt: a.finishedAt,
+        examBaseName: examBase.name,
+        institution: examBase.institution ?? null,
+        examDate: examBase.examDate,
+        examBoardName: examBase.examBoard?.name ?? null,
+        examBoardId: examBase.examBoardId ?? null,
+        minPassingGradeNonQuota: minPassing,
+        percentage,
+        passed,
+      };
+    });
+  }
+
   async list(examBaseId: string, userId: string) {
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },

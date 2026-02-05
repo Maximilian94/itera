@@ -5,14 +5,10 @@ import {
   Alert,
   Box,
   Button,
-  Chip,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  List,
-  ListItem,
-  ListItemText,
   Paper,
   Stack,
   Tab,
@@ -41,8 +37,9 @@ import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateExamBaseAttemptMutation,
-  useExamBaseAttemptsQuery,
+  useExamBaseAttemptHistoryQuery,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
+import { ExamBaseAttemptsList } from '@/components/ExamBaseAttemptsList'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -76,8 +73,8 @@ function RouteComponent() {
   const navigate = useNavigate()
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
-  const { data: attempts = [], isLoading: isLoadingAttempts } =
-    useExamBaseAttemptsQuery(value === 1 ? examBaseId : undefined)
+  const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
+    useExamBaseAttemptHistoryQuery(value === 1 ? examBaseId : undefined)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
   const extractFromPdf = useExtractFromPdfMutation(examBaseId)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -224,54 +221,19 @@ function RouteComponent() {
             >
               {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
             </Button>
-            {isLoadingAttempts && (
-              <Typography color="text.secondary">Carregando tentativas…</Typography>
-            )}
-            {!isLoadingAttempts && attempts.length === 0 && (
-              <Typography color="text.secondary">
-                Nenhuma tentativa ainda. Clique em &quot;Iniciar prova&quot; para começar.
-              </Typography>
-            )}
-            {!isLoadingAttempts && attempts.length > 0 && (
-              <List disablePadding>
-                {attempts.map((attempt) => {
-                  const startedAt = new Date(attempt.startedAt)
-                  const isFinished = attempt.finishedAt != null
-                  return (
-                    <ListItem
-                      key={attempt.id}
-                      disablePadding
-                      sx={{ alignItems: 'center', gap: 1, flexWrap: 'wrap' }}
-                    >
-                      <ListItemText
-                        primary={startedAt.toLocaleString('pt-BR', {
-                          dateStyle: 'short',
-                          timeStyle: 'short',
-                        })}
-                      />
-                      <Chip
-                        label={isFinished ? 'Finalizada' : 'Em andamento'}
-                        size="small"
-                        color={isFinished ? 'success' : 'default'}
-                        variant="outlined"
-                      />
-                      <Button
-                        variant="outlined"
-                        size="small"
-                        onClick={() => {
-                          const path = isFinished
-                            ? '/exams/$examBoard/$examId/$attemptId/feedback'
-                            : '/exams/$examBoard/$examId/$attemptId'
-                          navigate({ to: path, params: { examBoard, examId, attemptId: attempt.id } } as any)
-                        }}
-                      >
-                        {isFinished ? 'Ver feedback' : 'Continuar'}
-                      </Button>
-                    </ListItem>
-                  )
-                })}
-              </List>
-            )}
+            <ExamBaseAttemptsList
+              items={attempts}
+              isLoading={isLoadingAttempts}
+              error={attemptsError ?? null}
+              emptyMessage='Nenhuma tentativa ainda. Clique em "Iniciar prova" para começar.'
+              showExamBaseColumns={false}
+              onRowClick={(item) => {
+                const path = item.finishedAt
+                  ? '/exams/$examBoard/$examId/$attemptId/feedback'
+                  : '/exams/$examBoard/$examId/$attemptId'
+                navigate({ to: path, params: { examBoard, examId, attemptId: item.id } } as any)
+              }}
+            />
           </Stack>
         </CustomTabPanel>
 

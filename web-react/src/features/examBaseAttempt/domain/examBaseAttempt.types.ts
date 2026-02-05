@@ -18,6 +18,22 @@ export type UpsertAnswerInput = {
   selectedAlternativeId: string | null
 }
 
+/** Item from history list: attempt + exam base info + score/passed when finished. */
+export type ExamBaseAttemptHistoryItem = {
+  id: string
+  examBaseId: string
+  startedAt: string
+  finishedAt: string | null
+  examBaseName: string
+  institution: string | null
+  examDate: string
+  examBoardName: string | null
+  examBoardId: string | null
+  minPassingGradeNonQuota: number
+  percentage: number | null
+  passed: boolean | null
+}
+
 /** Full feedback for a finished attempt (overall + per-subject stats and AI feedback). */
 export type ExamAttemptFeedback = {
   examTitle: string
