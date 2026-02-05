@@ -2,6 +2,7 @@ import { apiFetch } from '@/lib/api'
 import type {
   ExamBaseAttempt,
   ExamBaseAttemptWithQuestionsAndAnswers,
+  ExamBaseAttemptHistoryItem,
   ExamAttemptFeedback,
   UpsertAnswerInput,
 } from '../domain/examBaseAttempt.types'
@@ -9,6 +10,14 @@ import type {
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/attempts`
 
 export const examBaseAttemptService = {
+  listHistory(examBaseId?: string): Promise<ExamBaseAttemptHistoryItem[]> {
+    const url =
+      examBaseId != null
+        ? `/exam-base-attempts/history?examBaseId=${encodeURIComponent(examBaseId)}`
+        : '/exam-base-attempts/history'
+    return apiFetch(url, { method: 'GET' })
+  },
+
   list(
     examBaseId: string,
   ): Promise<Array<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt' | 'finishedAt'>>> {
