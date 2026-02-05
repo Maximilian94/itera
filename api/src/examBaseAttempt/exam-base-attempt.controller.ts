@@ -22,6 +22,23 @@ export class ExamBaseAttemptController {
     return this.service.create(examBaseId, req.user.userId);
   }
 
+  /**
+   * POST /:attemptId/feedback/generate
+   * Generates AI feedback per subject for a finished attempt (e.g. for older attempts).
+   */
+  @Post(':attemptId/feedback/generate')
+  generateFeedback(
+    @Param('examBaseId') examBaseId: string,
+    @Param('attemptId') attemptId: string,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.service.generateSubjectFeedback(
+      examBaseId,
+      attemptId,
+      req.user.userId,
+    );
+  }
+
   @Get(':attemptId/feedback')
   getFeedback(
     @Param('examBaseId') examBaseId: string,

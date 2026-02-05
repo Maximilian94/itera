@@ -258,18 +258,12 @@ function RouteComponent() {
                       <Button
                         variant="outlined"
                         size="small"
-                        onClick={() =>
-                          navigate({
-                            to: isFinished
-                              ? '/exams/$examBoard/$examId/$attemptId/feedback'
-                              : '/exams/$examBoard/$examId/$attemptId',
-                            params: {
-                              examBoard,
-                              examId,
-                              attemptId: attempt.id,
-                            },
-                          })
-                        }
+                        onClick={() => {
+                          const path = isFinished
+                            ? '/exams/$examBoard/$examId/$attemptId/feedback'
+                            : '/exams/$examBoard/$examId/$attemptId'
+                          navigate({ to: path, params: { examBoard, examId, attemptId: attempt.id } } as any)
+                        }}
                       >
                         {isFinished ? 'Ver feedback' : 'Continuar'}
                       </Button>

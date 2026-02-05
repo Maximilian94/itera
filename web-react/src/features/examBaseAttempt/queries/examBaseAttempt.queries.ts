@@ -75,6 +75,9 @@ export function useFinishExamBaseAttemptMutation(
   })
 }
 
+/**
+ * Fetches full feedback for a finished attempt (stats + AI subject feedback).
+ */
 export function useExamBaseAttemptFeedbackQuery(
   examBaseId: string | undefined,
   attemptId: string | undefined,
@@ -84,5 +87,25 @@ export function useExamBaseAttemptFeedbackQuery(
     queryFn: () =>
       examBaseAttemptService.getFeedback(examBaseId!, attemptId!),
     enabled: Boolean(examBaseId && attemptId),
+  })
+}
+
+/**
+ * Mutation to generate AI feedback per subject for a finished attempt.
+ * Invalidates feedback query on success so the page refetches.
+ */
+export function useGenerateSubjectFeedbackMutation(
+  examBaseId: string,
+  attemptId: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      examBaseAttemptService.generateSubjectFeedback(examBaseId, attemptId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: examBaseAttemptKeys.feedback(examBaseId, attemptId),
+      })
+    },
   })
 }

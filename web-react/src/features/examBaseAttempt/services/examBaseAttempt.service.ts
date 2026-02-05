@@ -54,4 +54,17 @@ export const examBaseAttemptService = {
       method: 'GET',
     })
   },
+
+  /**
+   * Generates AI feedback per subject for a finished attempt (e.g. older attempts).
+   * Saves result in DB; refetch feedback to see it.
+   */
+  generateSubjectFeedback(
+    examBaseId: string,
+    attemptId: string,
+  ): Promise<{ generated: boolean; subjectFeedback?: Record<string, { evaluation: string; recommendations: string }> }> {
+    return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback/generate`, {
+      method: 'POST',
+    })
+  },
 }

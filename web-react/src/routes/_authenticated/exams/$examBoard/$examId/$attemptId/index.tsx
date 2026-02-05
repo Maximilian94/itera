@@ -503,7 +503,7 @@ function RouteComponent() {
                   navigate({
                     to: '/exams/$examBoard/$examId/$attemptId/feedback',
                     params: { examBoard, examId, attemptId },
-                  })
+                  } as any)
                 }
               >
                 Ver feedback
@@ -516,7 +516,9 @@ function RouteComponent() {
                 onClick={() => finishAttempt.mutate()}
                 disabled={finishAttempt.isPending}
               >
-                {finishAttempt.isPending ? 'Finalizando…' : 'Finalizar prova'}
+                {finishAttempt.isPending
+                  ? 'Finalizando prova e gerando feedback…'
+                  : 'Finalizar prova'}
               </Button>
             )}
             <Grid container spacing={1} className="w-full">

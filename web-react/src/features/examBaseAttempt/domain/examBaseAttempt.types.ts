@@ -18,6 +18,7 @@ export type UpsertAnswerInput = {
   selectedAlternativeId: string | null
 }
 
+/** Full feedback for a finished attempt (overall + per-subject stats and AI feedback). */
 export type ExamAttemptFeedback = {
   examTitle: string
   minPassingGradeNonQuota: number
@@ -33,4 +34,8 @@ export type ExamAttemptFeedback = {
     total: number
     percentage: number
   }>
+  subjectFeedback: Record<
+    string,
+    { evaluation: string; recommendations: string }
+  >
 }
