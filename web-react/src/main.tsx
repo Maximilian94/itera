@@ -14,6 +14,9 @@ import { routeTree } from './routeTree.gen'
 
 import './styles.css'
 import reportWebVitals from './reportWebVitals.ts'
+import { useAuth } from '@clerk/clerk-react'
+import { setApiTokenGetter } from '@/lib/api'
+import { ClerkWrapper, useClerkAuth } from '@/auth/clerk'
 
 
 const toHex = (color: string) => formatHex(converter('rgb')(color))
@@ -34,10 +37,10 @@ const darkTheme = createTheme({
   },
 })
 
-// Create a new router instance
+// Create a new router instance (auth is injected via RouterProvider below)
 const router = createRouter({
   routeTree,
-  context: {},
+  context: { auth: undefined! },
   defaultPreload: 'intent',
   scrollRestoration: true,
   defaultStructuralSharing: true,
@@ -53,6 +56,30 @@ declare module '@tanstack/react-router' {
 
 const queryClient = new QueryClient()
 
+
+const PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY
+
+if (!PUBLISHABLE_KEY) {
+  throw new Error('Add your Clerk Publishable Key to the .env file')
+}
+
+function InnerApp() {
+  const auth = useClerkAuth()
+  const { getToken } = useAuth()
+  // Set token getter during render so it's available before any child fetches (useEffect runs too late)
+  setApiTokenGetter(getToken)
+
+  if (auth.isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading...
+      </div>
+    )
+  }
+
+  return <RouterProvider router={router} context={{ auth }} />
+}
+
 // Render the app
 const rootElement = document.getElementById('app')
 if (rootElement && !rootElement.innerHTML) {
@@ -61,7 +88,9 @@ if (rootElement && !rootElement.innerHTML) {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider theme={darkTheme}>
-          <RouterProvider router={router} />
+          <ClerkWrapper>
+            <InnerApp />
+          </ClerkWrapper>
         </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>,

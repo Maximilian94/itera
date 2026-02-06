@@ -12,6 +12,7 @@
     "check": "prettier --write . && eslint --fix"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.60.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.7",
@@ -22,10 +23,10 @@
     "@tanstack/react-router": "^1.132.0",
     "@tanstack/react-router-devtools": "^1.132.0",
     "@tanstack/router-plugin": "^1.132.0",
+    "chart.js": "^4.4.6",
     "culori": "^4.0.2",
     "dayjs": "^1.11.19",
     "lucide-react": "^0.545.0",
-    "chart.js": "^4.4.6",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.2.0",
     "react-dom": "^19.2.0",

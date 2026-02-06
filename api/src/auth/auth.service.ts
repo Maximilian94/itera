@@ -1,47 +1,40 @@
-import {
-  ConflictException,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import * as bcrypt from 'bcrypt';
+import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class AuthService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwt: JwtService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async register(email: string, password: string) {
-    const existing = await this.prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      throw new ConflictException('email already exists');
-    }
-
-    const passwordHash = await bcrypt.hash(password, 10);
-    const user = await this.prisma.user.create({
-      data: { email, passwordHash },
+  async findOrCreateByClerk(
+    clerkUserId: string,
+    email: string,
+  ): Promise<{ id: string; email: string }> {
+    let user = await this.prisma.user.findUnique({
+      where: { clerkUserId },
       select: { id: true, email: true },
     });
 
-    const token = await this.jwt.signAsync({ sub: user.id, email: user.email });
-    return { user, token };
-  }
-
-  async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user) {
-      throw new UnauthorizedException('invalid credentials');
+    if (user) {
+      return user;
     }
 
-    const ok = await bcrypt.compare(password, user.passwordHash);
-    if (!ok) {
-      throw new UnauthorizedException('invalid credentials');
+    user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true, email: true },
+    });
+
+    if (user) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { clerkUserId },
+      });
+      return user;
     }
 
-    const token = await this.jwt.signAsync({ sub: user.id, email: user.email });
-    return { user: { id: user.id, email: user.email }, token };
+    const created = await this.prisma.user.create({
+      data: { email, clerkUserId },
+      select: { id: true, email: true },
+    });
+    return created;
   }
 }

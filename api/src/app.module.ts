@@ -4,7 +4,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { ClerkJwtAuthGuard } from './auth/clerk-jwt-auth.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { SkillsModule } from './skills/skills.module';
 import { QuestionsModule } from './questions/questions.module';
@@ -38,7 +38,7 @@ import { StorageModule } from './storage/storage.module';
     AppService,
     {
       provide: APP_GUARD,
-      useClass: JwtAuthGuard,
+      useClass: ClerkJwtAuthGuard,
     },
   ],
 })

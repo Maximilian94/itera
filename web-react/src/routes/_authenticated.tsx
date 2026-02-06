@@ -1,12 +1,15 @@
 import { Outlet, createFileRoute, redirect } from '@tanstack/react-router'
-import { SideBar } from '@/components/SideBar.tsx'
-import { getAuthToken } from '@/lib/auth'
+import { SideBar } from '@/components/SideBar'
 
 export const Route = createFileRoute('/_authenticated')({
-  beforeLoad: () => {
-    const token = getAuthToken()
-    if (!token) {
-      throw redirect({ to: '/' })
+  beforeLoad: ({ context, location }) => {
+    if (!context.auth.isAuthenticated) {
+      throw redirect({
+        to: '/sign-in',
+        search: {
+          redirect: location.href,
+        },
+      })
     }
   },
   component: RouteComponent,
