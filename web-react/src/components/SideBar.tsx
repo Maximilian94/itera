@@ -17,7 +17,7 @@ import { Route as DatabaseRoute } from '@/routes/_authenticated/database'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
 import { Route as ExamBasesRoute } from '@/routes/_authenticated/exam-bases'
 import LogoutIcon from '@mui/icons-material/Logout'
-import { clearAuthToken } from '@/lib/auth'
+import { useClerk } from '@clerk/clerk-react'
 
 interface NavItem {
   label: string
@@ -28,7 +28,8 @@ interface NavItem {
 export const SideBar = () => {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const navigate = useNavigate()
-  
+  const { signOut } = useClerk()
+
   const pages: Array<NavItem> = [
     {
       label: 'Dashboard',
@@ -63,7 +64,7 @@ export const SideBar = () => {
   ]
 
   async function logout() {
-    clearAuthToken()
+    await signOut()
     await navigate({ to: '/' })
   }
 

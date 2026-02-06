@@ -1,9 +1,13 @@
-import { getAuthToken } from './auth'
-
 function getApiBaseUrl() {
   const raw =
     (import.meta as any).env?.VITE_API_URL?.toString() ?? 'http://localhost:3000'
   return raw.replace(/\/+$/, '')
+}
+
+let tokenGetter: (() => Promise<string | null>) | null = null
+
+export function setApiTokenGetter(getter: (() => Promise<string | null>) | null) {
+  tokenGetter = getter
 }
 
 export class ApiError extends Error {
@@ -33,9 +37,11 @@ export async function apiFetch<T>(
     headers.set('Content-Type', 'application/json')
   }
 
-  const token = getAuthToken()
-  if (token && !headers.has('Authorization')) {
-    headers.set('Authorization', `Bearer ${token}`)
+  if (!headers.has('Authorization') && tokenGetter) {
+    const token = await tokenGetter()
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`)
+    }
   }
 
   const res = await fetch(url, { ...init, headers })
