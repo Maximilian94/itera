@@ -48,8 +48,11 @@ function assertValidGovernmentScopeLocation(input: {
 export class ExamBaseService {
   constructor(private readonly prisma: PrismaService) {}
 
-  list(input?: { examBoardId?: string }) {
-    return this.prisma.examBase.findMany({
+  async list(
+    input?: { examBoardId?: string },
+    userId?: string,
+  ) {
+    const examBases = await this.prisma.examBase.findMany({
       where: { examBoardId: input?.examBoardId },
       orderBy: [{ examDate: 'desc' }, { name: 'asc' }],
       select: {
@@ -67,6 +70,136 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, logoUrl: true } },
         _count: { select: { questions: true } },
       },
+    });
+
+    if (!userId) {
+      return examBases as Array<
+        (typeof examBases)[number] & {
+          userStats?: { attemptCount: number; bestScore: number | null };
+        }
+      >;
+    }
+
+    const stats = await this.prisma.examBaseAttempt.groupBy({
+      by: ['examBaseId'],
+      where: {
+        userId,
+        finishedAt: { not: null },
+      },
+      _count: { id: true },
+      _max: { scorePercentage: true } as Parameters<
+        typeof this.prisma.examBaseAttempt.groupBy
+      >[0]['_max'],
+    });
+
+    const statsByExamBaseId = new Map<
+      string,
+      { attemptCount: number; bestScore: number | null }
+    >();
+    for (const s of stats) {
+      const count = (s._count as { id: number } | undefined)?.id ?? 0;
+      const maxScore = (s._max as { scorePercentage: unknown } | undefined)
+        ?.scorePercentage;
+      statsByExamBaseId.set(s.examBaseId, {
+        attemptCount: count,
+        bestScore:
+          maxScore != null ? Number(maxScore) : null,
+      });
+    }
+
+    const examBaseIdsNeedingScore = [...statsByExamBaseId.entries()]
+      .filter(([, v]) => v.attemptCount > 0 && v.bestScore === null)
+      .map(([id]) => id);
+
+    if (examBaseIdsNeedingScore.length > 0) {
+      const attemptsWithoutScore = await this.prisma.examBaseAttempt.findMany({
+        where: {
+          userId,
+          finishedAt: { not: null },
+          scorePercentage: null,
+          examBaseId: { in: examBaseIdsNeedingScore },
+        },
+        select: {
+          id: true,
+          examBaseId: true,
+          answers: {
+            select: {
+              examBaseQuestionId: true,
+              selectedAlternativeId: true,
+            },
+          },
+        },
+      });
+
+      if (attemptsWithoutScore.length > 0) {
+        const questionsByBase =
+          await this.prisma.examBaseQuestion.findMany({
+            where: { examBaseId: { in: examBaseIdsNeedingScore } },
+            select: {
+              id: true,
+              examBaseId: true,
+              correctAlternative: true,
+              alternatives: { select: { id: true, key: true } },
+            },
+          });
+
+        const correctAltByQuestion = new Map<string, string>();
+        for (const q of questionsByBase) {
+          const alt = q.alternatives.find(
+            (a) => a.key === q.correctAlternative,
+          );
+          if (alt) correctAltByQuestion.set(q.id, alt.id);
+        }
+
+        const questionCountByExamBaseId = new Map<string, number>();
+        for (const q of questionsByBase) {
+          questionCountByExamBaseId.set(
+            q.examBaseId,
+            (questionCountByExamBaseId.get(q.examBaseId) ?? 0) + 1,
+          );
+        }
+
+        const bestScoreByExamBaseId = new Map<string, number>();
+        for (const a of attemptsWithoutScore) {
+          const total =
+            questionCountByExamBaseId.get(a.examBaseId) ?? 0;
+          let correct = 0;
+          for (const ans of a.answers) {
+            const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
+            if (
+              correctId != null &&
+              ans.selectedAlternativeId != null &&
+              ans.selectedAlternativeId === correctId
+            ) {
+              correct += 1;
+            }
+          }
+          const percentage = total > 0 ? (correct / total) * 100 : 0;
+          const current = bestScoreByExamBaseId.get(a.examBaseId);
+          if (current == null || percentage > current) {
+            bestScoreByExamBaseId.set(a.examBaseId, percentage);
+          }
+        }
+
+        for (const examBaseId of examBaseIdsNeedingScore) {
+          const best = bestScoreByExamBaseId.get(examBaseId);
+          if (best != null) {
+            const existing = statsByExamBaseId.get(examBaseId)!;
+            statsByExamBaseId.set(examBaseId, {
+              ...existing,
+              bestScore: best,
+            });
+          }
+        }
+      }
+    }
+
+    return examBases.map((exam) => {
+      const userStats = statsByExamBaseId.get(exam.id) ?? {
+        attemptCount: 0,
+        bestScore: null as number | null,
+      };
+      return { ...exam, userStats };
     });
   }
 

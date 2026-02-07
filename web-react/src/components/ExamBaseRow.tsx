@@ -4,9 +4,10 @@ import {
   BanknotesIcon,
   DocumentTextIcon,
 } from '@heroicons/react/24/outline'
-import { Tooltip, Typography } from '@mui/material'
+import { Tooltip } from '@mui/material'
 import dayjs from 'dayjs'
-import { CalendarDaysIcon } from '@heroicons/react/24/solid'
+import { CalendarDaysIcon, TrophyIcon } from '@heroicons/react/24/solid'
+import { ArrowPathIcon } from '@heroicons/react/24/outline'
 
 const rowClasses = `
   border border-solid border-slate-300 rounded-lg shadow-md
@@ -50,6 +51,14 @@ export function ExamBaseRow({ examBase }: ExamBaseRowProps) {
     <div className={`flex ${rowClasses}`}>
       <div className="flex w-full justify-between items-center gap-4">
         <div className="flex items-center gap-4">
+          <Tooltip title={dayjs(examBase.examDate).format('DD/MMMM/YYYY')}>
+            <div className="flex flex-col items-center justify-center group shrink-0">
+              <CalendarDaysIcon className="w-5 h-5 text-slate-500 group-hover:text-rose-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
+              <span className="text-xs text-slate-500 group-hover:text-rose-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
+                {dayjs(examBase.examDate).format('MMM/YYYY')}
+              </span>
+            </div>
+          </Tooltip>
           <Tooltip title={examBase.examBoard?.name ?? 'Banca'}>
             <img
               src={examBase.examBoard?.logoUrl ?? ''}
@@ -71,6 +80,28 @@ export function ExamBaseRow({ examBase }: ExamBaseRowProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {(examBase.userStats?.attemptCount ?? 0) > 0 && (
+            <>
+              <Tooltip title="Melhor nota">
+                <div className="flex flex-col items-center justify-center group">
+                  <TrophyIcon className="w-5 h-5 text-slate-500 group-hover:text-amber-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
+                  <span className="text-xs text-slate-500 group-hover:text-amber-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
+                    {examBase.userStats?.bestScore != null
+                      ? `${examBase.userStats.bestScore.toFixed(1)}%`
+                      : '—'}
+                  </span>
+                </div>
+              </Tooltip>
+              <Tooltip title="Tentativas realizadas">
+                <div className="flex flex-col items-center justify-center group">
+                  <ArrowPathIcon className="w-5 h-5 text-slate-500 group-hover:text-indigo-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
+                  <span className="text-xs text-slate-500 group-hover:text-indigo-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
+                    {examBase.userStats!.attemptCount} Tentativas
+                  </span>
+                </div>
+              </Tooltip>
+            </>
+          )}
           <Tooltip title="Quantidade de questões">
             <div className="flex flex-col items-center justify-center group">
               <DocumentTextIcon className="w-5 h-5 text-slate-500 group-hover:text-blue-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
@@ -84,14 +115,6 @@ export function ExamBaseRow({ examBase }: ExamBaseRowProps) {
               <BanknotesIcon className="w-5 h-5 text-slate-500 group-hover:text-green-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
               <span className="text-xs text-slate-500 group-hover:text-green-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
                 {formatBRL(examBase.salaryBase ?? 0)}
-              </span>
-            </div>
-          </Tooltip>
-          <Tooltip title={dayjs(examBase.examDate).format('DD/MMMM/YYYY')}>
-            <div className="flex flex-col items-center justify-center group">
-              <CalendarDaysIcon className="w-5 h-5 text-slate-500 group-hover:text-rose-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
-              <span className="text-xs text-slate-500 group-hover:text-rose-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
-                {dayjs(examBase.examDate).format('MMM/YYYY')}
               </span>
             </div>
           </Tooltip>

@@ -12,6 +12,7 @@ export type ExamBase = {
   examBoardId: string | null
   examBoard: { id: string; name: string; logoUrl: string } | null
   _count?: { questions: number }
+  userStats?: { attemptCount: number; bestScore: number | null }
 }
 
 export type CreateExamBaseInput = {

@@ -2,9 +2,7 @@ import { ExamBaseRow } from '@/components/ExamBaseRow'
 import { ExamDisplayOption } from '@/components/ExamDisplayOption'
 import { PageHeader } from '@/components/PageHeader'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
-import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
-import { Button, Grid, Paper, Typography } from '@mui/material'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import {
   AcademicCapIcon,
   BookmarkIcon,
@@ -17,7 +15,6 @@ export const Route = createFileRoute('/_authenticated/exams/')({
 
 function RouteComponent() {
   const { examBases, isLoadingExamBases } = useExamBaseFacade()
-  const { examBoards, isLoadingExamBoards } = useExamBoardFacade()
 
   return (
     <div className="flex flex-col gap-4">
