@@ -18,10 +18,10 @@ export const Route = createFileRoute('/_authenticated')({
 
 function RouteComponent() {
   return (
-    <div className="flex h-full bg-white p-2 gap-2">
+    <div className="flex h-full bg-slate-100 p-2 gap-2">
       {/* <SideBar /> */}
       <SideBarV2 />
-      <div className="flex-1 border border-solid border-slate-300 rounded-lg bg-slate-50">
+      <div className="flex-1 border border-solid border-slate-300 rounded-lg bg-slate-50 p-2">
         <Outlet />
       </div>
     </div>

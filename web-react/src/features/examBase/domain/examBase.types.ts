@@ -11,6 +11,7 @@ export type ExamBase = {
   minPassingGradeNonQuota: string | null
   examBoardId: string | null
   examBoard: { id: string; name: string; logoUrl: string } | null
+  _count?: { questions: number }
 }
 
 export type CreateExamBaseInput = {

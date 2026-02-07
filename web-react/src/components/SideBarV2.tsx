@@ -28,24 +28,24 @@ export const SideBarV2 = () => {
             icon: ClockIconOutline,
             activeIcon: ClockIcon,
         },
-        {
-            label: 'Questions Database',
-            href: DatabaseRoute.to,
-            icon: HomeIconOutline,
-            activeIcon: HomeIcon,
-        },
-        {
-            label: 'Exam Boards',
-            href: ExamBoardsRoute.to,
-            icon: HomeIconOutline,
-            activeIcon: HomeIcon,
-        },
-        {
-            label: 'Exam Base',
-            href: ExamBasesRoute.to,
-            icon: HomeIconOutline,
-            activeIcon: HomeIcon,
-        },
+        // {
+        //     label: 'Questions Database',
+        //     href: DatabaseRoute.to,
+        //     icon: HomeIconOutline,
+        //     activeIcon: HomeIcon,
+        // },
+        // {
+        //     label: 'Exam Boards',
+        //     href: ExamBoardsRoute.to,
+        //     icon: HomeIconOutline,
+        //     activeIcon: HomeIcon,
+        // },
+        // {
+        //     label: 'Exam Base',
+        //     href: ExamBasesRoute.to,
+        //     icon: HomeIconOutline,
+        //     activeIcon: HomeIcon,
+        // },
     ]
 
     return (
@@ -53,7 +53,7 @@ export const SideBarV2 = () => {
             <div
                 className={'w-13 bg-linear-to-b from-blue-600 to-blue-900 h-full rounded-lg flex flex-col items-center justify-between py-2 gap-2'}
             >
-                <div>
+                <div className='flex flex-col items-center justify-center gap-2'>
                     {pages.map((page) => (
                         <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} />
                     ))}

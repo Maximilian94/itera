@@ -65,6 +65,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
+        _count: { select: { questions: true } },
       },
     });
   }
