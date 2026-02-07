@@ -8,6 +8,7 @@ import { Tooltip } from '@mui/material'
 import dayjs from 'dayjs'
 import { CalendarDaysIcon, TrophyIcon } from '@heroicons/react/24/solid'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
+import { formatBRL } from '@/lib/utils'
 
 const rowClasses = `
   border border-solid border-slate-300 rounded-lg shadow-md
@@ -27,15 +28,6 @@ function locationLabel(examBase: ExamBase) {
   }
   if (examBase.governmentScope === 'STATE') return examBase.state ?? ''
   return 'Federal'
-}
-
-function formatBRL(value: string | number) {
-  const number = typeof value === 'string' ? Number(value) : value
-  if (!Number.isFinite(number)) return '—'
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(number)
 }
 
 type ExamBaseRowProps = {
