@@ -21,7 +21,7 @@ function RouteComponent() {
     <div className="flex h-full bg-slate-100 p-2 gap-2">
       {/* <SideBar /> */}
       <SideBarV2 />
-      <div className="flex-1 border border-solid border-slate-300 rounded-lg bg-slate-50 p-2">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col border border-solid border-slate-300 rounded-lg bg-slate-50 p-2">
         <Outlet />
       </div>
     </div>
