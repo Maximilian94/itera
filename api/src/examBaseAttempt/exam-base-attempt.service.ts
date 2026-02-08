@@ -79,7 +79,9 @@ export class ExamBaseAttemptService {
             examDate: true,
             minPassingGradeNonQuota: true,
             examBoardId: true,
-            examBoard: { select: { id: true, name: true } },
+            state: true,
+            city: true,
+            examBoard: { select: { id: true, name: true, logoUrl: true } },
           },
         },
         answers: {
@@ -147,6 +149,9 @@ export class ExamBaseAttemptService {
         examDate: examBase.examDate,
         examBoardName: examBase.examBoard?.name ?? null,
         examBoardId: examBase.examBoardId ?? null,
+        examBoardLogoUrl: examBase.examBoard?.logoUrl ?? null,
+        state: examBase.state ?? null,
+        city: examBase.city ?? null,
         minPassingGradeNonQuota: minPassing,
         percentage,
         passed,
@@ -328,16 +333,28 @@ export class ExamBaseAttemptService {
     if (attempt.finishedAt != null)
       throw new BadRequestException('attempt is already finished');
 
-    await this.prisma.examBaseAttempt.update({
-      where: { id: attemptId },
-      data: { finishedAt: new Date() },
-    });
-
     const data = await this.getOneWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
     );
+    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
+      data.questions,
+      data.answers,
+    );
+    const totalCorrect = subjectStats.reduce((acc, s) => acc + s.correct, 0);
+    const totalQuestions = subjectStats.reduce((acc, s) => acc + s.total, 0);
+    const scorePercentage =
+      totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
+
+    await this.prisma.examBaseAttempt.update({
+      where: { id: attemptId },
+      data: {
+        finishedAt: new Date(),
+        scorePercentage,
+      },
+    });
+
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
       select: { minPassingGradeNonQuota: true },
@@ -346,11 +363,6 @@ export class ExamBaseAttemptService {
       examBase?.minPassingGradeNonQuota != null
         ? Number(examBase.minPassingGradeNonQuota)
         : 60;
-
-    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
-      data.questions,
-      data.answers,
-    );
 
     let subjectFeedback: Record<string, SubjectFeedbackFromAI> = {};
     const apiKey = this.config.get<string>('XAI_API_KEY');

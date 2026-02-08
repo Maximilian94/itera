@@ -25,7 +25,7 @@ const darkTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: {
-      main: toHex(colors.indigo[500]) ?? '',
+      main: toHex(colors.blue[500]) ?? '',
     },
     // secondary: {
     //   main: '#000000',

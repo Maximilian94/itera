@@ -14,6 +14,7 @@ import {
   Tab,
   Tabs,
   TextField,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
@@ -39,7 +40,21 @@ import {
   useCreateExamBaseAttemptMutation,
   useExamBaseAttemptHistoryQuery,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
+import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
 import { ExamBaseAttemptsList } from '@/components/ExamBaseAttemptsList'
+import { PageHeader } from '@/components/PageHeader'
+import { Card } from '@/components/Card'
+import {
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  BanknotesIcon,
+  CheckCircleIcon,
+  TrophyIcon,
+  XCircleIcon,
+} from '@heroicons/react/24/solid'
+import { AcademicCapIcon, CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { formatBRL } from '@/lib/utils'
+import dayjs from 'dayjs'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -74,7 +89,7 @@ function RouteComponent() {
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
   const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
-    useExamBaseAttemptHistoryQuery(value === 1 ? examBaseId : undefined)
+    useExamBaseAttemptHistoryQuery(examBaseId)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
   const extractFromPdf = useExtractFromPdfMutation(examBaseId)
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -161,10 +176,10 @@ function RouteComponent() {
         alternatives:
           draft.alternatives.length > 0
             ? draft.alternatives.map((a) => ({
-                key: a.key,
-                text: a.text,
-                explanation: '',
-              }))
+              key: a.key,
+              text: a.text,
+              explanation: '',
+            }))
             : undefined,
       })
       setDraftQuestions((prev) => prev.filter((_, i) => i !== index))
@@ -178,9 +193,222 @@ function RouteComponent() {
     setExamBase(examBase ?? null)
   }, [examBases, examBaseId])
 
+  const finishedAttempts = attempts.filter((a) => a.finishedAt != null && a.percentage != null)
+  const lastScore = finishedAttempts[0]?.percentage ?? null
+  const previousScore = finishedAttempts[1]?.percentage ?? null
+  const trendDiff =
+    lastScore != null && previousScore != null ? lastScore - previousScore : null
+  const hasTrend = finishedAttempts.length >= 2 && trendDiff != null
+  const minPassingDisplay =
+    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+      ? `${examBase.minPassingGradeNonQuota}%`
+      : '—'
+  const minPassingNum =
+    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+      ? Number(examBase.minPassingGradeNonQuota)
+      : null
+  const lastScoreColorClass =
+    lastScore == null || minPassingNum == null
+      ? 'text-slate-700'
+      : lastScore >= minPassingNum
+        ? 'text-green-500'
+        : 'text-red-500'
+
   return (
-    <div className="p-4">
-      <Paper>
+    <div className="flex flex-col gap-4">
+      <PageHeader title="Exame / ExameX" />
+
+      <div className="flex flex-col gap-1">
+        <div className="flex gap-4">
+          <Card noElevation className="flex-1">
+            <div className="flex gap-2">
+              <img src="https://upload.wikimedia.org/wikipedia/commons/2/28/FGV_Nacional.png" alt="Logo" className="w-18 h-18 rounded-md" />
+
+              <div className="flex flex-col gap-0">
+                <span className="text-2xl text-slate-900">{examBase?.institution}</span>
+                <span className="text-md text-slate-500">{examBase?.state ?? ''} {examBase?.city ?? ''}</span>
+                <span className="text-xs text-slate-500">{examBase?.role}</span>
+              </div>
+            </div>
+          </Card>
+
+          <Card noElevation className="select-none">
+            <div className="flex flex-col gap-0">
+              <span className="text-xs text-slate-900">Última nota</span>
+
+              <div className="flex items-center space-between gap-2">
+                <span className={`text-3xl font-medium ${lastScoreColorClass}`}>
+                  {lastScore != null ? `${lastScore.toFixed(1)}%` : '—'}
+                </span>
+
+                {hasTrend && (
+                  <Tooltip
+                    title={
+                      trendDiff >= 0
+                        ? `Sua nota melhorou ${trendDiff.toFixed(1)}% em relação à tentativa anterior`
+                        : `Sua nota caiu ${Math.abs(trendDiff).toFixed(1)}% em relação à tentativa anterior`
+                    }
+                  >
+                    <div
+                      className={`flex items-center gap-1 rounded-md p-1 h-min w-min cursor-pointer ${
+                        trendDiff >= 0
+                          ? 'bg-green-100 hover:bg-green-200'
+                          : 'bg-red-100 hover:bg-red-200'
+                      }`}
+                    >
+                      {trendDiff >= 0 ? (
+                        <ArrowTrendingUpIcon className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <ArrowTrendingDownIcon className="w-3 h-3 text-red-500" />
+                      )}
+                      <span
+                        className={`text-xs font-bold ${
+                          trendDiff >= 0 ? 'text-green-500' : 'text-red-500'
+                        }`}
+                      >
+                        {trendDiff >= 0 ? '+' : ''}{trendDiff.toFixed(1)}%
+                      </span>
+                    </div>
+                  </Tooltip>
+                )}
+              </div>
+
+              <Tooltip title="Menor nota entre os aprovados da ampla concorrência [não cotista]">
+                <span className="text-xs text-slate-500 hover:bg-slate-200 cursor-pointer">
+                  Nota de corte: {minPassingDisplay}
+                </span>
+              </Tooltip>
+            </div>
+          </Card>
+
+          <Card noElevation className="select-none bg-red-50 border-red-200">
+            <div className="flex flex-col gap-0">
+              <span className="text-xs text-slate-900">Concorrência</span>
+
+              <Tooltip title="Preencher: ex.: 400 candidatos inscritos para 10 vagas">
+                <span className="text-3xl text-slate-700 font-medium hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
+                  1/40
+                </span>
+              </Tooltip>
+
+              <Tooltip title="Preencher: ex.: Em média a concorrência é de 1/10">
+                <span className="text-xs text-slate-500 hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
+                  Acima da média
+                </span>
+              </Tooltip>
+            </div>
+          </Card>
+        </div>
+
+        <div className="flex gap-1">
+        <Card noElevation className="flex-1 p-0 flex items-center gap-0">
+            <div className="flex items-center gap-1">
+              <AcademicCapIcon className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-medium text-slate-500">{examBase?.examBoard?.name}</span>
+            </div>
+          </Card>
+
+          <Card noElevation className="p-0 flex items-center gap-0">
+            <div className="flex items-center gap-1">
+              <BanknotesIcon className="w-5 h-5 text-green-500" />
+              <span className="text-xs font-medium text-slate-500">{formatBRL(examBase?.salaryBase ?? 0)}</span>
+            </div>
+          </Card>
+
+          <Card noElevation className="p-0 flex items-center gap-0">
+            <div className="flex items-center gap-1">
+              <CalendarDaysIcon className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-medium text-slate-500">{ dayjs(examBase?.examDate).format('DD/MMMM/YYYY') }</span>
+            </div>
+          </Card>
+        </div>
+      </div>
+
+      {/* Seção Tentativas */}
+      <Card noElevation className="flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-lg font-semibold text-slate-900">Tentativas</span>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<PlayArrowIcon />}
+            onClick={handleStartExam}
+            disabled={createAttempt.isPending}
+          >
+            {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
+          </Button>
+        </div>
+        {attemptsError && (
+          <span className="text-sm text-red-600">Erro ao carregar tentativas.</span>
+        )}
+        {isLoadingAttempts && (
+          <span className="text-sm text-slate-500">Carregando…</span>
+        )}
+        {!isLoadingAttempts && !attemptsError && attempts.length === 0 && (
+          <span className="text-sm text-slate-500">
+            Nenhuma tentativa ainda. Clique em &quot;Iniciar prova&quot; para começar.
+          </span>
+        )}
+        {!isLoadingAttempts && !attemptsError && attempts.length > 0 && (
+          <div className="flex flex-col gap-2">
+            {attempts.map((item: ExamBaseAttemptHistoryItem) => {
+              const path = item.finishedAt
+                ? '/exams/$examBoard/$examId/$attemptId/feedback'
+                : '/exams/$examBoard/$examId/$attemptId'
+              const isClickable = item.examBoardId != null
+              const status =
+                item.finishedAt == null
+                  ? { label: 'Em andamento', icon: ClockIcon, className: 'text-amber-600 bg-amber-50' }
+                  : item.passed === true
+                    ? { label: 'Aprovado', icon: CheckCircleIcon, className: 'text-green-600 bg-green-50' }
+                    : { label: 'Reprovado', icon: ExclamationTriangleIcon, className: 'text-red-600 bg-red-100' }
+              const StatusIcon = status.icon
+              return (
+                <div
+                  key={item.id}
+                  role={isClickable ? 'button' : undefined}
+                  onClick={() =>
+                    isClickable &&
+                    navigate({ to: path, params: { examBoard, examId, attemptId: item.id } } as any)
+                  }
+                  className={`
+                    flex items-center justify-between gap-4 rounded-lg border border-slate-300 p-3
+                    transition-all ease-in-out duration-200
+                    ${isClickable ? 'cursor-pointer hover:bg-slate-100 hover:shadow-sm active:shadow-none' : ''}
+                  `}
+                >
+                  <div className="flex items-center gap-4">
+                    <Tooltip title={item.finishedAt ? dayjs(item.finishedAt).format('DD/MM/YYYY HH:mm') : dayjs(item.startedAt).format('DD/MM/YYYY HH:mm')}>
+                      <div className="flex items-center gap-1.5">
+                        <CalendarDaysIcon className="w-5 h-5 text-slate-500" />
+                        <span className="text-sm text-slate-700">
+                          {item.finishedAt
+                            ? dayjs(item.finishedAt).format('DD/MM/YYYY HH:mm')
+                            : dayjs(item.startedAt).format('DD/MM/YYYY HH:mm')}
+                        </span>
+                      </div>
+                    </Tooltip>
+                    <div className="flex items-center gap-1.5">
+                      <TrophyIcon className="w-5 h-5 text-slate-500" />
+                      <span className="text-sm font-medium text-slate-700">
+                        {item.percentage != null ? `${item.percentage.toFixed(1)}%` : '—'}
+                      </span>
+                    </div>
+                  </div>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${status.className}`}
+                  >
+                    <StatusIcon className="w-4 h-4" />
+                    {status.label}
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </Card>
+
+      {/* <Paper>
         <Tabs value={value} onChange={handleChange} aria-label="exam tabs">
           <Tab label="Detalhes" value={0} />
           <Tab label="Tentativas" value={1} />
@@ -432,7 +660,7 @@ function RouteComponent() {
         <CustomTabPanel value={value} hidden={value !== CREATE_QUESTION_TAB_INDEX}>
           <QuestionCreator />
         </CustomTabPanel>
-      </Paper>
+      </Paper> */}
 
       <Dialog open={addQuestionOpen} onClose={() => setAddQuestionOpen(false)}>
         <DialogTitle>Add question</DialogTitle>

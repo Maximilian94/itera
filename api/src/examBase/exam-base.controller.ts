@@ -1,4 +1,13 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
 import { UpdateExamBaseDto } from './dto/update-exam-base.dto';
@@ -9,8 +18,14 @@ export class ExamBaseController {
   constructor(private readonly examBases: ExamBaseService) {}
 
   @Get()
-  list(@Query() query: GetExamBasesQueryDto) {
-    return this.examBases.list({ examBoardId: query.examBoardId });
+  list(
+    @Query() query: GetExamBasesQueryDto,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.examBases.list(
+      { examBoardId: query.examBoardId },
+      req.user.userId,
+    );
   }
 
   @Get(':id')
