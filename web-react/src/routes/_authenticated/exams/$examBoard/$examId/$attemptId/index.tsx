@@ -298,7 +298,7 @@ function RouteComponent() {
               })}
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
+            <div className="flex-1 overflow-auto p-5">
               <CustomTabPanel value={value} hidden={value !== 0}>
                 {currentQuestion && (
                   <div className="flex flex-col gap-6">
@@ -380,7 +380,7 @@ function RouteComponent() {
                               <button
                                 type="button"
                                 className={`
-                                  flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors
+                                  flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400
                                   ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
                                   ${optionBg}
                                   ${isFinished ? 'cursor-default' : ''}`}
@@ -412,7 +412,7 @@ function RouteComponent() {
               </CustomTabPanel>
 
               <CustomTabPanel value={value} hidden={value !== 1}>
-                <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-6">
                   {!isFinished && (
                     <span className="text-sm text-slate-500">
                       As explicações ficam disponíveis após você finalizar a prova.
@@ -423,51 +423,64 @@ function RouteComponent() {
                       <p className="text-sm font-semibold text-slate-700">
                         Resposta correta: {currentQuestion.correctAlternative ?? '—'}
                       </p>
-                      <ul className="list-none p-0 m-0 flex flex-col gap-3">
+                      <div className="flex flex-col gap-5">
                         {currentQuestion.alternatives.map((alt, idx) => {
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[idx] ?? alt.key
                           const isCorrect = currentQuestion.correctAlternative === alt.key
                           const wasSelected = selectedAlternativeId === alt.id
                           const isWrong = wasSelected && !isCorrect
-                          const boxClass = isCorrect
-                            ? 'border-green-400 bg-green-50'
-                            : isWrong
-                              ? 'border-red-400 bg-red-50'
-                              : 'border-slate-300 bg-slate-50'
+                          const variant = isCorrect ? 'correct' : isWrong ? 'wrong' : 'neutral'
+                          const cardStyles = {
+                            correct: 'border-2 border-green-400 bg-green-100 overflow-hidden rounded-lg',
+                            wrong: 'border-2 border-red-400 bg-red-100 overflow-hidden rounded-lg',
+                            neutral: 'border border-slate-300 bg-slate-50 overflow-hidden rounded-lg',
+                          }
+                          const headerTextStyles = {
+                            correct: 'text-green-800',
+                            wrong: 'text-red-800',
+                            neutral: 'text-slate-700',
+                          }
+                          const badgeCorrect = 'text-xs font-semibold text-green-700 bg-green-200/80 px-2 py-0.5 rounded'
+                          const badgeWrong = 'text-xs font-semibold text-red-700 bg-red-200/80 px-2 py-0.5 rounded'
+                          const explanationWrapStyles = {
+                            correct: 'border-t border-green-300 bg-green-50/70',
+                            wrong: 'border-t border-red-300 bg-red-50/70',
+                            neutral: 'border-t border-slate-200 bg-slate-100/70',
+                          }
                           return (
-                            <li
-                              key={alt.id}
-                              className={`p-4 rounded-lg border-2 ${boxClass}`}
-                            >
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                <span className={`text-sm font-semibold ${isCorrect ? 'text-green-700' : isWrong ? 'text-red-700' : 'text-slate-700'}`}>
-                                  {keyLabel}.
-                                </span>
-                                {isCorrect && (
-                                  <span className="text-xs font-semibold text-green-600 bg-green-100 px-2 py-0.5 rounded">
-                                    Resposta correta
+                            <div key={alt.id} className={cardStyles[variant]}>
+                              <div className="p-4">
+                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                  <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>
+                                    {keyLabel}.
                                   </span>
-                                )}
-                                {isWrong && (
-                                  <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded">
-                                    Sua resposta
-                                  </span>
-                                )}
-                              </div>
-                              <div className="text-sm text-slate-700 mb-2">
-                                <Markdown>{alt.text}</Markdown>
-                              </div>
-                              {alt.explanation ? (
-                                <div className="text-sm text-slate-600">
-                                  <Markdown>{alt.explanation}</Markdown>
+                                  {isCorrect && (
+                                    <span className={badgeCorrect}>Resposta correta</span>
+                                  )}
+                                  {isWrong && (
+                                    <span className={badgeWrong}>Sua resposta</span>
+                                  )}
                                 </div>
-                              ) : (
-                                <span className="text-sm text-slate-500 italic">Sem explicação cadastrada.</span>
-                              )}
-                            </li>
+                                <div className={`text-sm ${headerTextStyles[variant]}`}>
+                                  <Markdown>{alt.text}</Markdown>
+                                </div>
+                              </div>
+                              <div className={`p-4 ${explanationWrapStyles[variant]}`}>
+                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">
+                                  Explicação
+                                </span>
+                                {alt.explanation ? (
+                                  <div className="text-sm text-slate-700">
+                                    <Markdown>{alt.explanation}</Markdown>
+                                  </div>
+                                ) : (
+                                  <span className="text-sm text-slate-500 italic">Sem explicação cadastrada.</span>
+                                )}
+                              </div>
+                            </div>
                           )
                         })}
-                      </ul>
+                      </div>
                     </>
                   )}
                 </div>
@@ -531,7 +544,8 @@ function RouteComponent() {
           </div>
           <Card noElevation className="p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
             <span className="text-xs font-medium text-slate-500 block mb-2 shrink-0">Questões</span>
-            <div className="grid grid-cols-5 gap-1 overflow-auto min-h-0 content-start">
+            <div className="overflow-auto min-h-0 p-1.5">
+            <div className="grid grid-cols-5 gap-1 content-start">
               {questions.map((_, index) => (
                 <button
                   key={questions[index].id}
@@ -542,6 +556,7 @@ function RouteComponent() {
                   {index + 1}
                 </button>
               ))}
+            </div>
             </div>
           </Card>
         </div>
