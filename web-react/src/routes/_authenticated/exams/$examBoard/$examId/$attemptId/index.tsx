@@ -35,6 +35,29 @@ const QUESTION_ALTERNATIVE_KEYS = [
   'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z',
 ]
 
+function QuestionSlide({
+  direction,
+  children,
+}: {
+  direction: 'forward' | 'backward'
+  children: React.ReactNode
+}) {
+  const [entered, setEntered] = useState(false)
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setEntered(true))
+    return () => cancelAnimationFrame(raf)
+  }, [])
+  return (
+    <div
+      className={`transition-transform duration-300 ease-out ${
+        entered ? 'translate-x-0' : direction === 'forward' ? 'translate-x-full' : '-translate-x-full'
+      }`}
+    >
+      {children}
+    </div>
+  )
+}
+
 function RouteComponent() {
   const { examBoard, examId, attemptId } = Route.useParams()
   const navigate = useNavigate()
@@ -52,6 +75,7 @@ function RouteComponent() {
 
   const [value, setValue] = useState(0)
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
+  const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward')
   const [eliminatedByQuestion, setEliminatedByQuestion] = useState<
     Record<string, Set<string>>
   >({})
@@ -112,14 +136,17 @@ function RouteComponent() {
   }
 
   const handlePrevQuestion = () => {
+    setSlideDirection('backward')
     setCurrentQuestionIndex((i) => Math.max(0, i - 1))
   }
 
   const handleNextQuestion = () => {
+    setSlideDirection('forward')
     setCurrentQuestionIndex((i) => Math.min(questionCount - 1, i + 1))
   }
 
   const handleSelectQuestion = (index: number) => {
+    setSlideDirection(index > currentQuestionIndex ? 'forward' : 'backward')
     setCurrentQuestionIndex(index)
   }
 
@@ -315,9 +342,10 @@ function RouteComponent() {
               })}
             </div>
 
-            <div className="flex-1 overflow-auto p-5">
+            <div className="flex-1 overflow-auto overflow-x-hidden p-5">
               <CustomTabPanel value={value} hidden={value !== 0}>
-                {currentQuestion && (
+                <QuestionSlide key={currentQuestionIndex} direction={slideDirection}>
+                  {currentQuestion && (
                   <div className="flex flex-col gap-6">
                     {currentQuestion.referenceText && (
                       <div>
@@ -425,7 +453,8 @@ function RouteComponent() {
                       )}
                     </div>
                   </div>
-                )}
+                  )}
+                </QuestionSlide>
               </CustomTabPanel>
 
               <CustomTabPanel value={value} hidden={value !== 1}>
