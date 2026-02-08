@@ -1,66 +1,35 @@
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  alpha,
-  Box,
-  Button,
-  Grid,
-  Paper,
-  Typography,
-  useTheme,
-} from '@mui/material'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
-import {
-  Chart as ChartJS,
-  RadialLinearScale,
-  PointElement,
-  LineElement,
-  Filler,
-  Tooltip,
-  Legend,
-} from 'chart.js'
+import { Alert, Button } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Radar } from 'react-chartjs-2'
+import {
+  ArrowLeftIcon,
+  DocumentTextIcon,
+  SparklesIcon,
+  TrophyIcon,
+} from '@heroicons/react/24/outline'
+import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { Markdown } from '@/components/Markdown'
+import { Card } from '@/components/Card'
 import {
   useExamBaseAttemptFeedbackQuery,
   useGenerateSubjectFeedbackMutation,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 
-ChartJS.register(
-  RadialLinearScale,
-  PointElement,
-  LineElement,
-  Filler,
-  Tooltip,
-  Legend,
-)
-
-/**
- * Returns MUI color key for subject bar based on percentage vs min passing grade.
- */
-function getSubjectColor(
-  percentage: number,
-  minPassing: number,
-): 'success' | 'warning' | 'error' {
-  if (percentage >= minPassing) return 'success'
-  if (percentage >= minPassing - 15) return 'warning'
-  return 'error'
-}
-
-/**
- * Returns hex color for subject bar (green / yellow / red) based on performance.
- */
-function getSubjectBgColor(
+function getSubjectBarColor(
   percentage: number,
   minPassing: number,
 ): string {
-  if (percentage >= minPassing) return '#22c55e'
-  if (percentage >= minPassing - 15) return '#eab308'
-  return '#ef4444'
+  if (percentage >= minPassing) return 'bg-green-500'
+  if (percentage >= minPassing - 15) return 'bg-amber-500'
+  return 'bg-red-500'
+}
+
+function getSubjectTextColor(
+  percentage: number,
+  minPassing: number,
+): string {
+  if (percentage >= minPassing) return 'text-green-700'
+  if (percentage >= minPassing - 15) return 'text-amber-700'
+  return 'text-red-700'
 }
 
 export const Route = createFileRoute(
@@ -69,16 +38,10 @@ export const Route = createFileRoute(
   component: RouteComponent,
 })
 
-/**
- * Feedback page: exam title, approval status, subject bars, radar chart,
- * and AI-generated evaluation/recommendations per subject.
- */
 function RouteComponent() {
   const { examBoard, examId, attemptId } = Route.useParams()
   const navigate = useNavigate()
-  const theme = useTheme()
   const examBaseId = examId
-  const textColor = theme.palette.text.secondary
 
   const { data, isLoading, error } = useExamBaseAttemptFeedbackQuery(
     examBaseId,
@@ -91,26 +54,35 @@ function RouteComponent() {
 
   if (isLoading) {
     return (
-      <div className="p-4">
-        <Typography color="text.secondary">Carregando feedback…</Typography>
+      <div className="flex flex-col gap-4 h-full min-h-0 overflow-auto">
+        <Card noElevation className="p-6">
+          <span className="text-sm text-slate-500">Carregando feedback…</span>
+        </Card>
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="p-4">
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error instanceof Error
-            ? error.message
-            : 'Não foi possível carregar o feedback.'}
-        </Alert>
-        <Button
-          variant="outlined"
-          onClick={() => navigate({ to: '/exams/$examBoard/$examId', params: { examBoard, examId } } as any)}
-        >
-          Voltar à prova
-        </Button>
+      <div className="flex flex-col gap-4 h-full min-h-0 overflow-auto">
+        <Card noElevation className="flex flex-col gap-3 p-6">
+          <Alert severity="error">
+            {error instanceof Error
+              ? error.message
+              : 'Não foi possível carregar o feedback.'}
+          </Alert>
+          <Button
+            variant="outlined"
+            onClick={() =>
+              navigate({
+                to: '/exams/$examBoard/$examId',
+                params: { examBoard, examId },
+              } as any)
+            }
+          >
+            Voltar à prova
+          </Button>
+        </Card>
       </div>
     )
   }
@@ -124,313 +96,241 @@ function RouteComponent() {
     subjectFeedback = {},
   } = data
 
-  const radarData = {
-    labels: subjectStats.map((s) => s.subject),
-    datasets: [
-      {
-        label: '% de acertos',
-        data: subjectStats.map((s) => s.percentage),
-        backgroundColor: alpha(theme.palette.primary.main, 0.2),
-        borderColor: theme.palette.primary.main,
-        borderWidth: 1,
-      },
-      {
-        label: 'Nota mínima aprovação',
-        data: subjectStats.map(() => minPassingGradeNonQuota),
-        backgroundColor: alpha(theme.palette.success.main, 0.1),
-        borderColor: alpha(theme.palette.success.main, 0.8),
-        borderWidth: 1,
-        borderDash: [5, 5],
-      },
-    ],
-  }
-
-  const radarOptions = {
-    maintainAspectRatio: false,
-    color: textColor,
-    scales: {
-      r: {
-        min: 0,
-        max: 100,
-        ticks: {
-          stepSize: 20,
-          color: textColor,
-          backdropColor: 'transparent',
-        },
-        pointLabels: {
-          color: textColor,
-        },
-        grid: {
-          color: textColor,
-        },
-        angleLines: {
-          color: textColor,
-        },
-      },
-    },
-    plugins: {
-      legend: {
-        labels: {
-          color: textColor,
-        },
-      },
-    },
-  }
+  const hasAnyFeedback = subjectStats.some((s) => subjectFeedback[s.subject])
 
   return (
-    <div className="p-4 h-full overflow-y-auto">
-      <Box className="flex flex-col gap-3 h-full">
-        <Paper className="flex flex-col gap-2 p-4">
-          <Typography variant="h5" component="h1" fontWeight={600}>
-            {examTitle}
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-            Feedback da prova
-          </Typography>
-        </Paper>
+    <div className="flex flex-col gap-6 h-full min-h-0 overflow-auto p-1">
+      <h1 className="text-xl font-bold text-slate-900">{examTitle}</h1>
 
-        <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 4 }}>
-          <Paper className="flex flex-col gap-2 p-4 h-full">
-          <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 3 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography variant="h6" component="span">
-                {passed ? 'Aprovado' : 'Reprovado'}
-              </Typography>
-              <Box
-                component="span"
-                sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 1,
-                  backgroundColor: passed ? 'success.main' : 'error.main',
-                  color: 'white',
-                  fontSize: '0.875rem',
-                  fontWeight: 600,
-                }}
-              >
-                {passed ? '✓' : '✗'}
-              </Box>
-            </Box>
-            <Typography variant="body1" color="text.secondary">
-              Taxa de acerto geral:{' '}
-              <strong>
-                {overall.correct}/{overall.total} ({overall.percentage.toFixed(1)}%)
-              </strong>
-            </Typography>
-            <Typography variant="caption" color="text.secondary" display="block">
-              Nota mínima para aprovação (não cotista): {minPassingGradeNonQuota}%
-            </Typography>
-          </Box>
-        </Paper>
-          </Grid>
-          <Grid size={{ xs: 12, md: 8 }}>
-          <Paper className="flex flex-col gap-2 p-4">
-          <Typography variant="subtitle1" fontWeight={600}>
+      {/* Resultado + Desempenho por matéria lado a lado */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card
+          noElevation
+          className={`p-6 ${
+            passed
+              ? 'border-green-300 bg-green-50'
+              : 'border-red-300 bg-red-50'
+          }`}
+        >
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              {passed ? (
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-200">
+                  <CheckCircleIcon className="w-8 h-8 text-green-600" />
+                </div>
+              ) : (
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-200">
+                  <XCircleIcon className="w-8 h-8 text-red-600" />
+                </div>
+              )}
+              <div>
+                <p
+                  className={`text-lg font-semibold ${
+                    passed ? 'text-green-800' : 'text-red-800'
+                  }`}
+                >
+                  {passed ? 'Aprovado' : 'Reprovado'}
+                </p>
+                <p className="text-sm text-slate-600">
+                  {overall.correct} de {overall.total} questões corretas
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <TrophyIcon className="w-8 h-8 text-slate-400" />
+              <span className="text-3xl font-bold text-slate-800">
+                {overall.percentage.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+          <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-200/80">
+            Nota mínima para aprovação (ampla concorrência):{' '}
+            {minPassingGradeNonQuota}%
+          </p>
+        </Card>
+
+        <Card noElevation className="p-5">
+          <h2 className="text-base font-semibold text-slate-800 mb-4">
             Desempenho por matéria
-          </Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {subjectStats.map((stat) => {
-              const color = getSubjectColor(stat.percentage, minPassingGradeNonQuota)
-              const bgColor = getSubjectBgColor(stat.percentage, minPassingGradeNonQuota)
-              return (
-                <Box key={stat.subject}>
-                  <Box
-                    sx={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      mb: 0.5,
-                    }}
+          </h2>
+          <div className="flex flex-col gap-4">
+            {subjectStats.map((stat) => (
+              <div key={stat.subject}>
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-sm font-medium text-slate-700">
+                    {stat.subject}
+                  </span>
+                  <span
+                    className={`text-sm font-semibold ${getSubjectTextColor(
+                      stat.percentage,
+                      minPassingGradeNonQuota,
+                    )}`}
                   >
-                    <Typography variant="body2" fontWeight={500}>
-                      {stat.subject}
-                    </Typography>
-                    <Typography variant="body2" color={`${color}.main`} fontWeight={600}>
-                      {stat.percentage.toFixed(1)}%
-                    </Typography>
-                  </Box>
-                  <Box
-                    sx={{
-                      height: 24,
-                      borderRadius: 1,
-                      backgroundColor: 'action.hover',
-                      overflow: 'hidden',
+                    {stat.percentage.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="h-2.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-400 ease-out ${getSubjectBarColor(
+                      stat.percentage,
+                      minPassingGradeNonQuota,
+                    )}`}
+                    style={{
+                      width: `${Math.min(100, stat.percentage)}%`,
+                      minWidth: stat.percentage > 0 ? 8 : 0,
                     }}
-                  >
-                    <Box
-                      sx={{
-                        height: '100%',
-                        width: `${Math.min(100, stat.percentage)}%`,
-                        minWidth: stat.percentage > 0 ? 4 : 0,
-                        backgroundColor: bgColor,
-                        borderRadius: 1,
-                        transition: 'width 0.4s ease',
-                      }}
-                    />
-                  </Box>
-                </Box>
-              )
-            })}
-          </Box>
-        </Paper>
-          </Grid>
-        </Grid>
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
 
-        {/* <Grid container spacing={2}>
-          <Grid size={{ xs: 12, md: 6 }}>
-            <Paper
-              sx={{
-                p: 2,
-                height: '100%',
-                minHeight: 480,
-                backgroundColor: 'var(--bg-slate-900)',
-              }}
-            >
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 2 }}>
-                Radar de acertos por matéria
-              </Typography>
-              <Box sx={{ height: 420, position: 'relative' }}>
-                <Radar data={radarData} options={radarOptions} />
-              </Box>
-            </Paper>
-          </Grid>
-        </Grid> */}
-
-        {subjectStats.length > 0 &&
-          !subjectStats.some((s) => subjectFeedback[s.subject]) && (
-            <Paper className="flex flex-col gap-2 p-4">
-              <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>
+      {/* Gerar feedback por matéria (quando ainda não existe) */}
+      {subjectStats.length > 0 && !hasAnyFeedback && (
+        <Card noElevation className="p-5 border border-slate-200 bg-slate-50/50">
+          <div className="flex items-start gap-3">
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+              <SparklesIcon className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2 className="text-base font-semibold text-slate-800 mb-1">
                 Feedback e recomendações por matéria
-              </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                Provas antigas podem não ter o feedback gerado pela IA. Clique no botão
-                abaixo para gerar avaliações e recomendações de estudo por matéria.
-              </Typography>
+              </h2>
+              <p className="text-sm text-slate-600 mb-4">
+                Provas antigas podem não ter o feedback gerado pela IA. Clique
+                no botão abaixo para gerar avaliações e recomendações de estudo
+                por matéria.
+              </p>
               <Button
                 variant="contained"
                 color="primary"
-                startIcon={<AutoAwesomeIcon />}
+                startIcon={<SparklesIcon className="w-5 h-5" />}
                 onClick={() => generateFeedback.mutate()}
                 disabled={generateFeedback.isPending}
               >
-                {generateFeedback.isPending ? 'Gerando feedback…' : 'Gerar feedback por matéria'}
+                {generateFeedback.isPending
+                  ? 'Gerando feedback…'
+                  : 'Gerar feedback por matéria'}
               </Button>
               {generateFeedback.isError && (
-                <Alert severity="error" sx={{ mt: 2 }}>
+                <Alert severity="error" className="mt-3">
                   {generateFeedback.error instanceof Error
                     ? generateFeedback.error.message
                     : 'Erro ao gerar feedback.'}
                 </Alert>
               )}
-            </Paper>
-          )}
+            </div>
+          </div>
+        </Card>
+      )}
 
-        {subjectStats.some((s) => subjectFeedback[s.subject]) && (
-          <Paper className="flex flex-col gap-4 p-4">
-            <Box className="flex items-center justify-between gap-2">
-              <Typography variant="subtitle1" fontWeight={600}>
-                Feedback e recomendações por matéria
-              </Typography>
-              {/* TODO: mostrar este botão apenas para admin */}
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<AutoAwesomeIcon />}
-                onClick={() => generateFeedback.mutate()}
-                disabled={generateFeedback.isPending}
-              >
-                {generateFeedback.isPending ? 'Refazendo feedback…' : 'Refazer feedback'}
-              </Button>
-            </Box>
-
+      {/* Feedback por matéria (quando já existe) */}
+      {hasAnyFeedback && (
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <h2 className="text-base font-semibold text-slate-800">
+              Feedback e recomendações por matéria
+            </h2>
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<SparklesIcon className="w-4 h-4" />}
+              onClick={() => generateFeedback.mutate()}
+              disabled={generateFeedback.isPending}
+            >
+              {generateFeedback.isPending ? 'Refazendo…' : 'Refazer feedback'}
+            </Button>
+          </div>
+          <div className="flex flex-col gap-3">
             {subjectStats.map((stat) => {
               const feedback = subjectFeedback[stat.subject]
               if (!feedback) return null
+              const isGreen = stat.percentage >= minPassingGradeNonQuota
+              const isRed = stat.percentage < minPassingGradeNonQuota - 15
+              const cardBorder = isGreen
+                ? 'border-green-200'
+                : isRed
+                  ? 'border-red-200'
+                  : 'border-amber-200'
+              const cardBg = isGreen
+                ? 'bg-green-50/50'
+                : isRed
+                  ? 'bg-red-50/50'
+                  : 'bg-amber-50/50'
               return (
-                <Paper
+                <Card
                   key={stat.subject}
-                  elevation={3}
-                  className="flex flex-col gap-2 p-4"
+                  noElevation
+                  className={`p-5 border-2 ${cardBorder} ${cardBg} overflow-hidden rounded-lg`}
                 >
-                  <Typography variant="subtitle1" fontWeight={600}>
-                    {stat.subject}
-                  </Typography>
-                  <Markdown>{feedback.evaluation}</Markdown>
-                  <Markdown>{feedback.recommendations}</Markdown>
-                </Paper>
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    <h3 className="text-sm font-semibold text-slate-800">
+                      {stat.subject}
+                    </h3>
+                    <span
+                      className={`text-sm font-semibold ${getSubjectTextColor(
+                        stat.percentage,
+                        minPassingGradeNonQuota,
+                      )}`}
+                    >
+                      {stat.percentage.toFixed(0)}% acertos
+                    </span>
+                  </div>
+                  <div className="flex flex-col gap-4">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
+                        Avaliação
+                      </p>
+                      <div className="text-sm text-slate-700">
+                        <Markdown>{feedback.evaluation}</Markdown>
+                      </div>
+                    </div>
+                    <div className="pt-3 border-t border-slate-200">
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
+                        Recomendações de estudo
+                      </p>
+                      <div className="text-sm text-slate-700">
+                        <Markdown>{feedback.recommendations}</Markdown>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
               )
             })}
-            {/* <Box>
-              {subjectStats.map((stat) => {
-                const feedback = subjectFeedback[stat.subject]
-                if (!feedback) return null
-                return (
-                  <Accordion key={stat.subject} elevation={3}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <div className="flex gap-4 items-center">
-                        <Typography variant="body1" fontWeight={500}>
-                          {stat.subject}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {stat.percentage.toFixed(0)}% de acertos
-                        </Typography>
-                      </div>
+          </div>
+        </div>
+      )}
 
-                    </AccordionSummary>
-                    <AccordionDetails            >
-                      <Box >
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          fontWeight={600}
-
-                        >
-                          Avaliação
-                        </Typography>
-                        <Markdown variant="body2">{feedback.evaluation}</Markdown>
-                      </Box>
-                      <Box>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          fontWeight={600}
-
-                        >
-                          Recomendações de estudo
-                        </Typography>
-                        <Markdown variant="body2">{feedback.recommendations}</Markdown>
-                      </Box>
-                    </AccordionDetails>
-                  </Accordion>
-                )
-              })}
-            </Box> */}
-          </Paper>
-        )}
-
-        <Box sx={{ display: 'flex', gap: 1 }}>
-          <Button
-            variant="outlined"
-            onClick={() =>
-              navigate({
-                to: '/exams/$examBoard/$examId/$attemptId',
-                params: { examBoard, examId, attemptId },
-              } as any)
-            }
-          >
-            Ver as questões
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() =>
-              navigate({ to: '/exams/$examBoard/$examId', params: { examBoard, examId } } as any)
-            }
-          >
-            Voltar a informações da prova
-          </Button>
-        </Box>
-      </Box>
+      {/* Ações */}
+      <div className="flex flex-wrap gap-2 pt-2 pb-4">
+        <Button
+          variant="contained"
+          color="primary"
+          startIcon={<DocumentTextIcon className="w-5 h-5" />}
+          onClick={() =>
+            navigate({
+              to: '/exams/$examBoard/$examId/$attemptId',
+              params: { examBoard, examId, attemptId },
+            } as any)
+          }
+        >
+          Ver as questões
+        </Button>
+        <Button
+          variant="outlined"
+          startIcon={<ArrowLeftIcon className="w-5 h-5" />}
+          onClick={() =>
+            navigate({
+              to: '/exams/$examBoard/$examId',
+              params: { examBoard, examId },
+            } as any)
+          }
+        >
+          Voltar à prova
+        </Button>
+      </div>
     </div>
   )
 }

@@ -29,9 +29,15 @@ export type ExamBaseAttemptHistoryItem = {
   examDate: string
   examBoardName: string | null
   examBoardId: string | null
+  /** Logo URL of the exam board (banca). */
+  examBoardLogoUrl?: string | null
+  state?: string | null
+  city?: string | null
   minPassingGradeNonQuota: number
   percentage: number | null
   passed: boolean | null
+  /** Trend vs previous attempt (e.g. +5 or -2). When present, percentage change. */
+  trendPercentage?: number | null
 }
 
 /** Full feedback for a finished attempt (overall + per-subject stats and AI feedback). */

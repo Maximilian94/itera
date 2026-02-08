@@ -51,7 +51,7 @@ import {
   TrophyIcon,
   XCircleIcon,
 } from '@heroicons/react/24/solid'
-import { CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { AcademicCapIcon, CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
 import dayjs from 'dayjs'
 
@@ -252,6 +252,13 @@ function RouteComponent() {
         </div>
 
         <div className="flex gap-1">
+        <Card noElevation className="flex-1 p-0 flex items-center gap-0">
+            <div className="flex items-center gap-1">
+              <AcademicCapIcon className="w-5 h-5 text-blue-500" />
+              <span className="text-xs font-medium text-slate-500">{examBase?.examBoard?.name}</span>
+            </div>
+          </Card>
+
           <Card noElevation className="p-0 flex items-center gap-0">
             <div className="flex items-center gap-1">
               <BanknotesIcon className="w-5 h-5 text-green-500" />
