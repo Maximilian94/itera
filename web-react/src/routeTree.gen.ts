@@ -18,6 +18,8 @@ import { Route as AuthenticatedExamBoardsRouteImport } from './routes/_authentic
 import { Route as AuthenticatedExamBasesRouteImport } from './routes/_authenticated/exam-bases'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCheckoutSuccessRouteImport } from './routes/_authenticated/checkout-success'
+import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
 import { Route as AuthenticatedExamsIndexRouteImport } from './routes/_authenticated/exams/index'
 import { Route as AuthenticatedExamsExamBoardIndexRouteImport } from './routes/_authenticated/exams/$examBoard/index'
 import { Route as AuthenticatedExamsExamBoardExamIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/index'
@@ -68,6 +70,17 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCheckoutSuccessRoute =
+  AuthenticatedCheckoutSuccessRouteImport.update({
+    id: '/checkout-success',
+    path: '/checkout-success',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedExamsIndexRoute = AuthenticatedExamsIndexRouteImport.update({
   id: '/exams/',
   path: '/exams/',
@@ -102,6 +115,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/account': typeof AuthenticatedAccountRoute
+  '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
   '/exam-bases': typeof AuthenticatedExamBasesRoute
@@ -117,6 +132,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/account': typeof AuthenticatedAccountRoute
+  '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
   '/exam-bases': typeof AuthenticatedExamBasesRoute
@@ -134,6 +151,8 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
+  '/_authenticated/account': typeof AuthenticatedAccountRoute
+  '/_authenticated/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
   '/_authenticated/exam-bases': typeof AuthenticatedExamBasesRoute
@@ -151,6 +170,8 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/sign-up'
+    | '/account'
+    | '/checkout-success'
     | '/dashboard'
     | '/database'
     | '/exam-bases'
@@ -166,6 +187,8 @@ export interface FileRouteTypes {
     | '/'
     | '/sign-in'
     | '/sign-up'
+    | '/account'
+    | '/checkout-success'
     | '/dashboard'
     | '/database'
     | '/exam-bases'
@@ -182,6 +205,8 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/sign-in'
     | '/sign-up'
+    | '/_authenticated/account'
+    | '/_authenticated/checkout-success'
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
     | '/_authenticated/exam-bases'
@@ -266,6 +291,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/checkout-success': {
+      id: '/_authenticated/checkout-success'
+      path: '/checkout-success'
+      fullPath: '/checkout-success'
+      preLoaderRoute: typeof AuthenticatedCheckoutSuccessRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/account': {
+      id: '/_authenticated/account'
+      path: '/account'
+      fullPath: '/account'
+      preLoaderRoute: typeof AuthenticatedAccountRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/exams/': {
       id: '/_authenticated/exams/'
       path: '/exams'
@@ -305,6 +344,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
+  AuthenticatedCheckoutSuccessRoute: typeof AuthenticatedCheckoutSuccessRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
   AuthenticatedExamBasesRoute: typeof AuthenticatedExamBasesRoute
@@ -318,6 +359,8 @@ interface AuthenticatedRouteChildren {
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAccountRoute: AuthenticatedAccountRoute,
+  AuthenticatedCheckoutSuccessRoute: AuthenticatedCheckoutSuccessRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
   AuthenticatedExamBasesRoute: AuthenticatedExamBasesRoute,
