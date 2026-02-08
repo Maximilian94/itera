@@ -3,13 +3,15 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import React, { useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
-import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/Card'
 import {
+  BookmarkIcon,
   BookOpenIcon,
   ChartBarIcon,
   ChatBubbleLeftRightIcon,
   ClockIcon,
+  EyeIcon,
+  FlagIcon,
   PencilSquareIcon,
   PlayIcon,
   ScissorsIcon,
@@ -63,7 +65,7 @@ function RouteComponent() {
   function getQuestionButtonStyle(index: number) {
     const isCurrent = currentQuestionIndex === index
     const q = questions[index]
-    if (!q) return 'flex shrink-0 items-center justify-center w-full aspect-square rounded-lg border border-slate-300 bg-slate-100 text-slate-600 text-sm font-medium hover:bg-slate-200 cursor-pointer'
+    if (!q) return 'flex shrink-0 items-center justify-center w-full h-7 rounded border border-slate-200 bg-slate-100 text-slate-500 text-xs font-medium hover:bg-slate-200 cursor-pointer'
     const selectedId = answers[q.id] ?? null
     const isAnswered = selectedId != null && selectedId !== ''
     const correctAlt = q.correctAlternative
@@ -75,16 +77,16 @@ function RouteComponent() {
     const isWrong =
       isFinished && isAnswered && (correctId == null || selectedId !== correctId)
 
-    const base = 'flex shrink-0 items-center justify-center w-full aspect-square rounded-lg text-sm font-medium cursor-pointer transition-colors'
+    const base = 'flex shrink-0 items-center justify-center w-full h-7 rounded text-xs font-medium cursor-pointer transition-colors'
     if (isCurrent) {
-      return `${base} outline-2 outline-blue-400 outline-offset-1 ${
-        isAnswered ? 'bg-blue-500 text-white border border-blue-500' : 'bg-slate-700 text-white border border-slate-700'
+      return `${base} outline outline-2 outline-blue-400 outline-offset-0.5 ${
+        isAnswered ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
-    if (isCorrect) return `${base} bg-green-500 text-white border border-green-500 hover:bg-green-600`
-    if (isWrong) return `${base} bg-red-500 text-white border border-red-500 hover:bg-red-600`
-    if (isAnswered) return `${base} bg-blue-500 text-white border border-blue-500 hover:bg-blue-600`
-    return `${base} border border-slate-300 bg-white text-slate-700 hover:bg-slate-100`
+    if (isCorrect) return `${base} bg-green-100 text-green-700 border border-green-200 hover:bg-green-200`
+    if (isWrong) return `${base} bg-red-100 text-red-700 border border-red-200 hover:bg-red-200`
+    if (isAnswered) return `${base} bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200`
+    return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
   }
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
@@ -136,7 +138,6 @@ function RouteComponent() {
   if (isLoading) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Prova" />
         <Card noElevation className="p-4">
           <span className="text-sm text-slate-500">Carregando prova…</span>
         </Card>
@@ -147,7 +148,6 @@ function RouteComponent() {
   if (error || !data) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Prova" />
         <Card noElevation className="flex flex-col gap-3 p-4">
           <Alert severity="error">
             {error instanceof Error ? error.message : 'Tentativa não encontrada.'}
@@ -171,7 +171,6 @@ function RouteComponent() {
   if (questionCount === 0) {
     return (
       <div className="flex flex-col gap-4">
-        <PageHeader title="Prova" />
         <Card noElevation className="flex flex-col gap-3 p-4">
           <span className="text-sm text-slate-600">Esta prova não tem questões.</span>
           <Button
@@ -207,37 +206,62 @@ function RouteComponent() {
   ]
 
   return (
-    <div className="flex flex-col gap-4 h-full min-h-0 overflow-hidden">
-      <PageHeader title={`Prova · Questão ${currentQuestionIndex + 1} de ${questionCount}`} />
-
+    <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
         {/* Coluna principal: navegação + conteúdo da questão */}
         <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0 overflow-hidden">
-          <Card noElevation className="flex items-center justify-between p-3">
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrevQuestion}
-                disabled={currentQuestionIndex === 0}
-                aria-label="Questão anterior"
-                className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeftIcon className="w-5 h-5" />
-              </button>
-              <span className="text-sm font-medium text-slate-700 min-w-24 text-center">
-                {currentQuestionIndex + 1} / {questionCount}
-              </span>
-              <button
-                type="button"
-                onClick={handleNextQuestion}
-                disabled={currentQuestionIndex === questionCount - 1}
-                aria-label="Próxima questão"
-                className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRightIcon className="w-5 h-5" />
-              </button>
+          <div className="flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={handlePrevQuestion}
+              disabled={currentQuestionIndex === 0}
+              aria-label="Questão anterior"
+              className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+            >
+              <ChevronLeftIcon className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-slate-700 shrink-0">
+              Q {currentQuestionIndex + 1} / {questionCount}
+            </span>
+            <div className="flex items-center gap-1 shrink-0">
+              <Tooltip title="Salvar questão para revisar depois" enterDelay={300}>
+                <button
+                  type="button"
+                  aria-label="Salvar questão"
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                >
+                  <BookmarkIcon className="w-5 h-5" />
+                </button>
+              </Tooltip>
+              <Tooltip title="Reportar erro ou inconsistência nesta questão" enterDelay={300}>
+                <button
+                  type="button"
+                  aria-label="Reportar questão"
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                >
+                  <FlagIcon className="w-5 h-5" />
+                </button>
+              </Tooltip>
+              <Tooltip title="Acompanhar questão para ver comentários e atualizações" enterDelay={300}>
+                <button
+                  type="button"
+                  aria-label="Acompanhar questão"
+                  className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                >
+                  <EyeIcon className="w-5 h-5" />
+                </button>
+              </Tooltip>
             </div>
-          </Card>
+            <button
+              type="button"
+              onClick={handleNextQuestion}
+              disabled={currentQuestionIndex === questionCount - 1}
+              aria-label="Próxima questão"
+              className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 ml-auto"
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </button>
+          </div>
 
           <Card noElevation className="flex flex-col flex-1 min-h-0 p-0">
             {/* Tabs estilo consistente */}
@@ -478,7 +502,7 @@ function RouteComponent() {
 
         {/* Sidebar: finalizar + grid de questões */}
         <div className="flex flex-col gap-3 w-56 shrink-0 min-h-0 overflow-hidden">
-          <Card noElevation className="p-3 shrink-0">
+          <div className="shrink-0">
             {isFinished ? (
               <Button
                 variant="contained"
@@ -504,10 +528,10 @@ function RouteComponent() {
                 {finishAttempt.isPending ? 'Finalizando…' : 'Finalizar prova'}
               </Button>
             )}
-          </Card>
+          </div>
           <Card noElevation className="p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
             <span className="text-xs font-medium text-slate-500 block mb-2 shrink-0">Questões</span>
-            <div className="grid grid-cols-4 gap-1.5 overflow-auto min-h-0 content-start">
+            <div className="grid grid-cols-5 gap-1 overflow-auto min-h-0 content-start">
               {questions.map((_, index) => (
                 <button
                   key={questions[index].id}
