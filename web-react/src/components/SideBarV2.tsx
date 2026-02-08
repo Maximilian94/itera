@@ -1,3 +1,4 @@
+import { useClerkAuth } from '@/auth/clerk'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
 import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
@@ -9,7 +10,8 @@ import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutlin
 import { Link, useMatchRoute, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
 
 export const SideBarV2 = () => {
-    const pages: Array<{ label: string, href: string, icon: React.ElementType, activeIcon: React.ElementType }> = [
+    const { logout } = useClerkAuth()
+    const pages: Array<{ label: string, href: string, icon: React.ElementType, activeIcon: React.ElementType, fuzzy?: boolean }> = [
         {
             label: 'Home',
             href: DashboardRoute.to,
@@ -21,6 +23,7 @@ export const SideBarV2 = () => {
             href: ExamsRoute.to,
             icon: DocumentTextIconOutline,
             activeIcon: DocumentTextIcon,
+            fuzzy: true,
         },
         {
             label: 'History',
@@ -55,19 +58,31 @@ export const SideBarV2 = () => {
             >
                 <div className='flex flex-col items-center justify-center gap-2'>
                     {pages.map((page) => (
-                        <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} />
+                        <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} />
                     ))}
                 </div>
 
-                <NavItem href="/" icon={ArrowRightOnRectangleIcon} activeIcon={ArrowRightOnRectangleIcon} label="Logout" />
+                <button
+                    type="button"
+                    onClick={() => logout()}
+                    className="flex flex-col items-center justify-center gap-0.5 cursor-pointer border-0 p-0 text-left w-full min-w-0"
+                    aria-label="Sair"
+                >
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center transition-all ease-in-out duration-200 bg-inherit text-white hover:bg-white/10">
+                        <ArrowRightOnRectangleIcon className="size-5" strokeWidth={1.5} />
+                    </div>
+                    <div className="text-[10px] text-white flex items-center justify-center font-bold">
+                        <span className="text-wrap text-center">Logout</span>
+                    </div>
+                </button>
             </div>
         </div>
     )
 }
 
-const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label }: { href: string, icon: React.ElementType, activeIcon: React.ElementType, label: string }) => {
+const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label, fuzzy }: { href: string, icon: React.ElementType, activeIcon: React.ElementType, label: string, fuzzy?: boolean }) => {
     const matchRoute = useMatchRoute()
-    const isActive = matchRoute({ to: href as ToPathOption<RegisteredRouter> })
+    const isActive = matchRoute({ to: href as ToPathOption<RegisteredRouter>, fuzzy: fuzzy ?? false })
     return (
         <Link to={href}>
             <div className="cursor-pointer flex flex-col items-center justify-center gap-0.5">
