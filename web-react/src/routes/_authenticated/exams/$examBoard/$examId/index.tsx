@@ -45,6 +45,7 @@ import { ExamBaseAttemptsList } from '@/components/ExamBaseAttemptsList'
 import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/Card'
 import {
+  ArrowTrendingDownIcon,
   ArrowTrendingUpIcon,
   BanknotesIcon,
   CheckCircleIcon,
@@ -192,6 +193,27 @@ function RouteComponent() {
     setExamBase(examBase ?? null)
   }, [examBases, examBaseId])
 
+  const finishedAttempts = attempts.filter((a) => a.finishedAt != null && a.percentage != null)
+  const lastScore = finishedAttempts[0]?.percentage ?? null
+  const previousScore = finishedAttempts[1]?.percentage ?? null
+  const trendDiff =
+    lastScore != null && previousScore != null ? lastScore - previousScore : null
+  const hasTrend = finishedAttempts.length >= 2 && trendDiff != null
+  const minPassingDisplay =
+    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+      ? `${examBase.minPassingGradeNonQuota}%`
+      : '—'
+  const minPassingNum =
+    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+      ? Number(examBase.minPassingGradeNonQuota)
+      : null
+  const lastScoreColorClass =
+    lastScore == null || minPassingNum == null
+      ? 'text-slate-700'
+      : lastScore >= minPassingNum
+        ? 'text-green-500'
+        : 'text-red-500'
+
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="Exame / ExameX" />
@@ -212,41 +234,68 @@ function RouteComponent() {
 
           <Card noElevation className="select-none">
             <div className="flex flex-col gap-0">
-              <Tooltip title="Menor nota entre os aprovados da ampla concorrência [não cotista]">
-                <span className="text-xs text-slate-900 hover:bg-slate-200 cursor-pointer">Nota de corte: 60%</span>
-              </Tooltip>
+              <span className="text-xs text-slate-900">Última nota</span>
 
               <div className="flex items-center space-between gap-2">
-                <span className="text-3xl text-green-500 font-medium">80%</span>
+                <span className={`text-3xl font-medium ${lastScoreColorClass}`}>
+                  {lastScore != null ? `${lastScore.toFixed(1)}%` : '—'}
+                </span>
 
-                <Tooltip title="Sua nota melhorou 5% em relação à última tentativa">
-                  <div className="flex items-center gap-1 bg-green-100 rounded-md p-1 h-min w-min hover:bg-green-200 cursor-pointer">
-                    <ArrowTrendingUpIcon className="w-3 h-3 text-green-500" />
-
-
-                    <span className="text-xs text-green-500 font-bold">5%</span>
-
-                  </div>
-                </Tooltip>
+                {hasTrend && (
+                  <Tooltip
+                    title={
+                      trendDiff >= 0
+                        ? `Sua nota melhorou ${trendDiff.toFixed(1)}% em relação à tentativa anterior`
+                        : `Sua nota caiu ${Math.abs(trendDiff).toFixed(1)}% em relação à tentativa anterior`
+                    }
+                  >
+                    <div
+                      className={`flex items-center gap-1 rounded-md p-1 h-min w-min cursor-pointer ${
+                        trendDiff >= 0
+                          ? 'bg-green-100 hover:bg-green-200'
+                          : 'bg-red-100 hover:bg-red-200'
+                      }`}
+                    >
+                      {trendDiff >= 0 ? (
+                        <ArrowTrendingUpIcon className="w-3 h-3 text-green-500" />
+                      ) : (
+                        <ArrowTrendingDownIcon className="w-3 h-3 text-red-500" />
+                      )}
+                      <span
+                        className={`text-xs font-bold ${
+                          trendDiff >= 0 ? 'text-green-500' : 'text-red-500'
+                        }`}
+                      >
+                        {trendDiff >= 0 ? '+' : ''}{trendDiff.toFixed(1)}%
+                      </span>
+                    </div>
+                  </Tooltip>
+                )}
               </div>
 
-              <span className="text-xs text-slate-500">Última nota</span>
+              <Tooltip title="Menor nota entre os aprovados da ampla concorrência [não cotista]">
+                <span className="text-xs text-slate-500 hover:bg-slate-200 cursor-pointer">
+                  Nota de corte: {minPassingDisplay}
+                </span>
+              </Tooltip>
             </div>
           </Card>
 
-          <Card noElevation>
-            <div className="flex flex-col gap-0 select-none">
+          <Card noElevation className="select-none bg-red-50 border-red-200">
+            <div className="flex flex-col gap-0">
               <span className="text-xs text-slate-900">Concorrência</span>
 
-              <Tooltip title="400 candidatos inscritos para 10 vagas">
-                <span className="text-3xl text-slate-700 font-medium hover:bg-slate-200 cursor-pointer">1/40</span>
+              <Tooltip title="Preencher: ex.: 400 candidatos inscritos para 10 vagas">
+                <span className="text-3xl text-slate-700 font-medium hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
+                  1/40
+                </span>
               </Tooltip>
 
-
-              <Tooltip title="Em média a concorrência é de 1/10">
-                <span className="text-xs text-slate-500 hover:bg-slate-200 cursor-pointer">Acima da média</span>
+              <Tooltip title="Preencher: ex.: Em média a concorrência é de 1/10">
+                <span className="text-xs text-slate-500 hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
+                  Acima da média
+                </span>
               </Tooltip>
-
             </div>
           </Card>
         </div>
