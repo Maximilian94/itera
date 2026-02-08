@@ -1,6 +1,6 @@
 import { Alert, Button, Tooltip } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { Card } from '@/components/Card'
@@ -55,12 +55,29 @@ function RouteComponent() {
   const [eliminatedByQuestion, setEliminatedByQuestion] = useState<
     Record<string, Set<string>>
   >({})
+  const selectedExplanationRef = useRef<HTMLDivElement>(null)
 
   const questions = data?.questions ?? []
   const answers = data?.answers ?? {}
   const isFinished = Boolean(data?.attempt.finishedAt)
   const currentQuestion = questions[currentQuestionIndex]
   const questionCount = questions.length
+
+  useEffect(() => {
+    if (value === 1 && selectedExplanationRef.current) {
+      const timer = setTimeout(() => {
+        selectedExplanationRef.current?.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start',
+        })
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [value])
+
+  useEffect(() => {
+    setValue(0)
+  }, [currentQuestionIndex])
 
   function getQuestionButtonStyle(index: number) {
     const isCurrent = currentQuestionIndex === index
@@ -448,7 +465,11 @@ function RouteComponent() {
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
                           return (
-                            <div key={alt.id} className={cardStyles[variant]}>
+                            <div
+                              key={alt.id}
+                              ref={wasSelected ? selectedExplanationRef : undefined}
+                              className={cardStyles[variant]}
+                            >
                               <div className="p-4">
                                 <div className="flex items-center gap-2 flex-wrap mb-2">
                                   <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>
