@@ -9,5 +9,6 @@ import { ExamBaseAttemptService } from './exam-base-attempt.service';
     ExamBaseAttemptHistoryController,
   ],
   providers: [ExamBaseAttemptService],
+  exports: [ExamBaseAttemptService],
 })
 export class ExamBaseAttemptModule {}

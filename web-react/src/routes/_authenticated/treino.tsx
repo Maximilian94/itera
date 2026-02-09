@@ -1,12 +1,27 @@
-import { Outlet, createFileRoute } from '@tanstack/react-router'
+import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
 import { AcademicCapIcon } from '@heroicons/react/24/outline'
 import { TreinoStepper } from './treino/TreinoStepper'
+import { TREINO_STAGES } from './treino/stages.config'
+import { useTrainingQuery } from '@/features/training/queries/training.queries'
 
 export const Route = createFileRoute('/_authenticated/treino')({
   component: TreinoLayout,
 })
 
+function deriveTrainingIdFromPath(pathname: string): string | undefined {
+  const after = pathname.replace(/^\/treino\/?/, '')
+  const first = after.split('/')[0]
+  if (!first) return undefined
+  const isStageSlug = TREINO_STAGES.some((s) => s.slug === first)
+  return isStageSlug ? undefined : first
+}
+
 function TreinoLayout() {
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const trainingId = deriveTrainingIdFromPath(pathname)
+  const { data: training } = useTrainingQuery(trainingId)
+  const currentStage = training?.currentStage
+
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 p-1">
       {/* WIP Banner */}
@@ -23,7 +38,7 @@ function TreinoLayout() {
       </div>
 
       <div className="shrink-0">
-        <TreinoStepper />
+        <TreinoStepper trainingId={trainingId} currentStage={currentStage} />
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto pb-4">

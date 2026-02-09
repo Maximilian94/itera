@@ -23,11 +23,12 @@ model User {
   stripeCustomerId String?   @unique
   createdAt        DateTime  @default(now())
 
-  attempts         Attempt[]
-  exams            Exam[]
-  examBaseAttempts ExamBaseAttempt[]
-  purchases        Purchase[]
-  refundRequests   RefundRequest[]
+  attempts          Attempt[]
+  exams             Exam[]
+  examBaseAttempts  ExamBaseAttempt[]
+  purchases         Purchase[]
+  refundRequests    RefundRequest[]
+  trainingSessions  TrainingSession[]
 
   @@map("users")
 }
@@ -169,8 +170,9 @@ model ExamBase {
   examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
 
-  questions ExamBaseQuestion[]
-  attempts  ExamBaseAttempt[]
+  questions         ExamBaseQuestion[]
+  attempts          ExamBaseAttempt[]
+  trainingSessions  TrainingSession[]
 
   @@index([examBoardId])
   @@map("exam_bases")
@@ -203,8 +205,9 @@ model ExamBaseQuestion {
   // habilidades cobradas (string por enquanto)
   skills String[] @default([])
 
-  alternatives   ExamBaseQuestionAlternative[]
-  attemptAnswers ExamBaseAttemptAnswer[]
+  alternatives          ExamBaseQuestionAlternative[]
+  attemptAnswers        ExamBaseAttemptAnswer[]
+  trainingRetryAnswers  TrainingRetryAnswer[]
 
   @@index([examBaseId])
   @@index([examBaseId, subject])
@@ -226,7 +229,8 @@ model ExamBaseQuestionAlternative {
   text        String
   explanation String
 
-  selectedInAnswers ExamBaseAttemptAnswer[]
+  selectedInAnswers           ExamBaseAttemptAnswer[]
+  selectedInTrainingRetryAnswers TrainingRetryAnswer[]
 
   @@unique([examBaseQuestionId, key])
   @@index([examBaseQuestionId])
@@ -246,7 +250,9 @@ model ExamBaseAttempt {
   userId String @db.Uuid
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  answers ExamBaseAttemptAnswer[]
+  answers          ExamBaseAttemptAnswer[]
+  trainingSession  TrainingSession?
+  subjectFeedbacks SubjectFeedback[]
 
   @@index([examBaseId])
   @@index([userId])
@@ -267,6 +273,123 @@ model ExamBaseAttemptAnswer {
   @@index([examBaseAttemptId])
   @@index([examBaseQuestionId])
   @@map("exam_base_attempt_answers")
+}
+
+// ---- Training (Treino) ----
+
+enum TrainingStage {
+  EXAM
+  DIAGNOSIS
+  STUDY
+  RETRY
+  FINAL
+}
+
+/// One training cycle: exam -> diagnosis -> study -> retry -> final. Tied to one ExamBaseAttempt.
+model TrainingSession {
+  id                    String         @id @default(uuid()) @db.Uuid
+  currentStage          TrainingStage  @default(EXAM)
+  finalScorePercentage  Decimal?       @db.Decimal(5, 2)
+  finalFeedback         String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
+
+  userId             String   @db.Uuid
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  examBaseAttemptId  String   @unique @db.Uuid
+  examBaseAttempt    ExamBaseAttempt @relation(fields: [examBaseAttemptId], references: [id], onDelete: Cascade)
+  examBaseId         String   @db.Uuid
+  examBase           ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  retryAnswers       TrainingRetryAnswer[]
+  trainingStudyItems TrainingStudyItem[]
+
+  @@index([userId])
+  @@index([examBaseId])
+  @@map("training_sessions")
+}
+
+model TrainingRetryAnswer {
+  trainingSessionId     String   @db.Uuid
+  trainingSession       TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  examBaseQuestionId    String   @db.Uuid
+  examBaseQuestion      ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
+  selectedAlternativeId String   @db.Uuid
+  selectedAlternative   ExamBaseQuestionAlternative @relation(fields: [selectedAlternativeId], references: [id], onDelete: Restrict)
+
+  @@id([trainingSessionId, examBaseQuestionId])
+  @@index([trainingSessionId])
+  @@index([examBaseQuestionId])
+  @@map("training_retry_answers")
+}
+
+/// One row per (attempt, subject): AI-generated evaluation + recommendations (study recommendation).
+model SubjectFeedback {
+  id               String   @id @default(uuid()) @db.Uuid
+  examBaseAttemptId String   @db.Uuid
+  examBaseAttempt   ExamBaseAttempt @relation(fields: [examBaseAttemptId], references: [id], onDelete: Cascade)
+  subject          String
+  evaluation       String   @db.Text
+  recommendations  String   @db.Text
+  createdAt        DateTime @default(now())
+
+  trainingStudyItems TrainingStudyItem[]
+
+  @@unique([examBaseAttemptId, subject])
+  @@index([examBaseAttemptId])
+  @@map("subject_feedbacks")
+}
+
+/// One per SubjectFeedback per TrainingSession: study item with explanation + 5 exercises (AI-generated).
+model TrainingStudyItem {
+  id                 String    @id @default(uuid()) @db.Uuid
+  trainingSessionId  String    @db.Uuid
+  trainingSession    TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  subjectFeedbackId  String    @db.Uuid
+  subjectFeedback    SubjectFeedback @relation(fields: [subjectFeedbackId], references: [id], onDelete: Cascade)
+  subject            String
+  topic              String?
+  explanation        String?   @db.Text
+  completedAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  exercises StudyExercise[]
+
+  @@unique([trainingSessionId, subjectFeedbackId])
+  @@index([trainingSessionId])
+  @@index([subjectFeedbackId])
+  @@map("training_study_items")
+}
+
+/// One of 5 exercises per TrainingStudyItem (AI-generated).
+model StudyExercise {
+  id                    String   @id @default(uuid()) @db.Uuid
+  trainingStudyItemId   String   @db.Uuid
+  trainingStudyItem     TrainingStudyItem @relation(fields: [trainingStudyItemId], references: [id], onDelete: Cascade)
+  order                 Int
+  statement             String   @db.Text
+  correctAlternativeKey String
+  createdAt             DateTime @default(now())
+
+  alternatives StudyExerciseAlternative[]
+
+  @@index([trainingStudyItemId])
+  @@map("study_exercises")
+}
+
+model StudyExerciseAlternative {
+  id              String        @id @default(uuid()) @db.Uuid
+  studyExerciseId String        @db.Uuid
+  studyExercise   StudyExercise @relation(fields: [studyExerciseId], references: [id], onDelete: Cascade)
+  key             String
+  text            String        @db.Text
+  isCorrect       Boolean
+  createdAt       DateTime      @default(now())
+
+  @@unique([studyExerciseId, key])
+  @@index([studyExerciseId])
+  @@map("study_exercise_alternatives")
 }
 
 // ---- Billing / Payments ----

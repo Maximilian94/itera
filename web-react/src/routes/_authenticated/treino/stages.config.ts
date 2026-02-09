@@ -79,7 +79,36 @@ export function getStageById(id: number) {
   return TREINO_STAGES.find((s) => s.id === id)
 }
 
-/** Path segment for each stage (no leading slash) */
-export function getStagePath(slug: TreinoStageSlug) {
+/** Path for each stage. When trainingId is provided, use /treino/:trainingId/:slug */
+export function getStagePath(slug: TreinoStageSlug, trainingId?: string) {
+  if (trainingId) return `/treino/${trainingId}/${slug}`
   return `/treino/${slug}`
+}
+
+/** Order of stages from the API (TrainingStage). Index = allowed up to that stage. */
+export const TRAINING_STAGE_ORDER = [
+  'EXAM',
+  'DIAGNOSIS',
+  'STUDY',
+  'RETRY',
+  'FINAL',
+] as const
+
+export type TrainingStageFromOrder = (typeof TRAINING_STAGE_ORDER)[number]
+
+/** Index of the current stage (0 = EXAM, 4 = FINAL). Stages with index <= this are allowed. */
+export function getAllowedStageIndex(
+  currentStage: TrainingStageFromOrder,
+): number {
+  const idx = TRAINING_STAGE_ORDER.indexOf(currentStage)
+  return idx >= 0 ? idx : 0
+}
+
+/** Slug for each API stage (for redirects and links). */
+export const TRAINING_STAGE_TO_SLUG: Record<TrainingStageFromOrder, TreinoStageSlug> = {
+  EXAM: 'prova',
+  DIAGNOSIS: 'diagnostico',
+  STUDY: 'estudo',
+  RETRY: 'retentativa',
+  FINAL: 'final',
 }

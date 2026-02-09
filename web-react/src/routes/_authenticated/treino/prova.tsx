@@ -1,8 +1,11 @@
 import { Card } from '@/components/Card'
-import { Button } from '@mui/material'
+import { Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ClipboardDocumentListIcon, ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
-import { getStageById, TREINO_STAGES } from './stages.config'
+import { useState } from 'react'
+import { ClipboardDocumentListIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
+import { getStageById, TREINO_STAGES, getStagePath } from './stages.config'
+import { useExamBaseQueries } from '@/features/examBase/queries/examBase.queries'
+import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
 
 export const Route = createFileRoute('/_authenticated/treino/prova')({
   component: ProvaPage,
@@ -10,7 +13,19 @@ export const Route = createFileRoute('/_authenticated/treino/prova')({
 
 function ProvaPage() {
   const navigate = useNavigate()
+  const [selectedExamBaseId, setSelectedExamBaseId] = useState<string>('')
+  const { data: examBases = [], isLoading: loadingBases } = useExamBaseQueries()
+  const createMutation = useCreateTrainingMutation()
   const stage = getStageById(1)!
+
+  const handleStart = () => {
+    if (!selectedExamBaseId) return
+    createMutation.mutate(selectedExamBaseId, {
+      onSuccess: (res) => {
+        navigate({ to: getStagePath('prova', res.trainingId) })
+      },
+    })
+  }
 
   return (
     <>
@@ -29,11 +44,38 @@ function ProvaPage() {
 
       <Card noElevation className="p-6">
         <p className="text-slate-600 mb-4">
-          Aqui será exibida a prova do simulado, no mesmo formato que você já conhece. Questão a questão, com tempo e envio ao final.
+          Escolha o simulado com o qual deseja fazer o treino. Ao iniciar, uma nova sessão será criada e você fará a prova no mesmo formato que já conhece.
         </p>
-        <p className="text-sm text-slate-500">
-          (Conteúdo placeholder — etapa Prova)
-        </p>
+        <FormControl size="small" className="min-w-[260px]" fullWidth>
+          <InputLabel id="treino-prova-exam-base-label">Simulado</InputLabel>
+          <Select
+            labelId="treino-prova-exam-base-label"
+            label="Simulado"
+            value={selectedExamBaseId}
+            onChange={(e) => setSelectedExamBaseId(e.target.value)}
+            disabled={loadingBases}
+          >
+            <MenuItem value="">
+              <em>Selecione um simulado</em>
+            </MenuItem>
+            {examBases.map((eb) => (
+              <MenuItem key={eb.id} value={eb.id}>
+                {eb.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
+        <div className="mt-4">
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<ClipboardDocumentListIcon className="w-5 h-5" />}
+            onClick={handleStart}
+            disabled={!selectedExamBaseId || createMutation.isPending}
+          >
+            {createMutation.isPending ? 'Criando sessão...' : 'Iniciar prova'}
+          </Button>
+        </div>
       </Card>
 
       <div className="flex flex-wrap gap-3 justify-between">
@@ -44,14 +86,6 @@ function ProvaPage() {
           to="/treino"
         >
           Voltar ao início
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          endIcon={<ArrowRightIcon className="w-5 h-5" />}
-          onClick={() => navigate({ to: '/treino/diagnostico' })}
-        >
-          Próxima: Diagnóstico
         </Button>
       </div>
     </>

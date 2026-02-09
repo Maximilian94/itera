@@ -377,10 +377,17 @@ export class ExamBaseAttemptService {
           where: { id: attemptId },
           data: { subjectFeedback: subjectFeedback as object },
         });
+        await this.upsertSubjectFeedbackTable(attemptId, subjectFeedback);
       } catch (err) {
         console.error('AI subject feedback generation failed:', err);
       }
     }
+
+    // If this attempt belongs to a training session, advance to DIAGNOSIS
+    await this.prisma.trainingSession.updateMany({
+      where: { examBaseAttemptId: attemptId },
+      data: { currentStage: 'DIAGNOSIS' },
+    });
 
     const updated = await this.prisma.examBaseAttempt.findUnique({
       where: { id: attemptId },
@@ -521,8 +528,33 @@ export class ExamBaseAttemptService {
       where: { id: attemptId },
       data: { subjectFeedback: subjectFeedback as object },
     });
+    await this.upsertSubjectFeedbackTable(attemptId, subjectFeedback);
 
     return { generated: true, subjectFeedback };
+  }
+
+  /** Persist subject feedback to SubjectFeedback table (one row per subject). */
+  private async upsertSubjectFeedbackTable(
+    attemptId: string,
+    subjectFeedback: Record<string, SubjectFeedbackFromAI>,
+  ): Promise<void> {
+    for (const [subject, fb] of Object.entries(subjectFeedback)) {
+      await this.prisma.subjectFeedback.upsert({
+        where: {
+          examBaseAttemptId_subject: { examBaseAttemptId: attemptId, subject },
+        },
+        create: {
+          examBaseAttemptId: attemptId,
+          subject,
+          evaluation: fb.evaluation,
+          recommendations: fb.recommendations,
+        },
+        update: {
+          evaluation: fb.evaluation,
+          recommendations: fb.recommendations,
+        },
+      });
+    }
   }
 
   /**
@@ -573,11 +605,22 @@ export class ExamBaseAttemptService {
     const overallPercentage = total > 0 ? (totalCorrect / total) * 100 : 0;
     const passed = overallPercentage >= minPassing;
 
-    const subjectFeedback =
-      (attempt.subjectFeedback as Record<
-        string,
-        { evaluation: string; recommendations: string }
-      >) ?? {};
+    const subjectFeedbackRows = await this.prisma.subjectFeedback.findMany({
+      where: { examBaseAttemptId: attemptId },
+      select: { subject: true, evaluation: true, recommendations: true },
+    });
+    const subjectFeedback: Record<string, { evaluation: string; recommendations: string }> =
+      subjectFeedbackRows.length > 0
+        ? Object.fromEntries(
+            subjectFeedbackRows.map((row) => [
+              row.subject,
+              { evaluation: row.evaluation, recommendations: row.recommendations },
+            ]),
+          )
+        : (attempt.subjectFeedback as Record<
+            string,
+            { evaluation: string; recommendations: string }
+          >) ?? {};
 
     return {
       examTitle: examBase.name,
