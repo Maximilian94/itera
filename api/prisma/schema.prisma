@@ -14,14 +14,20 @@ enum GovernmentScope {
 }
 
 model User {
-  id          String    @id @default(uuid()) @db.Uuid
-  email       String    @unique
-  clerkUserId String?   @unique
-  createdAt   DateTime  @default(now())
+  id               String    @id @default(uuid()) @db.Uuid
+  email            String    @unique
+  clerkUserId      String?   @unique
+  /// Phone number; required for checkout. Used to contact the user after a refund (e.g. for feedback).
+  phone            String?
+  /// Stripe Customer ID; set when the user completes checkout or when we create a customer for them.
+  stripeCustomerId String?   @unique
+  createdAt        DateTime  @default(now())
 
   attempts         Attempt[]
   exams            Exam[]
   examBaseAttempts ExamBaseAttempt[]
+  purchases        Purchase[]
+  refundRequests   RefundRequest[]
 
   @@map("users")
 }
@@ -261,4 +267,62 @@ model ExamBaseAttemptAnswer {
   @@index([examBaseAttemptId])
   @@index([examBaseQuestionId])
   @@map("exam_base_attempt_answers")
+}
+
+// ---- Billing / Payments ----
+
+/// One-time purchase granting platform access (e.g. 1 year). One purchase = one access period.
+/// Used to determine if the user has active access (accessExpiresAt > now and refundedAt is null).
+/// stripeChargeId is required to create a refund (e.g. for the 7-day right of withdrawal).
+model Purchase {
+  id                   String    @id @default(uuid()) @db.Uuid
+  userId               String    @db.Uuid
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeSessionId      String?
+  stripePaymentIntentId String?
+  stripeChargeId       String?
+  purchasedAt          DateTime  @default(now())
+  accessExpiresAt      DateTime
+  refundedAt          DateTime?
+
+  refundRequests RefundRequest[]
+
+  @@index([userId])
+  @@index([accessExpiresAt])
+  @@map("purchases")
+}
+
+/// Webhook events from payment gateways (e.g. Stripe). Used for idempotency: we store each
+/// event by (gateway, externalEventId) and skip processing if already seen, so retries do not
+/// create duplicate purchases or double-apply refunds.
+model PaymentEvent {
+  id               String   @id @default(uuid()) @db.Uuid
+  gateway          String
+  externalEventId  String
+  type             String
+  processedAt      DateTime @default(now())
+  payload          Json?
+
+  @@unique([gateway, externalEventId])
+  @@index([gateway])
+  @@map("payment_events")
+}
+
+/// Record of a user requesting a refund (e.g. 7-day right of withdrawal / CDC). Tied to a
+/// Purchase; once status is completed we do not allow another refund for the same purchase.
+/// Keeps an audit trail and supports “already requested refund” checks in the API.
+model RefundRequest {
+  id           String    @id @default(uuid()) @db.Uuid
+  userId       String    @db.Uuid
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purchaseId   String    @db.Uuid
+  purchase     Purchase  @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  requestedAt  DateTime  @default(now())
+  reason       String?
+  stripeRefundId String?
+  status       String    // pending | completed | failed
+
+  @@index([userId])
+  @@index([purchaseId])
+  @@map("refund_requests")
 }

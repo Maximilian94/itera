@@ -23,17 +23,9 @@ const toHex = (color: string) => formatHex(converter('rgb')(color))
 
 const darkTheme = createTheme({
   palette: {
-    mode: 'dark',
     primary: {
-      main: toHex(colors.blue[500]) ?? '',
-    },
-    // secondary: {
-    //   main: '#000000',
-    // },
-    background: {
-      default: toHex(colors.gray[900]) ?? '',
-      paper: toHex(colors.gray[800]) ?? '',
-    },
+      main: toHex(colors.blue[600]) ?? '',
+    }
   },
 })
 
