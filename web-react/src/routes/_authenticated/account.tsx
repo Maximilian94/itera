@@ -1,12 +1,14 @@
 import { useUser } from '@clerk/clerk-react'
 import { Card } from '@/components/Card'
+import { authService } from '@/features/auth/services/auth.service'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { stripeService } from '@/features/stripe/services/stripe.service'
 import type { AccessState } from '@/features/stripe/domain/stripe.types'
 import { ApiError } from '@/lib/api'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useState } from 'react'
-import { Button } from '@mui/material'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState, useEffect } from 'react'
+import { Button, TextField } from '@mui/material'
 import {
   CreditCardIcon,
   UserCircleIcon,
@@ -43,10 +45,37 @@ function formatDateBR(iso: string): string {
 
 function AccountPage() {
   const { user } = useUser()
+  const queryClient = useQueryClient()
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+  const profile = profileData?.user ?? null
+  const [phoneValue, setPhoneValue] = useState('')
+  const [phoneSaving, setPhoneSaving] = useState(false)
+  const [phoneMessage, setPhoneMessage] = useState<'success' | 'error' | null>(null)
+  useEffect(() => {
+    setPhoneValue(profile?.phone ?? '')
+  }, [profile?.phone])
+
   const { access, isLoading: accessLoading, isMock } = useAccessState()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [cancellingTrial, setCancellingTrial] = useState(false)
+
+  const handleSavePhone = async () => {
+    setPhoneMessage(null)
+    setPhoneSaving(true)
+    try {
+      await authService.updatePhone(phoneValue.trim() || null)
+      queryClient.invalidateQueries({ queryKey: ['auth', 'profile'] })
+      setPhoneMessage('success')
+    } catch {
+      setPhoneMessage('error')
+    } finally {
+      setPhoneSaving(false)
+    }
+  }
 
   const displayName =
     user?.fullName?.trim() ||
@@ -115,7 +144,42 @@ function AccountPage() {
             <dd className="text-slate-900">{displayName}</dd>
             <dt className="text-slate-500 font-medium">Email</dt>
             <dd className="text-slate-900">{displayEmail}</dd>
+            <dt className="text-slate-500 font-medium">Telefone</dt>
+            <dd className="text-slate-900">
+              {profileLoading ? (
+                <span className="text-slate-400">Carregando…</span>
+              ) : (
+                <div className="flex flex-wrap items-center gap-2">
+                  <TextField
+                    size="small"
+                    placeholder="Ex.: (11) 99999-9999"
+                    value={phoneValue}
+                    onChange={(e) => setPhoneValue(e.target.value)}
+                    disabled={phoneSaving}
+                    sx={{ minWidth: 200 }}
+                    inputProps={{ 'aria-label': 'Telefone' }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={phoneSaving}
+                    onClick={handleSavePhone}
+                  >
+                    {phoneSaving ? 'Salvando…' : 'Salvar'}
+                  </Button>
+                  {phoneMessage === 'success' && (
+                    <span className="text-xs text-green-600">Salvo.</span>
+                  )}
+                  {phoneMessage === 'error' && (
+                    <span className="text-xs text-red-600">Erro ao salvar.</span>
+                  )}
+                </div>
+              )}
+            </dd>
           </dl>
+          <p className="text-xs text-slate-500 mt-3">
+            O telefone é obrigatório para comprar acesso. Também usamos para entrar em contato em caso de reembolso (ex.: pedido de feedback).
+          </p>
         </Card>
       </section>
 
@@ -158,7 +222,7 @@ function AccountPage() {
         )}
       </section>
 
-      {/* Espaço para outras seções no futuro (telefone, reembolso, etc.) */}
+      {/* Espaço para outras seções no futuro (reembolso, etc.) */}
     </div>
   )
 }

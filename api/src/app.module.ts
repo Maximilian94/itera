@@ -15,6 +15,7 @@ import { ExamBaseModule } from './examBase/exam-base.module';
 import { ExamBaseQuestionModule } from './examBaseQuestion/exam-base-question.module';
 import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.module';
 import { StorageModule } from './storage/storage.module';
+import { StripeModule } from './stripe/stripe.module';
 
 @Module({
   imports: [
@@ -32,6 +33,7 @@ import { StorageModule } from './storage/storage.module';
     ExamBaseQuestionModule,
     ExamBaseAttemptModule,
     StorageModule,
+    StripeModule,
   ],
   controllers: [AppController],
   providers: [

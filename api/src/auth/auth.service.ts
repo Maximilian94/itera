@@ -37,4 +37,20 @@ export class AuthService {
     });
     return created;
   }
+
+  async getProfile(userId: string): Promise<{ id: string; email: string; phone: string | null }> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, phone: true },
+    });
+    if (!user) throw new Error('User not found');
+    return user;
+  }
+
+  async updatePhone(userId: string, phone: string | null): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { phone: phone?.trim() || null },
+    });
+  }
 }
