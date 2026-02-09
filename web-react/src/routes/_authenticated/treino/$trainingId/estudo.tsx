@@ -65,7 +65,7 @@ function EstudoPage() {
 
   return (
     <>
-      <div
+      {/* <div
         className={`rounded-lg border-l-4 ${stage.borderColor} ${stage.color} bg-opacity-20 p-4`}
       >
         <div className="flex items-center gap-3">
@@ -82,7 +82,7 @@ function EstudoPage() {
             <p className="text-sm text-slate-600 mt-0.5">{stage.subtitle}</p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <p className="text-slate-600 text-sm">
         Estude cada assunto recomendado pelo diagnóstico: leia a mini-explicação

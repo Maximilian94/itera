@@ -36,7 +36,9 @@ import { Route as AuthenticatedTreinoTrainingIdProvaRouteImport } from './routes
 import { Route as AuthenticatedTreinoTrainingIdFinalRouteImport } from './routes/_authenticated/treino/$trainingId/final'
 import { Route as AuthenticatedTreinoTrainingIdEstudoRouteImport } from './routes/_authenticated/treino/$trainingId/estudo'
 import { Route as AuthenticatedTreinoTrainingIdDiagnosticoRouteImport } from './routes/_authenticated/treino/$trainingId/diagnostico'
+import { Route as AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa/index'
 import { Route as AuthenticatedExamsExamBoardExamIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/index'
+import { Route as AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa/prova'
 import { Route as AuthenticatedExamsExamBoardExamIdAttemptIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/$attemptId/index'
 import { Route as AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/$attemptId/feedback'
 
@@ -189,11 +191,23 @@ const AuthenticatedTreinoTrainingIdDiagnosticoRoute =
     path: '/diagnostico',
     getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
   } as any)
+const AuthenticatedTreinoTrainingIdRetentativaIndexRoute =
+  AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedTreinoTrainingIdRetentativaRoute,
+  } as any)
 const AuthenticatedExamsExamBoardExamIdIndexRoute =
   AuthenticatedExamsExamBoardExamIdIndexRouteImport.update({
     id: '/exams/$examBoard/$examId/',
     path: '/exams/$examBoard/$examId/',
     getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTreinoTrainingIdRetentativaProvaRoute =
+  AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport.update({
+    id: '/prova',
+    path: '/prova',
+    getParentRoute: () => AuthenticatedTreinoTrainingIdRetentativaRoute,
   } as any)
 const AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute =
   AuthenticatedExamsExamBoardExamIdAttemptIdIndexRouteImport.update({
@@ -232,10 +246,12 @@ export interface FileRoutesByFullPath {
   '/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoRoute
   '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
-  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRoute
+  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
   '/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
   '/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
+  '/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/exams/$examBoard/$examId/': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
+  '/treino/$trainingId/retentativa/': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/exams/$examBoard/$examId/$attemptId/': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -261,10 +277,11 @@ export interface FileRoutesByTo {
   '/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoRoute
   '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
-  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRoute
   '/exams/$examBoard': typeof AuthenticatedExamsExamBoardIndexRoute
   '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdIndexRoute
+  '/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
+  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/exams/$examBoard/$examId/$attemptId': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -294,10 +311,12 @@ export interface FileRoutesById {
   '/_authenticated/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoRoute
   '/_authenticated/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/_authenticated/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
-  '/_authenticated/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRoute
+  '/_authenticated/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
   '/_authenticated/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
   '/_authenticated/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
+  '/_authenticated/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/_authenticated/exams/$examBoard/$examId/': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
+  '/_authenticated/treino/$trainingId/retentativa/': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/_authenticated/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/_authenticated/exams/$examBoard/$examId/$attemptId/': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -330,7 +349,9 @@ export interface FileRouteTypes {
     | '/treino/$trainingId/retentativa'
     | '/exams/$examBoard/'
     | '/treino/$trainingId/'
+    | '/treino/$trainingId/retentativa/prova'
     | '/exams/$examBoard/$examId/'
+    | '/treino/$trainingId/retentativa/'
     | '/exams/$examBoard/$examId/$attemptId/feedback'
     | '/exams/$examBoard/$examId/$attemptId/'
   fileRoutesByTo: FileRoutesByTo
@@ -356,10 +377,11 @@ export interface FileRouteTypes {
     | '/treino/$trainingId/estudo'
     | '/treino/$trainingId/final'
     | '/treino/$trainingId/prova'
-    | '/treino/$trainingId/retentativa'
     | '/exams/$examBoard'
     | '/treino/$trainingId'
+    | '/treino/$trainingId/retentativa/prova'
     | '/exams/$examBoard/$examId'
+    | '/treino/$trainingId/retentativa'
     | '/exams/$examBoard/$examId/$attemptId/feedback'
     | '/exams/$examBoard/$examId/$attemptId'
   id:
@@ -391,7 +413,9 @@ export interface FileRouteTypes {
     | '/_authenticated/treino/$trainingId/retentativa'
     | '/_authenticated/exams/$examBoard/'
     | '/_authenticated/treino/$trainingId/'
+    | '/_authenticated/treino/$trainingId/retentativa/prova'
     | '/_authenticated/exams/$examBoard/$examId/'
+    | '/_authenticated/treino/$trainingId/retentativa/'
     | '/_authenticated/exams/$examBoard/$examId/$attemptId/feedback'
     | '/_authenticated/exams/$examBoard/$examId/$attemptId/'
   fileRoutesById: FileRoutesById
@@ -594,12 +618,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedTreinoTrainingIdDiagnosticoRouteImport
       parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
     }
+    '/_authenticated/treino/$trainingId/retentativa/': {
+      id: '/_authenticated/treino/$trainingId/retentativa/'
+      path: '/'
+      fullPath: '/treino/$trainingId/retentativa/'
+      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport
+      parentRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRoute
+    }
     '/_authenticated/exams/$examBoard/$examId/': {
       id: '/_authenticated/exams/$examBoard/$examId/'
       path: '/exams/$examBoard/$examId'
       fullPath: '/exams/$examBoard/$examId/'
       preLoaderRoute: typeof AuthenticatedExamsExamBoardExamIdIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/treino/$trainingId/retentativa/prova': {
+      id: '/_authenticated/treino/$trainingId/retentativa/prova'
+      path: '/prova'
+      fullPath: '/treino/$trainingId/retentativa/prova'
+      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport
+      parentRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRoute
     }
     '/_authenticated/exams/$examBoard/$examId/$attemptId/': {
       id: '/_authenticated/exams/$examBoard/$examId/$attemptId/'
@@ -618,12 +656,30 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface AuthenticatedTreinoTrainingIdRetentativaRouteChildren {
+  AuthenticatedTreinoTrainingIdRetentativaProvaRoute: typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
+  AuthenticatedTreinoTrainingIdRetentativaIndexRoute: typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
+}
+
+const AuthenticatedTreinoTrainingIdRetentativaRouteChildren: AuthenticatedTreinoTrainingIdRetentativaRouteChildren =
+  {
+    AuthenticatedTreinoTrainingIdRetentativaProvaRoute:
+      AuthenticatedTreinoTrainingIdRetentativaProvaRoute,
+    AuthenticatedTreinoTrainingIdRetentativaIndexRoute:
+      AuthenticatedTreinoTrainingIdRetentativaIndexRoute,
+  }
+
+const AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren =
+  AuthenticatedTreinoTrainingIdRetentativaRoute._addFileChildren(
+    AuthenticatedTreinoTrainingIdRetentativaRouteChildren,
+  )
+
 interface AuthenticatedTreinoTrainingIdRouteChildren {
   AuthenticatedTreinoTrainingIdDiagnosticoRoute: typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
   AuthenticatedTreinoTrainingIdEstudoRoute: typeof AuthenticatedTreinoTrainingIdEstudoRoute
   AuthenticatedTreinoTrainingIdFinalRoute: typeof AuthenticatedTreinoTrainingIdFinalRoute
   AuthenticatedTreinoTrainingIdProvaRoute: typeof AuthenticatedTreinoTrainingIdProvaRoute
-  AuthenticatedTreinoTrainingIdRetentativaRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRoute
+  AuthenticatedTreinoTrainingIdRetentativaRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
   AuthenticatedTreinoTrainingIdIndexRoute: typeof AuthenticatedTreinoTrainingIdIndexRoute
 }
 
@@ -638,7 +694,7 @@ const AuthenticatedTreinoTrainingIdRouteChildren: AuthenticatedTreinoTrainingIdR
     AuthenticatedTreinoTrainingIdProvaRoute:
       AuthenticatedTreinoTrainingIdProvaRoute,
     AuthenticatedTreinoTrainingIdRetentativaRoute:
-      AuthenticatedTreinoTrainingIdRetentativaRoute,
+      AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren,
     AuthenticatedTreinoTrainingIdIndexRoute:
       AuthenticatedTreinoTrainingIdIndexRoute,
   }

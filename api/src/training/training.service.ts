@@ -121,6 +121,36 @@ export class TrainingService {
       .filter((i) => i.completedAt != null)
       .map((i) => i.subject);
 
+    const latestRetry = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, finishedAt: true },
+    });
+
+    let retryCorrectMap: Record<string, string> | undefined;
+    if (latestRetry?.finishedAt != null) {
+      const retryAnswers = await this.prisma.trainingRetryAnswer.findMany({
+        where: { trainingRetryId: latestRetry.id },
+        select: { examBaseQuestionId: true },
+      });
+      const questionIds = retryAnswers.map((a) => a.examBaseQuestionId);
+      if (questionIds.length > 0) {
+        const questionsWithCorrect = await this.prisma.examBaseQuestion.findMany({
+          where: { id: { in: questionIds } },
+          select: {
+            id: true,
+            correctAlternative: true,
+            alternatives: { select: { id: true, key: true } },
+          },
+        });
+        retryCorrectMap = {};
+        for (const q of questionsWithCorrect) {
+          const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+          if (correctAlt) retryCorrectMap[q.id] = correctAlt.id;
+        }
+      }
+    }
+
     const base = {
       trainingId: session.id,
       currentStage: session.currentStage,
@@ -130,6 +160,8 @@ export class TrainingService {
       examTitle: session.examBase.name,
       studyCompletedSubjects,
       attemptFinishedAt: attempt.finishedAt,
+      retryFinishedAt: latestRetry?.finishedAt ?? null,
+      ...(retryCorrectMap && { retryCorrectMap }),
     };
 
     // Return feedback whenever the attempt is finished (so Diagnóstico page can show it even if stage is still EXAM).
@@ -207,19 +239,26 @@ export class TrainingService {
         const initialCorrect = Math.round(
           (Number(attempt.scorePercentage) / 100) * totalQuestions,
         );
-        const retryAnswers = await this.prisma.trainingRetryAnswer.findMany({
+        const latestRetry = await this.prisma.trainingRetry.findFirst({
           where: { trainingSessionId: trainingId },
-          select: {
-            examBaseQuestionId: true,
-            selectedAlternativeId: true,
-            examBaseQuestion: {
-              select: {
-                correctAlternative: true,
-                alternatives: { select: { id: true, key: true } },
-              },
-            },
-          },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
         });
+        const retryAnswers = latestRetry
+          ? await this.prisma.trainingRetryAnswer.findMany({
+              where: { trainingRetryId: latestRetry.id },
+              select: {
+                examBaseQuestionId: true,
+                selectedAlternativeId: true,
+                examBaseQuestion: {
+                  select: {
+                    correctAlternative: true,
+                    alternatives: { select: { id: true, key: true } },
+                  },
+                },
+              },
+            })
+          : [];
         let retryCorrect = 0;
         for (const ra of retryAnswers) {
           const correctKey = ra.examBaseQuestion.correctAlternative;
@@ -240,11 +279,57 @@ export class TrainingService {
       data: updates,
     });
 
+    if (requested === 'FINAL') {
+      const latestRetry = await this.prisma.trainingRetry.findFirst({
+        where: { trainingSessionId: trainingId },
+        orderBy: { createdAt: 'desc' },
+        select: { id: true },
+      });
+      if (latestRetry) {
+        await this.prisma.trainingRetry.update({
+          where: { id: latestRetry.id },
+          data: { finishedAt: new Date() },
+        });
+      }
+    }
+
     if (requested === 'STUDY') {
       await this.ensureStudyItems(trainingId, session.examBaseAttemptId);
     }
 
+    if (requested === 'RETRY') {
+      await this.ensureRetry(trainingId);
+    }
+
     return this.getOne(trainingId, userId);
+  }
+
+  /** Create one TrainingRetry for this session when entering RETRY stage. */
+  private async ensureRetry(trainingId: string): Promise<void> {
+    const existing = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      select: { id: true },
+    });
+    if (existing) return;
+    await this.prisma.trainingRetry.create({
+      data: { trainingSessionId: trainingId },
+    });
+  }
+
+  /** Get the current (latest) TrainingRetry for this session, or create one. */
+  private async getOrCreateRetry(trainingId: string): Promise<{ id: string }> {
+    let retry = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!retry) {
+      retry = await this.prisma.trainingRetry.create({
+        data: { trainingSessionId: trainingId },
+        select: { id: true },
+      });
+    }
+    return retry;
   }
 
   /** Create one TrainingStudyItem per SubjectFeedback for this attempt when entering STUDY. */
@@ -374,6 +459,26 @@ export class TrainingService {
     return { studyCompletedSubjects };
   }
 
+  /** Get current retry answers for this session (questionId -> selectedAlternativeId). */
+  async getRetryAnswers(trainingId: string, userId: string): Promise<Record<string, string>> {
+    await this.getSessionForUser(trainingId, userId);
+    const latestRetry = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true },
+    });
+    if (!latestRetry) return {};
+    const answers = await this.prisma.trainingRetryAnswer.findMany({
+      where: { trainingRetryId: latestRetry.id },
+      select: { examBaseQuestionId: true, selectedAlternativeId: true },
+    });
+    const out: Record<string, string> = {};
+    for (const a of answers) {
+      out[a.examBaseQuestionId] = a.selectedAlternativeId;
+    }
+    return out;
+  }
+
   /** List questions that were wrong in the exam, for retry. Does not expose the previously selected alternative. */
   async listRetryQuestions(trainingId: string, userId: string) {
     const session = await this.getSessionForUser(trainingId, userId);
@@ -415,6 +520,54 @@ export class TrainingService {
     });
   }
 
+  /**
+   * Same as listRetryQuestions but returns full question data (correctAlternative, alternatives with explanation).
+   * Only allowed when the latest retry has been finished (so we can show Explicação tab).
+   */
+  async listRetryQuestionsWithFeedback(trainingId: string, userId: string) {
+    const session = await this.getSessionForUser(trainingId, userId);
+    const latestRetry = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      orderBy: { createdAt: 'desc' },
+      select: { finishedAt: true },
+    });
+    if (latestRetry?.finishedAt == null) {
+      throw new BadRequestException(
+        'retry questions with feedback only available after finalizing re-tentativa',
+      );
+    }
+
+    const attemptId = session.examBaseAttemptId;
+    const examBaseId = session.examBaseId;
+    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+
+    const wrongQuestionIds = new Set<string>();
+    for (const q of data.questions) {
+      const selectedId = data.answers[q.id] ?? null;
+      const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+      const correctId = correctAlt?.id ?? null;
+      if (correctId != null && selectedId !== correctId) {
+        wrongQuestionIds.add(q.id);
+      }
+    }
+
+    return data.questions
+      .filter((q) => wrongQuestionIds.has(q.id))
+      .map((q) => ({
+        ...q,
+        alternatives: q.alternatives.map((a) => ({
+          id: a.id,
+          key: a.key,
+          text: a.text,
+          explanation: a.explanation,
+        })),
+      }));
+  }
+
   /** Submit or update a retry answer. Only allowed for questions that were wrong in the exam. */
   async upsertRetryAnswer(
     trainingId: string,
@@ -444,15 +597,24 @@ export class TrainingService {
     const alt = q.alternatives.find((a) => a.id === dto.selectedAlternativeId);
     if (!alt) throw new BadRequestException('alternative not found for this question');
 
+    const retry = await this.getOrCreateRetry(trainingId);
+    const retryWithFinished = await this.prisma.trainingRetry.findUnique({
+      where: { id: retry.id },
+      select: { finishedAt: true },
+    });
+    if (retryWithFinished?.finishedAt != null) {
+      throw new BadRequestException('re-tentativa já finalizada');
+    }
+
     await this.prisma.trainingRetryAnswer.upsert({
       where: {
-        trainingSessionId_examBaseQuestionId: {
-          trainingSessionId: trainingId,
+        trainingRetryId_examBaseQuestionId: {
+          trainingRetryId: retry.id,
           examBaseQuestionId: dto.questionId,
         },
       },
       create: {
-        trainingSessionId: trainingId,
+        trainingRetryId: retry.id,
         examBaseQuestionId: dto.questionId,
         selectedAlternativeId: dto.selectedAlternativeId,
       },

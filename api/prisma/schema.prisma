@@ -301,7 +301,7 @@ model TrainingSession {
   examBaseId         String   @db.Uuid
   examBase           ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
 
-  retryAnswers       TrainingRetryAnswer[]
+  trainingRetries     TrainingRetry[]
   trainingStudyItems TrainingStudyItem[]
 
   @@index([userId])
@@ -309,16 +309,30 @@ model TrainingSession {
   @@map("training_sessions")
 }
 
+/// One retry attempt: user answers (again) the questions they got wrong in the exam. Session can have multiple retries in the future.
+model TrainingRetry {
+  id                 String    @id @default(uuid()) @db.Uuid
+  trainingSessionId  String    @db.Uuid
+  trainingSession    TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now())
+  finishedAt        DateTime? @db.Timestamp(3)
+
+  retryAnswers       TrainingRetryAnswer[]
+
+  @@index([trainingSessionId])
+  @@map("training_retries")
+}
+
 model TrainingRetryAnswer {
-  trainingSessionId     String   @db.Uuid
-  trainingSession       TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
-  examBaseQuestionId    String   @db.Uuid
-  examBaseQuestion      ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
-  selectedAlternativeId String   @db.Uuid
+  trainingRetryId      String   @db.Uuid
+  trainingRetry        TrainingRetry @relation(fields: [trainingRetryId], references: [id], onDelete: Cascade)
+  examBaseQuestionId   String   @db.Uuid
+  examBaseQuestion     ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
+  selectedAlternativeId String  @db.Uuid
   selectedAlternative   ExamBaseQuestionAlternative @relation(fields: [selectedAlternativeId], references: [id], onDelete: Restrict)
 
-  @@id([trainingSessionId, examBaseQuestionId])
-  @@index([trainingSessionId])
+  @@id([trainingRetryId, examBaseQuestionId])
+  @@index([trainingRetryId])
   @@index([examBaseQuestionId])
   @@map("training_retry_answers")
 }

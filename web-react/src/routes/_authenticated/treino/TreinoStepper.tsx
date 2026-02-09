@@ -42,7 +42,7 @@ export function TreinoStepper({
 
   return (
     <nav
-      className="flex flex-wrap items-center gap-2 sm:gap-0 sm:flex-nowrap border border-slate-300 rounded-lg bg-slate-50 p-2 mb-4"
+      className="flex flex-wrap items-center gap-2 sm:gap-0 sm:flex-nowrap border border-slate-300 rounded-lg bg-slate-50 p-2"
       aria-label="Etapas do treino"
     >
       {trainingId ? (

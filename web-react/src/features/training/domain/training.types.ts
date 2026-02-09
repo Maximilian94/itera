@@ -35,6 +35,10 @@ export interface TrainingState {
   studyCompletedSubjects: string[]
   /** When the user finished the exam (submitted). Null if still in progress. */
   attemptFinishedAt: string | null
+  /** When the user finished the re-tentativa (clicked Finalizar re-tentativa). Null if not yet. */
+  retryFinishedAt: string | null
+  /** When retry is finished, questionId -> correctAlternativeId so the UI can show green/red. */
+  retryCorrectMap?: Record<string, string>
   feedback?: import('@/features/examBaseAttempt/domain/examBaseAttempt.types').ExamAttemptFeedback
   final?: TrainingFinalPayload
 }

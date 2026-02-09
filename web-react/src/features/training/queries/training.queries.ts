@@ -8,6 +8,10 @@ export const trainingKeys = {
     ['training', trainingId, 'studyItems'] as const,
   retryQuestions: (trainingId: string) =>
     ['training', trainingId, 'retryQuestions'] as const,
+  retryQuestionsWithFeedback: (trainingId: string) =>
+    ['training', trainingId, 'retryQuestionsWithFeedback'] as const,
+  retryAnswers: (trainingId: string) =>
+    ['training', trainingId, 'retryAnswers'] as const,
   final: (trainingId: string) => ['training', trainingId, 'final'] as const,
 }
 
@@ -99,8 +103,58 @@ export function useUpdateTrainingStageMutation(trainingId: string) {
   return useMutation({
     mutationFn: (stage: string) =>
       trainingService.updateStage(trainingId, stage),
+    onSuccess: (data) => {
+      queryClient.setQueryData(trainingKeys.one(trainingId), data)
+    },
+  })
+}
+
+export function useRetryQuestionsQuery(trainingId: string | undefined) {
+  return useQuery({
+    queryKey: trainingKeys.retryQuestions(trainingId ?? ''),
+    queryFn: () => trainingService.listRetryQuestions(trainingId!),
+    enabled: Boolean(trainingId),
+  })
+}
+
+export function useRetryQuestionsWithFeedbackQuery(
+  trainingId: string | undefined,
+  enabled: boolean,
+) {
+  return useQuery({
+    queryKey: trainingKeys.retryQuestionsWithFeedback(trainingId ?? ''),
+    queryFn: () => trainingService.listRetryQuestionsWithFeedback(trainingId!),
+    enabled: Boolean(trainingId) && enabled,
+  })
+}
+
+export function useRetryAnswersQuery(trainingId: string | undefined) {
+  return useQuery({
+    queryKey: trainingKeys.retryAnswers(trainingId ?? ''),
+    queryFn: () => trainingService.getRetryAnswers(trainingId!),
+    enabled: Boolean(trainingId),
+  })
+}
+
+export function useUpsertRetryAnswerMutation(trainingId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      questionId,
+      selectedAlternativeId,
+    }: {
+      questionId: string
+      selectedAlternativeId: string
+    }) =>
+      trainingService.upsertRetryAnswer(
+        trainingId,
+        questionId,
+        selectedAlternativeId,
+      ),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: trainingKeys.one(trainingId) })
+      queryClient.invalidateQueries({
+        queryKey: trainingKeys.retryAnswers(trainingId),
+      })
     },
   })
 }
