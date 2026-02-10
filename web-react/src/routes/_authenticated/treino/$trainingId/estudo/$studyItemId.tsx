@@ -2,13 +2,17 @@ import { Card } from '@/components/Card'
 import { Markdown } from '@/components/Markdown'
 import { Button } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useState } from 'react'
 import {
   ArrowLeftIcon,
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  DocumentTextIcon,
+  BookOpenIcon,
   PencilSquareIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
-import { getStagePath } from '../../stages.config'
 import {
   useTrainingStudyItemsQuery,
   useCompleteStudyItemMutation,
@@ -16,15 +20,24 @@ import {
   trainingKeys,
 } from '@/features/training/queries/training.queries'
 import { useQueryClient } from '@tanstack/react-query'
+import type { TrainingStudyItemExercise } from '@/features/training/domain/training.types'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/estudo/$studyItemId')({
   component: StudyItemDetailPage,
 })
 
+const TAB_RECOMENDACAO = 0
+const TAB_EXPLICACAO = 1
+const TAB_EXERCICIOS = 2
+
 function StudyItemDetailPage() {
   const { trainingId, studyItemId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const [tab, setTab] = useState(0)
+  const [exerciseIndex, setExerciseIndex] = useState(0)
+  /** exerciseId -> selected alternative id (local state, not persisted) */
+  const [selectedByExerciseId, setSelectedByExerciseId] = useState<Record<string, string>>({})
 
   const { data: studyItems = [], isLoading } = useTrainingStudyItemsQuery(trainingId)
   const item = studyItems.find((i) => i.id === studyItemId)
@@ -32,6 +45,10 @@ function StudyItemDetailPage() {
   const generateMutation = useGenerateStudyItemContentMutation(trainingId, studyItemId)
   const hasContent = Boolean(item?.explanation) || (item?.exercises?.length ?? 0) > 0
   const isPronto = Boolean(item?.completedAt)
+  const exercises = item?.exercises ?? []
+  const totalExercises = exercises.length
+  const safeExerciseIndex = totalExercises > 0 ? Math.min(exerciseIndex, totalExercises - 1) : 0
+  const currentExercise = totalExercises > 0 ? exercises[safeExerciseIndex] : null
 
   const handleVoltarEstudo = () => {
     queryClient.invalidateQueries({ queryKey: trainingKeys.studyItems(trainingId) })
@@ -43,8 +60,22 @@ function StudyItemDetailPage() {
     completeMutation.mutate(!isPronto, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trainingKeys.one(trainingId) })
+        queryClient.invalidateQueries({ queryKey: trainingKeys.studyItems(trainingId) })
+        handleVoltarEstudo()
       },
     })
+  }
+
+  const handlePrevExercise = () => {
+    setExerciseIndex((i) => Math.max(0, i - 1))
+  }
+
+  const handleNextExercise = () => {
+    setExerciseIndex((i) => Math.min(totalExercises - 1, i + 1))
+  }
+
+  const handleSelectAlternative = (exerciseId: string, alternativeId: string) => {
+    setSelectedByExerciseId((prev) => ({ ...prev, [exerciseId]: alternativeId }))
   }
 
   if (isLoading) {
@@ -61,6 +92,12 @@ function StudyItemDetailPage() {
       </>
     )
   }
+
+  const tabButtons = [
+    { value: TAB_RECOMENDACAO, label: 'Recomendação', icon: DocumentTextIcon },
+    { value: TAB_EXPLICACAO, label: 'Explicação', icon: BookOpenIcon },
+    { value: TAB_EXERCICIOS, label: 'Exercícios', icon: PencilSquareIcon, disabled: totalExercises === 0 },
+  ]
 
   return (
     <>
@@ -80,67 +117,115 @@ function StudyItemDetailPage() {
         </Button>
       </div>
 
-      <Card noElevation className="p-5 border border-slate-200">
-        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-          Recomendação
-        </p>
-        <div className="text-sm text-slate-700">
-          <Markdown>{item.recommendationText}</Markdown>
+      <Card noElevation className="overflow-hidden border border-slate-200">
+        <div className="flex border-b border-slate-200 overflow-x-auto">
+          {tabButtons.map((t) => {
+            const Icon = t.icon
+            const isActive = tab === t.value
+            const disabled = t.disabled ?? false
+            return (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => !disabled && setTab(t.value)}
+                disabled={disabled}
+                className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
+                  isActive ? 'border-emerald-500 text-emerald-600 bg-emerald-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+              >
+                <Icon className="w-4 h-4 shrink-0" />
+                {t.label}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="p-5 min-h-[200px]">
+          {tab === TAB_RECOMENDACAO && (
+            <div className="flex flex-col gap-4">
+              <div className="text-sm text-slate-700">
+                <Markdown>{item.recommendationText}</Markdown>
+              </div>
+              {!hasContent && (
+                <div className="pt-4 border-t border-slate-200">
+                  <p className="text-sm text-slate-600 mb-3">
+                    Gere uma explicação e exercícios com base nesta recomendação (usando IA).
+                  </p>
+                  <Button
+                    variant="outlined"
+                    onClick={() => generateMutation.mutate()}
+                    disabled={generateMutation.isPending}
+                  >
+                    {generateMutation.isPending ? 'Gerando...' : 'Gerar explicação e exercícios (IA)'}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === TAB_EXPLICACAO && (
+            <div className="flex flex-col gap-4">
+              {!item.explanation && !generateMutation.isPending && (
+                <p className="text-sm text-slate-500">
+                  Nenhuma explicação ainda. Use o botão &quot;Gerar explicação e exercícios (IA)&quot; na aba Recomendação.
+                </p>
+              )}
+              {generateMutation.isPending && (
+                <p className="text-sm text-slate-500">Gerando conteúdo...</p>
+              )}
+              {item.explanation && (
+                <div className="text-sm text-slate-700">
+                  <Markdown>{item.explanation}</Markdown>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === TAB_EXERCICIOS && (
+            <div className="flex flex-col gap-4">
+              {totalExercises === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Nenhum exercício ainda. Gere conteúdo na aba Recomendação.
+                </p>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrevExercise}
+                      disabled={safeExerciseIndex === 0}
+                      aria-label="Questão anterior"
+                      className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      <ChevronLeftIcon className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm font-medium text-slate-700 shrink-0">
+                      Questão {safeExerciseIndex + 1} de {totalExercises}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextExercise}
+                      disabled={safeExerciseIndex === totalExercises - 1}
+                      aria-label="Próxima questão"
+                      className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {currentExercise && (
+                    <StudyExerciseBlock
+                      exercise={currentExercise}
+                      selectedAlternativeId={selectedByExerciseId[currentExercise.id]}
+                      onSelectAlternative={(alternativeId) => handleSelectAlternative(currentExercise.id, alternativeId)}
+                    />
+                  )}
+                </>
+              )}
+            </div>
+          )}
         </div>
       </Card>
-
-      {!hasContent && (
-        <Card noElevation className="p-5 border border-slate-200 border-dashed">
-          <p className="text-sm text-slate-600 mb-3">
-            Gere uma explicação e exercícios com base nesta recomendação (usando IA).
-          </p>
-          <Button
-            variant="outlined"
-            onClick={() => generateMutation.mutate()}
-            disabled={generateMutation.isPending}
-          >
-            {generateMutation.isPending ? 'Gerando...' : 'Gerar explicação e exercícios (IA)'}
-          </Button>
-        </Card>
-      )}
-
-      {item.explanation && (
-        <Card noElevation className="p-5 border border-slate-200">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-            Explicação
-          </p>
-          <div className="text-sm text-slate-700">
-            <Markdown>{item.explanation}</Markdown>
-          </div>
-        </Card>
-      )}
-
-      {item.exercises && item.exercises.length > 0 && (
-        <Card noElevation className="p-5 border border-slate-200">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3 flex items-center gap-1.5">
-            <PencilSquareIcon className="w-4 h-4" />
-            Exercícios ({item.exercises.length})
-          </p>
-          <div className="flex flex-col gap-4">
-            {item.exercises.map((ex) => (
-              <div
-                key={ex.id}
-                className="px-4 py-3 rounded-lg bg-slate-50 border border-slate-200 text-sm"
-              >
-                <p className="font-medium text-slate-700 mb-2">Questão {ex.order}</p>
-                <p className="text-slate-600 mb-2">{ex.statement}</p>
-                <ul className="list-disc list-inside text-slate-600 space-y-1">
-                  {ex.alternatives.map((alt) => (
-                    <li key={alt.id}>
-                      <span className="font-medium">{alt.key}.</span> {alt.text}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </Card>
-      )}
 
       <div className="flex flex-wrap gap-3">
         <Button
@@ -152,5 +237,70 @@ function StudyItemDetailPage() {
         </Button>
       </div>
     </>
+  )
+}
+
+function StudyExerciseBlock({
+  exercise,
+  selectedAlternativeId,
+  onSelectAlternative,
+}: {
+  exercise: TrainingStudyItemExercise
+  selectedAlternativeId?: string
+  onSelectAlternative: (alternativeId: string) => void
+}) {
+  const sortedAlternatives = [...exercise.alternatives].sort((a, b) =>
+    (a.key || '').localeCompare(b.key || ''),
+  )
+  const hasSelection = selectedAlternativeId != null
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="text-base font-medium text-slate-900">
+        <Markdown>{exercise.statement}</Markdown>
+      </div>
+      <div className="flex flex-col gap-2">
+        {sortedAlternatives.map((alt) => {
+          const isSelected = selectedAlternativeId === alt.id
+          const isCorrect = alt.isCorrect
+          const isWrong = hasSelection && isSelected && !isCorrect
+          const showResult = hasSelection
+          const optionBg = showResult
+            ? isCorrect
+              ? 'bg-green-50 border-green-400'
+              : isWrong
+                ? 'bg-red-50 border-red-400'
+                : 'bg-slate-50 border-slate-300'
+            : isSelected
+              ? 'bg-blue-50 border-blue-400'
+              : 'bg-slate-50 border-slate-300 hover:bg-slate-100'
+          const keyBadge = showResult
+            ? isCorrect
+              ? 'bg-green-600 text-white'
+              : isWrong
+                ? 'bg-red-600 text-white'
+                : 'bg-slate-200 text-slate-700'
+            : isSelected
+              ? 'bg-blue-500 text-white'
+              : 'bg-slate-200 text-slate-700'
+
+          return (
+            <button
+              key={alt.id}
+              type="button"
+              onClick={() => onSelectAlternative(alt.id)}
+              className={`flex gap-3 items-center justify-start w-full p-3 rounded-lg border-2 text-left transition-colors ${optionBg}`}
+            >
+              <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>
+                {alt.key}
+              </span>
+              <span className="text-sm text-slate-800 flex-1">
+                <Markdown>{alt.text}</Markdown>
+              </span>
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
