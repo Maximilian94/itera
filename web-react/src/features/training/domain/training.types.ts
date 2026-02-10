@@ -73,7 +73,7 @@ export interface TrainingStudyItemResponse {
   subject: string
   topic: string | null
   evaluation: string
-  recommendations: string
+  recommendations: Array<{ title: string; text: string }>
   explanation: string | null
   completedAt: string | null
   exercises: TrainingStudyItemExercise[]

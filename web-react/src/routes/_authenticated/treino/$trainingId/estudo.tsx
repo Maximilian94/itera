@@ -254,7 +254,12 @@ function StudyItemCard({
           </p>
           <div className="text-sm text-slate-700 space-y-2">
             <Markdown>{item.evaluation}</Markdown>
-            <Markdown>{item.recommendations}</Markdown>
+            {item.recommendations?.map((rec, idx) => (
+              <div key={idx}>
+                <p className="font-medium text-slate-800 mb-0.5">{rec.title}</p>
+                <Markdown>{rec.text}</Markdown>
+              </div>
+            ))}
           </div>
         </div>
 

@@ -42,10 +42,16 @@ type SubjectQuestionDetail = {
   answered: boolean;
 };
 
-/** AI-generated feedback for a subject (evaluation + recommendations). */
+/** One recommendation: title + deeper text. */
+export type SubjectFeedbackRecommendationFromAI = {
+  title: string;
+  text: string;
+};
+
+/** AI-generated feedback for a subject (evaluation + recommendations array). */
 type SubjectFeedbackFromAI = {
   evaluation: string;
-  recommendations: string;
+  recommendations: SubjectFeedbackRecommendationFromAI[];
 };
 
 @Injectable()
@@ -533,13 +539,13 @@ export class ExamBaseAttemptService {
     return { generated: true, subjectFeedback };
   }
 
-  /** Persist subject feedback to SubjectFeedback table (one row per subject). */
+  /** Persist subject feedback to SubjectFeedback table + SubjectFeedbackRecommendation rows. */
   private async upsertSubjectFeedbackTable(
     attemptId: string,
     subjectFeedback: Record<string, SubjectFeedbackFromAI>,
   ): Promise<void> {
     for (const [subject, fb] of Object.entries(subjectFeedback)) {
-      await this.prisma.subjectFeedback.upsert({
+      const sf = await this.prisma.subjectFeedback.upsert({
         where: {
           examBaseAttemptId_subject: { examBaseAttemptId: attemptId, subject },
         },
@@ -547,13 +553,22 @@ export class ExamBaseAttemptService {
           examBaseAttemptId: attemptId,
           subject,
           evaluation: fb.evaluation,
-          recommendations: fb.recommendations,
         },
-        update: {
-          evaluation: fb.evaluation,
-          recommendations: fb.recommendations,
-        },
+        update: { evaluation: fb.evaluation },
       });
+      await this.prisma.subjectFeedbackRecommendation.deleteMany({
+        where: { subjectFeedbackId: sf.id },
+      });
+      if (Array.isArray(fb.recommendations) && fb.recommendations.length > 0) {
+        await this.prisma.subjectFeedbackRecommendation.createMany({
+          data: fb.recommendations.map((rec, idx) => ({
+            subjectFeedbackId: sf.id,
+            title: typeof rec.title === 'string' ? rec.title.slice(0, 500) : 'Recomendação',
+            text: typeof rec.text === 'string' ? rec.text : '',
+            order: idx,
+          })),
+        });
+      }
     }
   }
 
@@ -607,20 +622,27 @@ export class ExamBaseAttemptService {
 
     const subjectFeedbackRows = await this.prisma.subjectFeedback.findMany({
       where: { examBaseAttemptId: attemptId },
-      select: { subject: true, evaluation: true, recommendations: true },
+      select: {
+        subject: true,
+        evaluation: true,
+        recommendations: { orderBy: { order: 'asc' }, select: { title: true, text: true } },
+      },
     });
-    const subjectFeedback: Record<string, { evaluation: string; recommendations: string }> =
+    const subjectFeedback: Record<
+      string,
+      { evaluation: string; recommendations: Array<{ title: string; text: string }> }
+    > =
       subjectFeedbackRows.length > 0
         ? Object.fromEntries(
             subjectFeedbackRows.map((row) => [
               row.subject,
-              { evaluation: row.evaluation, recommendations: row.recommendations },
+              {
+                evaluation: row.evaluation,
+                recommendations: row.recommendations.map((r) => ({ title: r.title, text: r.text })),
+              },
             ]),
           )
-        : (attempt.subjectFeedback as Record<
-            string,
-            { evaluation: string; recommendations: string }
-          >) ?? {};
+        : {};
 
     return {
       examTitle: examBase.name,
@@ -667,30 +689,22 @@ Cada questão tem: topic (assunto), subtopics (subassuntos), correct (acertou), 
 
 Para cada matéria, retorne um objeto JSON com:
 - "evaluation": Avaliação HONESTA e CONSTRUTIVA. Reconheça pontos fortes e fracos. Use topic e subtopics para identificar padrões. Se houver questões em branco, mencione isso.
-- "recommendations": Recomendações APENAS sobre assuntos e subassuntos a estudar, com dicas sobre o conteúdo. NÃO sugira fontes (livros, sites, cursos), NÃO sugira horas de estudo. Foque em: quais assuntos/subassuntos priorizar e dicas sobre esses tópicos.
+- "recommendations": Array de objetos, cada um com "title" (título curto da recomendação, ex.: "Equações do 1º grau") e "text" (texto em português com uma recomendação mais profunda sobre esse assunto: o que priorizar, dicas de conteúdo). NÃO sugira fontes (livros, sites, cursos), NÃO sugira horas de estudo. Gere de 2 a 5 recomendações por matéria.
 
 REGRAS DE FORMATAÇÃO (obrigatório):
-1. NÃO use títulos em Markdown (nada de # ou ##). O título da matéria já existe na tela; títulos grandes no texto ficam maiores que ele e poluem a leitura.
-2. Use SEMPRE bullet points para listas: comece cada item com "- " (hífen e espaço). Exemplo: "- Primeiro item\\n- Segundo item".
-3. Pode usar **negrito** para destacar termos importantes (nomes de assuntos, subassuntos).
-4. Espaçamento: use exatamente uma linha em branco (\\n\\n) entre parágrafos. Não use múltiplas linhas em branco nem espaços extras no início/fim de linhas. Isso evita texto desalinhado.
-5. O feedback deve dar MUITO VALOR ao aluno. Seja encorajador, mas não falseie a avaliação.`;
+1. NÃO use títulos em Markdown (nada de # ou ##) dentro de evaluation ou text. Pode usar **negrito** para destacar termos.
+2. Use bullet points em listas com "- ". Parágrafos separados por \\n\\n.
+3. O feedback deve dar MUITO VALOR ao aluno. Seja encorajador, mas não falseie a avaliação.`;
 
     const userPrompt = `Nota mínima para aprovação: ${minPassingGrade}%.
 
 Dados de desempenho por matéria:
 ${JSON.stringify(payload, null, 2)}
 
-Retorne APENAS um JSON object: chaves = nomes das matérias (exatamente como no payload), valores = objetos com "evaluation" e "recommendations" (strings em português).
-
-Formato do texto:
-- Sem # ou ## (sem títulos grandes).
-- Listas em bullet points com "- ".
-- Parágrafos separados por \\n\\n.
-- Recomendações: só assuntos/subassuntos e dicas sobre o conteúdo; sem fontes de estudo, sem horas.
+Retorne APENAS um JSON object: chaves = nomes das matérias (exatamente como no payload), valores = objetos com "evaluation" (string) e "recommendations" (array de objetos com "title" e "text", em português).
 
 Exemplo:
-{"Matemática":{"evaluation":"Você acertou bem **Geometria** e teve dificuldade em **Álgebra**.\\n\\n- Pontos fortes: triângulos e áreas.\\n- Atenção: equações e funções.","recommendations":"- **Equações do 1º grau**: revisar isolamento de incógnita.\\n- **Funções**: praticar leitura de gráficos.\\n- **Geometria plana**: manter o ritmo, reforçar áreas de figuras compostas."},"Português":{"evaluation":"...","recommendations":"..."}}`;
+{"Matemática":{"evaluation":"Você acertou bem **Geometria** e teve dificuldade em **Álgebra**.\\n\\n- Pontos fortes: triângulos e áreas.\\n- Atenção: equações e funções.","recommendations":[{"title":"Equações do 1º grau","text":"Revisar isolamento de incógnita e equações simples. Pratique problemas que misturam frações e decimais."},{"title":"Funções","text":"Praticar leitura de gráficos e identificação de domínio e imagem. Foque em funções afim e quadráticas."}]},"Português":{"evaluation":"...","recommendations":[{"title":"...","text":"..."}]}}`;
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -730,7 +744,7 @@ Exemplo:
       jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
     }
 
-    let parsed: Record<string, { evaluation?: string; recommendations?: string }>;
+    let parsed: Record<string, { evaluation?: string; recommendations?: unknown }>;
     try {
       parsed = JSON.parse(jsonStr);
     } catch {
@@ -740,12 +754,16 @@ Exemplo:
     const result: Record<string, SubjectFeedbackFromAI> = {};
     for (const s of subjectStats) {
       const fb = parsed[s.subject];
-      if (fb && typeof fb.evaluation === 'string' && typeof fb.recommendations === 'string') {
-        result[s.subject] = {
-          evaluation: fb.evaluation,
-          recommendations: fb.recommendations,
-        };
-      }
+      if (!fb || typeof fb.evaluation !== 'string') continue;
+      const recs = Array.isArray(fb.recommendations)
+        ? (fb.recommendations as Array<{ title?: unknown; text?: unknown }>)
+            .filter((r) => r && typeof r.title === 'string' && typeof r.text === 'string')
+            .map((r) => ({ title: r.title as string, text: r.text as string }))
+        : [];
+      result[s.subject] = {
+        evaluation: fb.evaluation,
+        recommendations: recs.length > 0 ? recs : [{ title: 'Recomendações', text: 'Priorize os assuntos em que você teve mais dificuldade e revise os tópicos relacionados.' }],
+      };
     }
     return result;
   }

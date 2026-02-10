@@ -71,7 +71,7 @@ export const examBaseAttemptService = {
   generateSubjectFeedback(
     examBaseId: string,
     attemptId: string,
-  ): Promise<{ generated: boolean; subjectFeedback?: Record<string, { evaluation: string; recommendations: string }> }> {
+  ): Promise<{ generated: boolean; subjectFeedback?: Record<string, { evaluation: string; recommendations: Array<{ title: string; text: string }> }> }> {
     return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback/generate`, {
       method: 'POST',
     })

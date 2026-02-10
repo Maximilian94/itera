@@ -367,7 +367,10 @@ export class TrainingService {
       where: { trainingSessionId: trainingId },
       include: {
         subjectFeedback: {
-          select: { evaluation: true, recommendations: true },
+          select: {
+            evaluation: true,
+            recommendations: { orderBy: { order: 'asc' }, select: { title: true, text: true } },
+          },
         },
         exercises: {
           orderBy: { order: 'asc' },
@@ -382,7 +385,7 @@ export class TrainingService {
       subject: item.subject,
       topic: item.topic,
       evaluation: item.subjectFeedback.evaluation,
-      recommendations: item.subjectFeedback.recommendations,
+      recommendations: item.subjectFeedback.recommendations.map((r) => ({ title: r.title, text: r.text })),
       explanation: item.explanation,
       completedAt: item.completedAt?.toISOString() ?? null,
       exercises: item.exercises.map((ex) => ({
@@ -639,7 +642,10 @@ export class TrainingService {
       where: { id: studyItemId, trainingSessionId: trainingId },
       include: {
         subjectFeedback: {
-          select: { subject: true, recommendations: true },
+          select: {
+            subject: true,
+            recommendations: { orderBy: { order: 'asc' }, select: { title: true, text: true } },
+          },
         },
       },
     });
@@ -697,8 +703,11 @@ REGRAS OBRIGATÓRIAS:
 - Formato da explanation: use bullet points com "- ", pode usar **negrito**. Sem títulos com #.
 - Retorne APENAS um JSON válido no formato: {"explanation":"...","exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
 
+    const recommendationsText = item.subjectFeedback.recommendations
+      .map((r) => `**${r.title}**: ${r.text}`)
+      .join('\n\n');
     const userPrompt = `Recomendações de estudo para esta matéria:
-${item.subjectFeedback.recommendations}
+${recommendationsText}
 
 Questões que o aluno errou (use apenas como contexto do que reforçar; NÃO cite nem resolva estas questões na explanation):
 ${JSON.stringify(wrongQuestionsContext, null, 2)}
