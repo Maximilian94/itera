@@ -18,7 +18,7 @@ export const Route = createFileRoute('/_authenticated/treino/estudo')({
   component: EstudoPage,
 })
 
-// Mock: assuntos recomendados com mini-explicação e exercícios
+// Mock: assuntos recomendados com explicação e exercícios
 const MOCK_ASSUNTOS = [
   {
     id: '1',
@@ -97,7 +97,7 @@ function EstudoPage() {
       </div>
 
       <p className="text-slate-600 text-sm">
-        Estude cada assunto recomendado pelo diagnóstico: leia a mini-explicação
+        Estude cada assunto recomendado pelo diagnóstico: leia a explicação
         e faça os exercícios. Marque como &quot;pronto&quot; quando terminar ou pule
         para a próxima etapa quando quiser.
       </p>
@@ -174,7 +174,7 @@ function EstudoPage() {
 
                 <div className="mt-4 pl-[52px] min-w-0 sm:pl-0">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                    Mini-explicação
+                    Explicação
                   </p>
                   <div className="text-sm text-slate-700">
                     <Markdown>{assunto.explanation}</Markdown>

@@ -72,8 +72,10 @@ export interface TrainingStudyItemResponse {
   id: string
   subject: string
   topic: string | null
-  evaluation: string
-  recommendations: Array<{ title: string; text: string }>
+  /** Title of the single recommendation this study item is for. */
+  recommendationTitle: string
+  /** Text of the recommendation. */
+  recommendationText: string
   explanation: string | null
   completedAt: string | null
   exercises: TrainingStudyItemExercise[]

@@ -2,9 +2,8 @@ import { Card } from '@/components/Card'
 import { Markdown } from '@/components/Markdown'
 import { Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import {
-  BookOpenIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   CheckIcon,
@@ -12,7 +11,7 @@ import {
   PencilSquareIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
-import { getStageById, TREINO_STAGES, getStagePath } from '../stages.config'
+import { getStagePath } from '../stages.config'
 import { useRequireTrainingStage } from '../useRequireTrainingStage'
 import {
   useTrainingStudyItemsQuery,
@@ -33,7 +32,6 @@ function EstudoPage() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   useRequireTrainingStage(trainingId, 'estudo')
-  const stage = getStageById(3)!
 
   const { data: studyItems = [], isLoading } = useTrainingStudyItemsQuery(trainingId)
   const updateStageMutation = useUpdateTrainingStageMutation(trainingId)
@@ -43,6 +41,16 @@ function EstudoPage() {
   const pendentes = total - concluidos
   const progresso = total > 0 ? Math.round((concluidos / total) * 100) : 0
   const temPendentes = pendentes > 0
+
+  const studyItemsBySubject = useMemo(() => {
+    const bySubject = new Map<string, typeof studyItems>()
+    for (const item of studyItems) {
+      const list = bySubject.get(item.subject) ?? []
+      list.push(item)
+      bySubject.set(item.subject, list)
+    }
+    return Array.from(bySubject.entries()).map(([subject, items]) => ({ subject, items }))
+  }, [studyItems])
 
   const handleIrParaRetentativa = () => {
     if (temPendentes) {
@@ -85,9 +93,9 @@ function EstudoPage() {
       </div> */}
 
       <p className="text-slate-600 text-sm">
-        Estude cada assunto recomendado pelo diagnóstico: leia a mini-explicação
-        e faça os exercícios. Marque como &quot;pronto&quot; quando terminar ou pule
-        para a próxima etapa quando quiser.
+        Estude cada recomendação do diagnóstico: leia a explicação
+        e faça os exercícios. As recomendações estão agrupadas por matéria.
+        Marque como &quot;pronto&quot; quando terminar ou pule para a próxima etapa quando quiser.
       </p>
 
       {isLoading ? (
@@ -99,7 +107,7 @@ function EstudoPage() {
               <div className="flex items-center gap-2">
                 <CheckCircleIcon className="w-5 h-5 text-emerald-600" />
                 <span className="text-sm font-medium text-slate-700">
-                  {concluidos} de {total} assuntos concluídos
+                  {concluidos} de {total} recomendações concluídas
                 </span>
               </div>
               <div className="flex items-center gap-2 min-w-[120px]">
@@ -116,17 +124,26 @@ function EstudoPage() {
             </div>
           </Card>
 
-          <div className="flex flex-col gap-4">
-            {studyItems.map((item) => (
-              <StudyItemCard
-                key={item.id}
-                trainingId={trainingId}
-                item={item}
-              />
-            ))}
-          </div>
-
-          {studyItems.length === 0 && (
+          {studyItemsBySubject.length > 0 ? (
+            <div className="flex flex-col gap-6">
+              {studyItemsBySubject.map(({ subject, items }) => (
+                <div key={subject} className="flex flex-col gap-3">
+                  <h3 className="text-base font-semibold text-slate-800 border-b border-slate-200 pb-2">
+                    {subject}
+                  </h3>
+                  <div className="flex flex-col gap-3 pl-0">
+                    {items.map((item) => (
+                      <StudyItemCard
+                        key={item.id}
+                        trainingId={trainingId}
+                        item={item}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
             <Card noElevation className="p-6 border-dashed border-2 border-slate-300">
               <p className="text-slate-600 text-sm">
                 Nenhum item de estudo ainda. Avance para o diagnóstico e conclua a prova para gerar as recomendações.
@@ -139,7 +156,7 @@ function EstudoPage() {
       <Card noElevation className="p-4 border-dashed border-2 border-slate-300 bg-slate-50/50">
         <p className="text-sm text-slate-600">
           Você pode seguir para a <strong>Re-tentativa</strong> mesmo sem ter
-          concluído todos os assuntos. O que já foi marcado como pronto fica
+          concluído todas as recomendações. O que já foi marcado como pronto fica
           registrado.
         </p>
       </Card>
@@ -167,10 +184,10 @@ function EstudoPage() {
         <DialogTitle>Ir para Re-tentativa?</DialogTitle>
         <DialogContent>
           <p className="text-slate-700 mb-2">
-            Você ainda tem <strong>{pendentes} {pendentes === 1 ? 'assunto' : 'assuntos'}</strong> de estudo não concluídos.
+            Você ainda tem <strong>{pendentes} {pendentes === 1 ? 'recomendação' : 'recomendações'}</strong> de estudo não concluídas.
           </p>
           <p className="text-slate-600 text-sm mb-2">
-            Não é obrigatório terminar todos antes de seguir — você pode ir para a Re-tentativa agora e testar o que já estudou. Porém, concluir os assuntos pendentes costuma melhorar seu desempenho na segunda chance nas questões.
+            Não é obrigatório terminar todas antes de seguir — você pode ir para a Re-tentativa agora e testar o que já estudou. Porém, concluir as recomendações pendentes costuma melhorar seu desempenho na segunda chance nas questões.
           </p>
           <p className="text-slate-600 text-sm">
             Se preferir, pode continuar estudando e marcar como &quot;pronto&quot; quando terminar. Você também pode voltar a esta etapa depois, a partir do menu.
@@ -227,7 +244,7 @@ function StudyItemCard({
               </div>
             )}
             <h3 className="text-base font-semibold text-slate-800">
-              {item.topic ? `${item.subject} — ${item.topic}` : item.subject}
+              {item.recommendationTitle}
             </h3>
           </div>
           <Button
@@ -250,16 +267,10 @@ function StudyItemCard({
 
         <div className="mt-4 pl-[52px] min-w-0 sm:pl-0">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-            Avaliação e recomendações
+            Recomendação
           </p>
-          <div className="text-sm text-slate-700 space-y-2">
-            <Markdown>{item.evaluation}</Markdown>
-            {item.recommendations?.map((rec, idx) => (
-              <div key={idx}>
-                <p className="font-medium text-slate-800 mb-0.5">{rec.title}</p>
-                <Markdown>{rec.text}</Markdown>
-              </div>
-            ))}
+          <div className="text-sm text-slate-700">
+            <Markdown>{item.recommendationText}</Markdown>
           </div>
         </div>
 
@@ -279,7 +290,7 @@ function StudyItemCard({
         {item.explanation && (
           <div className="mt-4 pt-4 border-t border-slate-200 pl-[52px] sm:pl-0">
             <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-              Mini-explicação
+              Explicação
             </p>
             <div className="text-sm text-slate-700">
               <Markdown>{item.explanation}</Markdown>

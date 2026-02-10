@@ -115,11 +115,14 @@ export class TrainingService {
 
     const studyItems = await this.prisma.trainingStudyItem.findMany({
       where: { trainingSessionId: trainingId },
-      select: { id: true, subject: true, topic: true, completedAt: true },
+      select: { subject: true, completedAt: true },
     });
-    const studyCompletedSubjects = studyItems
-      .filter((i) => i.completedAt != null)
-      .map((i) => i.subject);
+    const subjectsWithItems = [...new Set(studyItems.map((i) => i.subject))];
+    const studyCompletedSubjects = subjectsWithItems.filter((subject) =>
+      studyItems
+        .filter((i) => i.subject === subject)
+        .every((i) => i.completedAt != null),
+    );
 
     const latestRetry = await this.prisma.trainingRetry.findFirst({
       where: { trainingSessionId: trainingId },
@@ -332,45 +335,44 @@ export class TrainingService {
     return retry;
   }
 
-  /** Create one TrainingStudyItem per SubjectFeedback for this attempt when entering STUDY. */
+  /** Create one TrainingStudyItem per SubjectFeedbackRecommendation for this attempt when entering STUDY. */
   private async ensureStudyItems(
     trainingId: string,
     attemptId: string,
   ): Promise<void> {
-    const subjectFeedbacks = await this.prisma.subjectFeedback.findMany({
-      where: { examBaseAttemptId: attemptId },
-      select: { id: true, subject: true },
+    const recommendations = await this.prisma.subjectFeedbackRecommendation.findMany({
+      where: { subjectFeedback: { examBaseAttemptId: attemptId } },
+      select: { id: true, title: true, subjectFeedback: { select: { subject: true } } },
+      orderBy: [{ subjectFeedbackId: 'asc' }, { order: 'asc' }],
     });
-    for (const sf of subjectFeedbacks) {
+    for (const rec of recommendations) {
       await this.prisma.trainingStudyItem.upsert({
         where: {
-          trainingSessionId_subjectFeedbackId: {
+          trainingSessionId_subjectFeedbackRecommendationId: {
             trainingSessionId: trainingId,
-            subjectFeedbackId: sf.id,
+            subjectFeedbackRecommendationId: rec.id,
           },
         },
         create: {
           trainingSessionId: trainingId,
-          subjectFeedbackId: sf.id,
-          subject: sf.subject,
+          subjectFeedbackRecommendationId: rec.id,
+          subject: rec.subjectFeedback.subject,
+          topic: rec.title,
         },
         update: {},
       });
     }
   }
 
-  /** List study items for the session (one per SubjectFeedback). Creates them from SubjectFeedback if not yet present. */
+  /** List study items for the session (one per recommendation). Creates them from recommendations if not yet present. */
   async listStudyItems(trainingId: string, userId: string) {
     const session = await this.getSessionForUser(trainingId, userId);
     await this.ensureStudyItems(trainingId, session.examBaseAttemptId);
     const items = await this.prisma.trainingStudyItem.findMany({
       where: { trainingSessionId: trainingId },
       include: {
-        subjectFeedback: {
-          select: {
-            evaluation: true,
-            recommendations: { orderBy: { order: 'asc' }, select: { title: true, text: true } },
-          },
+        subjectFeedbackRecommendation: {
+          select: { title: true, text: true },
         },
         exercises: {
           orderBy: { order: 'asc' },
@@ -384,8 +386,8 @@ export class TrainingService {
       id: item.id,
       subject: item.subject,
       topic: item.topic,
-      evaluation: item.subjectFeedback.evaluation,
-      recommendations: item.subjectFeedback.recommendations.map((r) => ({ title: r.title, text: r.text })),
+      recommendationTitle: item.subjectFeedbackRecommendation.title,
+      recommendationText: item.subjectFeedbackRecommendation.text,
       explanation: item.explanation,
       completedAt: item.completedAt?.toISOString() ?? null,
       exercises: item.exercises.map((ex) => ({
@@ -426,38 +428,39 @@ export class TrainingService {
       where: { trainingSessionId: trainingId },
       select: { subject: true, completedAt: true },
     });
-    const studyCompletedSubjects = studyItems
-      .filter((i) => i.completedAt != null)
-      .map((i) => i.subject);
+    const subjectsWithItems = [...new Set(studyItems.map((i) => i.subject))];
+    const studyCompletedSubjects = subjectsWithItems.filter((subject) =>
+      studyItems
+        .filter((i) => i.subject === subject)
+        .every((i) => i.completedAt != null),
+    );
 
     return { studyCompletedSubjects };
   }
 
-  /** Mark a study item (by subject) as completed or not in the Study step. */
+  /** Mark all study items for a subject as completed or not. */
   async updateStudy(
     trainingId: string,
     userId: string,
     dto: UpdateStudyDto,
   ) {
     await this.getSessionForUser(trainingId, userId);
-    const item = await this.prisma.trainingStudyItem.findFirst({
+    const count = await this.prisma.trainingStudyItem.updateMany({
       where: { trainingSessionId: trainingId, subject: dto.subject },
-      select: { id: true },
-    });
-    if (!item) throw new NotFoundException('study item not found for this subject');
-
-    await this.prisma.trainingStudyItem.update({
-      where: { id: item.id },
       data: { completedAt: dto.completed ? new Date() : null },
     });
+    if (count.count === 0) throw new NotFoundException('no study items found for this subject');
 
     const studyItems = await this.prisma.trainingStudyItem.findMany({
       where: { trainingSessionId: trainingId },
       select: { subject: true, completedAt: true },
     });
-    const studyCompletedSubjects = studyItems
-      .filter((i) => i.completedAt != null)
-      .map((i) => i.subject);
+    const subjectsWithItems = [...new Set(studyItems.map((i) => i.subject))];
+    const studyCompletedSubjects = subjectsWithItems.filter((subject) =>
+      studyItems
+        .filter((i) => i.subject === subject)
+        .every((i) => i.completedAt != null),
+    );
 
     return { studyCompletedSubjects };
   }
@@ -628,7 +631,7 @@ export class TrainingService {
   }
 
   /**
-   * Generate explanation + 5 exercises for a study item using IA.
+   * Generate explanation + 5 exercises for a study item (one recommendation) using IA.
    * Input: wrong questions for this subject (statement, alternatives, selectedKey only — not correctKey).
    * Rule: explanation must help on the topic without describing or revealing the specific question.
    */
@@ -641,11 +644,8 @@ export class TrainingService {
     const item = await this.prisma.trainingStudyItem.findFirst({
       where: { id: studyItemId, trainingSessionId: trainingId },
       include: {
-        subjectFeedback: {
-          select: {
-            subject: true,
-            recommendations: { orderBy: { order: 'asc' }, select: { title: true, text: true } },
-          },
+        subjectFeedbackRecommendation: {
+          select: { title: true, text: true },
         },
       },
     });
@@ -661,7 +661,7 @@ export class TrainingService {
       session.examBaseAttemptId,
       userId,
     );
-    const subject = item.subjectFeedback.subject;
+    const subject = item.subject;
     const wrongQuestionsContext: Array<{
       statement: string;
       alternatives: Array<{ key: string; text: string }>;
@@ -691,28 +691,34 @@ export class TrainingService {
       );
     }
 
-    const systemPrompt = `Você é um tutor especializado em preparação para concursos. Sua tarefa é gerar conteúdo de estudo para o aluno.
+    const systemPrompt = `Você é um tutor especializado em preparação para concursos. Sua tarefa é gerar conteúdo de estudo de excelente qualidade para o aluno.
 
 Você receberá:
-1. As recomendações de estudo (texto) para esta matéria.
+1. Uma recomendação de estudo (título e texto) que é o foco deste item.
 2. Opcionalmente, as questões que o aluno ERROU nesta matéria (apenas como CONTEXTO do que ele precisa reforçar). Cada questão tem: statement (enunciado), alternatives (array com key e text), selectedKey (alternativa que o aluno marcou). NÃO receba qual é a alternativa correta.
 
-REGRAS OBRIGATÓRIAS:
-- A "explanation" deve explicar o assunto/tema de forma genérica, reforçando as recomendações, para ajudar o aluno a entender melhor. Use as questões erradas APENAS para saber em que tipo de conteúdo focar. A explanation NÃO pode descrever, citar ou dar a resposta da questão específica que foi enviada — senão o aluno terá a resposta na próxima interação (re-tentativa da prova).
-- Gere exatamente 5 exercícios novos (não use as questões do contexto). Cada exercício: statement (enunciado em português), 4 alternativas com keys "A", "B", "C", "D", e correctAlternativeKey ("A", "B", "C" ou "D").
-- Formato da explanation: use bullet points com "- ", pode usar **negrito**. Sem títulos com #.
-- Retorne APENAS um JSON válido no formato: {"explanation":"...","exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
+REGRAS OBRIGATÓRIAS PARA A "explanation" (explicação):
+- A explicação deve ser de **excelente qualidade**: clara, didática e aprofundada o suficiente para o aluno fixar o conteúdo. Reforce a recomendação recebida.
+- **Inclua exemplos** sempre que fizer sentido. Quando possível, traga tanto **exemplos corretos** (aplicação adequada da regra ou conceito) quanto **exemplos errados** (o que NÃO se deve fazer ou como NÃO se aplica), explicando brevemente por que estão errados. O contraste entre certo e errado ajuda muito na fixação.
+- Explique o assunto/tema de forma genérica. Use as questões erradas APENAS para saber em que tipo de conteúdo focar. A explicação NÃO pode descrever, citar ou dar a resposta da questão específica que foi enviada — senão o aluno terá a resposta na próxima interação (re-tentativa da prova).
+- Formato: use bullet points com "- " quando apropriado, **negrito** para termos importantes. Pode usar parágrafos curtos e subtópicos. Evite títulos com # no início.
+- Tamanho: a explicação deve ser completa o suficiente para cobrir bem o tema (não seja superficial).
 
-    const recommendationsText = item.subjectFeedback.recommendations
-      .map((r) => `**${r.title}**: ${r.text}`)
-      .join('\n\n');
-    const userPrompt = `Recomendações de estudo para esta matéria:
+REGRAS PARA OS EXERCÍCIOS:
+- Gere exatamente 5 exercícios novos (não use as questões do contexto). Cada exercício: statement (enunciado em português), 4 alternativas com keys "A", "B", "C", "D", e correctAlternativeKey ("A", "B", "C" ou "D").
+
+FORMATO DE RESPOSTA:
+- Retorne APENAS um JSON válido: {"explanation":"...","exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
+
+    const rec = item.subjectFeedbackRecommendation;
+    const recommendationsText = `**${rec.title}**: ${rec.text}`;
+    const userPrompt = `Recomendação de estudo (foco deste item):
 ${recommendationsText}
 
 Questões que o aluno errou (use apenas como contexto do que reforçar; NÃO cite nem resolva estas questões na explanation):
 ${JSON.stringify(wrongQuestionsContext, null, 2)}
 
-Gere "explanation" (texto em português) e "exercises" (array com exatamente 5 exercícios, cada um com statement, alternatives [4 itens com key e text], correctAlternativeKey).`;
+Gere uma "explanation" (explicação em português, de qualidade; inclua exemplos corretos e exemplos errados quando fizer sentido) e "exercises" (array com exatamente 5 exercícios, cada um com statement, alternatives [4 itens com key e text], correctAlternativeKey).`;
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',

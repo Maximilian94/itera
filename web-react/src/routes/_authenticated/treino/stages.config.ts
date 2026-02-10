@@ -37,7 +37,7 @@ export const TREINO_STAGES = [
     title: 'Estudo',
     subtitle: 'Sub-etapas por assunto',
     description:
-      'Para cada assunto recomendado: mini-explicação + exercícios. Você marca como "pronto" ao concluir ou pode pular para a próxima etapa.',
+      'Para cada recomendação: explicação + exercícios. Você marca como "pronto" ao concluir ou pode pular para a próxima etapa.',
     icon: BookOpenIcon,
     color: 'bg-emerald-100 text-emerald-700',
     borderColor: 'border-emerald-300',

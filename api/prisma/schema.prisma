@@ -347,7 +347,6 @@ model SubjectFeedback {
   createdAt        DateTime @default(now())
 
   recommendations  SubjectFeedbackRecommendation[]
-  trainingStudyItems TrainingStudyItem[]
 
   @@unique([examBaseAttemptId, subject])
   @@index([examBaseAttemptId])
@@ -364,29 +363,31 @@ model SubjectFeedbackRecommendation {
   order               Int      @default(0)
   createdAt           DateTime @default(now())
 
+  trainingStudyItems TrainingStudyItem[]
+
   @@index([subjectFeedbackId])
   @@map("subject_feedback_recommendations")
 }
 
-/// One per SubjectFeedback per TrainingSession: study item with explanation + 5 exercises (AI-generated).
+/// One per SubjectFeedbackRecommendation per TrainingSession: study item for a single recommendation (explanation + 5 exercises AI-generated).
 model TrainingStudyItem {
-  id                 String    @id @default(uuid()) @db.Uuid
-  trainingSessionId  String    @db.Uuid
-  trainingSession    TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
-  subjectFeedbackId  String    @db.Uuid
-  subjectFeedback    SubjectFeedback @relation(fields: [subjectFeedbackId], references: [id], onDelete: Cascade)
-  subject            String
-  topic              String?
-  explanation        String?   @db.Text
-  completedAt        DateTime?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                          String    @id @default(uuid()) @db.Uuid
+  trainingSessionId           String    @db.Uuid
+  trainingSession             TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Cascade)
+  subjectFeedbackRecommendationId String    @db.Uuid
+  subjectFeedbackRecommendation   SubjectFeedbackRecommendation @relation(fields: [subjectFeedbackRecommendationId], references: [id], onDelete: Cascade)
+  subject                     String
+  topic                       String?
+  explanation                 String?   @db.Text
+  completedAt                 DateTime?
+  createdAt                   DateTime  @default(now())
+  updatedAt                   DateTime  @updatedAt
 
   exercises StudyExercise[]
 
-  @@unique([trainingSessionId, subjectFeedbackId])
+  @@unique([trainingSessionId, subjectFeedbackRecommendationId])
   @@index([trainingSessionId])
-  @@index([subjectFeedbackId])
+  @@index([subjectFeedbackRecommendationId])
   @@map("training_study_items")
 }
 
