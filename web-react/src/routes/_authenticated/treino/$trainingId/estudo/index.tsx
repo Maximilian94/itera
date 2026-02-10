@@ -44,7 +44,9 @@ function EstudoListPage() {
       list.push(item)
       bySubject.set(item.subject, list)
     }
-    return Array.from(bySubject.entries()).map(([subject, items]) => ({ subject, items }))
+    return Array.from(bySubject.entries())
+      .map(([subject, items]) => ({ subject, items }))
+      .sort((a, b) => a.subject.localeCompare(b.subject))
   }, [studyItems])
 
   const handleIrParaRetentativa = () => {

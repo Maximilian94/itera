@@ -370,6 +370,10 @@ export class TrainingService {
     await this.ensureStudyItems(trainingId, session.examBaseAttemptId);
     const items = await this.prisma.trainingStudyItem.findMany({
       where: { trainingSessionId: trainingId },
+      orderBy: [
+        { subject: 'asc' },
+        { subjectFeedbackRecommendation: { order: 'asc' } },
+      ],
       include: {
         subjectFeedbackRecommendation: {
           select: { title: true, text: true },
