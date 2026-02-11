@@ -12,6 +12,7 @@ import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { getStagePath } from '../../stages.config'
 import {
   useTrainingStudyItemsQuery,
+  useRetryQuestionsQuery,
   useUpdateTrainingStageMutation,
   trainingKeys,
 } from '@/features/training/queries/training.queries'
@@ -29,6 +30,7 @@ function EstudoListPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
 
   const { data: studyItems = [], isLoading } = useTrainingStudyItemsQuery(trainingId)
+  const { data: retryQuestions = [] } = useRetryQuestionsQuery(trainingId)
   const updateStageMutation = useUpdateTrainingStageMutation(trainingId)
 
   const total = studyItems.length
@@ -36,6 +38,7 @@ function EstudoListPage() {
   const pendentes = total - concluidos
   const progresso = total > 0 ? Math.round((concluidos / total) * 100) : 0
   const temPendentes = pendentes > 0
+  const totalRetryQuestions = retryQuestions.length
 
   const studyItemsBySubject = useMemo(() => {
     const bySubject = new Map<string, TrainingStudyItemResponse[]>()
@@ -69,11 +72,37 @@ function EstudoListPage() {
   }
 
   return (
-    <>
-      <p className="text-slate-600 text-sm">
-        Estude cada recomendação do diagnóstico. Clique em <strong>Estudar</strong> para abrir a
-        explicação e os exercícios. As recomendações estão agrupadas por matéria.
-      </p>
+    <div className="flex flex-col gap-4">
+      <Card noElevation className="p-5 border border-slate-200 bg-slate-50/50">
+        <h2 className="text-base font-semibold text-slate-800 mb-3">
+          Seu plano de estudo
+        </h2>
+        <div className="text-sm text-slate-700 space-y-3">
+          <p>
+            Este plano foi montado com base no seu diagnóstico: o conteúdo abaixo foca nos temas em que
+            você cometeu erros. A ideia é <strong>aproveitar ao máximo o tempo de estudo</strong> —
+            estudando apenas o que realmente precisa.
+          </p>
+          <p>
+            Depois de estudar, a próxima etapa é a <strong>Re-tentativa</strong>: você refaz apenas as questões
+            que errou e vê como se sairia após esse reforço.
+            {totalRetryQuestions > 0 && (
+              <>
+                {' '}Neste treino, a prova de re-tentativa terá <strong>{totalRetryQuestions} {totalRetryQuestions === 1 ? 'questão' : 'questões'}</strong>.
+              </>
+            )}
+          </p>
+          <p>
+            Você <strong>não precisa</strong> concluir todas as recomendações antes de ir para a Re-tentativa.
+            Por outro lado, fazer a re-tentativa sem ter passado pelos pontos que você deveria estudar tende a
+            não trazer tanto proveito. Vale usar este plano como guia e, quando se sentir mais seguro nos temas,
+            partir para a segunda chance — assim você continua economizando tempo.
+          </p>
+          <p className="text-slate-600">
+            Clique em um item para abrir a explicação e os exercícios. Marque como concluído quando terminar.
+          </p>
+        </div>
+      </Card>
 
       {isLoading ? (
         <p className="text-slate-500 text-sm">Carregando itens de estudo...</p>
@@ -109,9 +138,9 @@ function EstudoListPage() {
                     {subject}
                   </h3>
                   <ul className="flex flex-col gap-2 list-none p-0 m-0">
-                    {items.map((item) => (
-                      <StudyItemRow key={item.id} trainingId={trainingId} item={item} />
-                    ))}
+                      {items.map((item) => (
+                        <StudyItemRow key={item.id} trainingId={trainingId} item={item} />
+                      ))}
                   </ul>
                 </div>
               ))}
@@ -128,9 +157,9 @@ function EstudoListPage() {
 
       <Card noElevation className="p-4 border-dashed border-2 border-slate-300 bg-slate-50/50">
         <p className="text-sm text-slate-600">
-          Você pode seguir para a <strong>Re-tentativa</strong> mesmo sem ter
+          Você pode ir para a <strong>Re-tentativa</strong> a qualquer momento, mesmo sem ter
           concluído todas as recomendações. O que já foi marcado como pronto fica
-          registrado.
+          registrado e você pode voltar a esta etapa depois pelo menu.
         </p>
       </Card>
 
@@ -175,7 +204,7 @@ function EstudoListPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </>
+    </div>
   )
 }
 
