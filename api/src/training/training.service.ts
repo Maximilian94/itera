@@ -840,6 +840,39 @@ Gere uma "explanation" (explicação em português, de qualidade; inclua exemplo
     const initialCorrect = totalQuestions > 0 ? Math.round((initialPercentage / 100) * totalQuestions) : 0;
     const finalPercentage = session2.finalScorePercentage != null ? Number(session2.finalScorePercentage) : initialPercentage;
     const finalCorrect = totalQuestions > 0 ? Math.round((finalPercentage / 100) * totalQuestions) : 0;
+
+    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+      session2.examBaseId,
+      session2.examBaseAttemptId,
+      userId,
+    );
+    const subjectStatsInitial = this.examBaseAttemptService.getSubjectStats(data.questions, data.answers);
+
+    const latestRetry = await this.prisma.trainingRetry.findFirst({
+      where: { trainingSessionId: trainingId },
+      orderBy: { createdAt: 'desc' },
+    });
+    const retryAnswersList = latestRetry
+      ? await this.prisma.trainingRetryAnswer.findMany({
+          where: { trainingRetryId: latestRetry.id },
+          select: { examBaseQuestionId: true, selectedAlternativeId: true },
+        })
+      : [];
+    const retryMap: Record<string, string | null> = {};
+    for (const r of retryAnswersList) {
+      retryMap[r.examBaseQuestionId] = r.selectedAlternativeId;
+    }
+
+    const combinedAnswers: Record<string, string | null> = {};
+    for (const q of data.questions) {
+      const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+      const correctId = correctAlt?.id ?? null;
+      const initialSelected = data.answers[q.id] ?? null;
+      const initialCorrectQ = correctId != null && initialSelected === correctId;
+      combinedAnswers[q.id] = initialCorrectQ ? initialSelected : (retryMap[q.id] ?? null);
+    }
+    const subjectStatsFinal = this.examBaseAttemptService.getSubjectStats(data.questions, combinedAnswers);
+
     return {
       initialPercentage,
       beforeStudyPercentage: initialPercentage,
@@ -850,6 +883,8 @@ Gere uma "explanation" (explicação em português, de qualidade; inclua exemplo
       gainPoints: finalCorrect - initialCorrect,
       gainPercent: Math.round(finalPercentage - initialPercentage),
       finalFeedback: session2.finalFeedback ?? undefined,
+      subjectStatsInitial,
+      subjectStatsFinal,
     };
   }
 }

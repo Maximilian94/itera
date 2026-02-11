@@ -477,6 +477,25 @@ export class ExamBaseAttemptService {
   }
 
   /**
+   * Public helper: compute per-subject stats from questions and answers map.
+   * Used by training getFinal to get initial and final (after retry) subject stats.
+   */
+  getSubjectStats(
+    questions: Array<{
+      id: string;
+      subject: string | null;
+      topic: string | null;
+      subtopics: string[];
+      correctAlternative: string | null;
+      alternatives: Array<{ id: string; key: string }>;
+    }>,
+    answers: Record<string, string | null>,
+  ): Array<{ subject: string; correct: number; total: number; percentage: number }> {
+    const { subjectStats } = this.computeSubjectStats(questions, answers);
+    return subjectStats;
+  }
+
+  /**
    * Generates AI feedback per subject for a finished attempt.
    * Used for older attempts that don't have feedback, or to regenerate it.
    * Requires XAI_API_KEY. Saves result to subjectFeedback column.

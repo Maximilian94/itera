@@ -3,15 +3,14 @@ import { Markdown } from '@/components/Markdown'
 import { Button } from '@mui/material'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import {
-  SparklesIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   TrophyIcon,
   ChartBarIcon,
   DocumentTextIcon,
-  ChatBubbleLeftRightIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline'
-import { getStageById, TREINO_STAGES, getStagePath } from '../stages.config'
+import { getStagePath } from '../stages.config'
 import { useRequireTrainingStage } from '../useRequireTrainingStage'
 import {
   useTrainingQuery,
@@ -28,7 +27,6 @@ function FinalPage() {
   const { trainingId } = Route.useParams()
   const navigate = useNavigate()
   useRequireTrainingStage(trainingId, 'final')
-  const stage = getStageById(5)!
 
   const { data: training, isLoading: loadingTraining } = useTrainingQuery(trainingId)
   const { data: finalPayload, isLoading: loadingFinal } = useQuery({
@@ -50,49 +48,43 @@ function FinalPage() {
   }
 
   const initialPercentage = finalPayload?.initialPercentage ?? 0
-  const beforeStudyPercentage = finalPayload?.beforeStudyPercentage ?? finalPayload?.initialPercentage ?? 0
   const finalPercentage = finalPayload?.finalPercentage ?? 0
   const initialCorrect = finalPayload?.initialCorrect ?? 0
   const finalCorrect = finalPayload?.finalCorrect ?? 0
   const totalQuestions = finalPayload?.totalQuestions ?? 0
   const gainPoints = finalPayload?.gainPoints ?? 0
   const gainPercent = finalPayload?.gainPercent ?? 0
+  const subjectStatsInitial = finalPayload?.subjectStatsInitial ?? []
+  const subjectStatsFinal = finalPayload?.subjectStatsFinal ?? []
+
+  const subjectComparison = (() => {
+    const bySubject = new Map<string, { initial: typeof subjectStatsInitial[0]; final: typeof subjectStatsFinal[0] }>()
+    for (const s of subjectStatsInitial) bySubject.set(s.subject, { initial: s, final: undefined! })
+    for (const s of subjectStatsFinal) {
+      const entry = bySubject.get(s.subject)
+      if (entry) entry.final = s
+      else bySubject.set(s.subject, { initial: undefined!, final: s })
+    }
+    return Array.from(bySubject.entries()).map(([subject, { initial, final }]) => ({
+      subject,
+      initial: initial ?? { subject, correct: 0, total: 0, percentage: 0 },
+      final: final ?? { subject, correct: 0, total: 0, percentage: 0 },
+    }))
+  })()
 
   return (
-    <>
-      <div
-        className={`rounded-lg border-l-4 ${stage.borderColor} ${stage.color} bg-opacity-20 p-4`}
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-12 h-12 rounded-xl flex items-center justify-center ${stage.color}`}
-          >
-            <SparklesIcon className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-slate-500">
-              Etapa {TREINO_STAGES.length} de {TREINO_STAGES.length}
-            </p>
-            <h1 className="text-xl font-bold text-slate-900">{stage.title}</h1>
-            <p className="text-sm text-slate-600 mt-0.5">{stage.subtitle}</p>
-          </div>
-        </div>
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-xl font-bold text-slate-900">{examTitle}</h1>
+        <p className="text-sm text-slate-500 mt-1">
+          Resultado final: sua evolução da prova inicial até após o estudo e a re-tentativa.
+        </p>
       </div>
 
-      <h2 className="text-lg font-semibold text-slate-800">{examTitle}</h2>
-
-      <p className="text-slate-600 text-sm">
-        Sua evolução neste treino: da nota da prova até o resultado após estudo e
-        re-tentativa das questões erradas.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-stretch">
-        <Card
-          noElevation
-          className="p-5 rounded-xl border-2 border-slate-200 bg-slate-50 text-center flex flex-col"
-        >
-          <div className="flex justify-center mb-2">
-            <ChartBarIcon className="w-8 h-8 text-slate-500" />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-stretch">
+        <Card noElevation className="p-5 border border-slate-200 flex flex-col">
+          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center mb-3">
+            <ChartBarIcon className="w-6 h-6 text-slate-600" />
           </div>
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
             Nota inicial
@@ -100,7 +92,7 @@ function FinalPage() {
           <p className="text-[0.7rem] text-slate-500 mt-0.5">
             Resultado da prova
           </p>
-          <p className="text-3xl font-bold text-slate-700 mt-3">
+          <p className="text-2xl font-bold text-slate-800 mt-3 tabular-nums">
             {initialPercentage.toFixed(1)}%
           </p>
           <p className="text-sm text-slate-500 mt-1">
@@ -109,78 +101,95 @@ function FinalPage() {
         </Card>
 
         <div className="hidden md:flex items-center justify-center">
-          <ArrowRightIcon className="w-8 h-8 text-slate-300" aria-hidden />
+          <ArrowRightIcon className="w-6 h-6 text-slate-300" aria-hidden />
         </div>
 
-        <Card
-          noElevation
-          className="p-5 rounded-xl border-2 border-amber-200 bg-amber-50/50 text-center flex flex-col"
-        >
-          <div className="flex justify-center mb-2">
-            <ChartBarIcon className="w-8 h-8 text-amber-600" />
-          </div>
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-            Antes dos estudos
-          </p>
-          <p className="text-[0.7rem] text-slate-500 mt-0.5">
-            Mesmo resultado (diagnóstico)
-          </p>
-          <p className="text-3xl font-bold text-amber-700 mt-3">
-            {beforeStudyPercentage.toFixed(1)}%
-          </p>
-          <p className="text-sm text-slate-500 mt-1">
-            {initialCorrect} de {totalQuestions} questões
-          </p>
-        </Card>
-
-        <div className="hidden md:flex items-center justify-center">
-          <ArrowRightIcon className="w-8 h-8 text-emerald-400 shrink-0" aria-hidden />
-        </div>
-
-        <Card
-          noElevation
-          className="p-5 rounded-xl border-2 border-emerald-300 bg-emerald-50 text-center flex flex-col"
-        >
-          <div className="flex justify-center mb-2">
-            <TrophyIcon className="w-8 h-8 text-emerald-600" />
+        <Card noElevation className="p-5 border border-slate-200 flex flex-col border-l-4 border-l-emerald-500">
+          <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mb-3">
+            <TrophyIcon className="w-6 h-6 text-emerald-600" />
           </div>
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">
             Nota final
           </p>
           <p className="text-[0.7rem] text-slate-500 mt-0.5">
-            Depois do estudo e re-tentativa
+            Após estudo e re-tentativa
           </p>
-          <p className="text-3xl font-bold text-emerald-700 mt-3">
+          <p className="text-2xl font-bold text-emerald-700 mt-3 tabular-nums">
             {finalPercentage.toFixed(1)}%
           </p>
           <p className="text-sm text-slate-500 mt-1">
             {finalCorrect} de {totalQuestions} questões
           </p>
-          <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-200 text-emerald-800 text-sm font-semibold">
-            <span>+{gainPoints} questões</span>
-            <span className="text-emerald-600">(+{gainPercent.toFixed(0)}%)</span>
+          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-100 text-emerald-800 text-sm font-semibold w-fit">
+            +{gainPoints} questões (+{gainPercent > 0 ? '+' : ''}{gainPercent.toFixed(0)}%)
           </div>
         </Card>
       </div>
 
-      <Card
-        noElevation
-        className="p-5 border-2 border-emerald-200 bg-emerald-50/80 flex items-center gap-4"
-      >
-        <div className="w-12 h-12 rounded-full bg-emerald-200 flex items-center justify-center shrink-0">
-          <TrophyIcon className="w-7 h-7 text-emerald-700" />
+      {subjectComparison.length > 0 && (
+        <Card noElevation className="p-5 border border-slate-200">
+          <h3 className="text-base font-semibold text-slate-800 mb-4">
+            Desempenho por matéria: antes e depois
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-200 text-slate-500 font-medium text-left">
+                  <th className="py-2 pr-4">Matéria</th>
+                  <th className="py-2 pr-4 text-center">Antes</th>
+                  <th className="py-2 pr-4 text-center">Depois</th>
+                  <th className="py-2 text-center">Variação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {subjectComparison.map(({ subject, initial, final: f }) => {
+                  const delta = f.percentage - initial.percentage
+                  return (
+                    <tr key={subject} className="border-b border-slate-100">
+                      <td className="py-3 pr-4 font-medium text-slate-800">{subject}</td>
+                      <td className="py-3 pr-4 text-center tabular-nums text-slate-600">
+                        {initial.correct}/{initial.total} ({initial.percentage.toFixed(0)}%)
+                      </td>
+                      <td className="py-3 pr-4 text-center tabular-nums text-slate-600">
+                        {f.correct}/{f.total} ({f.percentage.toFixed(0)}%)
+                      </td>
+                      <td className="py-3 text-center">
+                        <span
+                          className={
+                            delta > 0
+                              ? 'text-emerald-600 font-semibold'
+                              : delta < 0
+                                ? 'text-red-600 font-semibold'
+                                : 'text-slate-500'
+                          }
+                        >
+                          {delta > 0 ? '+' : ''}{delta.toFixed(0)} p.p.
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      )}
+
+      <Card noElevation className="p-5 border border-slate-200 flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+          <TrophyIcon className="w-7 h-7 text-emerald-600" />
         </div>
         <div>
           <h3 className="font-semibold text-slate-800">Treino concluído</h3>
           <p className="text-sm text-slate-600 mt-0.5">
-            Você melhorou {gainPercent.toFixed(0)} pontos percentuais após o estudo e a
+            Você melhorou {gainPercent > 0 ? '+' : ''}{gainPercent.toFixed(0)} pontos percentuais após o estudo e a
             re-tentativa. Continue assim nos próximos treinos.
           </p>
         </div>
       </Card>
 
       {training?.examBaseId && (
-        <div className="flex flex-wrap gap-3 items-center">
+        <Card noElevation className="p-4 border border-slate-200 flex flex-wrap items-center gap-3">
           <Link to="/exams">
             <Button
               variant="outlined"
@@ -193,18 +202,18 @@ function FinalPage() {
           <span className="text-sm text-slate-500">
             Acesse o exame para revisar as questões deste treino.
           </span>
-        </div>
+        </Card>
       )}
 
       {feedback && (
         <Card noElevation className="p-5 border border-slate-200">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 mb-3">
             <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
-              <ChatBubbleLeftRightIcon className="w-5 h-5 text-slate-600" />
+              <SparklesIcon className="w-5 h-5 text-slate-600" />
             </div>
             <h3 className="text-base font-semibold text-slate-800">Feedback final</h3>
           </div>
-          <div className="text-sm text-slate-700">
+          <div className="text-sm text-slate-700 leading-relaxed">
             <Markdown>{feedback}</Markdown>
           </div>
         </Card>
@@ -222,6 +231,6 @@ function FinalPage() {
           Concluir e voltar ao início
         </Button>
       </div>
-    </>
+    </div>
   )
 }

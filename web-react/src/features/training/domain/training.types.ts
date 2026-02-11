@@ -43,6 +43,13 @@ export interface TrainingState {
   final?: TrainingFinalPayload
 }
 
+export interface SubjectStat {
+  subject: string
+  correct: number
+  total: number
+  percentage: number
+}
+
 export interface TrainingFinalPayload {
   initialPercentage: number
   beforeStudyPercentage: number
@@ -53,6 +60,8 @@ export interface TrainingFinalPayload {
   gainPoints: number
   gainPercent: number
   finalFeedback?: string
+  subjectStatsInitial?: SubjectStat[]
+  subjectStatsFinal?: SubjectStat[]
 }
 
 export interface TrainingStudyItemExercise {
