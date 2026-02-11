@@ -60,7 +60,7 @@ function FinalPage() {
 
   return (
     <>
-      <div
+      {/* <div
         className={`rounded-lg border-l-4 ${stage.borderColor} ${stage.color} bg-opacity-20 p-4`}
       >
         <div className="flex items-center gap-3">
@@ -77,7 +77,7 @@ function FinalPage() {
             <p className="text-sm text-slate-600 mt-0.5">{stage.subtitle}</p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       <h2 className="text-lg font-semibold text-slate-800">{examTitle}</h2>
 
