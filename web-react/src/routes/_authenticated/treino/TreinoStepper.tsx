@@ -75,7 +75,9 @@ export function TreinoStepper({
         const isActive = currentIndex === index
         const isPast = currentIndex > index
         const isLocked = trainingId != null && index > allowedStageIndex
-        const StageIcon = stage.icon
+        const isAvailable = !isLocked
+        const StageIcon = isAvailable ? stage.iconSolid : stage.icon
+        const iconColorClass = isAvailable ? (isActive ? 'text-white' : stage.iconColor) : ''
         const linkClass = `flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0 ${
           isActive
             ? `${stage.activeBg} text-white ring-1 ring-offset-1 ring-slate-400`
@@ -102,7 +104,7 @@ export function TreinoStepper({
                 placement="bottom"
               >
                 <span className={linkClass} aria-disabled>
-                  <StageIcon className="w-4 h-4 shrink-0" />
+                  <StageIcon className={`w-4 h-4 shrink-0 ${iconColorClass}`} />
                   <span className="hidden md:inline">{stage.title}</span>
                   <span className="md:hidden">{stage.id}</span>
                 </span>
@@ -114,7 +116,7 @@ export function TreinoStepper({
                 className={linkClass}
                 aria-current={isActive ? 'step' : undefined}
               >
-                <StageIcon className="w-4 h-4 shrink-0" />
+                <StageIcon className={`w-4 h-4 shrink-0 ${iconColorClass}`} />
                 <span className="hidden md:inline">{stage.title}</span>
                 <span className="md:hidden">{stage.id}</span>
               </Link>

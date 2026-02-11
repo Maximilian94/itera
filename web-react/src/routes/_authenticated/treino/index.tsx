@@ -1,17 +1,22 @@
 import { Card } from '@/components/Card'
 import {
-  CheckCircleIcon,
-  ClipboardDocumentListIcon,
+  AcademicCapIcon,
   PlayIcon,
   TrophyIcon,
+  ArrowPathIcon,
+  ClipboardDocumentListIcon,
+  RocketLaunchIcon,
+  PresentationChartLineIcon,
 } from '@heroicons/react/24/outline'
+import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { Button } from '@mui/material'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { TREINO_STAGES, getStagePath, getStageBySlug } from './stages.config'
+import { getStagePath, getStageBySlug } from './stages.config'
 import type { TreinoStageSlug } from './stages.config'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import type { TrainingStage } from '@/features/training/domain/training.types'
 import dayjs from 'dayjs'
+import { PageHeader } from '@/components/PageHeader'
 
 const STAGE_TO_SLUG: Record<TrainingStage, TreinoStageSlug> = {
   EXAM: 'prova',
@@ -28,24 +33,88 @@ export const Route = createFileRoute('/_authenticated/treino/')({
 function TreinoIndexPage() {
   const { data: trainings = [], isLoading } = useTrainingsQuery()
 
+  const total = trainings.length
+  const concluded = trainings.filter((t) => t.currentStage === 'FINAL').length
+  const inProgress = total - concluded
+
   return (
-    <>
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Treino</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Em vez de só fazer uma prova e receber feedback, o Treino é um processo completo: prova → diagnóstico → estudo → re-tentativa → resultado final.
-        </p>
+    <div className="flex flex-col gap-6 p-1">
+      {/* Título */}
+      <PageHeader title="Treino" />
+
+      {/* Dashboard: cards de estatísticas */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card noElevation className="p-2 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center">
+              <ClipboardDocumentListIcon className="w-6 h-6 text-slate-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-slate-900">{isLoading ? '—' : total}</p>
+              <p className="text-sm text-slate-500">Total de treinos</p>
+            </div>
+          </div>
+        </Card>
+        <Card noElevation className="p-2 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+              <CheckCircleIcon className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-emerald-700">{isLoading ? '—' : concluded}</p>
+              <p className="text-sm text-slate-500">Concluídos</p>
+            </div>
+          </div>
+        </Card>
+        <Card noElevation className="p-2 border border-slate-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+              <ArrowPathIcon className="w-6 h-6 text-amber-600" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold text-amber-700">{isLoading ? '—' : inProgress}</p>
+              <p className="text-sm text-slate-500">Em andamento</p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Lista de treinos */}
+      {/* CTA: explicar + criar novo */}
+      <Card noElevation className="p-5 border border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="flex flex-col gap-1 min-w-0">
+              <p className="text-sm text-slate-700">
+                <strong>Aqui seu erro vira plano de estudo.</strong>
+              </p>
+              <p className="text-sm text-slate-700">
+                Você entra em um ciclo de evolução:
+              </p>
+              <p className="text-sm text-slate-700">
+                Faz a prova, recebe um diagnóstico da IA, estuda o que realmente precisa e refaz as questões que errou.
+              </p>
+              <p className="text-sm text-slate-700">
+                No fim, você compara o antes e depois e vê o quanto evoluiu.
+              </p>
+            </div>
+          </div>
+          <Link to="/treino/prova" className="shrink-0">
+            <Button variant="contained" color="primary" startIcon={<RocketLaunchIcon className="w-5 h-5" />}>
+              Criar novo treino
+            </Button>
+          </Link>
+        </div>
+      </Card>
+
+      {/* Histórico de treinos */}
       <div className="space-y-3">
-        <h2 className="text-base font-semibold text-slate-800">Seus treinos</h2>
+        <h2 className="text-base font-semibold text-slate-800">Histórico de treinos</h2>
         {isLoading ? (
           <p className="text-slate-500 text-sm">Carregando...</p>
         ) : trainings.length === 0 ? (
           <Card noElevation className="p-5 border border-slate-200">
             <p className="text-slate-600 text-sm">
-              Você ainda não iniciou nenhum treino. Clique em &quot;Iniciar novo treino&quot; para escolher um simulado e começar.
+              Você ainda não tem nenhum treino. Use o botão acima para escolher um simulado e começar.
             </p>
           </Card>
         ) : (
@@ -56,47 +125,7 @@ function TreinoIndexPage() {
           </ul>
         )}
       </div>
-
-      {/* Iniciar novo */}
-      <Card noElevation className="p-5 border-dashed border-2 border-slate-300 bg-slate-50/50">
-        <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
-          <div className="w-14 h-14 rounded-full bg-slate-200 flex items-center justify-center shrink-0">
-            <CheckCircleIcon className="w-7 h-7 text-slate-500" />
-          </div>
-          <div className="flex-1">
-            <h3 className="font-semibold text-slate-700">Iniciar novo treino</h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Escolha um simulado e comece pela etapa Prova.
-            </p>
-          </div>
-          <Link to="/treino/prova">
-            <Button variant="contained" color="primary" startIcon={<ClipboardDocumentListIcon className="w-5 h-5" />}>
-              Ir para Prova
-            </Button>
-          </Link>
-        </div>
-      </Card>
-
-      {/* Resumo das etapas (colapsado / referência) */}
-      <details className="group">
-        <summary className="text-sm font-medium text-slate-600 cursor-pointer list-none flex items-center gap-1">
-          <span className="group-open:rotate-90 transition-transform">▶</span>
-          Ver etapas do treino
-        </summary>
-        <div className="flex flex-col gap-2 mt-2 pl-4">
-          {TREINO_STAGES.map((stage) => {
-            const Icon = stage.icon
-            return (
-              <div key={stage.id} className="flex items-center gap-2 text-sm text-slate-600">
-                <Icon className="w-4 h-4 shrink-0" />
-                <span>{stage.title}</span>
-                <span className="text-slate-400">— {stage.subtitle}</span>
-              </div>
-            )
-          })}
-        </div>
-      </details>
-    </>
+    </div>
   )
 }
 
