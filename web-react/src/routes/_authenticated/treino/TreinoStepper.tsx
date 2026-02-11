@@ -1,5 +1,6 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { Fragment } from 'react'
+import { HomeIcon } from '@heroicons/react/24/outline'
 import { Tooltip } from '@mui/material'
 import {
   TREINO_STAGES,
@@ -45,19 +46,34 @@ export function TreinoStepper({
       className="flex flex-wrap items-center gap-2 sm:gap-0 sm:flex-nowrap border border-slate-300 rounded-lg bg-slate-50 p-2"
       aria-label="Etapas do treino"
     >
-      {trainingId ? (
+      {trainingId === 'novo' ? (
         <Link
-          to="/treino/$trainingId"
-          params={{ trainingId }}
+          to="/treino/novo"
           className={`flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium transition-colors shrink-0 ${
             currentIndex === -1
               ? 'bg-slate-200 text-slate-800 ring-1 ring-slate-400'
               : 'text-slate-600 hover:bg-slate-200'
           }`}
         >
+          <HomeIcon className="w-4 h-4 shrink-0" />
           <span className="hidden sm:inline">Início</span>
           <span className="sm:hidden">1</span>
         </Link>
+      ) : trainingId ? (
+        <Tooltip
+          title="Você já escolheu o concurso e iniciou o treino. O início não está disponível após a criação."
+          arrow
+          placement="bottom"
+        >
+          <span
+            className="flex items-center gap-1.5 px-2 py-1.5 rounded-md text-sm font-medium text-slate-400 cursor-not-allowed opacity-70 shrink-0"
+            aria-disabled
+          >
+            <HomeIcon className="w-4 h-4 shrink-0" />
+            <span className="hidden sm:inline">Início</span>
+            <span className="sm:hidden">1</span>
+          </span>
+        </Tooltip>
       ) : (
         <Link
           to="/treino"
@@ -67,6 +83,7 @@ export function TreinoStepper({
               : 'text-slate-600 hover:bg-slate-200'
           }`}
         >
+          <HomeIcon className="w-4 h-4 shrink-0" />
           <span className="hidden sm:inline">Início</span>
           <span className="sm:hidden">1</span>
         </Link>
@@ -74,7 +91,8 @@ export function TreinoStepper({
       {TREINO_STAGES.map((stage, index) => {
         const isActive = currentIndex === index
         const isPast = currentIndex > index
-        const isLocked = trainingId != null && index > allowedStageIndex
+        const isCreateMode = trainingId === 'novo'
+        const isLocked = isCreateMode || (trainingId != null && index > allowedStageIndex)
         const isAvailable = !isLocked
         const StageIcon = isAvailable ? stage.iconSolid : stage.icon
         const iconColorClass = isAvailable ? (isActive ? 'text-white' : stage.iconColor) : ''
@@ -96,9 +114,11 @@ export function TreinoStepper({
             {isLocked ? (
               <Tooltip
                 title={
-                  currentStage != null && allowedStageIndex >= 0
-                    ? `Conclua a etapa "${TREINO_STAGES[allowedStageIndex].title}" para desbloquear "${stage.title}".`
-                    : 'Conclua as etapas anteriores para desbloquear.'
+                  isCreateMode
+                    ? 'Selecione um concurso e clique em "Criar e avançar" para continuar.'
+                    : currentStage != null && allowedStageIndex >= 0
+                      ? `Conclua a etapa "${TREINO_STAGES[allowedStageIndex].title}" para desbloquear "${stage.title}".`
+                      : 'Conclua as etapas anteriores para desbloquear.'
                 }
                 arrow
                 placement="bottom"

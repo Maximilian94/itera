@@ -98,7 +98,7 @@ function TreinoIndexPage() {
               </p>
             </div>
           </div>
-          <Link to="/treino/prova" className="shrink-0">
+          <Link to="/treino/novo" className="shrink-0">
             <Button variant="contained" color="primary" startIcon={<RocketLaunchIcon className="w-5 h-5" />}>
               Criar novo treino
             </Button>

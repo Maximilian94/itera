@@ -12,7 +12,8 @@ function deriveTrainingIdFromPath(pathname: string): string | undefined {
   const first = after.split('/')[0]
   if (!first) return undefined
   const isStageSlug = TREINO_STAGES.some((s) => s.slug === first)
-  return isStageSlug ? undefined : first
+  if (isStageSlug) return undefined
+  return first
 }
 
 function TreinoLayout() {

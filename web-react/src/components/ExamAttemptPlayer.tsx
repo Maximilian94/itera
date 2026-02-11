@@ -437,7 +437,7 @@ export function ExamAttemptPlayer({
                               </Tooltip>
                               <button
                                 type="button"
-                                className={`flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
+                                className={`flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
                                 onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
                                 disabled={isEliminated || isFinished}
                               >

@@ -25,6 +25,7 @@ import { Route as AuthenticatedTreinoIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedExamsIndexRouteImport } from './routes/_authenticated/exams/index'
 import { Route as AuthenticatedTreinoRetentativaRouteImport } from './routes/_authenticated/treino/retentativa'
 import { Route as AuthenticatedTreinoProvaRouteImport } from './routes/_authenticated/treino/prova'
+import { Route as AuthenticatedTreinoNovoRouteImport } from './routes/_authenticated/treino/novo'
 import { Route as AuthenticatedTreinoFinalRouteImport } from './routes/_authenticated/treino/final'
 import { Route as AuthenticatedTreinoEstudoRouteImport } from './routes/_authenticated/treino/estudo'
 import { Route as AuthenticatedTreinoDiagnosticoRouteImport } from './routes/_authenticated/treino/diagnostico'
@@ -127,6 +128,11 @@ const AuthenticatedTreinoProvaRoute =
     path: '/prova',
     getParentRoute: () => AuthenticatedTreinoRoute,
   } as any)
+const AuthenticatedTreinoNovoRoute = AuthenticatedTreinoNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => AuthenticatedTreinoRoute,
+} as any)
 const AuthenticatedTreinoFinalRoute =
   AuthenticatedTreinoFinalRouteImport.update({
     id: '/final',
@@ -252,6 +258,7 @@ export interface FileRoutesByFullPath {
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
   '/treino/final': typeof AuthenticatedTreinoFinalRoute
+  '/treino/novo': typeof AuthenticatedTreinoNovoRoute
   '/treino/prova': typeof AuthenticatedTreinoProvaRoute
   '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/exams/': typeof AuthenticatedExamsIndexRoute
@@ -285,6 +292,7 @@ export interface FileRoutesByTo {
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
   '/treino/final': typeof AuthenticatedTreinoFinalRoute
+  '/treino/novo': typeof AuthenticatedTreinoNovoRoute
   '/treino/prova': typeof AuthenticatedTreinoProvaRoute
   '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/exams': typeof AuthenticatedExamsIndexRoute
@@ -320,6 +328,7 @@ export interface FileRoutesById {
   '/_authenticated/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/_authenticated/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
   '/_authenticated/treino/final': typeof AuthenticatedTreinoFinalRoute
+  '/_authenticated/treino/novo': typeof AuthenticatedTreinoNovoRoute
   '/_authenticated/treino/prova': typeof AuthenticatedTreinoProvaRoute
   '/_authenticated/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/_authenticated/exams/': typeof AuthenticatedExamsIndexRoute
@@ -357,6 +366,7 @@ export interface FileRouteTypes {
     | '/treino/diagnostico'
     | '/treino/estudo'
     | '/treino/final'
+    | '/treino/novo'
     | '/treino/prova'
     | '/treino/retentativa'
     | '/exams/'
@@ -390,6 +400,7 @@ export interface FileRouteTypes {
     | '/treino/diagnostico'
     | '/treino/estudo'
     | '/treino/final'
+    | '/treino/novo'
     | '/treino/prova'
     | '/treino/retentativa'
     | '/exams'
@@ -424,6 +435,7 @@ export interface FileRouteTypes {
     | '/_authenticated/treino/diagnostico'
     | '/_authenticated/treino/estudo'
     | '/_authenticated/treino/final'
+    | '/_authenticated/treino/novo'
     | '/_authenticated/treino/prova'
     | '/_authenticated/treino/retentativa'
     | '/_authenticated/exams/'
@@ -563,6 +575,13 @@ declare module '@tanstack/react-router' {
       path: '/prova'
       fullPath: '/treino/prova'
       preLoaderRoute: typeof AuthenticatedTreinoProvaRouteImport
+      parentRoute: typeof AuthenticatedTreinoRoute
+    }
+    '/_authenticated/treino/novo': {
+      id: '/_authenticated/treino/novo'
+      path: '/novo'
+      fullPath: '/treino/novo'
+      preLoaderRoute: typeof AuthenticatedTreinoNovoRouteImport
       parentRoute: typeof AuthenticatedTreinoRoute
     }
     '/_authenticated/treino/final': {
@@ -765,6 +784,7 @@ interface AuthenticatedTreinoRouteChildren {
   AuthenticatedTreinoDiagnosticoRoute: typeof AuthenticatedTreinoDiagnosticoRoute
   AuthenticatedTreinoEstudoRoute: typeof AuthenticatedTreinoEstudoRoute
   AuthenticatedTreinoFinalRoute: typeof AuthenticatedTreinoFinalRoute
+  AuthenticatedTreinoNovoRoute: typeof AuthenticatedTreinoNovoRoute
   AuthenticatedTreinoProvaRoute: typeof AuthenticatedTreinoProvaRoute
   AuthenticatedTreinoRetentativaRoute: typeof AuthenticatedTreinoRetentativaRoute
   AuthenticatedTreinoIndexRoute: typeof AuthenticatedTreinoIndexRoute
@@ -776,6 +796,7 @@ const AuthenticatedTreinoRouteChildren: AuthenticatedTreinoRouteChildren = {
   AuthenticatedTreinoDiagnosticoRoute: AuthenticatedTreinoDiagnosticoRoute,
   AuthenticatedTreinoEstudoRoute: AuthenticatedTreinoEstudoRoute,
   AuthenticatedTreinoFinalRoute: AuthenticatedTreinoFinalRoute,
+  AuthenticatedTreinoNovoRoute: AuthenticatedTreinoNovoRoute,
   AuthenticatedTreinoProvaRoute: AuthenticatedTreinoProvaRoute,
   AuthenticatedTreinoRetentativaRoute: AuthenticatedTreinoRetentativaRoute,
   AuthenticatedTreinoIndexRoute: AuthenticatedTreinoIndexRoute,
