@@ -175,36 +175,6 @@ function FinalPage() {
         </Card>
       )}
 
-      <Card noElevation className="p-5 border border-slate-200 flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-          <TrophyIcon className="w-7 h-7 text-emerald-600" />
-        </div>
-        <div>
-          <h3 className="font-semibold text-slate-800">Treino concluído</h3>
-          <p className="text-sm text-slate-600 mt-0.5">
-            Você melhorou {gainPercent > 0 ? '+' : ''}{gainPercent.toFixed(0)} pontos percentuais após o estudo e a
-            re-tentativa. Continue assim nos próximos treinos.
-          </p>
-        </div>
-      </Card>
-
-      {training?.examBaseId && (
-        <Card noElevation className="p-4 border border-slate-200 flex flex-wrap items-center gap-3">
-          <Link to="/exams">
-            <Button
-              variant="outlined"
-              color="primary"
-              startIcon={<DocumentTextIcon className="w-5 h-5" />}
-            >
-              Ver as questões
-            </Button>
-          </Link>
-          <span className="text-sm text-slate-500">
-            Acesse o exame para revisar as questões deste treino.
-          </span>
-        </Card>
-      )}
-
       {feedback && (
         <Card noElevation className="p-5 border border-slate-200">
           <div className="flex items-center gap-3 mb-3">
