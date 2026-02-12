@@ -30,7 +30,7 @@ function TreinoLayout() {
         </div>
       )}
 
-      <div className="flex-1 min-h-0 overflow-auto pb-4">
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col pb-4">
         <Outlet />
       </div>
     </div>

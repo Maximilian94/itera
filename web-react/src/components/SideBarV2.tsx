@@ -7,8 +7,8 @@ import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as DatabaseRoute } from '@/routes/_authenticated/database'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
 import { Route as ExamBasesRoute } from '@/routes/_authenticated/exam-bases'
-import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, UserCircleIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, UserCircleIcon as UserCircleIconOutline, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, UserCircleIcon, PlusCircleIcon } from '@heroicons/react/24/solid'
+import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, UserCircleIcon as UserCircleIconOutline, ArrowRightOnRectangleIcon, PlusCircleIcon as PlusCircleIconOutline } from '@heroicons/react/24/outline'
 import { Link, useMatchRoute, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
 
 export const SideBarV2 = () => {
@@ -28,10 +28,17 @@ export const SideBarV2 = () => {
             fuzzy: true,
         },
         {
+            label: 'Criar exame',
+            href: ExamBasesRoute.to,
+            icon: PlusCircleIconOutline,
+            activeIcon: PlusCircleIcon,
+        },
+        {
             label: 'Treino',
             href: TreinoRoute.to,
             icon: AcademicCapIconOutline,
             activeIcon: AcademicCapIcon,
+            fuzzy: true,
         },
         {
             label: 'History',

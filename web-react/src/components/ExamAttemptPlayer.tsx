@@ -16,7 +16,7 @@ import {
   PlayIcon,
   ScissorsIcon,
 } from '@heroicons/react/24/outline'
-import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/solid'
+import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid } from '@heroicons/react/24/solid'
 import {
   useExamBaseAttemptQuery,
   useUpsertExamBaseAttemptAnswerMutation,
@@ -127,7 +127,8 @@ export function ExamAttemptPlayer({
   const [eliminatedByQuestion, setEliminatedByQuestion] = useState<
     Record<string, Set<string>>
   >({})
-  const selectedExplanationRef = useRef<HTMLDivElement>(null)
+  const [scrollToAlternativeId, setScrollToAlternativeId] = useState<string | null>(null)
+  const explanationRefsMap = useRef<Record<string, HTMLDivElement | null>>({})
 
   const questions: PlayerQuestion[] = isRetryMode
     ? (retryFinished
@@ -182,16 +183,15 @@ export function ExamAttemptPlayer({
   const finishButtonLabel = isRetryMode ? 'Finalizar re-tentativa' : 'Finalizar prova'
 
   useEffect(() => {
-    if (value === 1 && selectedExplanationRef.current) {
+    if (value === 1 && scrollToAlternativeId) {
+      const el = explanationRefsMap.current[scrollToAlternativeId]
       const timer = setTimeout(() => {
-        selectedExplanationRef.current?.scrollIntoView({
-          behavior: 'smooth',
-          block: 'start',
-        })
+        el?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        setScrollToAlternativeId(null)
       }, 100)
       return () => clearTimeout(timer)
     }
-  }, [value])
+  }, [value, scrollToAlternativeId])
 
   useEffect(() => {
     setValue(0)
@@ -308,6 +308,16 @@ export function ExamAttemptPlayer({
     ? eliminatedByQuestion[currentQuestion.id] ?? new Set()
     : new Set<string>()
 
+  const correctAlt = currentQuestion?.correctAlternative
+    ? currentQuestion.alternatives.find((a) => a.key === currentQuestion.correctAlternative)
+    : null
+  const currentQuestionHasWrongAnswer =
+    isFinished &&
+    currentQuestion != null &&
+    selectedAlternativeId != null &&
+    correctAlt != null &&
+    selectedAlternativeId !== correctAlt.id
+
   const tabButtons = [
     { value: 0, label: 'Questão', icon: PlayIcon },
     { value: 1, label: 'Explicação', icon: BookOpenIcon, disabled: !isFinished },
@@ -362,33 +372,46 @@ export function ExamAttemptPlayer({
             </button>
           </div>
 
-          <Card noElevation className="flex flex-col flex-1 min-h-0 p-0">
-            <div className="flex border-b border-slate-200 overflow-x-auto">
-              {tabButtons.map((tab) => {
+          <Card noElevation className="flex flex-col flex-1 min-h-0 p-0 overflow-hidden">
+            <div className="flex-1 overflow-auto min-h-0 flex flex-col">
+              <div className="sticky top-0 z-10 flex shrink-0 border-b border-slate-200 overflow-x-auto">
+                {tabButtons.map((tab) => {
                 const Icon = tab.icon
                 const isActive = value === tab.value
                 const isDisabled = tab.disabled ?? false
+                const isExplanationTab = tab.value === 1
+                const showWrongAnswerHighlight = isExplanationTab && currentQuestionHasWrongAnswer
+                const tabClasses = [
+                  'flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
+                  isActive ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50',
+                  isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+                ].join(' ')
+                const isViewingExplanation = value === 1
+                const TabIcon = isExplanationTab && showWrongAnswerHighlight && !isViewingExplanation
+                  ? BookOpenIconSolid
+                  : Icon
+                const iconClassName = isExplanationTab && showWrongAnswerHighlight && !isViewingExplanation
+                  ? 'w-4 h-4 text-amber-500 animate-[size-pulse_1.2s_ease-in-out_infinite]'
+                  : 'w-4 h-4'
                 return (
-                  <Tooltip key={tab.value} title={isDisabled ? 'Disponível após finalizar a prova.' : ''}>
+                  <Tooltip key={tab.value} title={isDisabled ? 'Disponível após finalizar a prova.' : showWrongAnswerHighlight ? 'Ver explicação para entender o erro' : ''}>
                     <span className="flex">
                       <button
                         type="button"
                         onClick={() => !isDisabled && handleChange(null as any, tab.value)}
                         disabled={isDisabled}
-                        className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-                          isActive ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                        } ${isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                        className={tabClasses}
                       >
-                        <Icon className="w-4 h-4" />
+                        <TabIcon className={iconClassName} />
                         {tab.label}
                       </button>
                     </span>
                   </Tooltip>
                 )
               })}
-            </div>
+              </div>
 
-            <div className="flex-1 overflow-auto overflow-x-hidden p-5">
+              <div className="flex-1 overflow-x-hidden p-5 min-h-0">
               <CustomTabPanel value={value} hidden={value !== 0}>
                 <QuestionSlide key={currentQuestionIndex} direction={slideDirection}>
                   {currentQuestion && (
@@ -423,18 +446,35 @@ export function ExamAttemptPlayer({
                             ? isCorrect ? 'bg-green-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
                           return (
-                            <div key={alt.id} className="group flex items-center gap-2 relative">
-                              <Tooltip title={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}>
-                                <button
-                                  type="button"
-                                  onClick={() => toggleEliminated(currentQuestion.id, alt.id, !isEliminated)}
-                                  disabled={isFinished}
-                                  aria-label={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}
-                                  className={`p-2 rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-50 shrink-0 transition-opacity ${isEliminated ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-                                >
-                                  <ScissorsIcon className="w-4 h-4" />
-                                </button>
-                              </Tooltip>
+                            <div key={alt.id} className="group relative flex items-center gap-2">
+                              {!isFinished && (
+                                <Tooltip title={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}>
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleEliminated(currentQuestion.id, alt.id, !isEliminated)}
+                                    aria-label={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}
+                                    className={`p-2 rounded-lg text-slate-500 hover:bg-slate-100 shrink-0 transition-opacity ${isEliminated ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+                                  >
+                                    <ScissorsIcon className="w-4 h-4" />
+                                  </button>
+                                </Tooltip>
+                              )}
+                              {isFinished && (
+                                <Tooltip title="Ver explicação">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation()
+                                      setScrollToAlternativeId(alt.id)
+                                      setValue(1)
+                                    }}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-slate-600 bg-white/90 border border-slate-200 shadow-sm opacity-0 group-hover:opacity-100 hover:bg-slate-50 hover:border-slate-300 transition-all z-10"
+                                  >
+                                    <BookOpenIcon className="w-3.5 h-3.5" />
+                                    Ver explicação
+                                  </button>
+                                </Tooltip>
+                              )}
                               <button
                                 type="button"
                                 className={`flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
@@ -480,7 +520,7 @@ export function ExamAttemptPlayer({
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
                           return (
-                            <div key={alt.id} ref={wasSelected ? selectedExplanationRef : undefined} className={cardStyles[variant]}>
+                            <div key={alt.id} ref={(el) => { explanationRefsMap.current[alt.id] = el }} className={cardStyles[variant]}>
                               <div className="p-4">
                                 <div className="flex items-center gap-2 flex-wrap mb-2">
                                   <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>{keyLabel}.</span>
@@ -514,6 +554,7 @@ export function ExamAttemptPlayer({
               <CustomTabPanel value={value} hidden={value !== 5}>
                 <div className="py-2"><span className="text-sm text-slate-500">Notas (em breve)</span></div>
               </CustomTabPanel>
+            </div>
             </div>
           </Card>
         </div>

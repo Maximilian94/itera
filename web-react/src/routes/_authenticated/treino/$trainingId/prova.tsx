@@ -27,7 +27,7 @@ function ProvaPage() {
   }
 
   return (
-    <>
+    <div className="flex flex-col flex-1 min-h-0 min-w-0">
       {/* <div className={`rounded-lg border-l-4 ${stage.borderColor} ${stage.color} bg-opacity-20 p-4`}>
         <div className="flex items-center gap-3">
           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${stage.color}`}>
@@ -56,7 +56,7 @@ function ProvaPage() {
           {/* {training.examTitle && (
             <p className="text-slate-700 font-medium text-sm">{training.examTitle}</p>
           )} */}
-          <div className="flex-1 min-h-0 flex flex-col">
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col overflow-hidden">
             <ExamAttemptPlayer
               examBaseId={training.examBaseId}
               attemptId={training.attemptId}
@@ -72,7 +72,7 @@ function ProvaPage() {
         </div>
       )}
 
-      <div className="flex flex-wrap gap-3 justify-between mt-4">
+      <div className="flex flex-wrap gap-3 justify-between mt-4 shrink-0">
         <Button
           variant="outlined"
           startIcon={<ArrowLeftIcon className="w-5 h-5" />}
@@ -90,6 +90,6 @@ function ProvaPage() {
           Próxima: Diagnóstico
         </Button>
       </div>
-    </>
+    </div>
   )
 }
