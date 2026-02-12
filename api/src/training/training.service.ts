@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -21,8 +22,36 @@ const STAGE_ORDER: TrainingStage[] = [
   'FINAL',
 ];
 
+type StudyDifficultyLevel = 'AVANCADA';
+
+interface WrongQuestionContext {
+  statement: string;
+  alternatives: { key: string; text: string }[];
+  selectedKey: string | null;
+  correctKey: string | null;
+  topic: string | null;
+  subtopics: string[];
+  skills: string[];
+  hasReferenceText: boolean;
+}
+
+interface GeneratedExerciseCandidate {
+  statement?: string;
+  alternatives?: { key?: string; text?: string }[];
+  correctAlternativeKey?: string;
+}
+
+interface GeneratedStudyContent {
+  explanation: string | null;
+  exercises: GeneratedExerciseCandidate[];
+}
+
+const TARGET_STUDY_DIFFICULTY: StudyDifficultyLevel = 'AVANCADA';
+
 @Injectable()
 export class TrainingService {
+  private readonly logger = new Logger(TrainingService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
@@ -46,6 +75,70 @@ export class TrainingService {
   private stageIndex(stage: TrainingStage): number {
     const idx = STAGE_ORDER.indexOf(stage);
     return idx >= 0 ? idx : -1;
+  }
+
+  private async requestStudyContentFromXAi(
+    apiKey: string,
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<GeneratedStudyContent> {
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-reasoning',
+        max_tokens: 8192,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(`xAI API error (${res.status}): ${errBody.slice(0, 300)}`);
+    }
+
+    const dataRes = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = dataRes.choices?.[0]?.message?.content?.trim() ?? '';
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsedUnknown: unknown;
+    try {
+      parsedUnknown = JSON.parse(jsonStr);
+    } catch {
+      throw new BadRequestException('AI returned invalid JSON');
+    }
+
+    const parsed =
+      typeof parsedUnknown === 'object' && parsedUnknown != null
+        ? (parsedUnknown as {
+            explanation?: unknown;
+            exercises?: unknown;
+          })
+        : {};
+    const exercises =
+      Array.isArray(parsed.exercises) ? (parsed.exercises as GeneratedExerciseCandidate[]) : [];
+
+    return {
+      explanation: typeof parsed.explanation === 'string' ? parsed.explanation : null,
+      exercises,
+    };
   }
 
   /** List training sessions for the user, most recent first. */
@@ -636,7 +729,7 @@ export class TrainingService {
 
   /**
    * Generate explanation + 5 exercises for a study item (one recommendation) using IA.
-   * Input: wrong questions for this subject (statement, alternatives, selectedKey only — not correctKey).
+   * Input: wrong questions for this subject with diagnostic context (selected/correct alternative and metadata).
    * Rule: explanation must help on the topic without describing or revealing the specific question.
    */
   async generateStudyItemContent(
@@ -666,11 +759,7 @@ export class TrainingService {
       userId,
     );
     const subject = item.subject;
-    const wrongQuestionsContext: Array<{
-      statement: string;
-      alternatives: Array<{ key: string; text: string }>;
-      selectedKey: string | null;
-    }> = [];
+    const wrongQuestionsContext: WrongQuestionContext[] = [];
     for (const q of attemptData.questions) {
       if ((q.subject ?? 'Sem matéria') !== subject) continue;
       const selectedId = attemptData.answers[q.id] ?? null;
@@ -685,8 +774,16 @@ export class TrainingService {
         statement: q.statement,
         alternatives: q.alternatives.map((a) => ({ key: a.key, text: a.text })),
         selectedKey,
+        correctKey: q.correctAlternative ?? null,
+        topic: q.topic ?? null,
+        subtopics: q.subtopics ?? [],
+        skills: q.skills ?? [],
+        hasReferenceText: (q.referenceText ?? '').trim().length > 0,
       });
     }
+    const targetDifficulty = TARGET_STUDY_DIFFICULTY;
+    const difficultyInstruction =
+      'A explicação e os exercícios devem ser de nível AVANCADO: incluir casos limítrofes, armadilhas comuns e interpretação aprofundada. Evite exercícios triviais.';
 
     const apiKey = this.config.get<string>('XAI_API_KEY');
     if (!apiKey) {
@@ -699,86 +796,43 @@ export class TrainingService {
 
 Você receberá:
 1. Uma recomendação de estudo (título e texto) que é o foco deste item.
-2. Opcionalmente, as questões que o aluno ERROU nesta matéria (apenas como CONTEXTO do que ele precisa reforçar). Cada questão tem: statement (enunciado), alternatives (array com key e text), selectedKey (alternativa que o aluno marcou). NÃO receba qual é a alternativa correta.
+2. Opcionalmente, as questões que o aluno ERROU nesta matéria (apenas como CONTEXTO do que ele precisa reforçar). Cada questão tem: statement (enunciado), alternatives (array com key e text), selectedKey (alternativa que o aluno marcou), correctKey (alternativa correta, APENAS para diagnóstico interno), topic, subtopics, skills e hasReferenceText.
 
 REGRAS OBRIGATÓRIAS PARA A "explanation" (explicação):
 - A explicação deve ser de **excelente qualidade**: clara, didática e aprofundada o suficiente para o aluno fixar o conteúdo. Reforce a recomendação recebida.
 - **Inclua exemplos** sempre que fizer sentido. Quando possível, traga tanto **exemplos corretos** (aplicação adequada da regra ou conceito) quanto **exemplos errados** (o que NÃO se deve fazer ou como NÃO se aplica), explicando brevemente por que estão errados. O contraste entre certo e errado ajuda muito na fixação.
 - Explique o assunto/tema de forma genérica. Use as questões erradas APENAS para saber em que tipo de conteúdo focar. A explicação NÃO pode descrever, citar ou dar a resposta da questão específica que foi enviada — senão o aluno terá a resposta na próxima interação (re-tentativa da prova).
+- Nunca revele explicitamente qual alternativa era correta em nenhuma questão do contexto. O campo correctKey serve apenas para você diagnosticar lacunas e aumentar precisão pedagógica.
 - Formato: use bullet points com "- " quando apropriado, **negrito** para termos importantes. Pode usar parágrafos curtos e subtópicos. Evite títulos com # no início.
 - Tamanho: a explicação deve ser completa o suficiente para cobrir bem o tema (não seja superficial).
+- Nível de dificuldade obrigatório: SEMPRE avançado.
 
 REGRAS PARA OS EXERCÍCIOS:
 - Gere exatamente 5 exercícios novos (não use as questões do contexto). Cada exercício: statement (enunciado em português), 4 alternativas com keys "A", "B", "C", "D", e correctAlternativeKey ("A", "B", "C" ou "D").
+- Os exercícios devem ser avançados; evite exercícios fáceis ou excessivamente diretos.
 
 FORMATO DE RESPOSTA:
 - Retorne APENAS um JSON válido: {"explanation":"...","exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
 
     const rec = item.subjectFeedbackRecommendation;
     const recommendationsText = `**${rec.title}**: ${rec.text}`;
-    const userPrompt = `Recomendação de estudo (foco deste item):
+    const userPromptBase = `Recomendação de estudo (foco deste item):
 ${recommendationsText}
+
+Nível mínimo exigido para explicação e exercícios: ${targetDifficulty}
+Instrução de nível: ${difficultyInstruction}
 
 Questões que o aluno errou (use apenas como contexto do que reforçar; NÃO cite nem resolva estas questões na explanation):
 ${JSON.stringify(wrongQuestionsContext, null, 2)}
 
 Gere uma "explanation" (explicação em português, de qualidade; inclua exemplos corretos e exemplos errados quando fizer sentido) e "exercises" (array com exatamente 5 exercícios, cada um com statement, alternatives [4 itens com key e text], correctAlternativeKey).`;
+    const generated = await this.requestStudyContentFromXAi(apiKey, systemPrompt, userPromptBase);
+    this.logger.log(
+      `Study content generated for studyItem=${studyItemId} with fixed target=${targetDifficulty}`,
+    );
 
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 8192,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-      }),
-    });
-
-    if (!res.ok) {
-      const errBody = await res.text();
-      throw new BadRequestException(
-        `xAI API error (${res.status}): ${errBody.slice(0, 300)}`,
-      );
-    }
-
-    const dataRes = (await res.json()) as {
-      choices?: { message?: { content?: string } }[];
-    };
-    const content = dataRes.choices?.[0]?.message?.content?.trim() ?? '';
-    let jsonStr = content
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/m, '')
-      .trim();
-    const firstBrace = jsonStr.indexOf('{');
-    const lastBrace = jsonStr.lastIndexOf('}');
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
-    }
-
-    let parsed: {
-      explanation?: string;
-      exercises?: Array<{
-        statement?: string;
-        alternatives?: Array<{ key?: string; text?: string }>;
-        correctAlternativeKey?: string;
-      }>;
-    };
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      throw new BadRequestException('AI returned invalid JSON');
-    }
-
-    const explanation =
-      typeof parsed.explanation === 'string' ? parsed.explanation : null;
-    const exercises = Array.isArray(parsed.exercises) ? parsed.exercises : [];
+    const explanation = generated.explanation;
+    const exercises = generated.exercises;
 
     await this.prisma.trainingStudyItem.update({
       where: { id: studyItemId },
