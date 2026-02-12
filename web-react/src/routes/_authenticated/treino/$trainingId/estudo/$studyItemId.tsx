@@ -5,6 +5,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import {
   ArrowLeftIcon,
+  ArrowRightIcon,
   CheckIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -43,7 +44,6 @@ function StudyItemDetailPage() {
   const item = studyItems.find((i) => i.id === studyItemId)
   const completeMutation = useCompleteStudyItemMutation(trainingId, studyItemId)
   const generateMutation = useGenerateStudyItemContentMutation(trainingId, studyItemId)
-  const hasContent = Boolean(item?.explanation) || (item?.exercises?.length ?? 0) > 0
   const isPronto = Boolean(item?.completedAt)
   const exercises = item?.exercises ?? []
   const totalExercises = exercises.length
@@ -96,11 +96,11 @@ function StudyItemDetailPage() {
   const tabButtons = [
     { value: TAB_RECOMENDACAO, label: 'Recomendação', icon: DocumentTextIcon },
     { value: TAB_EXPLICACAO, label: 'Explicação', icon: BookOpenIcon },
-    { value: TAB_EXERCICIOS, label: 'Exercícios', icon: PencilSquareIcon, disabled: totalExercises === 0 },
+    { value: TAB_EXERCICIOS, label: 'Exercícios', icon: PencilSquareIcon },
   ]
 
   return (
-    <>
+    <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium text-slate-500">{item.subject}</p>
@@ -122,16 +122,14 @@ function StudyItemDetailPage() {
           {tabButtons.map((t) => {
             const Icon = t.icon
             const isActive = tab === t.value
-            const disabled = t.disabled ?? false
             return (
               <button
                 key={t.value}
                 type="button"
-                onClick={() => !disabled && setTab(t.value)}
-                disabled={disabled}
+                onClick={() => setTab(t.value)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   isActive ? 'border-emerald-500 text-emerald-600 bg-emerald-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                } cursor-pointer`}
               >
                 <Icon className="w-4 h-4 shrink-0" />
                 {t.label}
@@ -146,10 +144,28 @@ function StudyItemDetailPage() {
               <div className="text-sm text-slate-700">
                 <Markdown>{item.recommendationText}</Markdown>
               </div>
-              {!hasContent && (
-                <div className="pt-4 border-t border-slate-200">
-                  <p className="text-sm text-slate-600 mb-3">
-                    Gere uma explicação e exercícios com base nesta recomendação (usando IA).
+              <div className="pt-4 border-t border-slate-200">
+                <p className="text-sm text-slate-600 mb-3">
+                  O próximo passo é aprofundar o conhecimento neste assunto. Acesse a aba <strong>Explicação</strong> para ler o conteúdo detalhado.
+                </p>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  endIcon={<ArrowRightIcon className="w-4 h-4" />}
+                  onClick={() => setTab(TAB_EXPLICACAO)}
+                >
+                  Ir para Explicação
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {tab === TAB_EXPLICACAO && (
+            <div className="flex flex-col gap-4">
+              {!item.explanation && !generateMutation.isPending && (
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-slate-500">
+                    Nenhuma explicação ainda. Gere uma explicação e exercícios com IA abaixo.
                   </p>
                   <Button
                     variant="outlined"
@@ -160,23 +176,28 @@ function StudyItemDetailPage() {
                   </Button>
                 </div>
               )}
-            </div>
-          )}
-
-          {tab === TAB_EXPLICACAO && (
-            <div className="flex flex-col gap-4">
-              {!item.explanation && !generateMutation.isPending && (
-                <p className="text-sm text-slate-500">
-                  Nenhuma explicação ainda. Use o botão &quot;Gerar explicação e exercícios (IA)&quot; na aba Recomendação.
-                </p>
-              )}
               {generateMutation.isPending && (
                 <p className="text-sm text-slate-500">Gerando conteúdo...</p>
               )}
               {item.explanation && (
-                <div className="text-sm text-slate-700">
-                  <Markdown>{item.explanation}</Markdown>
-                </div>
+                <>
+                  <div className="text-sm text-slate-700">
+                    <Markdown>{item.explanation}</Markdown>
+                  </div>
+                  <div className="pt-4 border-t border-slate-200">
+                    <p className="text-sm text-slate-600 mb-3">
+                      Agora que você leu a explicação do conteúdo, é hora de treinar! Acesse a aba <strong>Exercícios</strong> para praticar.
+                    </p>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      endIcon={<ArrowRightIcon className="w-4 h-4" />}
+                      onClick={() => setTab(TAB_EXERCICIOS)}
+                    >
+                      Ir para Exercícios
+                    </Button>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -184,9 +205,18 @@ function StudyItemDetailPage() {
           {tab === TAB_EXERCICIOS && (
             <div className="flex flex-col gap-4">
               {totalExercises === 0 ? (
-                <p className="text-sm text-slate-500">
-                  Nenhum exercício ainda. Gere conteúdo na aba Recomendação.
-                </p>
+                <div className="flex flex-col gap-4">
+                  <p className="text-sm text-slate-500">
+                    Nenhum exercício ainda. Gere uma explicação e exercícios com IA abaixo.
+                  </p>
+                  <Button
+                    variant="outlined"
+                    onClick={() => generateMutation.mutate()}
+                    disabled={generateMutation.isPending}
+                  >
+                    {generateMutation.isPending ? 'Gerando...' : 'Gerar explicação e exercícios (IA)'}
+                  </Button>
+                </div>
               ) : (
                 <>
                   <div className="flex items-center justify-between gap-3">
@@ -236,7 +266,7 @@ function StudyItemDetailPage() {
           Voltar: Estudo
         </Button>
       </div>
-    </>
+    </div>
   )
 }
 

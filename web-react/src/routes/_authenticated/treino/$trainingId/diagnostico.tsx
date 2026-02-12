@@ -92,7 +92,7 @@ function DiagnosticoPage() {
   } = feedback
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
       <div>
         <h1 className="text-xl font-bold text-slate-900">{examTitle}</h1>
         <p className="text-sm text-slate-500 mt-1">

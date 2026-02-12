@@ -72,7 +72,7 @@ function EstudoListPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 overflow-y-auto min-h-0 flex-1">
       <Card noElevation className="p-5 border border-slate-200 bg-slate-50/50">
         <h2 className="text-base font-semibold text-slate-800 mb-3">
           Seu plano de estudo
