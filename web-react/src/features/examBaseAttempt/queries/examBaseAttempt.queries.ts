@@ -62,13 +62,36 @@ export function useUpsertExamBaseAttemptAnswerMutation(
   attemptId: string,
 ) {
   const queryClient = useQueryClient()
+  const queryKey = examBaseAttemptKeys.one(examBaseId, attemptId)
   return useMutation({
     mutationFn: (input: UpsertAnswerInput) =>
       examBaseAttemptService.upsertAnswer(examBaseId, attemptId, input),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: examBaseAttemptKeys.one(examBaseId, attemptId),
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<{
+        attempt: unknown
+        questions: unknown[]
+        answers: Record<string, string | null>
+      }>(queryKey)
+      queryClient.setQueryData(queryKey, (old: typeof previous) => {
+        if (!old) return old
+        return {
+          ...old,
+          answers: {
+            ...old.answers,
+            [input.questionId]: input.selectedAlternativeId,
+          },
+        }
       })
+      return { previous }
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKey, context.previous)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }

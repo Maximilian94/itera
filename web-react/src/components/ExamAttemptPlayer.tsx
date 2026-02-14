@@ -1,4 +1,4 @@
-import { Alert, Button, Tooltip } from '@mui/material'
+import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
@@ -30,6 +30,7 @@ import {
   useUpsertRetryAnswerMutation,
   useUpdateTrainingStageMutation,
 } from '@/features/training/queries/training.queries'
+import { getApiMessage } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -144,6 +145,8 @@ export function ExamAttemptPlayer({
     Record<string, Set<string>>
   >({})
   const [scrollToAlternativeId, setScrollToAlternativeId] = useState<string | null>(null)
+  const [snackbarOpen, setSnackbarOpen] = useState(false)
+  const [snackbarMessage, setSnackbarMessage] = useState('')
   const explanationRefsMap = useRef<Record<string, HTMLDivElement | null>>({})
 
   const questions: PlayerQuestion[] = isRetryMode
@@ -186,15 +189,24 @@ export function ExamAttemptPlayer({
     if (isEliminated) return
     const current = answers[questionId]
     const nextId = current === alternativeId ? null : alternativeId
+    const onError = (err: unknown, variables: { questionId: string }) => {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+      const idx = questions.findIndex((q) => q.id === variables.questionId)
+      if (idx >= 0) goToQuestion(idx)
+    }
     if (isRetryMode) {
       if (nextId) {
-        upsertRetryAnswer.mutate({ questionId, selectedAlternativeId: nextId })
+        upsertRetryAnswer.mutate(
+          { questionId, selectedAlternativeId: nextId },
+          { onError },
+        )
       }
     } else {
-      upsertAttemptAnswer.mutate({
-        questionId,
-        selectedAlternativeId: nextId,
-      })
+      upsertAttemptAnswer.mutate(
+        { questionId, selectedAlternativeId: nextId },
+        { onError },
+      )
     }
   }
 
@@ -394,6 +406,7 @@ export function ExamAttemptPlayer({
   ]
 
   return (
+    <>
     <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0 overflow-hidden">
@@ -736,5 +749,20 @@ export function ExamAttemptPlayer({
         </div>
       </div>
     </div>
+    <Snackbar
+      open={snackbarOpen}
+      autoHideDuration={6000}
+      onClose={() => setSnackbarOpen(false)}
+      anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+    >
+      <Alert
+        severity="error"
+        onClose={() => setSnackbarOpen(false)}
+        variant="filled"
+      >
+        {snackbarMessage}
+      </Alert>
+    </Snackbar>
+    </>
   )
 }

@@ -143,6 +143,7 @@ export function useRetryAnswersQuery(trainingId: string | undefined) {
 
 export function useUpsertRetryAnswerMutation(trainingId: string) {
   const queryClient = useQueryClient()
+  const queryKey = trainingKeys.retryAnswers(trainingId)
   return useMutation({
     mutationFn: ({
       questionId,
@@ -156,10 +157,24 @@ export function useUpsertRetryAnswerMutation(trainingId: string) {
         questionId,
         selectedAlternativeId,
       ),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: trainingKeys.retryAnswers(trainingId),
-      })
+    onMutate: async (input) => {
+      await queryClient.cancelQueries({ queryKey })
+      const previous = queryClient.getQueryData<Record<string, string | null>>(
+        queryKey,
+      )
+      queryClient.setQueryData(queryKey, (old: Record<string, string | null> | undefined) => ({
+        ...(old ?? {}),
+        [input.questionId]: input.selectedAlternativeId,
+      }))
+      return { previous }
+    },
+    onError: (_err, _input, context) => {
+      if (context?.previous !== undefined) {
+        queryClient.setQueryData(queryKey, context.previous)
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey })
     },
   })
 }
