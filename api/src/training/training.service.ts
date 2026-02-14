@@ -47,6 +47,8 @@ interface GeneratedStudyContent {
 }
 
 const TARGET_STUDY_DIFFICULTY: StudyDifficultyLevel = 'AVANCADA';
+const UUID_V4_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class TrainingService {
@@ -59,6 +61,9 @@ export class TrainingService {
   ) {}
 
   private async getSessionForUser(trainingId: string, userId: string) {
+    if (!UUID_V4_REGEX.test(trainingId)) {
+      throw new BadRequestException('invalid trainingId');
+    }
     const session = await this.prisma.trainingSession.findUnique({
       where: { id: trainingId },
       include: {
@@ -75,6 +80,98 @@ export class TrainingService {
   private stageIndex(stage: TrainingStage): number {
     const idx = STAGE_ORDER.indexOf(stage);
     return idx >= 0 ? idx : -1;
+  }
+
+  private normalizeForMatch(text: string): string {
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  private extractMatchKeywords(input: string): string[] {
+    const stopwords = new Set([
+      'para',
+      'com',
+      'sem',
+      'das',
+      'dos',
+      'que',
+      'como',
+      'uma',
+      'uns',
+      'umas',
+      'sobre',
+      'entre',
+      'pela',
+      'pelas',
+      'pelo',
+      'pelos',
+      'este',
+      'esta',
+      'esse',
+      'essa',
+      'sao',
+      'sua',
+      'seu',
+      'mais',
+      'menos',
+      'nivel',
+      'avancado',
+      'estudo',
+      'revisao',
+    ]);
+    const normalized = this.normalizeForMatch(input);
+    const tokens = normalized
+      .split(/[^a-z0-9]+/g)
+      .map((t) => t.trim())
+      .filter((t) => t.length >= 4 && !stopwords.has(t));
+    return [...new Set(tokens)];
+  }
+
+  private getRelatedWrongQuestionIdsForRecommendation(
+    recommendationTitle: string,
+    recommendationText: string,
+    wrongQuestions: Array<{
+      id: string;
+      topic: string | null;
+      subtopics: string[];
+      skills: string[];
+      statement: string;
+    }>,
+  ): string[] {
+    if (wrongQuestions.length === 0) return [];
+    const normalizedTitle = this.normalizeForMatch(recommendationTitle);
+    const keywords = this.extractMatchKeywords(
+      `${recommendationTitle} ${recommendationText.slice(0, 180)}`,
+    );
+
+    const scored = wrongQuestions.map((q) => {
+      const haystack = this.normalizeForMatch(
+        [
+          q.topic ?? '',
+          ...q.subtopics,
+          ...q.skills,
+          q.statement.slice(0, 240),
+        ].join(' '),
+      );
+      let score = 0;
+      if (normalizedTitle.length >= 4 && haystack.includes(normalizedTitle)) {
+        score += 5;
+      }
+      for (const kw of keywords) {
+        if (haystack.includes(kw)) score += 1;
+      }
+      return { id: q.id, score };
+    });
+
+    const matched = scored
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .map((x) => x.id);
+
+    return matched.length > 0 ? matched : wrongQuestions.map((q) => q.id);
   }
 
   private async requestStudyContentFromXAi(
@@ -390,7 +487,12 @@ export class TrainingService {
     }
 
     if (requested === 'STUDY') {
-      await this.ensureStudyItems(trainingId, session.examBaseAttemptId);
+      await this.ensureStudyItems(
+        trainingId,
+        session.examBaseAttemptId,
+        userId,
+        session.examBaseId,
+      );
     }
 
     if (requested === 'RETRY') {
@@ -432,14 +534,58 @@ export class TrainingService {
   private async ensureStudyItems(
     trainingId: string,
     attemptId: string,
+    userId: string,
+    examBaseId: string,
   ): Promise<void> {
     const recommendations = await this.prisma.subjectFeedbackRecommendation.findMany({
       where: { subjectFeedback: { examBaseAttemptId: attemptId } },
-      select: { id: true, title: true, subjectFeedback: { select: { subject: true } } },
+      select: {
+        id: true,
+        title: true,
+        text: true,
+        subjectFeedback: { select: { subject: true } },
+      },
       orderBy: [{ subjectFeedbackId: 'asc' }, { order: 'asc' }],
     });
+    if (recommendations.length === 0) return;
+
+    const attemptData = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+      examBaseId,
+      attemptId,
+      userId,
+    );
+    const wrongQuestionsBySubject = new Map<
+      string,
+      Array<{
+        id: string;
+        topic: string | null;
+        subtopics: string[];
+        skills: string[];
+        statement: string;
+        selectedAlternativeId: string | null;
+      }>
+    >();
+    for (const q of attemptData.questions) {
+      const selectedId = attemptData.answers[q.id] ?? null;
+      const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
+      const correctId = correctAlt?.id ?? null;
+      if (correctId != null && selectedId === correctId) continue;
+
+      const subject = q.subject ?? 'Sem matéria';
+      const current = wrongQuestionsBySubject.get(subject) ?? [];
+      current.push({
+        id: q.id,
+        topic: q.topic ?? null,
+        subtopics: q.subtopics ?? [],
+        skills: q.skills ?? [],
+        statement: q.statement,
+        selectedAlternativeId: selectedId,
+      });
+      wrongQuestionsBySubject.set(subject, current);
+    }
+
     for (const rec of recommendations) {
-      await this.prisma.trainingStudyItem.upsert({
+      const studyItem = await this.prisma.trainingStudyItem.upsert({
         where: {
           trainingSessionId_subjectFeedbackRecommendationId: {
             trainingSessionId: trainingId,
@@ -453,6 +599,32 @@ export class TrainingService {
           topic: rec.title,
         },
         update: {},
+        select: { id: true, subject: true },
+      });
+
+      const existingLinksCount = await this.prisma.trainingStudyItemQuestionLink.count({
+        where: { trainingStudyItemId: studyItem.id },
+      });
+      if (existingLinksCount > 0) continue;
+
+      const wrongQuestionsInSubject = wrongQuestionsBySubject.get(studyItem.subject) ?? [];
+      const relatedQuestionIds = this.getRelatedWrongQuestionIdsForRecommendation(
+        rec.title,
+        rec.text,
+        wrongQuestionsInSubject,
+      );
+      if (relatedQuestionIds.length === 0) continue;
+
+      const selectedAlternativeByQuestionId = new Map(
+        wrongQuestionsInSubject.map((q) => [q.id, q.selectedAlternativeId] as const),
+      );
+      await this.prisma.trainingStudyItemQuestionLink.createMany({
+        data: relatedQuestionIds.map((questionId) => ({
+          trainingStudyItemId: studyItem.id,
+          examBaseQuestionId: questionId,
+          selectedAlternativeId: selectedAlternativeByQuestionId.get(questionId) ?? null,
+        })),
+        skipDuplicates: true,
       });
     }
   }
@@ -460,7 +632,12 @@ export class TrainingService {
   /** List study items for the session (one per recommendation). Creates them from recommendations if not yet present. */
   async listStudyItems(trainingId: string, userId: string) {
     const session = await this.getSessionForUser(trainingId, userId);
-    await this.ensureStudyItems(trainingId, session.examBaseAttemptId);
+    await this.ensureStudyItems(
+      trainingId,
+      session.examBaseAttemptId,
+      userId,
+      session.examBaseId,
+    );
     const items = await this.prisma.trainingStudyItem.findMany({
       where: { trainingSessionId: trainingId },
       orderBy: [
@@ -470,6 +647,10 @@ export class TrainingService {
       include: {
         subjectFeedbackRecommendation: {
           select: { title: true, text: true },
+        },
+        questionLinks: {
+          select: { examBaseQuestionId: true },
+          orderBy: { examBaseQuestionId: 'asc' },
         },
         exercises: {
           orderBy: { order: 'asc' },
@@ -487,6 +668,7 @@ export class TrainingService {
       recommendationText: item.subjectFeedbackRecommendation.text,
       explanation: item.explanation,
       completedAt: item.completedAt?.toISOString() ?? null,
+      linkedQuestionIds: item.questionLinks.map((q) => q.examBaseQuestionId),
       exercises: item.exercises.map((ex) => ({
         id: ex.id,
         order: ex.order,
@@ -744,6 +926,9 @@ export class TrainingService {
         subjectFeedbackRecommendation: {
           select: { title: true, text: true },
         },
+        questionLinks: {
+          select: { examBaseQuestionId: true },
+        },
       },
     });
     if (!item) throw new NotFoundException('study item not found');
@@ -759,9 +944,16 @@ export class TrainingService {
       userId,
     );
     const subject = item.subject;
+    const linkedQuestionIdSet = new Set(
+      item.questionLinks.map((q) => q.examBaseQuestionId),
+    );
     const wrongQuestionsContext: WrongQuestionContext[] = [];
     for (const q of attemptData.questions) {
-      if ((q.subject ?? 'Sem matéria') !== subject) continue;
+      if (linkedQuestionIdSet.size > 0) {
+        if (!linkedQuestionIdSet.has(q.id)) continue;
+      } else if ((q.subject ?? 'Sem matéria') !== subject) {
+        continue;
+      }
       const selectedId = attemptData.answers[q.id] ?? null;
       const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
       const correctId = correctAlt?.id ?? null;

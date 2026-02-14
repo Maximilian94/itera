@@ -12,16 +12,19 @@ import {
   DocumentTextIcon,
   BookOpenIcon,
   PencilSquareIcon,
+  ClipboardDocumentListIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import {
   useTrainingStudyItemsQuery,
   useCompleteStudyItemMutation,
   useGenerateStudyItemContentMutation,
+  useRetryQuestionsQuery,
   trainingKeys,
 } from '@/features/training/queries/training.queries'
 import { useQueryClient } from '@tanstack/react-query'
 import type { TrainingStudyItemExercise } from '@/features/training/domain/training.types'
+import { QuestionDisplay } from '@/components/QuestionDisplay'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/estudo/$studyItemId')({
   component: StudyItemDetailPage,
@@ -30,6 +33,7 @@ export const Route = createFileRoute('/_authenticated/treino/$trainingId/estudo/
 const TAB_RECOMENDACAO = 0
 const TAB_EXPLICACAO = 1
 const TAB_EXERCICIOS = 2
+const TAB_QUESTOES_ERRADAS = 3
 
 function StudyItemDetailPage() {
   const { trainingId, studyItemId } = Route.useParams()
@@ -37,11 +41,26 @@ function StudyItemDetailPage() {
   const queryClient = useQueryClient()
   const [tab, setTab] = useState(0)
   const [exerciseIndex, setExerciseIndex] = useState(0)
+  const [wrongQuestionIndex, setWrongQuestionIndex] = useState(0)
   /** exerciseId -> selected alternative id (local state, not persisted) */
   const [selectedByExerciseId, setSelectedByExerciseId] = useState<Record<string, string>>({})
 
   const { data: studyItems = [], isLoading } = useTrainingStudyItemsQuery(trainingId)
+  const { data: retryQuestions = [] } = useRetryQuestionsQuery(trainingId)
   const item = studyItems.find((i) => i.id === studyItemId)
+  const linkedQuestionIdsSet = new Set(item?.linkedQuestionIds ?? [])
+  const wrongQuestionsForSubject =
+    item != null
+      ? retryQuestions.filter((q) => {
+          if (linkedQuestionIdsSet.size > 0) {
+            return linkedQuestionIdsSet.has(q.id)
+          }
+          return (q.subject ?? 'Sem matéria') === item.subject
+        })
+      : []
+  const totalWrongQuestions = wrongQuestionsForSubject.length
+  const safeWrongQuestionIndex =
+    totalWrongQuestions > 0 ? Math.min(wrongQuestionIndex, totalWrongQuestions - 1) : 0
   const completeMutation = useCompleteStudyItemMutation(trainingId, studyItemId)
   const generateMutation = useGenerateStudyItemContentMutation(trainingId, studyItemId)
   const isPronto = Boolean(item?.completedAt)
@@ -74,6 +93,14 @@ function StudyItemDetailPage() {
     setExerciseIndex((i) => Math.min(totalExercises - 1, i + 1))
   }
 
+  const handlePrevWrongQuestion = () => {
+    setWrongQuestionIndex((i) => Math.max(0, i - 1))
+  }
+
+  const handleNextWrongQuestion = () => {
+    setWrongQuestionIndex((i) => Math.min(totalWrongQuestions - 1, i + 1))
+  }
+
   const handleSelectAlternative = (exerciseId: string, alternativeId: string) => {
     setSelectedByExerciseId((prev) => ({ ...prev, [exerciseId]: alternativeId }))
   }
@@ -97,6 +124,11 @@ function StudyItemDetailPage() {
     { value: TAB_RECOMENDACAO, label: 'Recomendação', icon: DocumentTextIcon },
     { value: TAB_EXPLICACAO, label: 'Explicação', icon: BookOpenIcon },
     { value: TAB_EXERCICIOS, label: 'Exercícios', icon: PencilSquareIcon },
+    {
+      value: TAB_QUESTOES_ERRADAS,
+      label: 'Questões que errei',
+      icon: ClipboardDocumentListIcon,
+    },
   ]
 
   return (
@@ -197,6 +229,49 @@ function StudyItemDetailPage() {
                       Ir para Exercícios
                     </Button>
                   </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {tab === TAB_QUESTOES_ERRADAS && (
+            <div className="flex flex-col gap-6">
+              {wrongQuestionsForSubject.length === 0 ? (
+                <p className="text-sm text-slate-500">
+                  Nenhuma questão errada nesta matéria na prova.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-slate-600">
+                    Estas são as questões que você errou na prova sobre{' '}
+                    <strong>{item.subject}</strong>. Use-as como contexto para o seu estudo.
+                  </p>
+                  <div className="flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={handlePrevWrongQuestion}
+                      disabled={safeWrongQuestionIndex === 0}
+                      aria-label="Questão anterior"
+                      className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      <ChevronLeftIcon className="w-5 h-5" />
+                    </button>
+                    <span className="text-sm font-medium text-slate-700 shrink-0">
+                      Questão {safeWrongQuestionIndex + 1} de {totalWrongQuestions}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleNextWrongQuestion}
+                      disabled={safeWrongQuestionIndex === totalWrongQuestions - 1}
+                      aria-label="Próxima questão"
+                      className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+                    >
+                      <ChevronRightIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                  {wrongQuestionsForSubject[safeWrongQuestionIndex] && (
+                    <QuestionDisplay question={wrongQuestionsForSubject[safeWrongQuestionIndex]} />
+                  )}
                 </>
               )}
             </div>

@@ -81,6 +81,7 @@ export interface TrainingStudyItemResponse {
   id: string
   subject: string
   topic: string | null
+  linkedQuestionIds: string[]
   /** Title of the single recommendation this study item is for. */
   recommendationTitle: string
   /** Text of the recommendation. */

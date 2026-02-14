@@ -208,6 +208,7 @@ model ExamBaseQuestion {
   alternatives          ExamBaseQuestionAlternative[]
   attemptAnswers        ExamBaseAttemptAnswer[]
   trainingRetryAnswers  TrainingRetryAnswer[]
+  studyItemQuestionLinks TrainingStudyItemQuestionLink[]
 
   @@index([examBaseId])
   @@index([examBaseId, subject])
@@ -231,6 +232,7 @@ model ExamBaseQuestionAlternative {
 
   selectedInAnswers           ExamBaseAttemptAnswer[]
   selectedInTrainingRetryAnswers TrainingRetryAnswer[]
+  selectedInStudyItemQuestionLinks TrainingStudyItemQuestionLink[]
 
   @@unique([examBaseQuestionId, key])
   @@index([examBaseQuestionId])
@@ -384,11 +386,32 @@ model TrainingStudyItem {
   updatedAt                   DateTime  @updatedAt
 
   exercises StudyExercise[]
+  questionLinks TrainingStudyItemQuestionLink[]
 
   @@unique([trainingSessionId, subjectFeedbackRecommendationId])
   @@index([trainingSessionId])
   @@index([subjectFeedbackRecommendationId])
   @@map("training_study_items")
+}
+
+/// Links which wrong questions from the original attempt are related to a study item recommendation.
+model TrainingStudyItemQuestionLink {
+  trainingStudyItemId String @db.Uuid
+  trainingStudyItem   TrainingStudyItem @relation(fields: [trainingStudyItemId], references: [id], onDelete: Cascade)
+
+  examBaseQuestionId String @db.Uuid
+  examBaseQuestion   ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
+
+  // Snapshot of what the user selected in the original attempt for this question.
+  selectedAlternativeId String? @db.Uuid
+  selectedAlternative   ExamBaseQuestionAlternative? @relation(fields: [selectedAlternativeId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@id([trainingStudyItemId, examBaseQuestionId])
+  @@index([trainingStudyItemId])
+  @@index([examBaseQuestionId])
+  @@map("training_study_item_question_links")
 }
 
 /// One of 5 exercises per TrainingStudyItem (AI-generated).

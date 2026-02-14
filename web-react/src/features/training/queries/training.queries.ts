@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { trainingService } from '../services/training.service'
 
+function isUuid(value: string | undefined): value is string {
+  if (!value) return false
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
 export const trainingKeys = {
   list: () => ['training', 'list'] as const,
   one: (trainingId: string) => ['training', trainingId] as const,
@@ -26,7 +31,7 @@ export function useTrainingQuery(trainingId: string | undefined) {
   return useQuery({
     queryKey: trainingKeys.one(trainingId ?? ''),
     queryFn: () => trainingService.getOne(trainingId!),
-    enabled: Boolean(trainingId),
+    enabled: isUuid(trainingId),
   })
 }
 

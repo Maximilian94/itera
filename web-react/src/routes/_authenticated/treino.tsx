@@ -11,6 +11,7 @@ function deriveTrainingIdFromPath(pathname: string): string | undefined {
   const after = pathname.replace(/^\/treino\/?/, '')
   const first = after.split('/')[0]
   if (!first) return undefined
+  if (first === 'novo') return undefined
   const isStageSlug = TREINO_STAGES.some((s) => s.slug === first)
   if (isStageSlug) return undefined
   return first
