@@ -1,6 +1,6 @@
 import { Alert, Button, Tooltip } from '@mui/material'
 import { Link } from '@tanstack/react-router'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { Card } from '@/components/Card'
@@ -76,6 +76,8 @@ export interface ExamAttemptPlayerProps {
   attemptId?: string
   /** Retry mode: re-tentativa do treino (só questões erradas). Quando setado, examBaseId/attemptId são ignorados. */
   trainingId?: string
+  /** Training prova phase: simplified UI (no tabs, no sidebar finalize, blue nav, nav below alternatives). */
+  trainingProvaMode?: boolean
   /** For "Ver feedback" link (attempt mode when finished). If not provided, button is hidden when finished. */
   feedbackLink?: { examBoard: string; examId: string; attemptId: string }
   /** For error/empty state back button. If not provided, no back button. */
@@ -84,16 +86,30 @@ export interface ExamAttemptPlayerProps {
   onFinished?: () => void
   /** Retry mode when finished: called when user clicks "Ver resultado final". */
   onNavigateToFinal?: () => void
+  /** When trainingProvaMode: ref to expose finish API for external button. */
+  finishRef?: React.MutableRefObject<{ finish: () => void } | null>
+  /** When trainingProvaMode: called when finish state changes (for external footer). */
+  onTrainingProvaStateChange?: (state: {
+    isFinished: boolean
+    isFinishPending: boolean
+    finish: () => void
+    hasUnansweredQuestions: boolean
+    firstUnansweredIndex: number
+    goToQuestion: (index: number) => void
+  }) => void
 }
 
 export function ExamAttemptPlayer({
   examBaseId,
   attemptId,
   trainingId,
+  trainingProvaMode = false,
   feedbackLink,
   onBack,
   onFinished,
   onNavigateToFinal,
+  finishRef,
+  onTrainingProvaStateChange,
 }: ExamAttemptPlayerProps) {
   const isRetryMode = Boolean(trainingId)
 
@@ -149,6 +165,19 @@ export function ExamAttemptPlayer({
   const currentQuestion = questions[currentQuestionIndex]
   const questionCount = questions.length
 
+  const unansweredIndices = React.useMemo(() => {
+    return questions
+      .map((q, i) => (answers[q.id] == null || answers[q.id] === '' ? i : -1))
+      .filter((i) => i >= 0)
+  }, [questions, answers])
+  const hasUnansweredQuestions = unansweredIndices.length > 0
+  const firstUnansweredIndex = unansweredIndices[0] ?? 0
+
+  const goToQuestion = useCallback((index: number) => {
+    setSlideDirection(index > currentQuestionIndex ? 'forward' : 'backward')
+    setCurrentQuestionIndex(index)
+  }, [currentQuestionIndex])
+
   const handleOptionSelected = (
     questionId: string,
     alternativeId: string,
@@ -169,18 +198,54 @@ export function ExamAttemptPlayer({
     }
   }
 
-  const handleFinish = () => {
+  const handleFinish = useCallback(() => {
     if (isRetryMode) {
       updateStageMutation.mutate('FINAL', { onSuccess: onFinished })
     } else {
       finishAttemptMutation.mutate(undefined, { onSuccess: onFinished })
     }
-  }
+  }, [isRetryMode, updateStageMutation, finishAttemptMutation, onFinished])
 
   const isFinishPending = isRetryMode
     ? updateStageMutation.isPending
     : finishAttemptMutation.isPending
   const finishButtonLabel = isRetryMode ? 'Finalizar re-tentativa' : 'Finalizar prova'
+
+  useEffect(() => {
+    if (finishRef) {
+      finishRef.current = { finish: handleFinish }
+      return () => {
+        finishRef.current = null
+      }
+    }
+  }, [finishRef, handleFinish])
+
+  const prevProvaStateKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!trainingProvaMode || !onTrainingProvaStateChange) return
+
+    const stateKey = `${isFinished}-${isFinishPending}-${hasUnansweredQuestions}-${firstUnansweredIndex}`
+    if (prevProvaStateKeyRef.current === stateKey) return
+    prevProvaStateKeyRef.current = stateKey
+
+    onTrainingProvaStateChange({
+      isFinished,
+      isFinishPending,
+      finish: handleFinish,
+      hasUnansweredQuestions,
+      firstUnansweredIndex,
+      goToQuestion,
+    })
+  }, [
+    trainingProvaMode,
+    onTrainingProvaStateChange,
+    isFinished,
+    isFinishPending,
+    handleFinish,
+    hasUnansweredQuestions,
+    firstUnansweredIndex,
+    goToQuestion,
+  ])
 
   useEffect(() => {
     if (value === 1 && scrollToAlternativeId) {
@@ -332,15 +397,16 @@ export function ExamAttemptPlayer({
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3">
-            <button
-              type="button"
+            <Button
+              variant="outlined"
+              color={trainingProvaMode ? 'primary' : 'inherit'}
               onClick={handlePrevQuestion}
               disabled={currentQuestionIndex === 0}
               aria-label="Questão anterior"
-              className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0"
+              sx={{ flexShrink: 0, minWidth: 44 }}
             >
               <ChevronLeftIcon className="w-5 h-5" />
-            </button>
+            </Button>
             <span className="text-sm font-medium text-slate-700 shrink-0">
               Q {currentQuestionIndex + 1} / {questionCount}
             </span>
@@ -361,19 +427,21 @@ export function ExamAttemptPlayer({
                 </button>
               </Tooltip>
             </div>
-            <button
-              type="button"
+            <Button
+              variant="outlined"
+              color={trainingProvaMode ? 'primary' : 'inherit'}
               onClick={handleNextQuestion}
               disabled={currentQuestionIndex === questionCount - 1}
               aria-label="Próxima questão"
-              className="p-2 rounded-lg border border-slate-300 text-slate-600 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors shrink-0 ml-auto"
+              sx={{ flexShrink: 0, ml: 'auto', minWidth: 44 }}
             >
               <ChevronRightIcon className="w-5 h-5" />
-            </button>
+            </Button>
           </div>
 
           <Card noElevation className="flex flex-col flex-1 min-h-0 p-0 overflow-hidden">
             <div className="flex-1 overflow-auto min-h-0 flex flex-col">
+              {!trainingProvaMode && (
               <div className="sticky top-0 z-10 flex shrink-0 border-b border-slate-200 overflow-x-auto">
                 {tabButtons.map((tab) => {
                 const Icon = tab.icon
@@ -410,6 +478,7 @@ export function ExamAttemptPlayer({
                 )
               })}
               </div>
+              )}
 
               <div className="flex-1 overflow-x-hidden p-5 min-h-0">
               <CustomTabPanel value={value} hidden={value !== 0}>
@@ -477,7 +546,7 @@ export function ExamAttemptPlayer({
                               )}
                               <button
                                 type="button"
-                                className={`flex gap-3 items-center justify-start w-full p-3 rounded-lg text-left border-2 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
+                                className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
                                 onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
                                 disabled={isEliminated || isFinished}
                               >
@@ -488,6 +557,28 @@ export function ExamAttemptPlayer({
                           )
                         })}
                       </div>
+                      {trainingProvaMode && (
+                        <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 mt-2">
+                          <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={handlePrevQuestion}
+                            disabled={currentQuestionIndex === 0}
+                            startIcon={<ChevronLeftIcon className="w-5 h-5" />}
+                          >
+                            Anterior
+                          </Button>
+                          <Button
+                            variant="outlined"
+                            color="primary"
+                            onClick={handleNextQuestion}
+                            disabled={currentQuestionIndex === questionCount - 1}
+                            endIcon={<ChevronRightIcon className="w-5 h-5" />}
+                          >
+                            Próxima
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </QuestionSlide>
@@ -560,6 +651,7 @@ export function ExamAttemptPlayer({
         </div>
 
         <div className="flex flex-col gap-3 w-56 shrink-0 min-h-0 overflow-hidden">
+          {!trainingProvaMode && (
           <div className="shrink-0">
             {isFinished ? (
               isRetryMode && onNavigateToFinal ? (
@@ -593,6 +685,7 @@ export function ExamAttemptPlayer({
               </Button>
             )}
           </div>
+          )}
           <Card noElevation className="p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
             <span className="text-xs font-medium text-slate-500 block mb-2 shrink-0">Questões</span>
             <div className="overflow-auto min-h-0 p-1.5">

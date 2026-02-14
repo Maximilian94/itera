@@ -27,6 +27,15 @@ const darkTheme = createTheme({
       main: toHex(colors.blue[600]) ?? '',
     }
   },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: 8, // Tailwind rounded-lg (0.5rem)
+        },
+      },
+    },
+  },
 })
 
 // Create a new router instance (auth is injected via RouterProvider below)
