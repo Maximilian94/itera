@@ -5,6 +5,23 @@
   50% { transform: scale(1.6); }
 }
 
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.85); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes trophy-bounce {
+  0%   { transform: scale(0.5) rotate(-10deg); opacity: 0; }
+  50%  { transform: scale(1.15) rotate(5deg);  opacity: 1; }
+  70%  { transform: scale(0.95) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0deg);     opacity: 1; }
+}
+
 body {
   @apply m-0;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
