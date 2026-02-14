@@ -225,7 +225,7 @@ function StudyItemDetailPage() {
               )}
               {item.explanation && (
                 <>
-                  <div className="text-sm text-slate-700">
+                  <div className="text-sm text-slate-700 overflow-y-auto max-h-[60vh] pr-2 -mr-2">
                     <Markdown>{item.explanation}</Markdown>
                   </div>
                   <div className="pt-4 border-t border-slate-200">

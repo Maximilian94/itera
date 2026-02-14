@@ -34,18 +34,20 @@ const questionSelect = {
   },
 } as const;
 
-/** Per-question detail for AI feedback (topic, subtopics, correctness). */
+/** Per-question detail for AI feedback (id, topic, subtopics, correctness). */
 type SubjectQuestionDetail = {
+  id: string;
   topic: string | null;
   subtopics: string[];
   correct: boolean;
   answered: boolean;
 };
 
-/** One recommendation: title + deeper text. */
+/** One recommendation: title + deeper text + question IDs related to this topic. */
 export type SubjectFeedbackRecommendationFromAI = {
   title: string;
   text: string;
+  questionIds?: string[];
 };
 
 /** AI-generated feedback for a subject (evaluation + recommendations array). */
@@ -206,7 +208,18 @@ export class ExamBaseAttemptService {
     return attempt;
   }
 
-  async getOneWithQuestionsAndAnswers(
+  /**
+   * Fetches an exam attempt with all questions and the user's answers.
+   *
+   * @param examBaseId - ID of the exam base (prova)
+   * @param attemptId - ID of the attempt (tentativa)
+   * @param userId - User ID (for authorization)
+   * @returns Object with:
+   *   - attempt: Attempt metadata (id, startedAt, finishedAt, subjectFeedback)
+   *   - questions: All questions from the exam (statement, alternatives, topic, etc.)
+   *   - answers: Map of questionId -> selectedAlternativeId (null = blank/not answered)
+   */
+  async getExamAttemptWithQuestionsAndAnswers(
     examBaseId: string,
     attemptId: string,
     userId: string,
@@ -339,17 +352,21 @@ export class ExamBaseAttemptService {
     if (attempt.finishedAt != null)
       throw new BadRequestException('attempt is already finished');
 
-    const data = await this.getOneWithQuestionsAndAnswers(
+    const data = await this.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
     );
-    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
-      data.questions,
-      data.answers,
+    const { subjectPerformanceSummary, questionDetailsBySubject } =
+      this.computeSubjectStats(data.questions, data.answers);
+    const totalCorrect = subjectPerformanceSummary.reduce(
+      (acc, s) => acc + s.correct,
+      0,
     );
-    const totalCorrect = subjectStats.reduce((acc, s) => acc + s.correct, 0);
-    const totalQuestions = subjectStats.reduce((acc, s) => acc + s.total, 0);
+    const totalQuestions = subjectPerformanceSummary.reduce(
+      (acc, s) => acc + s.total,
+      0,
+    );
     const scorePercentage =
       totalQuestions > 0 ? (totalCorrect / totalQuestions) * 100 : 0;
 
@@ -372,11 +389,11 @@ export class ExamBaseAttemptService {
 
     let subjectFeedback: Record<string, SubjectFeedbackFromAI> = {};
     const apiKey = this.config.get<string>('XAI_API_KEY');
-    if (apiKey && subjectStats.length > 0) {
+    if (apiKey && subjectPerformanceSummary.length > 0) {
       try {
         subjectFeedback = await this.generateSubjectFeedbackWithAI(
-          subjectStats,
-          bySubjectDetails,
+          subjectPerformanceSummary,
+          questionDetailsBySubject,
           minPassing,
         );
         await this.prisma.examBaseAttempt.update({
@@ -408,8 +425,16 @@ export class ExamBaseAttemptService {
   }
 
   /**
-   * Computes per-subject correct/total/percentage and question details
-   * for AI feedback generation.
+   * Computes per-subject performance metrics and per-question metadata for AI feedback generation.
+   *
+   * @param questions - Exam questions with subject, topic, subtopics, and alternatives
+   * @param answers - Map of questionId -> selectedAlternativeId (null = blank)
+   * @returns Object with:
+   *   - subjectPerformanceSummary: Aggregate stats per subject (correct, total, percentage).
+   *     Used for score display and to tell the AI how the student performed in each subject.
+   *   - questionDetailsBySubject: Per-question metadata grouped by subject. Each entry has
+   *     topic, subtopics, correct, answered. Used by the AI to identify patterns (e.g. which
+   *     topics were missed) and generate targeted recommendations.
    */
   private computeSubjectStats(
     questions: Array<{
@@ -422,34 +447,32 @@ export class ExamBaseAttemptService {
     }>,
     answers: Record<string, string | null>,
   ): {
-    subjectStats: Array<{
+    subjectPerformanceSummary: Array<{
       subject: string;
       correct: number;
       total: number;
       percentage: number;
     }>;
-    bySubjectDetails: Record<string, SubjectQuestionDetail[]>;
+    questionDetailsBySubject: Record<string, SubjectQuestionDetail[]>;
   } {
-    const bySubject: Record<string, { correct: number; total: number }> = {};
-    const bySubjectDetails: Record<string, SubjectQuestionDetail[]> = {};
-    let totalCorrect = 0;
+    const correctTotalBySubject: Record<string, { correct: number; total: number }> = {};
+    const questionDetailsBySubject: Record<string, SubjectQuestionDetail[]> = {};
 
     for (const q of questions) {
       const subject = q.subject ?? 'Sem matéria';
-      if (!bySubject[subject]) bySubject[subject] = { correct: 0, total: 0 };
-      bySubject[subject].total += 1;
+      if (!correctTotalBySubject[subject]) correctTotalBySubject[subject] = { correct: 0, total: 0 };
+      correctTotalBySubject[subject].total += 1;
 
       const selectedId = answers[q.id] ?? null;
       if (selectedId != null && selectedId !== '') {
         const correctAlt = q.alternatives.find((a) => a.key === q.correctAlternative);
         const correctId = correctAlt?.id ?? null;
         if (correctId != null && selectedId === correctId) {
-          bySubject[subject].correct += 1;
-          totalCorrect += 1;
+          correctTotalBySubject[subject].correct += 1;
         }
       }
 
-      if (!bySubjectDetails[subject]) bySubjectDetails[subject] = [];
+      if (!questionDetailsBySubject[subject]) questionDetailsBySubject[subject] = [];
       const answered = selectedId != null && selectedId !== '';
       let correct = false;
       if (answered) {
@@ -457,7 +480,8 @@ export class ExamBaseAttemptService {
         const correctId = correctAlt?.id ?? null;
         correct = correctId != null && selectedId === correctId;
       }
-      bySubjectDetails[subject].push({
+      questionDetailsBySubject[subject].push({
+        id: q.id,
         topic: q.topic ?? null,
         subtopics: q.subtopics ?? [],
         correct,
@@ -465,7 +489,7 @@ export class ExamBaseAttemptService {
       });
     }
 
-    const subjectStats = Object.entries(bySubject).map(
+    const subjectPerformanceSummary = Object.entries(correctTotalBySubject).map(
       ([subject, { correct, total }]) => ({
         subject,
         correct,
@@ -473,7 +497,7 @@ export class ExamBaseAttemptService {
         percentage: total > 0 ? (correct / total) * 100 : 0,
       }),
     );
-    return { subjectStats, bySubjectDetails };
+    return { subjectPerformanceSummary, questionDetailsBySubject };
   }
 
   /**
@@ -491,8 +515,11 @@ export class ExamBaseAttemptService {
     }>,
     answers: Record<string, string | null>,
   ): Array<{ subject: string; correct: number; total: number; percentage: number }> {
-    const { subjectStats } = this.computeSubjectStats(questions, answers);
-    return subjectStats;
+    const { subjectPerformanceSummary } = this.computeSubjectStats(
+      questions,
+      answers,
+    );
+    return subjectPerformanceSummary;
   }
 
   /**
@@ -507,7 +534,7 @@ export class ExamBaseAttemptService {
     attemptId: string,
     userId: string,
   ) {
-    const data = await this.getOneWithQuestionsAndAnswers(
+    const data = await this.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -528,10 +555,8 @@ export class ExamBaseAttemptService {
         ? Number(examBase.minPassingGradeNonQuota)
         : 60;
 
-    const { subjectStats, bySubjectDetails } = this.computeSubjectStats(
-      data.questions,
-      data.answers,
-    );
+    const { subjectPerformanceSummary, questionDetailsBySubject } =
+      this.computeSubjectStats(data.questions, data.answers);
 
     const apiKey = this.config.get<string>('XAI_API_KEY');
     if (!apiKey) {
@@ -539,13 +564,13 @@ export class ExamBaseAttemptService {
         'XAI_API_KEY is not configured. Cannot generate AI feedback.',
       );
     }
-    if (subjectStats.length === 0) {
+    if (subjectPerformanceSummary.length === 0) {
       return { generated: false, message: 'No subjects to generate feedback for.' };
     }
 
     const subjectFeedback = await this.generateSubjectFeedbackWithAI(
-      subjectStats,
-      bySubjectDetails,
+      subjectPerformanceSummary,
+      questionDetailsBySubject,
       minPassing,
     );
 
@@ -558,7 +583,7 @@ export class ExamBaseAttemptService {
     return { generated: true, subjectFeedback };
   }
 
-  /** Persist subject feedback to SubjectFeedback table + SubjectFeedbackRecommendation rows. */
+  /** Persist subject feedback to SubjectFeedback table + SubjectFeedbackRecommendation rows + question links. */
   private async upsertSubjectFeedbackTable(
     attemptId: string,
     subjectFeedback: Record<string, SubjectFeedbackFromAI>,
@@ -579,14 +604,27 @@ export class ExamBaseAttemptService {
         where: { subjectFeedbackId: sf.id },
       });
       if (Array.isArray(fb.recommendations) && fb.recommendations.length > 0) {
-        await this.prisma.subjectFeedbackRecommendation.createMany({
-          data: fb.recommendations.map((rec, idx) => ({
-            subjectFeedbackId: sf.id,
-            title: typeof rec.title === 'string' ? rec.title.slice(0, 500) : 'Recomendação',
-            text: typeof rec.text === 'string' ? rec.text : '',
-            order: idx,
-          })),
-        });
+        for (let idx = 0; idx < fb.recommendations.length; idx++) {
+          const rec = fb.recommendations[idx];
+          const recRow = await this.prisma.subjectFeedbackRecommendation.create({
+            data: {
+              subjectFeedbackId: sf.id,
+              title: typeof rec.title === 'string' ? rec.title.slice(0, 500) : 'Recomendação',
+              text: typeof rec.text === 'string' ? rec.text : '',
+              order: idx,
+            },
+          });
+          const questionIds = Array.isArray(rec.questionIds) ? rec.questionIds : [];
+          if (questionIds.length > 0) {
+            await this.prisma.subjectFeedbackRecommendationQuestionLink.createMany({
+              data: questionIds.map((questionId) => ({
+                subjectFeedbackRecommendationId: recRow.id,
+                examBaseQuestionId: questionId,
+              })),
+              skipDuplicates: true,
+            });
+          }
+        }
       }
     }
   }
@@ -600,7 +638,7 @@ export class ExamBaseAttemptService {
     attemptId: string,
     userId: string,
   ) {
-    const data = await this.getOneWithQuestionsAndAnswers(
+    const data = await this.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -627,12 +665,12 @@ export class ExamBaseAttemptService {
         ? Number(examBase.minPassingGradeNonQuota)
         : 60;
 
-    const { subjectStats } = this.computeSubjectStats(
+    const { subjectPerformanceSummary } = this.computeSubjectStats(
       data.questions,
       data.answers,
     );
     const total = data.questions.length;
-    const totalCorrect = subjectStats.reduce(
+    const totalCorrect = subjectPerformanceSummary.reduce(
       (sum, s) => sum + s.correct,
       0,
     );
@@ -672,7 +710,7 @@ export class ExamBaseAttemptService {
         percentage: overallPercentage,
       },
       passed,
-      subjectStats,
+      subjectStats: subjectPerformanceSummary,
       subjectFeedback,
     };
   }
@@ -682,33 +720,35 @@ export class ExamBaseAttemptService {
    * Uses topic/subtopics and correct/answered per question for context.
    */
   private async generateSubjectFeedbackWithAI(
-    subjectStats: Array<{
+    subjectPerformanceSummary: Array<{
       subject: string;
       correct: number;
       total: number;
       percentage: number;
     }>,
-    bySubjectDetails: Record<string, SubjectQuestionDetail[]>,
+    questionDetailsBySubject: Record<string, SubjectQuestionDetail[]>,
     minPassingGrade: number,
   ): Promise<Record<string, SubjectFeedbackFromAI>> {
     const apiKey = this.config.get<string>('XAI_API_KEY');
     if (!apiKey) return {};
 
-    const payload = subjectStats.map((s) => ({
+    const payload = subjectPerformanceSummary.map((s) => ({
       subject: s.subject,
       correct: s.correct,
       total: s.total,
       percentage: s.percentage,
-      questions: bySubjectDetails[s.subject] ?? [],
+      questions: questionDetailsBySubject[s.subject] ?? [],
     }));
 
     const systemPrompt = `Você é um tutor especializado em preparação para concursos e vestibulares. Sua tarefa é gerar feedback personalizado para o aluno sobre seu desempenho em cada matéria da prova.
 
-Cada questão tem: topic (assunto), subtopics (subassuntos), correct (acertou), answered (respondeu ou deixou em branco).
+Cada questão tem: id (UUID da questão), topic (assunto), subtopics (subassuntos), correct (acertou), answered (respondeu ou deixou em branco).
 
 Para cada matéria, retorne um objeto JSON com:
 - "evaluation": Avaliação HONESTA e CONSTRUTIVA. Reconheça pontos fortes e fracos. Use topic e subtopics para identificar padrões. Se houver questões em branco, mencione isso.
-- "recommendations": Array de objetos, cada um com "title" (título curto da recomendação, ex.: "Equações do 1º grau") e "text" (texto em português com uma recomendação mais profunda sobre esse assunto: o que priorizar, dicas de conteúdo). NÃO sugira fontes (livros, sites, cursos), NÃO sugira horas de estudo. Gere de 2 a 5 recomendações por matéria.
+- "recommendations": Array de objetos, cada um com "title" (título curto da recomendação, ex.: "Equações do 1º grau"), "text" (texto em português com uma recomendação mais profunda sobre esse assunto: o que priorizar, dicas de conteúdo) e "questionIds" (array com os IDs das questões ERRADAS ou EM BRANCO que se relacionam diretamente a este tema — use o campo "id" de cada questão no payload). NÃO sugira fontes (livros, sites, cursos), NÃO sugira horas de estudo. Gere de 2 a 5 recomendações por matéria.
+- IMPORTANTE: Cada recomendação deve ter exatamente UM assunto/tópico no campo "title". NUNCA combine dois ou mais assuntos em um único título. Exemplo ERRADO: "Regência Verbal e Vícios de Linguagem" ou "Verbo haver e regência verbal". Exemplo CORRETO: duas recomendações separadas — "Regência Verbal" e "Vícios de Linguagem".
+- IMPORTANTE: O campo "questionIds" deve conter APENAS IDs de questões que errou ou deixou em branco e que são diretamente relacionadas ao tema da recomendação. Use topic e subtopics das questões para decidir. Se nenhuma questão se relacionar, retorne array vazio [].
 
 REGRAS DE FORMATAÇÃO (obrigatório):
 1. NÃO use títulos em Markdown (nada de # ou ##) dentro de evaluation ou text. Pode usar **negrito** para destacar termos.
@@ -720,10 +760,10 @@ REGRAS DE FORMATAÇÃO (obrigatório):
 Dados de desempenho por matéria:
 ${JSON.stringify(payload, null, 2)}
 
-Retorne APENAS um JSON object: chaves = nomes das matérias (exatamente como no payload), valores = objetos com "evaluation" (string) e "recommendations" (array de objetos com "title" e "text", em português).
+Retorne APENAS um JSON object: chaves = nomes das matérias (exatamente como no payload), valores = objetos com "evaluation" (string) e "recommendations" (array de objetos com "title", "text" e "questionIds", em português).
 
 Exemplo:
-{"Matemática":{"evaluation":"Você acertou bem **Geometria** e teve dificuldade em **Álgebra**.\\n\\n- Pontos fortes: triângulos e áreas.\\n- Atenção: equações e funções.","recommendations":[{"title":"Equações do 1º grau","text":"Revisar isolamento de incógnita e equações simples. Pratique problemas que misturam frações e decimais."},{"title":"Funções","text":"Praticar leitura de gráficos e identificação de domínio e imagem. Foque em funções afim e quadráticas."}]},"Português":{"evaluation":"...","recommendations":[{"title":"...","text":"..."}]}}`;
+{"Matemática":{"evaluation":"Você acertou bem **Geometria** e teve dificuldade em **Álgebra**.\\n\\n- Pontos fortes: triângulos e áreas.\\n- Atenção: equações e funções.","recommendations":[{"title":"Equações do 1º grau","text":"Revisar isolamento de incógnita e equações simples. Pratique problemas que misturam frações e decimais.","questionIds":["uuid-questao-1","uuid-questao-2"]},{"title":"Funções","text":"Praticar leitura de gráficos e identificação de domínio e imagem. Foque em funções afim e quadráticas.","questionIds":["uuid-questao-3"]}]},"Português":{"evaluation":"...","recommendations":[{"title":"...","text":"...","questionIds":[]}]}}`;
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -770,18 +810,52 @@ Exemplo:
       return {};
     }
 
+    const validQuestionIdsBySubject = new Map<string, Set<string>>();
+    for (const [subj, details] of Object.entries(questionDetailsBySubject)) {
+      validQuestionIdsBySubject.set(
+        subj,
+        new Set(details.filter((d) => !d.correct).map((d) => d.id)),
+      );
+    }
+
     const result: Record<string, SubjectFeedbackFromAI> = {};
-    for (const s of subjectStats) {
+    for (const s of subjectPerformanceSummary) {
       const fb = parsed[s.subject];
       if (!fb || typeof fb.evaluation !== 'string') continue;
+      const validIds = validQuestionIdsBySubject.get(s.subject) ?? new Set<string>();
       const recs = Array.isArray(fb.recommendations)
-        ? (fb.recommendations as Array<{ title?: unknown; text?: unknown }>)
+        ? (fb.recommendations as Array<{
+            title?: unknown;
+            text?: unknown;
+            questionIds?: unknown;
+          }>)
             .filter((r) => r && typeof r.title === 'string' && typeof r.text === 'string')
-            .map((r) => ({ title: r.title as string, text: r.text as string }))
+            .map((r) => {
+              const rawIds = Array.isArray(r.questionIds)
+                ? (r.questionIds as unknown[]).filter((id) => typeof id === 'string')
+                : [];
+              const questionIds = (rawIds as string[]).filter((id) =>
+                validIds.has(id),
+              );
+              return {
+                title: r.title as string,
+                text: r.text as string,
+                questionIds,
+              };
+            })
         : [];
       result[s.subject] = {
         evaluation: fb.evaluation,
-        recommendations: recs.length > 0 ? recs : [{ title: 'Recomendações', text: 'Priorize os assuntos em que você teve mais dificuldade e revise os tópicos relacionados.' }],
+        recommendations:
+          recs.length > 0
+            ? recs
+            : [
+                {
+                  title: 'Recomendações',
+                  text: 'Priorize os assuntos em que você teve mais dificuldade e revise os tópicos relacionados.',
+                  questionIds: [],
+                },
+              ],
       };
     }
     return result;

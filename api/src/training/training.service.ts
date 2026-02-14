@@ -41,11 +41,6 @@ interface GeneratedExerciseCandidate {
   correctAlternativeKey?: string;
 }
 
-interface GeneratedStudyContent {
-  explanation: string | null;
-  exercises: GeneratedExerciseCandidate[];
-}
-
 const TARGET_STUDY_DIFFICULTY: StudyDifficultyLevel = 'AVANCADA';
 const UUID_V4_REGEX =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -174,12 +169,12 @@ export class TrainingService {
     return matched.length > 0 ? matched : wrongQuestions.map((q) => q.id);
   }
 
-  private async requestStudyContentFromXAi(
+  private async requestExplanationFromOpenAI(
     apiKey: string,
     systemPrompt: string,
     userPrompt: string,
-  ): Promise<GeneratedStudyContent> {
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+  ): Promise<string | null> {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -187,8 +182,8 @@ export class TrainingService {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 8192,
+        model: 'gpt-4.1-mini',
+        max_tokens: 4096,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -198,7 +193,9 @@ export class TrainingService {
 
     if (!res.ok) {
       const errBody = await res.text();
-      throw new BadRequestException(`xAI API error (${res.status}): ${errBody.slice(0, 300)}`);
+      throw new BadRequestException(
+        `OpenAI API error (${res.status}): ${errBody.slice(0, 300)}`,
+      );
     }
 
     const dataRes = (await res.json()) as {
@@ -219,23 +216,73 @@ export class TrainingService {
     try {
       parsedUnknown = JSON.parse(jsonStr);
     } catch {
-      throw new BadRequestException('AI returned invalid JSON');
+      throw new BadRequestException('OpenAI returned invalid JSON');
     }
 
     const parsed =
       typeof parsedUnknown === 'object' && parsedUnknown != null
-        ? (parsedUnknown as {
-            explanation?: unknown;
-            exercises?: unknown;
-          })
+        ? (parsedUnknown as { explanation?: unknown })
         : {};
-    const exercises =
-      Array.isArray(parsed.exercises) ? (parsed.exercises as GeneratedExerciseCandidate[]) : [];
+    return typeof parsed.explanation === 'string' ? parsed.explanation : null;
+  }
 
-    return {
-      explanation: typeof parsed.explanation === 'string' ? parsed.explanation : null,
-      exercises,
+  private async requestExercisesFromXAi(
+    apiKey: string,
+    systemPrompt: string,
+    userPrompt: string,
+  ): Promise<GeneratedExerciseCandidate[]> {
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-reasoning',
+        max_tokens: 4096,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(
+        `xAI API error (${res.status}): ${errBody.slice(0, 300)}`,
+      );
+    }
+
+    const dataRes = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
     };
+    const content = dataRes.choices?.[0]?.message?.content?.trim() ?? '';
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsedUnknown: unknown;
+    try {
+      parsedUnknown = JSON.parse(jsonStr);
+    } catch {
+      throw new BadRequestException('xAI returned invalid JSON');
+    }
+
+    const parsed =
+      typeof parsedUnknown === 'object' && parsedUnknown != null
+        ? (parsedUnknown as { exercises?: unknown })
+        : {};
+    return Array.isArray(parsed.exercises)
+      ? (parsed.exercises as GeneratedExerciseCandidate[])
+      : [];
   }
 
   /** List training sessions for the user, most recent first. */
@@ -544,12 +591,13 @@ export class TrainingService {
         title: true,
         text: true,
         subjectFeedback: { select: { subject: true } },
+        questionLinks: { select: { examBaseQuestionId: true } },
       },
       orderBy: [{ subjectFeedbackId: 'asc' }, { order: 'asc' }],
     });
     if (recommendations.length === 0) return;
 
-    const attemptData = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const attemptData = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -608,11 +656,20 @@ export class TrainingService {
       if (existingLinksCount > 0) continue;
 
       const wrongQuestionsInSubject = wrongQuestionsBySubject.get(studyItem.subject) ?? [];
-      const relatedQuestionIds = this.getRelatedWrongQuestionIdsForRecommendation(
-        rec.title,
-        rec.text,
-        wrongQuestionsInSubject,
-      );
+      const wrongQuestionIdSet = new Set(wrongQuestionsInSubject.map((q) => q.id));
+
+      let relatedQuestionIds: string[];
+      if (rec.questionLinks.length > 0) {
+        relatedQuestionIds = rec.questionLinks
+          .map((l) => l.examBaseQuestionId)
+          .filter((id) => wrongQuestionIdSet.has(id));
+      } else {
+        relatedQuestionIds = this.getRelatedWrongQuestionIdsForRecommendation(
+          rec.title,
+          rec.text,
+          wrongQuestionsInSubject,
+        );
+      }
       if (relatedQuestionIds.length === 0) continue;
 
       const selectedAlternativeByQuestionId = new Map(
@@ -770,7 +827,7 @@ export class TrainingService {
     const attemptId = session.examBaseAttemptId;
     const examBaseId = session.examBaseId;
 
-    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const data = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -824,7 +881,7 @@ export class TrainingService {
 
     const attemptId = session.examBaseAttemptId;
     const examBaseId = session.examBaseId;
-    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const data = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -863,7 +920,7 @@ export class TrainingService {
     const attemptId = session.examBaseAttemptId;
     const examBaseId = session.examBaseId;
 
-    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const data = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       userId,
@@ -938,7 +995,7 @@ export class TrainingService {
       );
     }
 
-    const attemptData = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const attemptData = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       session.examBaseId,
       session.examBaseAttemptId,
       userId,
@@ -977,14 +1034,25 @@ export class TrainingService {
     const difficultyInstruction =
       'A explicação e os exercícios devem ser de nível AVANCADO: incluir casos limítrofes, armadilhas comuns e interpretação aprofundada. Evite exercícios triviais.';
 
-    const apiKey = this.config.get<string>('XAI_API_KEY');
-    if (!apiKey) {
+    const openaiApiKey = this.config.get<string>('OPENAI_API_KEY');
+    const xaiApiKey = this.config.get<string>('XAI_API_KEY');
+    if (!openaiApiKey) {
       throw new BadRequestException(
-        'XAI_API_KEY is not configured. Cannot generate study content.',
+        'OPENAI_API_KEY is not configured. Cannot generate study explanations.',
+      );
+    }
+    if (!xaiApiKey) {
+      throw new BadRequestException(
+        'XAI_API_KEY is not configured. Cannot generate study exercises.',
       );
     }
 
-    const systemPrompt = `Você é um tutor especializado em preparação para concursos. Sua tarefa é gerar conteúdo de estudo de excelente qualidade para o aluno.
+    const rec = item.subjectFeedbackRecommendation;
+    const recommendationsText = `**${rec.title}**: ${rec.text}`;
+    const contextBlock = `Questões que o aluno errou (use apenas como contexto do que reforçar; NÃO cite nem resolva estas questões na explanation):
+${JSON.stringify(wrongQuestionsContext, null, 2)}`;
+
+    const explanationSystemPrompt = `Você é um tutor especializado em preparação para concursos. Sua tarefa é gerar uma explicação de estudo de excelente qualidade para o aluno.
 
 Você receberá:
 1. Uma recomendação de estudo (título e texto) que é o foco deste item.
@@ -999,32 +1067,54 @@ REGRAS OBRIGATÓRIAS PARA A "explanation" (explicação):
 - Tamanho: a explicação deve ser completa o suficiente para cobrir bem o tema (não seja superficial).
 - Nível de dificuldade obrigatório: SEMPRE avançado.
 
+FORMATO DE RESPOSTA:
+- Retorne APENAS um JSON válido: {"explanation":"..."}`;
+
+    const exercisesSystemPrompt = `Você é um tutor especializado em preparação para concursos. Sua tarefa é gerar 5 exercícios de múltipla escolha para o aluno praticar.
+
+Você receberá:
+1. Uma recomendação de estudo (título e texto) que é o foco deste item.
+2. Opcionalmente, as questões que o aluno ERROU nesta matéria (apenas como CONTEXTO do que ele precisa praticar).
+
 REGRAS PARA OS EXERCÍCIOS:
 - Gere exatamente 5 exercícios novos (não use as questões do contexto). Cada exercício: statement (enunciado em português), 4 alternativas com keys "A", "B", "C", "D", e correctAlternativeKey ("A", "B", "C" ou "D").
 - Os exercícios devem ser avançados; evite exercícios fáceis ou excessivamente diretos.
 
 FORMATO DE RESPOSTA:
-- Retorne APENAS um JSON válido: {"explanation":"...","exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
+- Retorne APENAS um JSON válido: {"exercises":[{"statement":"...","alternatives":[{"key":"A","text":"..."},{"key":"B","text":"..."},{"key":"C","text":"..."},{"key":"D","text":"..."}],"correctAlternativeKey":"A"}, ...]} (5 objetos em exercises).`;
 
-    const rec = item.subjectFeedbackRecommendation;
-    const recommendationsText = `**${rec.title}**: ${rec.text}`;
     const userPromptBase = `Recomendação de estudo (foco deste item):
 ${recommendationsText}
 
-Nível mínimo exigido para explicação e exercícios: ${targetDifficulty}
+Nível mínimo exigido: ${targetDifficulty}
 Instrução de nível: ${difficultyInstruction}
 
-Questões que o aluno errou (use apenas como contexto do que reforçar; NÃO cite nem resolva estas questões na explanation):
-${JSON.stringify(wrongQuestionsContext, null, 2)}
+${contextBlock}`;
 
-Gere uma "explanation" (explicação em português, de qualidade; inclua exemplos corretos e exemplos errados quando fizer sentido) e "exercises" (array com exatamente 5 exercícios, cada um com statement, alternatives [4 itens com key e text], correctAlternativeKey).`;
-    const generated = await this.requestStudyContentFromXAi(apiKey, systemPrompt, userPromptBase);
+    const explanationUserPrompt = `${userPromptBase}
+
+Gere uma "explanation" (explicação em português, de qualidade; inclua exemplos corretos e exemplos errados quando fizer sentido). Retorne JSON: {"explanation":"..."}`;
+
+    const exercisesUserPrompt = `${userPromptBase}
+
+Gere "exercises" (array com exatamente 5 exercícios, cada um com statement, alternatives [4 itens com key e text], correctAlternativeKey). Retorne JSON: {"exercises":[...]}`;
+
+    const [explanation, exercises] = await Promise.all([
+      this.requestExplanationFromOpenAI(
+        openaiApiKey,
+        explanationSystemPrompt,
+        explanationUserPrompt,
+      ),
+      this.requestExercisesFromXAi(
+        xaiApiKey,
+        exercisesSystemPrompt,
+        exercisesUserPrompt,
+      ),
+    ]);
+
     this.logger.log(
       `Study content generated for studyItem=${studyItemId} with fixed target=${targetDifficulty}`,
     );
-
-    const explanation = generated.explanation;
-    const exercises = generated.exercises;
 
     await this.prisma.trainingStudyItem.update({
       where: { id: studyItemId },
@@ -1087,7 +1177,7 @@ Gere uma "explanation" (explicação em português, de qualidade; inclua exemplo
     const finalPercentage = session2.finalScorePercentage != null ? Number(session2.finalScorePercentage) : initialPercentage;
     const finalCorrect = totalQuestions > 0 ? Math.round((finalPercentage / 100) * totalQuestions) : 0;
 
-    const data = await this.examBaseAttemptService.getOneWithQuestionsAndAnswers(
+    const data = await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
       session2.examBaseId,
       session2.examBaseAttemptId,
       userId,

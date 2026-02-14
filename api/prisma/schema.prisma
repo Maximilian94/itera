@@ -209,6 +209,7 @@ model ExamBaseQuestion {
   attemptAnswers        ExamBaseAttemptAnswer[]
   trainingRetryAnswers  TrainingRetryAnswer[]
   studyItemQuestionLinks TrainingStudyItemQuestionLink[]
+  recommendationQuestionLinks SubjectFeedbackRecommendationQuestionLink[]
 
   @@index([examBaseId])
   @@index([examBaseId, subject])
@@ -366,9 +367,23 @@ model SubjectFeedbackRecommendation {
   createdAt           DateTime @default(now())
 
   trainingStudyItems TrainingStudyItem[]
+  questionLinks      SubjectFeedbackRecommendationQuestionLink[]
 
   @@index([subjectFeedbackId])
   @@map("subject_feedback_recommendations")
+}
+
+/// Links which wrong questions from the attempt are related to each recommendation (AI-determined).
+model SubjectFeedbackRecommendationQuestionLink {
+  subjectFeedbackRecommendationId String   @db.Uuid
+  subjectFeedbackRecommendation   SubjectFeedbackRecommendation @relation(fields: [subjectFeedbackRecommendationId], references: [id], onDelete: Cascade)
+  examBaseQuestionId               String   @db.Uuid
+  examBaseQuestion                 ExamBaseQuestion @relation(fields: [examBaseQuestionId], references: [id], onDelete: Cascade)
+
+  @@id([subjectFeedbackRecommendationId, examBaseQuestionId])
+  @@index([subjectFeedbackRecommendationId])
+  @@index([examBaseQuestionId])
+  @@map("subject_feedback_recommendation_question_links")
 }
 
 /// One per SubjectFeedbackRecommendation per TrainingSession: study item for a single recommendation (explanation + 5 exercises AI-generated).
