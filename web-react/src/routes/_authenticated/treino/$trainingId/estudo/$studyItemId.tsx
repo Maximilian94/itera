@@ -114,7 +114,7 @@ function StudyItemDetailPage() {
       <>
         <p className="text-slate-600 text-sm">Item de estudo não encontrado.</p>
         <Button variant="outlined" startIcon={<ArrowLeftIcon className="w-5 h-5" />} onClick={handleVoltarEstudo}>
-          Voltar: Estudo
+          Voltar ao plano de estudo
         </Button>
       </>
     )
@@ -133,19 +133,31 @@ function StudyItemDetailPage() {
 
   return (
     <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-medium text-slate-500">{item.subject}</p>
-          <h1 className="text-xl font-bold text-slate-900">{item.recommendationTitle}</h1>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-slate-500">{item.subject}</p>
+            <h1 className="text-xl font-bold text-slate-900 truncate">{item.recommendationTitle}</h1>
+          </div>
+          <Button
+            variant={isPronto ? 'outlined' : 'contained'}
+            color="success"
+            startIcon={isPronto ? <CheckCircleIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
+            onClick={togglePronto}
+            disabled={completeMutation.isPending}
+          >
+            {isPronto ? 'Concluído' : 'Marcar como concluído'}
+          </Button>
         </div>
         <Button
-          variant={isPronto ? 'outlined' : 'contained'}
-          color={isPronto ? 'success' : 'primary'}
-          startIcon={isPronto ? <CheckCircleIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
-          onClick={togglePronto}
-          disabled={completeMutation.isPending}
+          variant="outlined"
+          size="small"
+          startIcon={<ArrowLeftIcon className="w-4 h-4" />}
+          onClick={handleVoltarEstudo}
+          className="self-start"
+          aria-label="Voltar ao plano de estudo"
         >
-          {isPronto ? 'Pronto' : 'Marcar pronto'}
+          Voltar ao plano de estudo
         </Button>
       </div>
 
@@ -331,16 +343,6 @@ function StudyItemDetailPage() {
           )}
         </div>
       </Card>
-
-      <div className="flex flex-wrap gap-3">
-        <Button
-          variant="outlined"
-          startIcon={<ArrowLeftIcon className="w-5 h-5" />}
-          onClick={handleVoltarEstudo}
-        >
-          Voltar: Estudo
-        </Button>
-      </div>
     </div>
   )
 }

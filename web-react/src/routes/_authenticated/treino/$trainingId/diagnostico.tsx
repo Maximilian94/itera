@@ -75,7 +75,7 @@ function DiagnosticoPage() {
             startIcon={<ArrowLeftIcon className="w-5 h-5" />}
             onClick={() => navigate({ to: getStagePath('prova', trainingId) })}
           >
-            Voltar: Prova
+            Revisar a prova
           </Button>
         </div>
       </div>
@@ -93,13 +93,6 @@ function DiagnosticoPage() {
 
   return (
     <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">{examTitle}</h1>
-        <p className="text-sm text-slate-500 mt-1">
-          Resultado e feedback por matéria para orientar seu estudo.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card noElevation className="p-5 border border-slate-200">
           <div className="flex items-center gap-3">
@@ -245,7 +238,7 @@ function DiagnosticoPage() {
           startIcon={<ArrowLeftIcon className="w-5 h-5" />}
           onClick={() => navigate({ to: getStagePath('prova', trainingId) })}
         >
-          Voltar: Prova
+          Revisar a prova
         </Button>
         <Button
           variant="contained"
@@ -254,7 +247,7 @@ function DiagnosticoPage() {
           onClick={handleGoToEstudo}
           disabled={updateStageMutation.isPending}
         >
-          {updateStageMutation.isPending ? 'Avançando...' : 'Próxima: Estudo'}
+          {updateStageMutation.isPending ? 'Avançando...' : 'Ir para o estudo'}
         </Button>
       </div>
     </div>
