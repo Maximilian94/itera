@@ -11,7 +11,7 @@ function deriveTrainingIdFromPath(pathname: string): string | undefined {
   const after = pathname.replace(/^\/treino\/?/, '')
   const first = after.split('/')[0]
   if (!first) return undefined
-  if (first === 'novo') return undefined
+  if (first === 'novo') return 'novo'
   const isStageSlug = TREINO_STAGES.some((s) => s.slug === first)
   if (isStageSlug) return undefined
   return first
@@ -20,7 +20,7 @@ function deriveTrainingIdFromPath(pathname: string): string | undefined {
 function TreinoLayout() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const trainingId = deriveTrainingIdFromPath(pathname)
-  const { data: training } = useTrainingQuery(trainingId)
+  const { data: training } = useTrainingQuery(trainingId === 'novo' ? undefined : trainingId)
   const currentStage = training?.currentStage
 
   return (
