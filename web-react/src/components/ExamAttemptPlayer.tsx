@@ -383,13 +383,14 @@ export function ExamAttemptPlayer({
     correctAlt != null &&
     selectedAlternativeId !== correctAlt.id
 
+  const comingSoonTooltip = 'Em breve disponível. Estamos trabalhando nisso.'
   const tabButtons = [
     { value: 0, label: 'Questão', icon: PlayIcon },
     { value: 1, label: 'Explicação', icon: BookOpenIcon, disabled: !isFinished },
-    { value: 2, label: 'Estatísticas', icon: ChartBarIcon },
-    { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon },
-    { value: 4, label: 'Histórico', icon: ClockIcon },
-    { value: 5, label: 'Notas', icon: PencilSquareIcon },
+    { value: 2, label: 'Estatísticas', icon: ChartBarIcon, comingSoon: true },
+    { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon, comingSoon: true },
+    { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
+    { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
   ]
 
   return (
@@ -411,20 +412,41 @@ export function ExamAttemptPlayer({
               Q {currentQuestionIndex + 1} / {questionCount}
             </span>
             <div className="flex items-center gap-1 shrink-0">
-              <Tooltip title="Salvar questão para revisar depois" enterDelay={300}>
-                <button type="button" aria-label="Salvar questão" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                  <BookmarkIcon className="w-5 h-5" />
-                </button>
+              <Tooltip title={comingSoonTooltip} enterDelay={300}>
+                <span className="inline-flex">
+                  <button
+                    type="button"
+                    disabled
+                    aria-label="Salvar questão"
+                    className="p-2 rounded-lg text-slate-400 cursor-not-allowed opacity-60"
+                  >
+                    <BookmarkIcon className="w-5 h-5" />
+                  </button>
+                </span>
               </Tooltip>
-              <Tooltip title="Reportar erro ou inconsistência nesta questão" enterDelay={300}>
-                <button type="button" aria-label="Reportar questão" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                  <FlagIcon className="w-5 h-5" />
-                </button>
+              <Tooltip title={comingSoonTooltip} enterDelay={300}>
+                <span className="inline-flex">
+                  <button
+                    type="button"
+                    disabled
+                    aria-label="Reportar questão"
+                    className="p-2 rounded-lg text-slate-400 cursor-not-allowed opacity-60"
+                  >
+                    <FlagIcon className="w-5 h-5" />
+                  </button>
+                </span>
               </Tooltip>
-              <Tooltip title="Acompanhar questão para ver comentários e atualizações" enterDelay={300}>
-                <button type="button" aria-label="Acompanhar questão" className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors">
-                  <EyeIcon className="w-5 h-5" />
-                </button>
+              <Tooltip title={comingSoonTooltip} enterDelay={300}>
+                <span className="inline-flex">
+                  <button
+                    type="button"
+                    disabled
+                    aria-label="Acompanhar questão"
+                    className="p-2 rounded-lg text-slate-400 cursor-not-allowed opacity-60"
+                  >
+                    <EyeIcon className="w-5 h-5" />
+                  </button>
+                </span>
               </Tooltip>
             </div>
             <Button
@@ -441,12 +463,13 @@ export function ExamAttemptPlayer({
 
           <Card noElevation className="flex flex-col flex-1 min-h-0 p-0 overflow-hidden">
             <div className="flex-1 overflow-auto min-h-0 flex flex-col">
-              {!trainingProvaMode && (
+              {(!trainingProvaMode || isFinished) && (
               <div className="sticky top-0 z-10 flex shrink-0 border-b border-slate-200 overflow-x-auto">
                 {tabButtons.map((tab) => {
                 const Icon = tab.icon
                 const isActive = value === tab.value
-                const isDisabled = tab.disabled ?? false
+                const isComingSoon = tab.comingSoon ?? false
+                const isDisabled = (tab.disabled ?? false) || isComingSoon
                 const isExplanationTab = tab.value === 1
                 const showWrongAnswerHighlight = isExplanationTab && currentQuestionHasWrongAnswer
                 const tabClasses = [
@@ -461,8 +484,15 @@ export function ExamAttemptPlayer({
                 const iconClassName = isExplanationTab && showWrongAnswerHighlight && !isViewingExplanation
                   ? 'w-4 h-4 text-amber-500 animate-[size-pulse_1.2s_ease-in-out_infinite]'
                   : 'w-4 h-4'
+                const tooltipTitle = isComingSoon
+                  ? comingSoonTooltip
+                  : isDisabled
+                    ? 'Disponível após finalizar a prova.'
+                    : showWrongAnswerHighlight
+                      ? 'Ver explicação para entender o erro'
+                      : ''
                 return (
-                  <Tooltip key={tab.value} title={isDisabled ? 'Disponível após finalizar a prova.' : showWrongAnswerHighlight ? 'Ver explicação para entender o erro' : ''}>
+                  <Tooltip key={tab.value} title={tooltipTitle}>
                     <span className="flex">
                       <button
                         type="button"
