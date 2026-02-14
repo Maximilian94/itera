@@ -85,6 +85,8 @@ export interface ExamAttemptPlayerProps {
   onBack?: () => void
   /** Called after finishing (attempt or retry). */
   onFinished?: () => void
+  /** Called if the finish mutation fails. */
+  onFinishError?: () => void
   /** Retry mode when finished: called when user clicks "Ver resultado final". */
   onNavigateToFinal?: () => void
   /** When trainingProvaMode: ref to expose finish API for external button. */
@@ -108,6 +110,7 @@ export function ExamAttemptPlayer({
   feedbackLink,
   onBack,
   onFinished,
+  onFinishError,
   onNavigateToFinal,
   finishRef,
   onTrainingProvaStateChange,
@@ -212,11 +215,17 @@ export function ExamAttemptPlayer({
 
   const handleFinish = useCallback(() => {
     if (isRetryMode) {
-      updateStageMutation.mutate('FINAL', { onSuccess: onFinished })
+      updateStageMutation.mutate('FINAL', {
+        onSuccess: onFinished,
+        onError: () => onFinishError?.(),
+      })
     } else {
-      finishAttemptMutation.mutate(undefined, { onSuccess: onFinished })
+      finishAttemptMutation.mutate(undefined, {
+        onSuccess: onFinished,
+        onError: () => onFinishError?.(),
+      })
     }
-  }, [isRetryMode, updateStageMutation, finishAttemptMutation, onFinished])
+  }, [isRetryMode, updateStageMutation, finishAttemptMutation, onFinished, onFinishError])
 
   const isFinishPending = isRetryMode
     ? updateStageMutation.isPending

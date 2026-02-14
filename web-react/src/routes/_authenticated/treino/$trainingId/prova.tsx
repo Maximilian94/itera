@@ -5,6 +5,7 @@ import { ArrowLeftIcon, ChartBarIcon, PencilSquareIcon } from '@heroicons/react/
 import { getStagePath } from '../stages.config'
 import { useTrainingQuery } from '@/features/training/queries/training.queries'
 import { ExamAttemptPlayer } from '@/components/ExamAttemptPlayer'
+import { ExamAnalysisOverlay } from '@/components/ExamAnalysisOverlay'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'
 import { useCallback, useState } from 'react'
@@ -27,12 +28,30 @@ function ProvaPage() {
     goToQuestion: (index: number) => void
   } | null>(null)
   const [unansweredModalOpen, setUnansweredModalOpen] = useState(false)
+  const [showAnalysisOverlay, setShowAnalysisOverlay] = useState(false)
+  const [analysisApiDone, setAnalysisApiDone] = useState(false)
 
   const canOpenExam = Boolean(training?.examBoardId && training?.examBaseId && training?.attemptId)
 
   const handleExamFinished = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: trainingKeys.one(trainingId) })
+    setAnalysisApiDone(true)
   }, [queryClient, trainingId])
+
+  const handleFinishError = useCallback(() => {
+    setShowAnalysisOverlay(false)
+    setAnalysisApiDone(false)
+  }, [])
+
+  const handleAnalysisComplete = useCallback(() => {
+    navigate({ to: getStagePath('diagnostico', trainingId) })
+  }, [navigate, trainingId])
+
+  /** Trigger overlay + actual finish */
+  const triggerFinishWithOverlay = useCallback(() => {
+    setShowAnalysisOverlay(true)
+    provaState?.finish()
+  }, [provaState])
 
   return (
     <div className="flex flex-col flex-1 min-h-0 min-w-0">
@@ -76,6 +95,7 @@ function ProvaPage() {
               }}
               onBack={() => navigate({ to: '/treino' })}
               onFinished={handleExamFinished}
+              onFinishError={handleFinishError}
               onTrainingProvaStateChange={setProvaState}
             />
           </div>
@@ -110,16 +130,23 @@ function ProvaPage() {
                   if (provaState.hasUnansweredQuestions) {
                     setUnansweredModalOpen(true)
                   } else {
-                    provaState.finish()
+                    triggerFinishWithOverlay()
                   }
                 }}
-                disabled={provaState.isFinishPending}
+                disabled={provaState.isFinishPending || showAnalysisOverlay}
               >
-                {provaState.isFinishPending ? 'Finalizando…' : 'Finalizar prova'}
+                Finalizar prova
               </Button>
             )
           ) : null}
         </div>
+      )}
+
+      {showAnalysisOverlay && (
+        <ExamAnalysisOverlay
+          apiFinished={analysisApiDone}
+          onComplete={handleAnalysisComplete}
+        />
       )}
 
       <Dialog
@@ -151,8 +178,8 @@ function ProvaPage() {
           </Button>
           <Button
             onClick={() => {
-              provaState?.finish()
               setUnansweredModalOpen(false)
+              triggerFinishWithOverlay()
             }}
             color="inherit"
           >

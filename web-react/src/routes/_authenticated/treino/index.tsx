@@ -38,7 +38,7 @@ function TreinoIndexPage() {
   const inProgress = total - concluded
 
   return (
-    <div className="flex flex-col gap-6 p-1">
+    <div className="flex flex-col gap-6 p-1 overflow-y-auto min-h-0 flex-1">
       {/* Título */}
       <PageHeader title="Treino" />
 

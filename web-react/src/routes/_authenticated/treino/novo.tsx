@@ -29,7 +29,7 @@ function NovoPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
       <PageHeader
         title="Escolher concurso"
         subtitle="Selecione o concurso com o qual deseja fazer o treino. Em seguida, crie e avance para a etapa Prova."
