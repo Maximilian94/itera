@@ -291,8 +291,8 @@ export class TrainingService {
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
-        examBase: { select: { id: true, name: true, examBoardId: true } },
-        examBaseAttempt: { select: { id: true, finishedAt: true } },
+        examBase: { select: { id: true, name: true, examBoardId: true, minPassingGradeNonQuota: true } },
+        examBaseAttempt: { select: { id: true, finishedAt: true, scorePercentage: true } },
       },
     });
     return sessions.map((s) => ({
@@ -305,6 +305,14 @@ export class TrainingService {
       createdAt: s.createdAt,
       updatedAt: s.updatedAt,
       attemptFinishedAt: s.examBaseAttempt.finishedAt,
+      minPassingGrade:
+        s.examBase.minPassingGradeNonQuota != null
+          ? Number(s.examBase.minPassingGradeNonQuota)
+          : null,
+      initialScorePercentage:
+        s.examBaseAttempt.scorePercentage != null
+          ? Number(s.examBaseAttempt.scorePercentage)
+          : null,
       finalScorePercentage:
         s.finalScorePercentage != null
           ? Number(s.finalScorePercentage)

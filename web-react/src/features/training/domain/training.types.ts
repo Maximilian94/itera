@@ -15,6 +15,8 @@ export interface TrainingListItem {
   createdAt: string
   updatedAt: string
   attemptFinishedAt: string | null
+  minPassingGrade: number | null
+  initialScorePercentage: number | null
   finalScorePercentage: number | null
 }
 
