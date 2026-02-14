@@ -863,6 +863,56 @@ export class TrainingService {
   }
 
   /**
+   * Wrong questions with full feedback (correctAlternative, explanations) for the study page.
+   * Available as soon as the prova is finished (no retry finish required).
+   * Includes selectedAlternativeId from the original attempt for each question.
+   */
+  async listRetryQuestionsWithFeedbackForStudy(
+    trainingId: string,
+    userId: string,
+  ) {
+    const session = await this.getSessionForUser(trainingId, userId);
+    const attemptId = session.examBaseAttemptId;
+    const examBaseId = session.examBaseId;
+    const data =
+      await this.examBaseAttemptService.getExamAttemptWithQuestionsAndAnswers(
+        examBaseId,
+        attemptId,
+        userId,
+      );
+    if (data.attempt.finishedAt == null) {
+      throw new BadRequestException(
+        'exam must be finished before viewing wrong questions with feedback',
+      );
+    }
+
+    const wrongQuestionIds = new Set<string>();
+    for (const q of data.questions) {
+      const selectedId = data.answers[q.id] ?? null;
+      const correctAlt = q.alternatives.find(
+        (a) => a.key === q.correctAlternative,
+      );
+      const correctId = correctAlt?.id ?? null;
+      if (correctId != null && selectedId !== correctId) {
+        wrongQuestionIds.add(q.id);
+      }
+    }
+
+    return data.questions
+      .filter((q) => wrongQuestionIds.has(q.id))
+      .map((q) => ({
+        ...q,
+        selectedAlternativeId: data.answers[q.id] ?? null,
+        alternatives: q.alternatives.map((a) => ({
+          id: a.id,
+          key: a.key,
+          text: a.text,
+          explanation: a.explanation,
+        })),
+      }));
+  }
+
+  /**
    * Same as listRetryQuestions but returns full question data (correctAlternative, alternatives with explanation).
    * Only allowed when the latest retry has been finished (so we can show Explicação tab).
    */

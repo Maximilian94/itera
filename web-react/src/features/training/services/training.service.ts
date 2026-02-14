@@ -86,6 +86,33 @@ export const trainingService = {
     })
   },
 
+  /** Retry questions with feedback for study page (available when prova is finished). */
+  listRetryQuestionsWithFeedbackForStudy(trainingId: string): Promise<
+    Array<{
+      id: string
+      statement: string
+      statementImageUrl: string | null
+      referenceText: string | null
+      subject: string | null
+      topic: string | null
+      correctAlternative: string | null
+      selectedAlternativeId: string | null
+      alternatives: Array<{
+        id: string
+        key: string
+        text: string
+        explanation: string | null
+      }>
+    }>
+  > {
+    return apiFetch(
+      `${basePath(trainingId)}/retry-questions/with-feedback-for-study`,
+      {
+        method: 'GET',
+      },
+    )
+  },
+
   /** Retry questions with correctAlternative and explanation (only when retry is finished). */
   listRetryQuestionsWithFeedback(trainingId: string): Promise<Array<{
     id: string

@@ -91,6 +91,17 @@ export class TrainingController {
     return this.service.listRetryQuestions(trainingId, req.user.userId);
   }
 
+  @Get(':trainingId/retry-questions/with-feedback-for-study')
+  listRetryQuestionsWithFeedbackForStudy(
+    @Param('trainingId') trainingId: string,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.service.listRetryQuestionsWithFeedbackForStudy(
+      trainingId,
+      req.user.userId,
+    );
+  }
+
   @Get(':trainingId/retry-questions/with-feedback')
   listRetryQuestionsWithFeedback(
     @Param('trainingId') trainingId: string,

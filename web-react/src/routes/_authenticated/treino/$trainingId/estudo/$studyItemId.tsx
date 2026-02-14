@@ -19,12 +19,12 @@ import {
   useTrainingStudyItemsQuery,
   useCompleteStudyItemMutation,
   useGenerateStudyItemContentMutation,
-  useRetryQuestionsQuery,
+  useRetryQuestionsWithFeedbackForStudyQuery,
   trainingKeys,
 } from '@/features/training/queries/training.queries'
 import { useQueryClient } from '@tanstack/react-query'
 import type { TrainingStudyItemExercise } from '@/features/training/domain/training.types'
-import { QuestionDisplay } from '@/components/QuestionDisplay'
+import { QuestionWithFeedbackDisplay } from '@/components/QuestionWithFeedbackDisplay'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/estudo/$studyItemId')({
   component: StudyItemDetailPage,
@@ -46,12 +46,13 @@ function StudyItemDetailPage() {
   const [selectedByExerciseId, setSelectedByExerciseId] = useState<Record<string, string>>({})
 
   const { data: studyItems = [], isLoading } = useTrainingStudyItemsQuery(trainingId)
-  const { data: retryQuestions = [] } = useRetryQuestionsQuery(trainingId)
+  const { data: retryQuestionsWithFeedback = [], isLoading: isLoadingWrongQuestions } =
+    useRetryQuestionsWithFeedbackForStudyQuery(trainingId)
   const item = studyItems.find((i) => i.id === studyItemId)
   const linkedQuestionIdsSet = new Set(item?.linkedQuestionIds ?? [])
   const wrongQuestionsForSubject =
     item != null
-      ? retryQuestions.filter((q) => {
+      ? retryQuestionsWithFeedback.filter((q) => {
           if (linkedQuestionIdsSet.size > 0) {
             return linkedQuestionIdsSet.has(q.id)
           }
@@ -132,24 +133,16 @@ function StudyItemDetailPage() {
   ]
 
   return (
-    <div className="flex flex-col gap-6 overflow-y-auto min-h-0 flex-1">
+    <div className="flex flex-col gap-3 overflow-y-auto min-h-0 flex-1">
       <div className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-sm font-medium text-slate-500">{item.subject}</p>
             <h1 className="text-xl font-bold text-slate-900 truncate">{item.recommendationTitle}</h1>
           </div>
+
+          <div className="flex items-center gap-3 justify-end">
           <Button
-            variant={isPronto ? 'outlined' : 'contained'}
-            color="success"
-            startIcon={isPronto ? <CheckCircleIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
-            onClick={togglePronto}
-            disabled={completeMutation.isPending}
-          >
-            {isPronto ? 'Concluído' : 'Marcar como concluído'}
-          </Button>
-        </div>
-        <Button
           variant="outlined"
           size="small"
           startIcon={<ArrowLeftIcon className="w-4 h-4" />}
@@ -159,9 +152,26 @@ function StudyItemDetailPage() {
         >
           Voltar ao plano de estudo
         </Button>
+
+        <Button
+            variant={isPronto ? 'outlined' : 'contained'}
+            size="small"
+            color="success"
+            startIcon={isPronto ? <CheckCircleIcon className="w-4 h-4" /> : <CheckIcon className="w-4 h-4" />}
+            onClick={togglePronto}
+            disabled={completeMutation.isPending}
+          >
+            {isPronto ? 'Concluído' : 'Marcar como concluído'}
+          </Button>
+
+
+          </div>
+  
+          
+        </div>
       </div>
 
-      <Card noElevation className="overflow-hidden border border-slate-200">
+      <Card noElevation className="overflow-hidden border border-slate-200 h-full">
         <div className="flex border-b border-slate-200 overflow-x-auto">
           {tabButtons.map((t) => {
             const Icon = t.icon
@@ -182,7 +192,7 @@ function StudyItemDetailPage() {
           })}
         </div>
 
-        <div className="p-5 min-h-[200px]">
+        <div className="p-5 min-h-[200px] h-full overflow-y-auto">
           {tab === TAB_RECOMENDACAO && (
             <div className="flex flex-col gap-4">
               <div className="text-sm text-slate-700">
@@ -247,17 +257,19 @@ function StudyItemDetailPage() {
           )}
 
           {tab === TAB_QUESTOES_ERRADAS && (
-            <div className="flex flex-col gap-6">
-              {wrongQuestionsForSubject.length === 0 ? (
+            <div className="flex flex-col gap-2">
+              {isLoadingWrongQuestions ? (
+                <p className="text-sm text-slate-500">Carregando questões...</p>
+              ) : wrongQuestionsForSubject.length === 0 ? (
                 <p className="text-sm text-slate-500">
                   Nenhuma questão errada nesta matéria na prova.
                 </p>
               ) : (
                 <>
-                  <p className="text-sm text-slate-600">
+                  {/* <p className="text-sm text-slate-600">
                     Estas são as questões que você errou na prova sobre{' '}
                     <strong>{item.subject}</strong>. Use-as como contexto para o seu estudo.
-                  </p>
+                  </p> */}
                   <div className="flex items-center justify-between gap-3">
                     <button
                       type="button"
@@ -282,7 +294,9 @@ function StudyItemDetailPage() {
                     </button>
                   </div>
                   {wrongQuestionsForSubject[safeWrongQuestionIndex] && (
-                    <QuestionDisplay question={wrongQuestionsForSubject[safeWrongQuestionIndex]} />
+                    <QuestionWithFeedbackDisplay
+                      question={wrongQuestionsForSubject[safeWrongQuestionIndex]}
+                    />
                   )}
                 </>
               )}

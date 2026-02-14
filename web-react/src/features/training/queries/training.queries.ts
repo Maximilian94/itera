@@ -15,6 +15,8 @@ export const trainingKeys = {
     ['training', trainingId, 'retryQuestions'] as const,
   retryQuestionsWithFeedback: (trainingId: string) =>
     ['training', trainingId, 'retryQuestionsWithFeedback'] as const,
+  retryQuestionsWithFeedbackForStudy: (trainingId: string) =>
+    ['training', trainingId, 'retryQuestionsWithFeedbackForStudy'] as const,
   retryAnswers: (trainingId: string) =>
     ['training', trainingId, 'retryAnswers'] as const,
   final: (trainingId: string) => ['training', trainingId, 'final'] as const,
@@ -130,6 +132,17 @@ export function useRetryQuestionsWithFeedbackQuery(
     queryKey: trainingKeys.retryQuestionsWithFeedback(trainingId ?? ''),
     queryFn: () => trainingService.listRetryQuestionsWithFeedback(trainingId!),
     enabled: Boolean(trainingId) && enabled,
+  })
+}
+
+export function useRetryQuestionsWithFeedbackForStudyQuery(
+  trainingId: string | undefined,
+) {
+  return useQuery({
+    queryKey: trainingKeys.retryQuestionsWithFeedbackForStudy(trainingId ?? ''),
+    queryFn: () =>
+      trainingService.listRetryQuestionsWithFeedbackForStudy(trainingId!),
+    enabled: Boolean(trainingId),
   })
 }
 
