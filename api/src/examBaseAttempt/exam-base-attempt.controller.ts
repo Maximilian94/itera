@@ -54,7 +54,7 @@ export class ExamBaseAttemptController {
     @Param('attemptId') attemptId: string,
     @Req() req: { user: { userId: string } },
   ) {
-    return this.service.getOneWithQuestionsAndAnswers(
+    return this.service.getExamAttemptWithQuestionsAndAnswers(
       examBaseId,
       attemptId,
       req.user.userId,

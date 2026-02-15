@@ -547,6 +547,89 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     });
   }
 
+  async listAvailableToAdd(targetExamBaseId: string, subject?: string) {
+    const where: Prisma.ExamBaseQuestionWhereInput = {
+      examBaseId: { not: targetExamBaseId },
+    };
+    if (subject && subject.trim()) {
+      where.subject = subject.trim();
+    }
+    return this.prisma.examBaseQuestion.findMany({
+      where,
+      orderBy: [{ subject: 'asc' }, { topic: 'asc' }, { createdAt: 'asc' }],
+      select: {
+        id: true,
+        createdAt: true,
+        updatedAt: true,
+        examBaseId: true,
+        subject: true,
+        topic: true,
+        subtopics: true,
+        statement: true,
+        statementImageUrl: true,
+        referenceText: true,
+        correctAlternative: true,
+        skills: true,
+        alternatives: {
+          orderBy: alternativesOrderBy,
+          select: {
+            id: true,
+            createdAt: true,
+            updatedAt: true,
+            key: true,
+            text: true,
+            explanation: true,
+          },
+        },
+        examBase: {
+          select: { id: true, name: true, institution: true },
+        },
+      },
+    });
+  }
+
+  async listAvailableSubjects(targetExamBaseId: string) {
+    const rows = await this.prisma.examBaseQuestion.findMany({
+      where: { examBaseId: { not: targetExamBaseId } },
+      select: { subject: true },
+      distinct: ['subject'],
+      orderBy: { subject: 'asc' },
+    });
+    return rows
+      .map((r) => r.subject?.trim())
+      .filter((s): s is string => Boolean(s))
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }
+
+  async copyQuestion(
+    targetExamBaseId: string,
+    sourceExamBaseId: string,
+    sourceQuestionId: string,
+  ) {
+    const source = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: sourceQuestionId, examBaseId: sourceExamBaseId },
+      include: {
+        alternatives: { orderBy: { key: 'asc' as const } },
+      },
+    });
+    if (!source) throw new NotFoundException('question not found');
+    return this.create(targetExamBaseId, {
+      subject: source.subject ?? '',
+      topic: source.topic ?? '',
+      subtopics: source.subtopics ?? [],
+      statement: source.statement,
+      statementImageUrl: source.statementImageUrl ?? undefined,
+      referenceText: source.referenceText ?? undefined,
+      skills: source.skills ?? [],
+      correctAlternative: source.correctAlternative ?? undefined,
+      alternatives: source.alternatives.map((a) => ({
+        key: a.key,
+        text: a.text,
+        explanation: a.explanation,
+      })),
+    });
+  }
+
   async getOne(examBaseId: string, questionId: string) {
     await assertQuestionBelongsToExamBase(
       this.prisma,

@@ -22,6 +22,10 @@ import type {
 export const examBaseQuestionsKeys = {
   list: (examBaseId: string) =>
     ['examBaseQuestions', examBaseId] as const,
+  availableToAdd: (examBaseId: string, subject?: string) =>
+    ['examBaseQuestions', 'availableToAdd', examBaseId, subject ?? 'all'] as const,
+  availableSubjects: (examBaseId: string) =>
+    ['examBaseQuestions', 'availableSubjects', examBaseId] as const,
 }
 
 export function useExamBaseQuestionsQuery(examBaseId: string | undefined) {
@@ -29,6 +33,46 @@ export function useExamBaseQuestionsQuery(examBaseId: string | undefined) {
     queryKey: examBaseQuestionsKeys.list(examBaseId ?? ''),
     queryFn: () => examBaseQuestionsService.list(examBaseId!),
     enabled: Boolean(examBaseId),
+  })
+}
+
+export function useAvailableToAddQuestionsQuery(
+  examBaseId: string | undefined,
+  subject?: string,
+) {
+  return useQuery({
+    queryKey: examBaseQuestionsKeys.availableToAdd(examBaseId ?? '', subject),
+    queryFn: () => examBaseQuestionsService.listAvailableToAdd(examBaseId!, subject),
+    enabled: Boolean(examBaseId),
+  })
+}
+
+export function useAvailableSubjectsQuery(examBaseId: string | undefined) {
+  return useQuery({
+    queryKey: examBaseQuestionsKeys.availableSubjects(examBaseId ?? ''),
+    queryFn: () => examBaseQuestionsService.listAvailableSubjects(examBaseId!),
+    enabled: Boolean(examBaseId),
+  })
+}
+
+export function useCopyQuestionMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      sourceExamBaseId,
+      sourceQuestionId,
+    }: {
+      sourceExamBaseId: string
+      sourceQuestionId: string
+    }) =>
+      examBaseQuestionsService.copyQuestion(
+        examBaseId,
+        sourceExamBaseId,
+        sourceQuestionId,
+      ),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
   })
 }
 

@@ -7,10 +7,12 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express/multer';
+import { CopyQuestionDto } from './dto/copy-question.dto';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { CreateExamBaseQuestionDto } from './dto/create-exam-base-question.dto';
 import { ParseQuestionsFromMarkdownDto } from './dto/parse-questions-from-markdown.dto';
@@ -37,6 +39,31 @@ export class ExamBaseQuestionController {
   @Get()
   list(@Param('examBaseId') examBaseId: string) {
     return this.service.list(examBaseId);
+  }
+
+  @Get('available-to-add')
+  listAvailableToAdd(
+    @Param('examBaseId') examBaseId: string,
+    @Query('subject') subject?: string,
+  ) {
+    return this.service.listAvailableToAdd(examBaseId, subject);
+  }
+
+  @Get('available-to-add/subjects')
+  listAvailableSubjects(@Param('examBaseId') examBaseId: string) {
+    return this.service.listAvailableSubjects(examBaseId);
+  }
+
+  @Post('copy')
+  copyQuestion(
+    @Param('examBaseId') examBaseId: string,
+    @Body() dto: CopyQuestionDto,
+  ) {
+    return this.service.copyQuestion(
+      examBaseId,
+      dto.sourceExamBaseId,
+      dto.sourceQuestionId,
+    );
   }
 
   @Post()

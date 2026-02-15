@@ -1,39 +1,7 @@
-import {
-  Accordion,
-  AccordionDetails,
-  AccordionSummary,
-  Alert,
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogTitle,
-  Paper,
-  Stack,
-  Tab,
-  Tabs,
-  TextField,
-  Tooltip,
-  Typography,
-} from '@mui/material'
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import { Button, Tooltip } from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
-import UploadFileIcon from '@mui/icons-material/UploadFile'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
-import { CustomTabPanel } from '@/ui/customTabPanel'
-import { Markdown } from '@/components/Markdown'
-import { QuestionEditor } from '@/components/QuestionEditor'
-import {
-  useExamBaseQuestionsQuery,
-  useCreateExamBaseQuestionMutation,
-  useParseQuestionsFromMarkdownMutation,
-  useExtractFromPdfMutation,
-  getApiMessage,
-  type ParsedQuestionItem,
-} from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
-import QuestionCreator from '@/components/QuestionCreator'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import {
@@ -41,7 +9,6 @@ import {
   useExamBaseAttemptHistoryQuery,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
-import { ExamBaseAttemptsList } from '@/components/ExamBaseAttemptsList'
 import { PageHeader } from '@/components/PageHeader'
 import { Card } from '@/components/Card'
 import {
@@ -50,7 +17,6 @@ import {
   BanknotesIcon,
   CheckCircleIcon,
   TrophyIcon,
-  XCircleIcon,
 } from '@heroicons/react/24/solid'
 import { AcademicCapIcon, CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
@@ -62,37 +28,16 @@ export const Route = createFileRoute(
   component: RouteComponent,
 })
 
-const QUESTIONS_TAB_INDEX = 3
-const CREATE_QUESTION_TAB_INDEX = 4
-
 function RouteComponent() {
   const { examBoard, examId } = Route.useParams()
   const [examBase, setExamBase] = useState<ExamBase | null>(null)
-  const [value, setValue] = useState(0)
-  const [addQuestionOpen, setAddQuestionOpen] = useState(false)
-  const [addSubject, setAddSubject] = useState('')
-  const [addTopic, setAddTopic] = useState('')
-  const [addStatement, setAddStatement] = useState('')
-  const [addReferenceText, setAddReferenceText] = useState('')
-  const [addError, setAddError] = useState<string | null>(null)
-  const [markdownText, setMarkdownText] = useState('')
-  const [draftQuestions, setDraftQuestions] = useState<ParsedQuestionItem[]>([])
-  const [, setRawResponseFromGrok] = useState('')
-  const [parseError, setParseError] = useState<string | null>(null)
 
   const examBaseId = examId
-  const { data: questions = [], isLoading, error } = useExamBaseQuestionsQuery(
-    value === QUESTIONS_TAB_INDEX ? examBaseId : undefined,
-  )
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
   const navigate = useNavigate()
-  const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
   const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
     useExamBaseAttemptHistoryQuery(examBaseId)
-  const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
-  const extractFromPdf = useExtractFromPdfMutation(examBaseId)
-  const pdfInputRef = useRef<HTMLInputElement>(null)
 
   const handleStartExam = async () => {
     try {
@@ -103,88 +48,6 @@ function RouteComponent() {
       })
     } catch {
       // Error can be shown via createAttempt.error or a toast
-    }
-  }
-
-  const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
-    setValue(newValue)
-  }
-
-  const handleAddQuestionOpen = () => {
-    setAddSubject('')
-    setAddTopic('')
-    setAddStatement('')
-    setAddReferenceText('')
-    setAddError(null)
-    setAddQuestionOpen(true)
-  }
-
-  const handleAddQuestionSubmit = async () => {
-    if (!addSubject.trim() || !addTopic.trim() || !addStatement.trim()) {
-      setAddError('Subject, topic and statement are required.')
-      return
-    }
-    setAddError(null)
-    try {
-      await createQuestion.mutateAsync({
-        subject: addSubject.trim(),
-        topic: addTopic.trim(),
-        statement: addStatement.trim(),
-        referenceText: addReferenceText.trim() || undefined,
-      })
-      setAddQuestionOpen(false)
-    } catch (err) {
-      setAddError(getApiMessage(err))
-    }
-  }
-
-  const handleParseMarkdown = async () => {
-    if (!markdownText.trim()) return
-    setParseError(null)
-    try {
-      const result = await parseFromMarkdown.mutateAsync(markdownText.trim())
-      setDraftQuestions(result.questions)
-      setRawResponseFromGrok(result.rawResponse)
-    } catch (err) {
-      setParseError(getApiMessage(err))
-    }
-  }
-
-  const handlePdfFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    e.target.value = ''
-    setParseError(null)
-    try {
-      const result = await extractFromPdf.mutateAsync(file)
-      setMarkdownText(result.content)
-    } catch (err) {
-      setParseError(getApiMessage(err))
-    }
-  }
-
-  const handleCreateDraft = async (draft: ParsedQuestionItem, index: number) => {
-    setParseError(null)
-    try {
-      await createQuestion.mutateAsync({
-        subject: draft.subject || 'Sem assunto',
-        topic: draft.topic ?? '',
-        statement: draft.statement,
-        referenceText: draft.referenceText?.trim() || undefined,
-        alternatives:
-          draft.alternatives.length > 0
-            ? draft.alternatives.map((a) => ({
-              key: a.key,
-              text: a.text,
-              explanation: '',
-            }))
-            : undefined,
-      })
-      setDraftQuestions((prev) => prev.filter((_, i) => i !== index))
-    } catch (err) {
-      setParseError(getApiMessage(err))
     }
   }
 
@@ -406,6 +269,16 @@ function RouteComponent() {
             })}
           </div>
         )}
+      </Card>
+
+      <Card noElevation className="p-4">
+        <Link
+          to="/exams/$examBoard/$examId/questoes"
+          params={{ examBoard, examId }}
+          className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium"
+        >
+          Gerenciar questões
+        </Link>
       </Card>
 
       {/* <Paper>
@@ -662,64 +535,6 @@ function RouteComponent() {
         </CustomTabPanel>
       </Paper> */}
 
-      <Dialog open={addQuestionOpen} onClose={() => setAddQuestionOpen(false)}>
-        <DialogTitle>Add question</DialogTitle>
-        <DialogContent>
-          {addError && (
-            <Alert severity="error" sx={{ mb: 2 }} onClose={() => setAddError(null)}>
-              {addError}
-            </Alert>
-          )}
-          <Stack spacing={2} sx={{ mt: 1, minWidth: 360 }}>
-            <TextField
-              label="Subject"
-              size="small"
-              fullWidth
-              required
-              value={addSubject}
-              onChange={(e) => setAddSubject(e.target.value)}
-            />
-            <TextField
-              label="Topic"
-              size="small"
-              fullWidth
-              required
-              value={addTopic}
-              onChange={(e) => setAddTopic(e.target.value)}
-            />
-            <TextField
-              label="Statement"
-              size="small"
-              fullWidth
-              required
-              multiline
-              minRows={2}
-              value={addStatement}
-              onChange={(e) => setAddStatement(e.target.value)}
-            />
-            <TextField
-              label="Texto de referência (opcional)"
-              size="small"
-              fullWidth
-              multiline
-              minRows={2}
-              value={addReferenceText}
-              onChange={(e) => setAddReferenceText(e.target.value)}
-              placeholder="Texto da prova ao qual a questão se refere"
-            />
-          </Stack>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setAddQuestionOpen(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            onClick={handleAddQuestionSubmit}
-            disabled={createQuestion.isPending}
-          >
-            Create
-          </Button>
-        </DialogActions>
-      </Dialog>
     </div>
   )
 }

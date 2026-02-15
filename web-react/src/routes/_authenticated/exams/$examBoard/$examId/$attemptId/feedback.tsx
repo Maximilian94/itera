@@ -291,8 +291,15 @@ function RouteComponent() {
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1.5">
                         Recomendações de estudo
                       </p>
-                      <div className="text-sm text-slate-700">
-                        <Markdown>{feedback.recommendations}</Markdown>
+                      <div className="flex flex-col gap-3 text-sm text-slate-700">
+                        {feedback.recommendations?.map((rec, idx) => (
+                          <div key={idx}>
+                            <p className="font-medium text-slate-800 mb-0.5">{rec.title}</p>
+                            <div className="text-slate-700">
+                              <Markdown>{rec.text}</Markdown>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>

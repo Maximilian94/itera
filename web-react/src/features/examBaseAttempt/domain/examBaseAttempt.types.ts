@@ -58,6 +58,6 @@ export type ExamAttemptFeedback = {
   }>
   subjectFeedback: Record<
     string,
-    { evaluation: string; recommendations: string }
+    { evaluation: string; recommendations: Array<{ title: string; text: string }> }
   >
 }

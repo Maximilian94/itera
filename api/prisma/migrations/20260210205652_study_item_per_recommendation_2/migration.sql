@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "training_study_items_trainingSessionId_subjectFeedbackRecommend" RENAME TO "training_study_items_trainingSessionId_subjectFeedbackRecom_key";
