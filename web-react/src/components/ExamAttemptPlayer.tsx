@@ -304,7 +304,7 @@ export function ExamAttemptPlayer({
         isAnswered ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
-    if (isCorrect) return `${base} bg-green-100 text-green-700 border border-green-200 hover:bg-green-200`
+    if (isCorrect) return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
     if (isWrong) return `${base} bg-red-100 text-red-700 border border-red-200 hover:bg-red-200`
     if (isAnswered) return `${base} bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
@@ -561,10 +561,10 @@ export function ExamAttemptPlayer({
                           const isWrong = isFinished && isSelected && !isCorrect
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[currentQuestion.alternatives.findIndex((a) => a.id === alt.id)] ?? alt.key
                           const optionBg = isFinished
-                            ? isCorrect ? 'bg-green-50 border-green-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
+                            ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
                             : isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-slate-300 hover:bg-slate-50'
                           const keyBadge = isFinished
-                            ? isCorrect ? 'bg-green-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
+                            ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
                           return (
                             <div key={alt.id} className="group relative flex items-center gap-2">
@@ -650,15 +650,15 @@ export function ExamAttemptPlayer({
                           const isWrong = wasSelected && !isCorrect
                           const variant = isCorrect ? 'correct' : isWrong ? 'wrong' : 'neutral'
                           const cardStyles = {
-                            correct: 'border-2 border-green-400 bg-green-100 overflow-hidden rounded-lg',
+                            correct: 'border-2 border-emerald-400 bg-emerald-100 overflow-hidden rounded-lg',
                             wrong: 'border-2 border-red-400 bg-red-100 overflow-hidden rounded-lg',
                             neutral: 'border border-slate-300 bg-slate-50 overflow-hidden rounded-lg',
                           }
-                          const headerTextStyles = { correct: 'text-green-800', wrong: 'text-red-800', neutral: 'text-slate-700' }
-                          const badgeCorrect = 'text-xs font-semibold text-green-700 bg-green-200/80 px-2 py-0.5 rounded'
+                          const headerTextStyles = { correct: 'text-emerald-800', wrong: 'text-red-800', neutral: 'text-slate-700' }
+                          const badgeCorrect = 'text-xs font-semibold text-emerald-700 bg-emerald-200/80 px-2 py-0.5 rounded'
                           const badgeWrong = 'text-xs font-semibold text-red-700 bg-red-200/80 px-2 py-0.5 rounded'
                           const explanationWrapStyles = {
-                            correct: 'border-t border-green-300 bg-green-50/70',
+                            correct: 'border-t border-emerald-300 bg-emerald-50/70',
                             wrong: 'border-t border-red-300 bg-red-50/70',
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
