@@ -1,7 +1,12 @@
-import { Controller, Get, Query, Req } from '@nestjs/common';
+import { Controller, Get, Query, Req, UseGuards } from '@nestjs/common';
+import { AccessGuard } from '../common/guards/access.guard';
 import { ExamBaseAttemptService } from './exam-base-attempt.service';
 
+/**
+ * Controller for exam attempt history. All endpoints require an active subscription.
+ */
 @Controller('exam-base-attempts')
+@UseGuards(AccessGuard)
 export class ExamBaseAttemptHistoryController {
   constructor(private readonly service: ExamBaseAttemptService) {}
 

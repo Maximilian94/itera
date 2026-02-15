@@ -20,6 +20,7 @@ import {
 } from '@heroicons/react/24/solid'
 import { AcademicCapIcon, CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import dayjs from 'dayjs'
 
 export const Route = createFileRoute(
@@ -38,8 +39,11 @@ function RouteComponent() {
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
   const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
     useExamBaseAttemptHistoryQuery(examBaseId)
+  const { hasAccess, requireAccess } = useRequireAccess()
 
+  /** Starts an exam attempt. Redirects to /planos if user has no active subscription. */
   const handleStartExam = async () => {
+    if (!requireAccess()) return
     try {
       const attempt = await createAttempt.mutateAsync()
       await navigate({
@@ -191,15 +195,19 @@ function RouteComponent() {
       <Card noElevation className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <span className="text-lg font-semibold text-slate-900">Tentativas</span>
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<PlayArrowIcon />}
-            onClick={handleStartExam}
-            disabled={createAttempt.isPending}
-          >
-            {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
-          </Button>
+          <Tooltip title={!hasAccess ? 'Assine um plano para iniciar provas' : ''}>
+            <span>
+              <Button
+                variant="contained"
+                size="small"
+                startIcon={<PlayArrowIcon />}
+                onClick={handleStartExam}
+                disabled={createAttempt.isPending || !hasAccess}
+              >
+                {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
+              </Button>
+            </span>
+          </Tooltip>
         </div>
         {attemptsError && (
           <span className="text-sm text-red-600">Erro ao carregar tentativas.</span>

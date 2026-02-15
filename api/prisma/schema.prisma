@@ -7,6 +7,29 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---- User Roles & Subscription ----
+
+/// User role on the platform. ADMIN has full access; USER is the default for everyone else.
+enum UserRole {
+  ADMIN
+  USER
+}
+
+/// Subscription plan chosen by the user. ESSENCIAL: unlimited exams, explanations, history. ESTRATEGICO: everything in Essencial + up to 5 smart trainings/month. ELITE: everything in Estratégico + up to 20 trainings/month.
+enum SubscriptionPlan {
+  ESSENCIAL
+  ESTRATEGICO
+  ELITE
+}
+
+/// Stripe subscription status synced via webhooks. ACTIVE: payment up to date. PAST_DUE: charge failed. CANCELED: cancelled. INCOMPLETE: checkout not finished.
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+}
+
 enum GovernmentScope {
   MUNICIPAL
   STATE
@@ -21,6 +44,8 @@ model User {
   phone            String?
   /// Stripe Customer ID; set when the user completes checkout or when we create a customer for them.
   stripeCustomerId String?   @unique
+  /// User role (ADMIN = full access, USER = default). Assigned manually for admins.
+  role             UserRole  @default(USER)
   createdAt        DateTime  @default(now())
 
   attempts          Attempt[]
@@ -28,6 +53,7 @@ model User {
   examBaseAttempts  ExamBaseAttempt[]
   purchases         Purchase[]
   refundRequests    RefundRequest[]
+  subscriptions     Subscription[]
   trainingSessions  TrainingSession[]
 
   @@map("users")
@@ -459,26 +485,67 @@ model StudyExerciseAlternative {
   @@map("study_exercise_alternatives")
 }
 
-// ---- Billing / Payments ----
+// ---- Billing / Subscriptions ----
 
-/// One-time purchase granting platform access (e.g. 1 year). One purchase = one access period.
-/// Used to determine if the user has active access (accessExpiresAt > now and refundedAt is null).
-/// stripeChargeId is required to create a refund (e.g. for the 7-day right of withdrawal).
+/// Recurring subscription for the user. Source of truth for platform access. Synced via Stripe webhooks (checkout.session.completed, customer.subscription.updated, etc.). A user can have multiple Subscriptions over time, but only one ACTIVE at a time.
+model Subscription {
+  id                    String             @id @default(uuid()) @db.Uuid
+  /// User who owns the subscription.
+  userId                String             @db.Uuid
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Stripe subscription ID (sub_xxx). Used for lookups and cancellations.
+  stripeSubscriptionId  String             @unique
+  /// Stripe customer ID (cus_xxx). Denormalized for easier lookups.
+  stripeCustomerId      String
+  /// Stripe price ID (price_xxx). Indicates plan + billing interval (monthly/yearly).
+  stripePriceId         String
+  /// Subscribed plan (ESSENCIAL, ESTRATEGICO, ELITE).
+  plan                  SubscriptionPlan
+  /// Current subscription status, synced via webhooks.
+  status                SubscriptionStatus
+  /// Start of the current billing period.
+  currentPeriodStart    DateTime
+  /// End of the current billing period. After this date, it renews or expires.
+  currentPeriodEnd      DateTime
+  /// If true, the subscription will be cancelled at the end of the current period (no renewal).
+  cancelAtPeriodEnd     Boolean            @default(false)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  purchases Purchase[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("subscriptions")
+}
+
+/// Individual payment record (financial audit trail). Each recurring charge (monthly/yearly) creates a Purchase linked to its Subscription. Used for payment tracking, receipt generation, and refund control (CDC 7-day withdrawal).
 model Purchase {
-  id                   String    @id @default(uuid()) @db.Uuid
-  userId               String    @db.Uuid
-  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  stripeSessionId      String?
+  id                    String        @id @default(uuid()) @db.Uuid
+  /// User who made the payment.
+  userId                String        @db.Uuid
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Subscription this payment belongs to.
+  subscriptionId        String?       @db.Uuid
+  subscription          Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
+  /// Stripe invoice ID (in_xxx). Identifies the specific charge.
+  stripeInvoiceId       String?       @unique
+  /// Stripe PaymentIntent ID (pi_xxx).
   stripePaymentIntentId String?
-  stripeChargeId       String?
-  purchasedAt          DateTime  @default(now())
-  accessExpiresAt      DateTime
-  refundedAt          DateTime?
+  /// Stripe charge ID (ch_xxx). Required for creating refunds.
+  stripeChargeId        String?
+  /// Amount in cents (e.g. 4990 = R$ 49.90). Default 0 for legacy records.
+  amount                Int           @default(0)
+  /// ISO 4217 currency code (e.g. "brl").
+  currency              String        @default("brl")
+  purchasedAt           DateTime      @default(now())
+  /// Date the payment was refunded. null = not refunded.
+  refundedAt            DateTime?
 
   refundRequests RefundRequest[]
 
   @@index([userId])
-  @@index([accessExpiresAt])
+  @@index([subscriptionId])
   @@map("purchases")
 }
 

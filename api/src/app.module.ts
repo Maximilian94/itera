@@ -5,6 +5,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { ClerkJwtAuthGuard } from './auth/clerk-jwt-auth.guard';
+import { RolesGuard } from './common/guards/roles.guard';
 import { PrismaModule } from './prisma/prisma.module';
 import { SkillsModule } from './skills/skills.module';
 import { QuestionsModule } from './questions/questions.module';
@@ -40,9 +41,15 @@ import { StripeModule } from './stripe/stripe.module';
   controllers: [AppController],
   providers: [
     AppService,
+    /** Global authentication guard: verifies Clerk JWT on all routes (except @Public). */
     {
       provide: APP_GUARD,
       useClass: ClerkJwtAuthGuard,
+    },
+    /** Global roles guard: checks @Roles() on all routes (allows access if no @Roles decorator). */
+    {
+      provide: APP_GUARD,
+      useClass: RolesGuard,
     },
   ],
 })

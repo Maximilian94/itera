@@ -12,7 +12,6 @@ import { Button, TextField } from '@mui/material'
 import {
   CreditCardIcon,
   UserCircleIcon,
-  CheckCircleIcon,
   ClockIcon,
   XCircleIcon,
 } from '@heroicons/react/24/outline'
@@ -25,15 +24,7 @@ export const Route = createFileRoute('/_authenticated/account')({
   component: AccountPage,
 })
 
-function getCheckoutUrls() {
-  const origin =
-    typeof window !== 'undefined' ? window.location.origin : ''
-  return {
-    successUrl: `${origin}/checkout-success`,
-    cancelUrl: `${origin}/account`,
-  }
-}
-
+/** Formata data ISO para formato brasileiro (dd/mm/aaaa). */
 function formatDateBR(iso: string): string {
   const d = new Date(iso)
   return d.toLocaleDateString('pt-BR', {
@@ -41,6 +32,16 @@ function formatDateBR(iso: string): string {
     month: '2-digit',
     year: 'numeric',
   })
+}
+
+/** Mapeia o nome do plano para exibição. */
+function planDisplayName(plan: string): string {
+  const names: Record<string, string> = {
+    ESSENCIAL: 'Essencial',
+    ESTRATEGICO: 'Estratégico',
+    ELITE: 'Elite',
+  }
+  return names[plan] ?? plan
 }
 
 function AccountPage() {
@@ -61,7 +62,7 @@ function AccountPage() {
   const { access, isLoading: accessLoading, isMock } = useAccessState()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [cancellingTrial, setCancellingTrial] = useState(false)
+  const [portalLoading, setPortalLoading] = useState(false)
 
   const handleSavePhone = async () => {
     setPhoneMessage(null)
@@ -83,44 +84,41 @@ function AccountPage() {
     '—'
   const displayEmail = user?.primaryEmailAddress?.emailAddress ?? '—'
 
-  const handleBuyClick = async () => {
+  /** Abre o Customer Portal do Stripe para gerenciar a assinatura. */
+  const handleManageSubscription = async () => {
+    setPortalLoading(true)
     setError(null)
-    setLoading(true)
     try {
-      const { successUrl, cancelUrl } = getCheckoutUrls()
-      const { url } = await stripeService.createCheckoutSession({
-        successUrl,
-        cancelUrl,
+      const { url } = await stripeService.createCustomerPortal({
+        returnUrl: window.location.href,
       })
-      if (url) {
-        window.location.href = url
-        return
-      }
-      setError('Resposta inválida do servidor.')
+      window.location.href = url
     } catch (err) {
       if (err instanceof ApiError) {
-        if (err.status === 400 && err.body && typeof err.body === 'object' && 'message' in err.body) {
-          setError(String((err.body as { message: string }).message))
-        } else if (err.status === 404 || err.status === 501) {
-          setError('Checkout em configuração. Tente novamente em breve.')
-        } else {
-          setError(err.message || 'Erro ao iniciar checkout.')
-        }
+        setError(err.message || 'Erro ao abrir portal de assinatura.')
       } else {
-        setError('Erro ao conectar. Verifique sua conexão.')
+        setError('Erro ao conectar.')
+      }
+      setPortalLoading(false)
+    }
+  }
+
+  /** Solicita reembolso CDC (7 dias). */
+  const handleRequestRefund = async (purchaseId: string) => {
+    setLoading(true)
+    setError(null)
+    try {
+      await stripeService.requestRefund(purchaseId)
+      queryClient.invalidateQueries({ queryKey: ['stripe', 'access'] })
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Erro ao solicitar reembolso.')
+      } else {
+        setError('Erro ao conectar.')
       }
     } finally {
       setLoading(false)
     }
-  }
-
-  const handleCancelTrial = () => {
-    setCancellingTrial(true)
-    // TODO: chamar API para cancelar trial quando existir
-    setTimeout(() => {
-      setCancellingTrial(false)
-      alert('Cancelamento de trial em breve será feito pela API.')
-    }, 500)
   }
 
   return (
@@ -132,7 +130,7 @@ function AccountPage() {
         </p>
       </div>
 
-      {/* Seção: Perfil (dados básicos) */}
+      {/* Seção: Perfil */}
       <section>
         <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
           <UserCircleIcon className="w-5 h-5 text-slate-600" />
@@ -178,16 +176,16 @@ function AccountPage() {
             </dd>
           </dl>
           <p className="text-xs text-slate-500 mt-3">
-            O telefone é obrigatório para comprar acesso. Também usamos para entrar em contato em caso de reembolso (ex.: pedido de feedback).
+            O telefone é obrigatório para assinar. Também usamos para entrar em contato em caso de reembolso.
           </p>
         </Card>
       </section>
 
-      {/* Seção: Acesso */}
+      {/* Seção: Assinatura */}
       <section>
         <h2 className="text-base font-semibold text-slate-800 mb-3 flex items-center gap-2">
           <CreditCardIcon className="w-5 h-5 text-slate-600" />
-          Acesso
+          Assinatura
           {isMock && (
             <span className="text-xs font-normal text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
               Modo teste (?access=active|trial|inactive)
@@ -196,7 +194,7 @@ function AccountPage() {
         </h2>
         {accessLoading ? (
           <Card noElevation className="p-6 max-w-lg">
-            <p className="text-sm text-slate-500">Carregando status de acesso…</p>
+            <p className="text-sm text-slate-500">Carregando status…</p>
           </Card>
         ) : (
           <>
@@ -204,9 +202,9 @@ function AccountPage() {
               access={access}
               error={error}
               loading={loading}
-              cancellingTrial={cancellingTrial}
-              onBuyClick={handleBuyClick}
-              onCancelTrial={handleCancelTrial}
+              portalLoading={portalLoading}
+              onManageSubscription={handleManageSubscription}
+              onRequestRefund={handleRequestRefund}
             />
             {isMock && (
               <p className="text-xs text-slate-500 mt-2 flex flex-wrap gap-x-2 gap-y-1">
@@ -221,26 +219,30 @@ function AccountPage() {
           </>
         )}
       </section>
-
-      {/* Espaço para outras seções no futuro (reembolso, etc.) */}
     </div>
   )
 }
 
+/**
+ * Card que exibe o estado da assinatura do usuário:
+ * - Ativo: plano, período, treinos usados, botão gerenciar.
+ * - Trial: mesma info + aviso de período CDC e botão de reembolso.
+ * - Inativo: CTA para assinar.
+ */
 function AccessCard({
   access,
   error,
   loading,
-  cancellingTrial,
-  onBuyClick,
-  onCancelTrial,
+  portalLoading,
+  onManageSubscription,
+  onRequestRefund,
 }: {
   access: AccessState
   error: string | null
   loading: boolean
-  cancellingTrial: boolean
-  onBuyClick: () => void
-  onCancelTrial: () => void
+  portalLoading: boolean
+  onManageSubscription: () => void
+  onRequestRefund: (purchaseId: string) => void
 }) {
   if (access.status === 'active') {
     return (
@@ -252,18 +254,50 @@ function AccessCard({
             </div>
             <div>
               <span className="inline-block text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded mb-1">
-                Ativo
+                Ativo — {planDisplayName(access.plan)}
               </span>
               <h3 className="text-lg font-semibold text-slate-900">
-                Seu acesso está ativo
+                Sua assinatura está ativa
               </h3>
               <p className="text-sm text-slate-500 mt-0.5">
-                Válido até {formatDateBR(access.accessExpiresAt)} ·{' '}
-                <strong className="text-slate-700">{access.daysLeft} dias</strong>{' '}
-                restantes
+                Renova em {formatDateBR(access.currentPeriodEnd)}
               </p>
             </div>
           </div>
+
+          {/* Treinos usados */}
+          {access.trainingLimit > 0 && (
+            <div className="bg-slate-50 rounded-lg px-4 py-3">
+              <p className="text-sm text-slate-600">
+                Treinos este mês:{' '}
+                <strong className="text-slate-900">
+                  {access.trainingsUsedThisMonth}/{access.trainingLimit}
+                </strong>
+              </p>
+              <div className="w-full bg-slate-200 rounded-full h-2 mt-2">
+                <div
+                  className="bg-blue-500 h-2 rounded-full transition-all"
+                  style={{ width: `${Math.min(100, (access.trainingsUsedThisMonth / access.trainingLimit) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">
+              {error}
+            </div>
+          )}
+
+          <Button
+            variant="outlined"
+            color="inherit"
+            size="medium"
+            disabled={portalLoading}
+            onClick={onManageSubscription}
+          >
+            {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
+          </Button>
         </div>
       </Card>
     )
@@ -279,27 +313,58 @@ function AccessCard({
             </div>
             <div>
               <span className="inline-block text-xs font-medium text-amber-700 bg-amber-50 px-2 py-1 rounded mb-1">
-                Trial
+                Trial — {planDisplayName(access.plan)}
               </span>
               <h3 className="text-lg font-semibold text-slate-900">
-                Período de teste
+                Período de arrependimento (CDC)
               </h3>
               <p className="text-sm text-slate-500 mt-0.5">
-                <strong className="text-slate-700">{access.daysLeftInTrial} dias</strong>{' '}
-                restantes no trial (até {formatDateBR(access.trialEndsAt)}). Após isso,
-                assine para continuar.
+                Você pode cancelar e receber reembolso total até 7 dias após a compra.
+                Renova em {formatDateBR(access.currentPeriodEnd)}.
               </p>
             </div>
           </div>
-          <Button
-            variant="outlined"
-            color="inherit"
-            size="medium"
-            disabled={cancellingTrial}
-            onClick={onCancelTrial}
-          >
-            {cancellingTrial ? 'Cancelando…' : 'Cancelar trial'}
-          </Button>
+
+          {/* Treinos usados */}
+          {access.trainingLimit > 0 && (
+            <div className="bg-slate-50 rounded-lg px-4 py-3">
+              <p className="text-sm text-slate-600">
+                Treinos este mês:{' '}
+                <strong className="text-slate-900">
+                  {access.trainingsUsedThisMonth}/{access.trainingLimit}
+                </strong>
+              </p>
+            </div>
+          )}
+
+          {error && (
+            <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outlined"
+              color="inherit"
+              size="medium"
+              disabled={portalLoading}
+              onClick={onManageSubscription}
+            >
+              {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
+            </Button>
+            {access.canRequestRefund && access.lastPurchaseId && (
+              <Button
+                variant="outlined"
+                color="error"
+                size="medium"
+                disabled={loading}
+                onClick={() => onRequestRefund(access.lastPurchaseId!)}
+              >
+                {loading ? 'Cancelando…' : 'Cancelar e reembolsar'}
+              </Button>
+            )}
+          </div>
         </div>
       </Card>
     )
@@ -315,43 +380,34 @@ function AccessCard({
           </div>
           <div>
             <span className="inline-block text-xs font-medium text-slate-600 bg-slate-100 px-2 py-1 rounded mb-1">
-              Não ativo
+              Sem assinatura
             </span>
             <h3 className="text-lg font-semibold text-slate-900">
-              Acesso Itera – 1 ano
+              Assine para acessar
             </h3>
             <p className="text-sm text-slate-500">
-              Acesso completo à plataforma por 12 meses.
+              Escolha um plano para ter acesso a provas, treinos e muito mais.
             </p>
           </div>
         </div>
 
         {error && (
-          <div
-            className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"
-            role="alert"
-          >
+          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2" role="alert">
             {error}
           </div>
         )}
 
-        <Button
-          variant="contained"
-          color="primary"
-          size="large"
-          disabled={loading}
-          onClick={onBuyClick}
-          startIcon={<CreditCardIcon className="w-5 h-5" />}
-          fullWidth
-        >
-          {loading ? 'Redirecionando…' : 'Comprar acesso (1 ano)'}
-        </Button>
-
-        <p className="text-xs text-slate-500">
-          Você será redirecionado ao ambiente seguro de pagamento. Em até 7 dias
-          você pode solicitar reembolso sem justificativa (direito de
-          arrependimento).
-        </p>
+        <Link to="/planos">
+          <Button
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={<CreditCardIcon className="w-5 h-5" />}
+            fullWidth
+          >
+            Ver planos
+          </Button>
+        </Link>
       </div>
     </Card>
   )

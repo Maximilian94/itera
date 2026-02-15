@@ -1,8 +1,14 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { AccessGuard } from '../common/guards/access.guard';
 import { ExamBaseAttemptService } from './exam-base-attempt.service';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
 
+/**
+ * Controller for exam base attempts. All endpoints require an active subscription
+ * (any plan). The AccessGuard is applied at the controller level.
+ */
 @Controller('exam-bases/:examBaseId/attempts')
+@UseGuards(AccessGuard)
 export class ExamBaseAttemptController {
   constructor(private readonly service: ExamBaseAttemptService) {}
 
