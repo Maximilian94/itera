@@ -320,8 +320,76 @@ export class TrainingService {
     }));
   }
 
-  /** Create a new attempt and training session. Returns ids for frontend routing. */
+  /** Monthly training limits per subscription plan. Essencial = 0 (no trainings). */
+  private static readonly TRAINING_LIMITS: Record<string, number> = {
+    ESSENCIAL: 0,
+    ESTRATEGICO: 5,
+    ELITE: 20,
+  };
+
+  /**
+   * Creates a new attempt and training session. Returns ids for frontend routing.
+   *
+   * Before creating, validates that the user's subscription plan allows trainings
+   * (Estratégico or Elite) and that the monthly limit has not been reached.
+   *
+   * @throws ForbiddenException if the plan does not include trainings or the limit is reached.
+   * @throws NotFoundException if the exam base does not exist.
+   */
   async create(examBaseId: string, userId: string) {
+    // ---- Plan & limit enforcement ----
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+
+    // Admin bypasses plan checks
+    if (user?.role !== 'ADMIN') {
+      const activeSubscription = await this.prisma.subscription.findFirst({
+        where: { userId, status: 'ACTIVE' },
+        orderBy: { createdAt: 'desc' },
+        select: { plan: true },
+      });
+
+      if (!activeSubscription) {
+        // New users get 1 free training (onboarding). After that, subscription required.
+        const totalTrainings = await this.prisma.trainingSession.count({
+          where: { userId },
+        });
+        if (totalTrainings >= 1) {
+          throw new ForbiddenException(
+            'Você precisa de uma assinatura ativa para criar treinos. Acesse /planos para ver as opções.',
+          );
+        }
+        // Allow 1 free training — fall through to create
+      } else {
+        const limit = TrainingService.TRAINING_LIMITS[activeSubscription.plan] ?? 0;
+
+        if (limit === 0) {
+          throw new ForbiddenException(
+            'Seu plano (Essencial) não inclui treinos inteligentes. Faça upgrade para Estratégico ou Elite.',
+          );
+        }
+
+        // Count training sessions created this month
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const trainingsThisMonth = await this.prisma.trainingSession.count({
+          where: {
+            userId,
+            createdAt: { gte: startOfMonth },
+          },
+        });
+
+        if (trainingsThisMonth >= limit) {
+          throw new ForbiddenException(
+            `Você atingiu o limite de ${limit} treinos/mês do seu plano. Faça upgrade para ter mais treinos.`,
+          );
+        }
+      }
+    }
+
+    // ---- Create attempt + session ----
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
       select: { id: true, examBoardId: true },

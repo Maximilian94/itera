@@ -1,3 +1,4 @@
+import { AccessGate } from '@/components/AccessGate'
 import { Card } from '@/components/Card'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
@@ -24,7 +25,12 @@ import { formatBRL } from '@/lib/utils'
 import dayjs from 'dayjs'
 
 export const Route = createFileRoute('/_authenticated/treino/novo')({
-  component: NovoPage,
+  /** Training creation page. Requires plan with trainings (Estratégico/Elite). */
+  component: () => (
+    <AccessGate type="treino">
+      <NovoPage />
+    </AccessGate>
+  ),
 })
 
 /* ------------------------------------------------------------------ */

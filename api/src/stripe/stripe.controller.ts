@@ -1,11 +1,14 @@
 import { BadRequestException, Body, Controller, Get, Post, Req } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Public } from '../common/decorators/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 import { StripeService } from './stripe.service';
 
 type ReqUser = { user: { userId: string } };
 
+/**
+ * Controller for Stripe subscription endpoints:
+ * available plans, checkout, customer portal, access and refund.
+ */
 @Controller('stripe')
 export class StripeController {
   constructor(
@@ -14,24 +17,33 @@ export class StripeController {
     private readonly config: ConfigService,
   ) {}
 
-  @Get('product')
-  @Public()
-  async getProduct() {
-    return this.stripe.getProductWithPrice();
+  /**
+   * Returns the 3 available plans with monthly/yearly prices, features and limits.
+   * Used by the plans page on the frontend to display subscription options.
+   */
+  @Get('plans')
+  async getPlans() {
+    return this.stripe.getPlans();
   }
 
   /**
-   * Creates a Stripe Checkout Session and returns its URL so the frontend can redirect
-   * the user to Stripe's hosted payment page. The user must have a phone number set
-   * (required for post-refund contact). After payment, Stripe sends a webhook and we
-   * create a Purchase; the user is redirected to successUrl or cancelUrl.
+   * Creates a Stripe Checkout session for recurring subscription.
+   * The frontend redirects the user to the returned URL.
+   *
+   * @param body.priceId – Stripe price ID (price_xxx) chosen by the user
+   * @param body.successUrl – Redirect URL after payment (optional)
+   * @param body.cancelUrl – Redirect URL if user abandons (optional)
    */
   @Post('checkout-session')
   async createCheckoutSession(
     @Req() req: ReqUser,
-    @Body() body: { successUrl?: string; cancelUrl?: string },
+    @Body() body: { priceId: string; successUrl?: string; cancelUrl?: string },
   ) {
     const userId = req.user.userId;
+    if (!body.priceId || typeof body.priceId !== 'string') {
+      throw new BadRequestException('priceId é obrigatório.');
+    }
+
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { email: true, phone: true },
@@ -39,30 +51,56 @@ export class StripeController {
     if (!user) {
       throw new BadRequestException('Usuário não encontrado.');
     }
+
     const frontendUrl =
       this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
     const successUrl = body.successUrl?.trim() || `${frontendUrl}/checkout-success`;
-    const cancelUrl = body.cancelUrl?.trim() || `${frontendUrl}/account`;
+    const cancelUrl = body.cancelUrl?.trim() || `${frontendUrl}/planos`;
+
     return this.stripe.createCheckoutSession(
       userId,
       user.email,
       user.phone,
+      body.priceId.trim(),
       successUrl,
       cancelUrl,
     );
   }
 
   /**
-   * Returns the current user's access state: whether they have active access, when it
-   * expires, how many days are left, and whether they can request a refund (7-day
-   * right of withdrawal). Used by the frontend to show "Active", "Trial", or "Inactive"
-   * and to display the correct CTA (e.g. "Buy access" vs "Request refund").
+   * Creates a Stripe Customer Portal session for the user to manage
+   * their subscription (change plan, cancel, update payment method).
+   *
+   * @param body.returnUrl – URL where Stripe redirects when leaving the portal (optional)
+   */
+  @Post('customer-portal')
+  async createCustomerPortal(
+    @Req() req: ReqUser,
+    @Body() body: { returnUrl?: string },
+  ) {
+    const userId = req.user.userId;
+    const frontendUrl =
+      this.config.get<string>('FRONTEND_URL') ?? 'http://localhost:3001';
+    const returnUrl = body.returnUrl?.trim() || `${frontendUrl}/account`;
+
+    return this.stripe.createCustomerPortalSession(userId, returnUrl);
+  }
+
+  /**
+   * Retorna o estado de acesso do usuário: plano ativo, status (active/trial/inactive),
+   * limites de treinos, e se pode solicitar reembolso (CDC 7 dias).
    */
   @Get('access')
   async getAccess(@Req() req: ReqUser) {
     return this.stripe.getAccess(req.user.userId);
   }
 
+  /**
+   * Requests refund for a specific payment (CDC 7-day withdrawal right).
+   * Cancels the subscription and refunds the amount paid.
+   *
+   * @param body.purchaseId – ID of the Purchase to be refunded
+   */
   @Post('request-refund')
   async requestRefund(
     @Req() req: ReqUser,
@@ -75,4 +113,5 @@ export class StripeController {
     await this.stripe.requestRefund(req.user.userId, purchaseId.trim());
     return { ok: true };
   }
+
 }

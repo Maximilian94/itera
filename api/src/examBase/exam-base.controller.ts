@@ -8,6 +8,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
 import { UpdateExamBaseDto } from './dto/update-exam-base.dto';
@@ -33,12 +34,16 @@ export class ExamBaseController {
     return this.examBases.getOne(id);
   }
 
+  /** Creates a new exam base. Admin only. */
   @Post()
+  @Roles('ADMIN')
   create(@Body() dto: CreateExamBaseDto) {
     return this.examBases.create(dto);
   }
 
+  /** Updates an existing exam base. Admin only. */
   @Patch(':id')
+  @Roles('ADMIN')
   update(@Param('id') id: string, @Body() dto: UpdateExamBaseDto) {
     return this.examBases.update(id, dto);
   }

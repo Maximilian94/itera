@@ -1,3 +1,4 @@
+import { AccessGate } from '@/components/AccessGate'
 import { Card } from '@/components/Card'
 import { Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
@@ -8,7 +9,12 @@ import { useExamBaseQueries } from '@/features/examBase/queries/examBase.queries
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
 
 export const Route = createFileRoute('/_authenticated/treino/prova')({
-  component: ProvaPage,
+  /** Training exam selection page. Requires plan with trainings (Estratégico/Elite). */
+  component: () => (
+    <AccessGate type="treino">
+      <ProvaPage />
+    </AccessGate>
+  ),
 })
 
 function ProvaPage() {

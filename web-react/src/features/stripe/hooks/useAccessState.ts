@@ -4,7 +4,7 @@ import { useMemo } from 'react'
 import { stripeService } from '../services/stripe.service'
 import type { AccessApiResponse, AccessState } from '../domain/stripe.types'
 
-/** Query param para testar estados no FE: ?access=active | trial | inactive */
+/** Query param to test states in the FE: ?access=active | trial | inactive */
 export type AccessSearchParam = 'active' | 'trial' | 'inactive'
 
 function parseAccessParam(
@@ -16,47 +16,85 @@ function parseAccessParam(
   return null
 }
 
+/**
+ * Converts the raw API response to the AccessState discriminated union.
+ * If required fields are not present, returns 'inactive'.
+ */
 function apiResponseToAccessState(res: AccessApiResponse): AccessState {
-  if (res.status === 'active' && res.accessExpiresAt != null && res.daysLeft != null) {
-    return { status: 'active', accessExpiresAt: res.accessExpiresAt, daysLeft: res.daysLeft }
-  }
-  if (res.status === 'trial' && res.trialEndsAt != null && res.daysLeftInTrial != null) {
-    return { status: 'trial', trialEndsAt: res.trialEndsAt, daysLeftInTrial: res.daysLeftInTrial }
-  }
-  return { status: 'inactive' }
-}
-
-function getMockAccessState(status: AccessSearchParam): AccessState {
-  const now = new Date()
-  switch (status) {
-    case 'active': {
-      const accessExpiresAt = new Date(now)
-      accessExpiresAt.setDate(accessExpiresAt.getDate() + 300)
-      return {
-        status: 'active',
-        accessExpiresAt: accessExpiresAt.toISOString(),
-        daysLeft: 300,
-      }
+  if (
+    (res.status === 'active' || res.status === 'trial') &&
+    res.plan != null &&
+    res.currentPeriodEnd != null &&
+    res.trainingLimit != null &&
+    res.trainingsUsedThisMonth != null
+  ) {
+    return {
+      status: res.status,
+      plan: res.plan,
+      billingInterval: res.billingInterval,
+      stripePriceId: res.stripePriceId,
+      currentPeriodEnd: res.currentPeriodEnd,
+      scheduledPlan: res.scheduledPlan,
+      scheduledChangeDate: res.scheduledChangeDate,
+      scheduledInterval: res.scheduledInterval,
+      canRequestRefund: res.canRequestRefund,
+      lastPurchaseId: res.lastPurchaseId,
+      trainingLimit: res.trainingLimit,
+      trainingsUsedThisMonth: res.trainingsUsedThisMonth,
     }
-    case 'trial': {
-      const trialEndsAt = new Date(now)
-      trialEndsAt.setDate(trialEndsAt.getDate() + 14)
-      return {
-        status: 'trial',
-        trialEndsAt: trialEndsAt.toISOString(),
-        daysLeftInTrial: 14,
-      }
-    }
-    default:
-      return { status: 'inactive' }
+  }
+  return {
+    status: 'inactive',
+    canDoFreeTraining: res.canDoFreeTraining ?? false,
   }
 }
 
 /**
- * Retorna o estado de acesso. Para testar no FE, use query param:
- * /account?access=active  → Ativo (ex.: 300 dias restantes)
- * /account?access=trial   → Trial (ex.: 14 dias + botão cancelar)
- * /account?access=inactive → Não ativo (CTA para assinar)
+ * Generates a mock AccessState for frontend testing via query param.
+ */
+function getMockAccessState(status: AccessSearchParam): AccessState {
+  switch (status) {
+    case 'active': {
+      const date = new Date()
+      date.setDate(date.getDate() + 30)
+      return {
+        status: 'active',
+        plan: 'ESTRATEGICO',
+        billingInterval: 'month',
+        stripePriceId: undefined,
+        currentPeriodEnd: date.toISOString(),
+        canRequestRefund: false,
+        trainingLimit: 5,
+        trainingsUsedThisMonth: 2,
+      }
+    }
+    case 'trial': {
+      const date = new Date()
+      date.setDate(date.getDate() + 5)
+      return {
+        status: 'trial',
+        plan: 'ESTRATEGICO',
+        billingInterval: 'month',
+        stripePriceId: undefined,
+        currentPeriodEnd: date.toISOString(),
+        canRequestRefund: true,
+        lastPurchaseId: 'mock-purchase-id',
+        trainingLimit: 5,
+        trainingsUsedThisMonth: 0,
+      }
+    }
+    default:
+      return { status: 'inactive', canDoFreeTraining: true }
+  }
+}
+
+/**
+ * Hook that returns the logged-in user's access state.
+ *
+ * To test in the FE, use query param:
+ * - /account?access=active  → Active (Strategic, 2/5 trainings used)
+ * - /account?access=trial   → Trial (5 days remaining, can cancel)
+ * - /account?access=inactive → Inactive (CTA to subscribe)
  */
 export function useAccessState(): {
   access: AccessState
@@ -82,7 +120,7 @@ export function useAccessState(): {
       return getMockAccessState(paramOverride)
     }
     if (isError || !data) {
-      return { status: 'inactive' }
+      return { status: 'inactive', canDoFreeTraining: false }
     }
     return apiResponseToAccessState(data)
   }, [paramOverride, isError, data])
