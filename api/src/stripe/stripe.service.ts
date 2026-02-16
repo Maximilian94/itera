@@ -61,7 +61,17 @@ export type AccessResponse = {
   hasAccess: boolean;
   status: 'active' | 'trial' | 'inactive';
   plan?: SubscriptionPlan;
+  /** Current billing interval when active/trial. */
+  billingInterval?: 'month' | 'year';
+  /** Current Stripe price ID when active/trial. */
+  stripePriceId?: string;
   currentPeriodEnd?: string;
+  /** Plan that will take effect at next billing (downgrade scheduled). */
+  scheduledPlan?: SubscriptionPlan;
+  /** ISO date when the scheduled change takes effect. */
+  scheduledChangeDate?: string;
+  /** Billing interval that will take effect (for interval change: annual->monthly). */
+  scheduledInterval?: 'month' | 'year';
   canRequestRefund: boolean;
   lastPurchaseId?: string;
   trainingLimit?: number;
@@ -306,6 +316,7 @@ export class StripeService {
         line_items: [{ price: priceId, quantity: 1 }],
         success_url: successUrl,
         cancel_url: cancelUrl,
+        locale: 'pt-BR',
         metadata: { userId },
         subscription_data: {
           metadata: { userId },
@@ -489,34 +500,58 @@ export class StripeService {
     const priceConfig = this.priceConfigMap.get(stripePriceId);
     const plan = priceConfig?.plan ?? 'ESSENCIAL';
 
+    // Plan change via Checkout: cancel old subscription.
+    // Per rules A–E: upgrades get proration (credit); downgrades do not.
+    if (session.metadata?.planChange === 'true') {
+      const isUpgrade = session.metadata?.isUpgrade === 'true';
+      const oldSubs = await this.prisma.subscription.findMany({
+        where: {
+          userId,
+          stripeSubscriptionId: { not: stripeSubscriptionId },
+          status: 'ACTIVE',
+        },
+      });
+      for (const old of oldSubs) {
+        try {
+          await this.stripe.subscriptions.cancel(old.stripeSubscriptionId, {
+            ...(isUpgrade ? { prorate: true, invoice_now: true } : {}),
+          });
+        } catch (err) {
+          this.logger.warn(
+            `Falha ao cancelar assinatura antiga ${old.stripeSubscriptionId}: ${err}`,
+          );
+        }
+      }
+    }
+
     // Create or update Subscription in database
+    const subscriptionData = {
+      stripePriceId,
+      plan,
+      status: this.mapStripeStatus(sub.status),
+      currentPeriodStart: new Date(sub.current_period_start * 1000),
+      currentPeriodEnd: new Date(sub.current_period_end * 1000),
+      cancelAtPeriodEnd: sub.cancel_at_period_end,
+      ...(session.metadata?.planChange === 'true'
+        ? { stripeScheduleId: null, scheduledPlan: null, scheduledPriceId: null }
+        : {}),
+    };
     await this.prisma.subscription.upsert({
       where: { stripeSubscriptionId },
       create: {
         userId,
         stripeSubscriptionId,
         stripeCustomerId: stripeCustomerId ?? '',
-        stripePriceId,
-        plan,
-        status: this.mapStripeStatus(sub.status),
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
-        cancelAtPeriodEnd: sub.cancel_at_period_end,
+        ...subscriptionData,
       },
-      update: {
-        stripePriceId,
-        plan,
-        status: this.mapStripeStatus(sub.status),
-        currentPeriodStart: new Date(sub.current_period_start * 1000),
-        currentPeriodEnd: new Date(sub.current_period_end * 1000),
-        cancelAtPeriodEnd: sub.cancel_at_period_end,
-      },
+      update: subscriptionData,
     });
   }
 
   /**
    * Handles customer.subscription.updated: syncs status, plan and period.
-   * Called when Stripe renews, updates or changes the subscription.
+   * Clears scheduled downgrade fields when the new plan/price has taken effect
+   * (schedule phase transition) or when the subscription no longer has a schedule.
    */
   private async handleSubscriptionUpdated(event: Stripe.Event): Promise<void> {
     const sub = event.data.object as Stripe.Subscription;
@@ -533,16 +568,32 @@ export class StripeService {
     const priceConfig = stripePriceId
       ? this.priceConfigMap.get(stripePriceId)
       : null;
+    const newPlan = priceConfig?.plan ?? existing.plan;
+
+    const downgradeTookEffect =
+      existing.scheduledPlan &&
+      existing.scheduledPriceId &&
+      stripePriceId === existing.scheduledPriceId;
+    const noLongerHasSchedule = !sub.schedule;
+
+    const clearScheduled = downgradeTookEffect || noLongerHasSchedule;
 
     await this.prisma.subscription.update({
       where: { stripeSubscriptionId: sub.id },
       data: {
         stripePriceId: stripePriceId ?? existing.stripePriceId,
-        plan: priceConfig?.plan ?? existing.plan,
+        plan: newPlan,
         status: this.mapStripeStatus(sub.status),
         currentPeriodStart: new Date(sub.current_period_start * 1000),
         currentPeriodEnd: new Date(sub.current_period_end * 1000),
         cancelAtPeriodEnd: sub.cancel_at_period_end,
+        ...(clearScheduled
+          ? {
+              stripeScheduleId: null,
+              scheduledPlan: null,
+              scheduledPriceId: null,
+            }
+          : {}),
       },
     });
   }
@@ -751,12 +802,25 @@ export class StripeService {
     });
 
     const trainingLimit = TRAINING_LIMITS[activeSubscription.plan];
+    const priceConfig = activeSubscription.stripePriceId
+      ? this.priceConfigMap.get(activeSubscription.stripePriceId)
+      : null;
+    const scheduledPriceConfig = activeSubscription.scheduledPriceId
+      ? this.priceConfigMap.get(activeSubscription.scheduledPriceId)
+      : null;
 
     return {
       hasAccess: true,
       status: isTrialPeriod ? 'trial' : 'active',
       plan: activeSubscription.plan,
+      billingInterval: priceConfig?.interval ?? undefined,
+      stripePriceId: activeSubscription.stripePriceId ?? undefined,
       currentPeriodEnd: activeSubscription.currentPeriodEnd.toISOString(),
+      scheduledPlan: activeSubscription.scheduledPlan ?? undefined,
+      scheduledChangeDate: activeSubscription.scheduledPlan
+        ? activeSubscription.currentPeriodEnd.toISOString()
+        : undefined,
+      scheduledInterval: scheduledPriceConfig?.interval ?? undefined,
       canRequestRefund,
       lastPurchaseId: firstPurchase?.id,
       trainingLimit,

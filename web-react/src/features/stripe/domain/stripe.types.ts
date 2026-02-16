@@ -57,7 +57,12 @@ export type AccessState =
   | {
       status: 'active'
       plan: SubscriptionPlan
+      billingInterval?: 'month' | 'year'
+      stripePriceId?: string
       currentPeriodEnd: string
+      scheduledPlan?: SubscriptionPlan
+      scheduledChangeDate?: string
+      scheduledInterval?: 'month' | 'year'
       canRequestRefund: boolean
       lastPurchaseId?: string
       trainingLimit: number
@@ -66,7 +71,12 @@ export type AccessState =
   | {
       status: 'trial'
       plan: SubscriptionPlan
+      billingInterval?: 'month' | 'year'
+      stripePriceId?: string
       currentPeriodEnd: string
+      scheduledPlan?: SubscriptionPlan
+      scheduledChangeDate?: string
+      scheduledInterval?: 'month' | 'year'
       canRequestRefund: boolean
       lastPurchaseId?: string
       trainingLimit: number
@@ -79,9 +89,15 @@ export type AccessApiResponse = {
   hasAccess: boolean
   status: 'active' | 'trial' | 'inactive'
   plan?: SubscriptionPlan
+  billingInterval?: 'month' | 'year'
+  stripePriceId?: string
   currentPeriodEnd?: string
+  scheduledPlan?: SubscriptionPlan
+  scheduledChangeDate?: string
+  scheduledInterval?: 'month' | 'year'
   canRequestRefund: boolean
   lastPurchaseId?: string
   trainingLimit?: number
   trainingsUsedThisMonth?: number
 }
+

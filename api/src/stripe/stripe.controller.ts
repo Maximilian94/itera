@@ -96,10 +96,10 @@ export class StripeController {
   }
 
   /**
-   * Solicita reembolso de um pagamento específico (direito de arrependimento CDC 7 dias).
-   * Cancela a assinatura e reembolsa o valor pago.
+   * Requests refund for a specific payment (CDC 7-day withdrawal right).
+   * Cancels the subscription and refunds the amount paid.
    *
-   * @param body.purchaseId – ID do Purchase a ser reembolsado
+   * @param body.purchaseId – ID of the Purchase to be refunded
    */
   @Post('request-refund')
   async requestRefund(
@@ -113,4 +113,5 @@ export class StripeController {
     await this.stripe.requestRefund(req.user.userId, purchaseId.trim());
     return { ok: true };
   }
+
 }

@@ -509,6 +509,14 @@ model Subscription {
   currentPeriodEnd      DateTime
   /// If true, the subscription will be cancelled at the end of the current period (no renewal).
   cancelAtPeriodEnd     Boolean            @default(false)
+  /// Stripe subscription schedule ID (sub_sched_xxx) when a downgrade is scheduled for period end.
+  stripeScheduleId      String?
+  /// Plan that will take effect at the next billing period (downgrade scheduled).
+  scheduledPlan         SubscriptionPlan?
+  /// Stripe price ID that will take effect at the next billing period.
+  scheduledPriceId      String?
+  /// Billing interval (month/year) that will take effect at the next billing period.
+  scheduledInterval     String?
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
 

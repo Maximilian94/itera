@@ -265,6 +265,15 @@ function AccessCard({
             </div>
           </div>
 
+          {access.scheduledPlan && access.scheduledChangeDate && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-amber-800">
+                Mudança agendada para {formatDateBR(access.scheduledChangeDate)}.
+                Abra o portal para gerenciar.
+              </p>
+            </div>
+          )}
+
           {/* Treinos usados */}
           {access.trainingLimit > 0 && (
             <div className="bg-slate-50 rounded-lg px-4 py-3">
@@ -289,15 +298,22 @@ function AccessCard({
             </div>
           )}
 
-          <Button
-            variant="outlined"
-            color="inherit"
-            size="medium"
-            disabled={portalLoading}
-            onClick={onManageSubscription}
-          >
-            {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Link to="/gerenciar-assinatura">
+              <Button variant="outlined" color="inherit" size="medium">
+                Gerenciar assinatura
+              </Button>
+            </Link>
+            <Button
+              variant="text"
+              color="inherit"
+              size="medium"
+              disabled={portalLoading}
+              onClick={onManageSubscription}
+            >
+              {portalLoading ? 'Abrindo…' : 'Atualizar pagamento'}
+            </Button>
+          </div>
         </div>
       </Card>
     )
@@ -325,6 +341,15 @@ function AccessCard({
             </div>
           </div>
 
+          {access.scheduledPlan && access.scheduledChangeDate && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
+              <p className="text-sm text-amber-800">
+                Mudança agendada para {formatDateBR(access.scheduledChangeDate)}.
+                Abra o portal para gerenciar.
+              </p>
+            </div>
+          )}
+
           {/* Treinos usados */}
           {access.trainingLimit > 0 && (
             <div className="bg-slate-50 rounded-lg px-4 py-3">
@@ -343,15 +368,20 @@ function AccessCard({
             </div>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Link to="/gerenciar-assinatura">
+              <Button variant="outlined" color="inherit" size="medium">
+                Gerenciar assinatura
+              </Button>
+            </Link>
             <Button
-              variant="outlined"
+              variant="text"
               color="inherit"
               size="medium"
               disabled={portalLoading}
               onClick={onManageSubscription}
             >
-              {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
+              {portalLoading ? 'Abrindo…' : 'Atualizar pagamento'}
             </Button>
             {access.canRequestRefund && access.lastPurchaseId && (
               <Button

@@ -5,17 +5,15 @@ import { LockClosedIcon } from '@heroicons/react/24/outline'
 
 /**
  * Gate component that displays an "access required" overlay when the user
- * does not have an active subscription, instead of rendering the children.
+ * does not have an active subscription or when their plan is insufficient,
+ * instead of rendering the children.
+ *
+ * For users who already have a subscription but need to upgrade (e.g. Essencial
+ * trying to access trainings), shows a "Fazer upgrade" button that redirects
+ * to the plans page where the in-app upgrade happens instantly.
  *
  * @param type - Resource type ('prova' | 'treino') to customize the message.
  * @param children - Content to render when the user has access.
- *
- * @example
- * ```tsx
- * <AccessGate type="treino">
- *   <TrainingContent />
- * </AccessGate>
- * ```
  */
 export function AccessGate({
   type,
@@ -28,7 +26,7 @@ export function AccessGate({
 
   if (isLoading) return null
 
-  // Para treinos, verificar se o plano permite
+  // For trainings, check if the plan allows it
   if (type === 'treino' && trainingBlockedMessage) {
     return (
       <div className="flex flex-col items-center justify-center gap-4 p-8 text-center max-w-md mx-auto mt-12">
@@ -36,14 +34,14 @@ export function AccessGate({
           <LockClosedIcon className="w-8 h-8 text-slate-400" />
         </div>
         <h2 className="text-lg font-semibold text-slate-900">
-          {hasAccess ? 'Treinos não disponíveis' : 'Assinatura necessária'}
+          {hasAccess ? 'Treinos não disponíveis no seu plano' : 'Assinatura necessária'}
         </h2>
         <p className="text-sm text-slate-500">
           {trainingBlockedMessage}
         </p>
         <Link to="/planos">
           <Button variant="contained" color="primary" size="large">
-            {hasAccess ? 'Ver planos para upgrade' : 'Ver planos'}
+            {hasAccess ? 'Fazer upgrade' : 'Ver planos'}
           </Button>
         </Link>
       </div>

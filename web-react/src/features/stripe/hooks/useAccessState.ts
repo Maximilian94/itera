@@ -31,7 +31,12 @@ function apiResponseToAccessState(res: AccessApiResponse): AccessState {
     return {
       status: res.status,
       plan: res.plan,
+      billingInterval: res.billingInterval,
+      stripePriceId: res.stripePriceId,
       currentPeriodEnd: res.currentPeriodEnd,
+      scheduledPlan: res.scheduledPlan,
+      scheduledChangeDate: res.scheduledChangeDate,
+      scheduledInterval: res.scheduledInterval,
       canRequestRefund: res.canRequestRefund,
       lastPurchaseId: res.lastPurchaseId,
       trainingLimit: res.trainingLimit,
@@ -52,6 +57,8 @@ function getMockAccessState(status: AccessSearchParam): AccessState {
       return {
         status: 'active',
         plan: 'ESTRATEGICO',
+        billingInterval: 'month',
+        stripePriceId: undefined,
         currentPeriodEnd: date.toISOString(),
         canRequestRefund: false,
         trainingLimit: 5,
@@ -64,6 +71,8 @@ function getMockAccessState(status: AccessSearchParam): AccessState {
       return {
         status: 'trial',
         plan: 'ESTRATEGICO',
+        billingInterval: 'month',
+        stripePriceId: undefined,
         currentPeriodEnd: date.toISOString(),
         canRequestRefund: true,
         lastPurchaseId: 'mock-purchase-id',

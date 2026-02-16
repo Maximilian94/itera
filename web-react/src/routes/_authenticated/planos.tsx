@@ -47,6 +47,7 @@ function PlanosPage() {
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month')
   const [loadingPlan, setLoadingPlan] = useState<SubscriptionPlan | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [portalLoading, setPortalLoading] = useState(false)
   const { access } = useAccessState()
 
   const { data: plans, isLoading: plansLoading } = useQuery({
@@ -55,8 +56,7 @@ function PlanosPage() {
     staleTime: 5 * 60_000,
   })
 
-  /** Starts checkout for a specific plan. */
-  const handleSubscribe = async (plan: PlanInfo) => {
+  const handleSubscribeNew = async (plan: PlanInfo) => {
     setError(null)
     setLoadingPlan(plan.plan)
     try {
@@ -65,6 +65,7 @@ function PlanosPage() {
         setError('Preço não disponível para este plano.')
         return
       }
+
       const { successUrl, cancelUrl } = getCheckoutUrls()
       const { url } = await stripeService.createCheckoutSession({
         priceId,
@@ -81,7 +82,7 @@ function PlanosPage() {
         if (err.status === 400 && err.body && typeof err.body === 'object' && 'message' in err.body) {
           setError(String((err.body as { message: string }).message))
         } else {
-          setError(err.message || 'Erro ao iniciar checkout.')
+          setError(err.message || 'Erro ao processar. Tente novamente.')
         }
       } else {
         setError('Erro ao conectar. Verifique sua conexão.')
@@ -91,8 +92,29 @@ function PlanosPage() {
     }
   }
 
+  const handleOpenPortal = async () => {
+    setError(null)
+    setPortalLoading(true)
+    try {
+      const origin = typeof window !== 'undefined' ? window.location.origin : ''
+      const { url } = await stripeService.createCustomerPortal({
+        returnUrl: `${origin}/planos`,
+      })
+      if (url) window.location.href = url
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message || 'Erro ao abrir portal.')
+      } else {
+        setError('Erro ao conectar.')
+      }
+    } finally {
+      setPortalLoading(false)
+    }
+  }
+
   const isActive = access.status === 'active' || access.status === 'trial'
   const currentPlan = access.status !== 'inactive' ? access.plan : null
+  const currentInterval = isActive ? (access.billingInterval ?? 'month') : 'month'
 
   return (
     <div className="flex flex-col items-center gap-8 p-4 max-w-5xl mx-auto w-full">
@@ -133,6 +155,23 @@ function PlanosPage() {
         </button>
       </div>
 
+      {/* Active user: Gerenciar via Portal */}
+      {isActive && (
+        <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-xl px-4 py-4">
+          <p className="text-sm text-blue-800 mb-3">
+            Você já possui uma assinatura ativa. Para alterar seu plano, forma de cobrança ou método de pagamento, use o portal do Stripe.
+          </p>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleOpenPortal}
+            disabled={portalLoading}
+          >
+            {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
+          </Button>
+        </div>
+      )}
+
       {/* Error */}
       {error && (
         <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 max-w-md text-center">
@@ -147,7 +186,7 @@ function PlanosPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full">
           {(plans ?? []).map((plan) => {
             const isPopular = plan.plan === 'ESTRATEGICO'
-            const isCurrent = currentPlan === plan.plan
+            const isCurrent = currentPlan === plan.plan && currentInterval === billingInterval
             const Icon = PLAN_ICONS[plan.plan]
             const price = billingInterval === 'month' ? plan.monthlyAmount : plan.yearlyAmount
             const monthlyEquivalent = billingInterval === 'year' ? Math.round(plan.yearlyAmount / 12) : plan.monthlyAmount
@@ -161,21 +200,17 @@ function PlanosPage() {
                     : 'border-slate-200 hover:shadow-md'
                 } ${isCurrent ? 'ring-2 ring-green-400' : ''}`}
               >
-                {/* Badge "Mais Popular" */}
                 {isPopular && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-500 text-white text-xs font-bold rounded-full">
                     Mais Popular
                   </div>
                 )}
-
-                {/* Badge "Plano Atual" */}
                 {isCurrent && (
                   <div className="absolute -top-3 right-4 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-full">
                     Plano Atual
                   </div>
                 )}
 
-                {/* Plan Header */}
                 <div className="flex items-center gap-3 mb-4">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                     isPopular ? 'bg-blue-100' : 'bg-slate-100'
@@ -188,10 +223,9 @@ function PlanosPage() {
                   </div>
                 </div>
 
-                {/* Price */}
                 <div className="mb-6">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-slate-900">
+                    <span className="text-3xl font-bold text-slate-900 tabular-nums">
                       {formatCurrency(billingInterval === 'month' ? price : monthlyEquivalent)}
                     </span>
                     <span className="text-slate-500 text-sm">/mês</span>
@@ -203,7 +237,6 @@ function PlanosPage() {
                   )}
                 </div>
 
-                {/* Features */}
                 <ul className="flex flex-col gap-2.5 mb-6 flex-1">
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
@@ -215,30 +248,27 @@ function PlanosPage() {
                   ))}
                 </ul>
 
-                {/* CTA Button */}
                 {isCurrent ? (
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    size="large"
-                    fullWidth
-                    disabled
-                  >
-                    Plano atual
-                  </Button>
+                  <div className="w-full min-h-[48px] flex items-center justify-center">
+                    <span className="inline-flex items-center justify-center rounded-full px-4 py-2.5 text-sm font-medium bg-green-100 text-green-800 border border-green-200">
+                      Plano atual
+                    </span>
+                  </div>
                 ) : (
                   <Button
                     variant={isPopular ? 'contained' : 'outlined'}
                     color={isPopular ? 'primary' : 'inherit'}
                     size="large"
                     fullWidth
-                    disabled={loadingPlan !== null}
-                    onClick={() => handleSubscribe(plan)}
+                    disabled={loadingPlan !== null || (isActive && portalLoading)}
+                    onClick={() => (isActive ? handleOpenPortal() : handleSubscribeNew(plan))}
                   >
                     {loadingPlan === plan.plan
-                      ? 'Redirecionando…'
+                      ? 'Processando…'
                       : isActive
-                        ? 'Trocar para este plano'
+                        ? portalLoading
+                          ? 'Abrindo…'
+                          : 'Gerenciar assinatura'
                         : 'Assinar'}
                   </Button>
                 )}
@@ -267,65 +297,32 @@ function PlanosPage() {
 
 type SupportLevel = 'yes' | 'no' | 'partial'
 
-/** Feature comparison row data. */
 interface ComparisonRow {
   feature: string
   qconcursos: SupportLevel
   aprova: SupportLevel
   estrategia: SupportLevel
   itera: SupportLevel
-  /** Optional tooltip for partial support columns. */
   partialNotes?: Partial<Record<'qconcursos' | 'aprova' | 'estrategia' | 'itera', string>>
 }
 
 const COMPARISON_DATA: ComparisonRow[] = [
-  {
-    feature: 'Provas de concursos reais',
-    qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes',
-  },
-  {
-    feature: 'Explicações das alternativas',
-    qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes',
-  },
-  {
-    feature: 'Estatísticas de desempenho',
-    qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes',
-  },
-  {
-    feature: 'Diagnóstico automático após prova',
-    qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes',
-  },
+  { feature: 'Provas de concursos reais', qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes' },
+  { feature: 'Explicações das alternativas', qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes' },
+  { feature: 'Estatísticas de desempenho', qconcursos: 'yes', aprova: 'yes', estrategia: 'yes', itera: 'yes' },
+  { feature: 'Diagnóstico automático após prova', qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes' },
   {
     feature: 'Identificação inteligente de pontos fracos',
     qconcursos: 'partial', aprova: 'partial', estrategia: 'partial', itera: 'yes',
-    partialNotes: {
-      qconcursos: 'Básico (por matéria)',
-      aprova: 'Básico',
-      estrategia: 'Manual',
-    },
+    partialNotes: { qconcursos: 'Básico (por matéria)', aprova: 'Básico', estrategia: 'Manual' },
   },
-  {
-    feature: 'Plano de estudo personalizado',
-    qconcursos: 'no', aprova: 'no', estrategia: 'partial', itera: 'yes',
-    partialNotes: {
-      estrategia: 'Manual (via trilhas/cursos)',
-    },
-  },
-  {
-    feature: 'Exercícios baseados nos seus erros',
-    qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes',
-  },
-  {
-    feature: 'Ciclo de reavaliação inteligente',
-    qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes',
-  },
+  { feature: 'Plano de estudo personalizado', qconcursos: 'no', aprova: 'no', estrategia: 'partial', itera: 'yes', partialNotes: { estrategia: 'Manual (via trilhas/cursos)' } },
+  { feature: 'Exercícios baseados nos seus erros', qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes' },
+  { feature: 'Ciclo de reavaliação inteligente', qconcursos: 'no', aprova: 'no', estrategia: 'no', itera: 'yes' },
 ]
 
-/** Renders a support level icon. */
 function SupportIcon({ level, note }: { level: SupportLevel; note?: string }) {
-  if (level === 'yes') {
-    return <CheckIcon className="w-5 h-5 text-green-500 mx-auto" />
-  }
+  if (level === 'yes') return <CheckIcon className="w-5 h-5 text-green-500 mx-auto" />
   if (level === 'partial') {
     return (
       <div className="flex flex-col items-center gap-0.5">
@@ -337,10 +334,9 @@ function SupportIcon({ level, note }: { level: SupportLevel; note?: string }) {
   return <XMarkIcon className="w-5 h-5 text-slate-300 mx-auto" />
 }
 
-/** Competitor comparison table showing Itera's unique advantages. */
 function ComparisonTable() {
   const competitors = ['qconcursos', 'aprova', 'estrategia', 'itera'] as const
-  const headers: Record<typeof competitors[number], string> = {
+  const headers: Record<(typeof competitors)[number], string> = {
     qconcursos: 'QConcursos',
     aprova: 'Aprova Concursos',
     estrategia: 'Estratégia Concursos',
@@ -350,9 +346,7 @@ function ComparisonTable() {
   return (
     <div className="w-full mt-4">
       <div className="text-center mb-6">
-        <h2 className="text-xl font-bold text-slate-900">
-          Por que o Itera?
-        </h2>
+        <h2 className="text-xl font-bold text-slate-900">Por que o Itera?</h2>
         <p className="text-slate-500 mt-1 text-sm">
           Compare as funcionalidades com as principais plataformas do mercado.
         </p>
@@ -362,16 +356,12 @@ function ComparisonTable() {
         <table className="w-full text-sm">
           <thead>
             <tr className="bg-slate-50">
-              <th className="text-left px-4 py-3 font-semibold text-slate-700 min-w-[200px]">
-                Funcionalidade
-              </th>
+              <th className="text-left px-4 py-3 font-semibold text-slate-700 min-w-[200px]">Funcionalidade</th>
               {competitors.map((c) => (
                 <th
                   key={c}
                   className={`px-3 py-3 font-semibold text-center min-w-[110px] ${
-                    c === 'itera'
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-slate-600'
+                    c === 'itera' ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
                   }`}
                 >
                   {headers[c]}
@@ -381,26 +371,11 @@ function ComparisonTable() {
           </thead>
           <tbody>
             {COMPARISON_DATA.map((row, i) => (
-              <tr
-                key={i}
-                className={`border-t border-slate-100 ${
-                  i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                }`}
-              >
-                <td className="px-4 py-3 text-slate-700 font-medium">
-                  {row.feature}
-                </td>
+              <tr key={i} className={`border-t border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
+                <td className="px-4 py-3 text-slate-700 font-medium">{row.feature}</td>
                 {competitors.map((c) => (
-                  <td
-                    key={c}
-                    className={`px-3 py-3 ${
-                      c === 'itera' ? 'bg-blue-50/50' : ''
-                    }`}
-                  >
-                    <SupportIcon
-                      level={row[c]}
-                      note={row.partialNotes?.[c]}
-                    />
+                  <td key={c} className={`px-3 py-3 ${c === 'itera' ? 'bg-blue-50/50' : ''}`}>
+                    <SupportIcon level={row[c]} note={row.partialNotes?.[c]} />
                   </td>
                 ))}
               </tr>

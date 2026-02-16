@@ -29,7 +29,7 @@ class StripeService {
     })
   }
 
-  /** Creates a checkout session for subscription and returns the Stripe URL. */
+  /** Creates a checkout session for new subscription and returns the Stripe URL. */
   async createCheckoutSession(
     body: CreateCheckoutSessionBody,
   ): Promise<CreateCheckoutSessionResponse> {
