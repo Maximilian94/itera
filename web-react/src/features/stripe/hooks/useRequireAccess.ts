@@ -22,6 +22,8 @@ export function useRequireAccess() {
   const navigate = useNavigate()
 
   const hasAccess = access.status === 'active' || access.status === 'trial'
+  const canDoFreeTraining =
+    access.status === 'inactive' && (access.canDoFreeTraining ?? false)
   const plan: SubscriptionPlan | null = access.status !== 'inactive' ? access.plan : null
   const trainingLimit = access.status !== 'inactive' ? access.trainingLimit : 0
   const trainingsUsedThisMonth = access.status !== 'inactive' ? access.trainingsUsedThisMonth : 0
@@ -40,10 +42,12 @@ export function useRequireAccess() {
 
   /**
    * Checks if the plan allows trainings and if the monthly limit has not been reached.
+   * Also allows 1 free training for new users (onboarding).
    * Essencial has no trainings (limit=0). Strategic and Elite have limits.
    * @returns true if can start training, false if redirected or blocked.
    */
   const canStartTraining = useCallback((): boolean => {
+    if (canDoFreeTraining) return true
     if (!hasAccess) {
       navigate({ to: '/planos' })
       return false
@@ -57,12 +61,14 @@ export function useRequireAccess() {
       return false
     }
     return true
-  }, [hasAccess, navigate, trainingLimit, trainingsUsedThisMonth])
+  }, [canDoFreeTraining, hasAccess, navigate, trainingLimit, trainingsUsedThisMonth])
 
   /**
    * Message to display when the plan does not allow trainings or the limit has been reached.
+   * Null when user can do free training (onboarding).
    */
   const trainingBlockedMessage = (() => {
+    if (canDoFreeTraining) return null
     if (!hasAccess) return 'Assine um plano para acessar treinos.'
     if (trainingLimit === 0) return 'Seu plano (Essencial) não inclui treinos. Faça upgrade para Estratégico ou Elite.'
     if (trainingsUsedThisMonth >= trainingLimit) return `Você atingiu o limite de ${trainingLimit} treinos/mês. Faça upgrade para ter mais treinos.`
@@ -71,6 +77,7 @@ export function useRequireAccess() {
 
   return {
     hasAccess,
+    canDoFreeTraining,
     plan,
     trainingLimit,
     trainingsUsedThisMonth,

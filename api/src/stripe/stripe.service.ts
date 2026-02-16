@@ -76,6 +76,8 @@ export type AccessResponse = {
   lastPurchaseId?: string;
   trainingLimit?: number;
   trainingsUsedThisMonth?: number;
+  /** When inactive: true if user has 0 trainings and can do 1 free onboarding training. */
+  canDoFreeTraining?: boolean;
 };
 
 // ---------------------------------------------------------------------------
@@ -769,10 +771,14 @@ export class StripeService {
     });
 
     if (!activeSubscription) {
+      const totalTrainings = await this.prisma.trainingSession.count({
+        where: { userId },
+      });
       return {
         hasAccess: false,
         status: 'inactive',
         canRequestRefund: false,
+        canDoFreeTraining: totalTrainings === 0,
       };
     }
 

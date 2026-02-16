@@ -82,7 +82,11 @@ export type AccessState =
       trainingLimit: number
       trainingsUsedThisMonth: number
     }
-  | { status: 'inactive' }
+  | {
+      status: 'inactive'
+      /** True when user has 0 trainings and can do 1 free onboarding training. */
+      canDoFreeTraining?: boolean
+    }
 
 /** Raw response from GET /stripe/access. */
 export type AccessApiResponse = {
@@ -99,5 +103,7 @@ export type AccessApiResponse = {
   lastPurchaseId?: string
   trainingLimit?: number
   trainingsUsedThisMonth?: number
+  /** When inactive: true if user can do 1 free onboarding training. */
+  canDoFreeTraining?: boolean
 }
 

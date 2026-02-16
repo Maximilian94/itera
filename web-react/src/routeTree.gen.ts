@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTreinoRouteImport } from './routes/_authenticated/treino'
 import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedExamsRouteImport } from './routes/_authenticated/exams'
 import { Route as AuthenticatedExamBoardsRouteImport } from './routes/_authenticated/exam-boards'
@@ -76,6 +77,11 @@ const AuthenticatedTreinoRoute = AuthenticatedTreinoRouteImport.update({
 const AuthenticatedPlanosRoute = AuthenticatedPlanosRouteImport.update({
   id: '/planos',
   path: '/planos',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
@@ -280,6 +286,7 @@ export interface FileRoutesByFullPath {
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/exams': typeof AuthenticatedExamsRouteWithChildren
   '/history': typeof AuthenticatedHistoryRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
@@ -319,6 +326,7 @@ export interface FileRoutesByTo {
   '/exam-bases': typeof AuthenticatedExamBasesRoute
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/history': typeof AuthenticatedHistoryRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
@@ -356,6 +364,7 @@ export interface FileRoutesById {
   '/_authenticated/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/_authenticated/exams': typeof AuthenticatedExamsRouteWithChildren
   '/_authenticated/history': typeof AuthenticatedHistoryRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/_authenticated/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
@@ -398,6 +407,7 @@ export interface FileRouteTypes {
     | '/exam-boards'
     | '/exams'
     | '/history'
+    | '/onboarding'
     | '/planos'
     | '/treino'
     | '/treino/$trainingId'
@@ -437,6 +447,7 @@ export interface FileRouteTypes {
     | '/exam-bases'
     | '/exam-boards'
     | '/history'
+    | '/onboarding'
     | '/planos'
     | '/treino/diagnostico'
     | '/treino/estudo'
@@ -473,6 +484,7 @@ export interface FileRouteTypes {
     | '/_authenticated/exam-boards'
     | '/_authenticated/exams'
     | '/_authenticated/history'
+    | '/_authenticated/onboarding'
     | '/_authenticated/planos'
     | '/_authenticated/treino'
     | '/_authenticated/treino/$trainingId'
@@ -551,6 +563,13 @@ declare module '@tanstack/react-router' {
       path: '/planos'
       fullPath: '/planos'
       preLoaderRoute: typeof AuthenticatedPlanosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/history': {
@@ -928,6 +947,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedExamBoardsRoute: typeof AuthenticatedExamBoardsRoute
   AuthenticatedExamsRoute: typeof AuthenticatedExamsRouteWithChildren
   AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedTreinoRoute: typeof AuthenticatedTreinoRouteWithChildren
 }
@@ -941,6 +961,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedExamBoardsRoute: AuthenticatedExamBoardsRoute,
   AuthenticatedExamsRoute: AuthenticatedExamsRouteWithChildren,
   AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedTreinoRoute: AuthenticatedTreinoRouteWithChildren,
 }

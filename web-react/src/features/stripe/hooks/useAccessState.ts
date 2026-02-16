@@ -43,7 +43,10 @@ function apiResponseToAccessState(res: AccessApiResponse): AccessState {
       trainingsUsedThisMonth: res.trainingsUsedThisMonth,
     }
   }
-  return { status: 'inactive' }
+  return {
+    status: 'inactive',
+    canDoFreeTraining: res.canDoFreeTraining ?? false,
+  }
 }
 
 /**
@@ -81,7 +84,7 @@ function getMockAccessState(status: AccessSearchParam): AccessState {
       }
     }
     default:
-      return { status: 'inactive' }
+      return { status: 'inactive', canDoFreeTraining: true }
   }
 }
 
@@ -117,7 +120,7 @@ export function useAccessState(): {
       return getMockAccessState(paramOverride)
     }
     if (isError || !data) {
-      return { status: 'inactive' }
+      return { status: 'inactive', canDoFreeTraining: false }
     }
     return apiResponseToAccessState(data)
   }, [paramOverride, isError, data])

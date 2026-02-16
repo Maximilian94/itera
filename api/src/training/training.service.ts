@@ -352,33 +352,40 @@ export class TrainingService {
       });
 
       if (!activeSubscription) {
-        throw new ForbiddenException(
-          'Você precisa de uma assinatura ativa para criar treinos. Acesse /planos para ver as opções.',
-        );
-      }
+        // New users get 1 free training (onboarding). After that, subscription required.
+        const totalTrainings = await this.prisma.trainingSession.count({
+          where: { userId },
+        });
+        if (totalTrainings >= 1) {
+          throw new ForbiddenException(
+            'Você precisa de uma assinatura ativa para criar treinos. Acesse /planos para ver as opções.',
+          );
+        }
+        // Allow 1 free training — fall through to create
+      } else {
+        const limit = TrainingService.TRAINING_LIMITS[activeSubscription.plan] ?? 0;
 
-      const limit = TrainingService.TRAINING_LIMITS[activeSubscription.plan] ?? 0;
+        if (limit === 0) {
+          throw new ForbiddenException(
+            'Seu plano (Essencial) não inclui treinos inteligentes. Faça upgrade para Estratégico ou Elite.',
+          );
+        }
 
-      if (limit === 0) {
-        throw new ForbiddenException(
-          'Seu plano (Essencial) não inclui treinos inteligentes. Faça upgrade para Estratégico ou Elite.',
-        );
-      }
+        // Count training sessions created this month
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const trainingsThisMonth = await this.prisma.trainingSession.count({
+          where: {
+            userId,
+            createdAt: { gte: startOfMonth },
+          },
+        });
 
-      // Count training sessions created this month
-      const now = new Date();
-      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const trainingsThisMonth = await this.prisma.trainingSession.count({
-        where: {
-          userId,
-          createdAt: { gte: startOfMonth },
-        },
-      });
-
-      if (trainingsThisMonth >= limit) {
-        throw new ForbiddenException(
-          `Você atingiu o limite de ${limit} treinos/mês do seu plano. Faça upgrade para ter mais treinos.`,
-        );
+        if (trainingsThisMonth >= limit) {
+          throw new ForbiddenException(
+            `Você atingiu o limite de ${limit} treinos/mês do seu plano. Faça upgrade para ter mais treinos.`,
+          );
+        }
       }
     }
 

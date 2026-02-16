@@ -4,6 +4,7 @@ import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queri
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { useClerkAuth } from '@/auth/clerk'
+import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import {
   AcademicCapIcon,
   ArrowRightIcon,
@@ -17,6 +18,7 @@ import {
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { Button } from '@mui/material'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import { getStagePath } from './treino/stages.config'
 import type { TreinoStageSlug } from './treino/stages.config'
 import dayjs from 'dayjs'
@@ -196,13 +198,36 @@ const STAGE_PROGRESS: Record<string, number> = {
 function Dashboard() {
   const navigate = useNavigate()
   const { user } = useClerkAuth()
+  const { access, isLoading: accessLoading } = useAccessState()
   const { data: historyItems = [], isLoading: loadingHistory } =
     useExamBaseAttemptHistoryQuery()
   const { data: trainings = [], isLoading: loadingTrainings } =
     useTrainingsQuery()
 
+  const canDoFreeTraining =
+    access.status === 'inactive' && (access.canDoFreeTraining ?? false)
+
+  // Redirect new users to onboarding (1 free training)
+  useEffect(() => {
+    if (accessLoading) return
+    if (canDoFreeTraining) {
+      navigate({ to: '/onboarding' })
+    }
+  }, [canDoFreeTraining, accessLoading, navigate])
+
   const firstName = getFirstName(user?.username || user?.email)
   const greeting = getGreeting()
+
+  // Show loading while redirecting to onboarding
+  if (accessLoading || canDoFreeTraining) {
+    return (
+      <div className="flex items-center justify-center min-h-[300px]">
+        <div className="animate-pulse text-slate-400 text-sm">
+          Carregando...
+        </div>
+      </div>
+    )
+  }
 
   // Exam stats
   const totalAttempts = historyItems.length
