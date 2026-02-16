@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Button } from '@mui/material'
 import {
   CheckIcon,
@@ -115,6 +115,15 @@ function PlanosPage() {
   const isActive = access.status === 'active' || access.status === 'trial'
   const currentPlan = access.status !== 'inactive' ? access.plan : null
   const currentInterval = isActive ? (access.billingInterval ?? 'month') : 'month'
+
+  // Ao carregar, seleciona automaticamente o intervalo do plano atual (ex: anual se plano é anual)
+  const hasInitializedInterval = useRef(false)
+  useEffect(() => {
+    if (isActive && currentInterval && !hasInitializedInterval.current) {
+      setBillingInterval(currentInterval)
+      hasInitializedInterval.current = true
+    }
+  }, [isActive, currentInterval])
 
   return (
     <div className="flex flex-col items-center gap-8 p-4 max-w-5xl mx-auto w-full">
