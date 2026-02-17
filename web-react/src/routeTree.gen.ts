@@ -20,6 +20,7 @@ import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedExamsRouteImport } from './routes/_authenticated/exams'
 import { Route as AuthenticatedExamBoardsRouteImport } from './routes/_authenticated/exam-boards'
 import { Route as AuthenticatedExamBasesRouteImport } from './routes/_authenticated/exam-bases'
+import { Route as AuthenticatedEvolucaoComoFuncionaRouteImport } from './routes/_authenticated/evolucao-como-funciona'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCheckoutSuccessRouteImport } from './routes/_authenticated/checkout-success'
@@ -104,6 +105,12 @@ const AuthenticatedExamBasesRoute = AuthenticatedExamBasesRouteImport.update({
   path: '/exam-bases',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedEvolucaoComoFuncionaRoute =
+  AuthenticatedEvolucaoComoFuncionaRouteImport.update({
+    id: '/evolucao-como-funciona',
+    path: '/evolucao-como-funciona',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDatabaseRoute = AuthenticatedDatabaseRouteImport.update({
   id: '/database',
   path: '/database',
@@ -282,6 +289,7 @@ export interface FileRoutesByFullPath {
   '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/exam-bases': typeof AuthenticatedExamBasesRoute
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/exams': typeof AuthenticatedExamsRouteWithChildren
@@ -323,6 +331,7 @@ export interface FileRoutesByTo {
   '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
+  '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/exam-bases': typeof AuthenticatedExamBasesRoute
   '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/history': typeof AuthenticatedHistoryRoute
@@ -360,6 +369,7 @@ export interface FileRoutesById {
   '/_authenticated/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
+  '/_authenticated/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/_authenticated/exam-bases': typeof AuthenticatedExamBasesRoute
   '/_authenticated/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/_authenticated/exams': typeof AuthenticatedExamsRouteWithChildren
@@ -403,6 +413,7 @@ export interface FileRouteTypes {
     | '/checkout-success'
     | '/dashboard'
     | '/database'
+    | '/evolucao-como-funciona'
     | '/exam-bases'
     | '/exam-boards'
     | '/exams'
@@ -444,6 +455,7 @@ export interface FileRouteTypes {
     | '/checkout-success'
     | '/dashboard'
     | '/database'
+    | '/evolucao-como-funciona'
     | '/exam-bases'
     | '/exam-boards'
     | '/history'
@@ -480,6 +492,7 @@ export interface FileRouteTypes {
     | '/_authenticated/checkout-success'
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
+    | '/_authenticated/evolucao-como-funciona'
     | '/_authenticated/exam-bases'
     | '/_authenticated/exam-boards'
     | '/_authenticated/exams'
@@ -598,6 +611,13 @@ declare module '@tanstack/react-router' {
       path: '/exam-bases'
       fullPath: '/exam-bases'
       preLoaderRoute: typeof AuthenticatedExamBasesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/evolucao-como-funciona': {
+      id: '/_authenticated/evolucao-como-funciona'
+      path: '/evolucao-como-funciona'
+      fullPath: '/evolucao-como-funciona'
+      preLoaderRoute: typeof AuthenticatedEvolucaoComoFuncionaRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/database': {
@@ -943,6 +963,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedCheckoutSuccessRoute: typeof AuthenticatedCheckoutSuccessRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
+  AuthenticatedEvolucaoComoFuncionaRoute: typeof AuthenticatedEvolucaoComoFuncionaRoute
   AuthenticatedExamBasesRoute: typeof AuthenticatedExamBasesRoute
   AuthenticatedExamBoardsRoute: typeof AuthenticatedExamBoardsRoute
   AuthenticatedExamsRoute: typeof AuthenticatedExamsRouteWithChildren
@@ -957,6 +978,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedCheckoutSuccessRoute: AuthenticatedCheckoutSuccessRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
+  AuthenticatedEvolucaoComoFuncionaRoute:
+    AuthenticatedEvolucaoComoFuncionaRoute,
   AuthenticatedExamBasesRoute: AuthenticatedExamBasesRoute,
   AuthenticatedExamBoardsRoute: AuthenticatedExamBoardsRoute,
   AuthenticatedExamsRoute: AuthenticatedExamsRouteWithChildren,

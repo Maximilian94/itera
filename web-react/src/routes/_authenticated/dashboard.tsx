@@ -4,10 +4,12 @@ import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queri
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { useClerkAuth } from '@/auth/clerk'
+import type { UserResource } from "@clerk/types";
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import {
   AcademicCapIcon,
   ArrowRightIcon,
+  ArrowTrendingUpIcon,
   ChartBarIcon,
   ClockIcon,
   DocumentTextIcon,
@@ -17,6 +19,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { Button } from '@mui/material'
+import { LineChart } from '@mui/x-charts/LineChart'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { getStagePath } from './treino/stages.config'
@@ -40,9 +43,28 @@ function getGreeting(): string {
   return 'Boa noite'
 }
 
-function getFirstName(name: string | undefined): string {
-  if (!name) return ''
-  return name.split(/[\s@]/)[0]
+function getFirstName(user: UserResource | null): string {
+  if (!user) return ''
+  return user.firstName ?? ''
+}
+
+/** Linear regression slope (p.p. per exam). Returns null if fewer than 2 points. */
+function linearRegressionSlope(scores: number[]): number | null {
+  const n = scores.length
+  if (n < 2) return null
+  let sumX = 0,
+    sumY = 0,
+    sumXY = 0,
+    sumX2 = 0
+  for (let i = 0; i < n; i++) {
+    sumX += i
+    sumY += scores[i]
+    sumXY += i * scores[i]
+    sumX2 += i * i
+  }
+  const denom = n * sumX2 - sumX * sumX
+  if (denom === 0) return null
+  return (n * sumXY - sumX * sumY) / denom
 }
 
 /* ------------------------------------------------------------------ */
@@ -125,6 +147,7 @@ function StatCard({
   valueColor = 'text-slate-900',
   isLoading,
   animDelay = 0,
+  valueDisplay,
 }: {
   value: number
   label: string
@@ -134,6 +157,8 @@ function StatCard({
   valueColor?: string
   isLoading: boolean
   animDelay?: number
+  /** When provided, used instead of value for display (e.g. "+15" for evolution). */
+  valueDisplay?: string
 }) {
   return (
     <div
@@ -147,7 +172,7 @@ function StatCard({
       </div>
       <div>
         <p className={`text-xl font-bold tabular-nums ${valueColor}`}>
-          {isLoading ? '—' : value}
+          {isLoading ? '—' : valueDisplay ?? value}
         </p>
         <p className="text-xs text-slate-500">{label}</p>
       </div>
@@ -215,7 +240,7 @@ function Dashboard() {
     }
   }, [canDoFreeTraining, accessLoading, navigate])
 
-  const firstName = getFirstName(user?.username || user?.email)
+  const firstName = user ? getFirstName(user) : ''
   const greeting = getGreeting()
 
   // Show loading while redirecting to onboarding
@@ -247,6 +272,60 @@ function Dashboard() {
   const activeTrainings = trainings.filter(
     (t) => t.currentStage !== 'FINAL',
   )
+
+  // Training quota (active/trial) or inactive
+  const trainingsUsed =
+    access.status === 'active' || access.status === 'trial'
+      ? access.trainingsUsedThisMonth
+      : 0
+  const trainingsAvailable =
+    access.status === 'active' || access.status === 'trial'
+      ? access.trainingLimit
+      : 0
+  const hasTrainingQuota =
+    access.status === 'active' || access.status === 'trial'
+      ? trainingsUsed < trainingsAvailable
+      : false
+  const lastActiveTraining = activeTrainings[0] ?? null
+  const canCreateTraining =
+    hasTrainingQuota && activeTrainings.length === 0
+
+  // Initial score trend: how much the user's exam scores are rising over time
+  // Data: finished attempts with percentage, ordered by date
+  const scoreHistory = historyItems
+    .filter((i) => i.finishedAt != null && i.percentage != null)
+    .map((i) => ({
+      date: dayjs(i.finishedAt!).toDate(),
+      score: i.percentage!,
+    }))
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+
+  const now = dayjs()
+  const lastMonth = now.subtract(1, 'month')
+
+  const attemptsThisMonth = scoreHistory.filter((p) =>
+    dayjs(p.date).isSame(now, 'month'),
+  )
+  const attemptsLastMonth = scoreHistory.filter((p) =>
+    dayjs(p.date).isSame(lastMonth, 'month'),
+  )
+
+  const avgThisMonth =
+    attemptsThisMonth.length > 0
+      ? attemptsThisMonth.reduce((s, p) => s + p.score, 0) / attemptsThisMonth.length
+      : null
+  const avgLastMonth =
+    attemptsLastMonth.length > 0
+      ? attemptsLastMonth.reduce((s, p) => s + p.score, 0) / attemptsLastMonth.length
+      : null
+
+  const initialScoreTrend =
+    avgThisMonth != null && avgLastMonth != null ? avgThisMonth - avgLastMonth : null
+
+  const trendSlopePerExam =
+    scoreHistory.length >= 2
+      ? linearRegressionSlope(scoreHistory.map((p) => p.score))
+      : null
 
   // Quick-action state
   const activeAttempt = historyItems.find(
@@ -303,6 +382,71 @@ function Dashboard() {
             estudos para concursos.
           </p>
         </div>
+      </div>
+
+      {/* ═══════════ TREINOS DISPONÍVEIS ═══════════ */}
+      <div style={{ animation: 'fade-in-up 0.5s ease-out 50ms both' }}>
+        <Card noElevation className="p-5 border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <AcademicCapIcon className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-800">
+                  Treinos do mês
+                </p>
+                <p className="text-xs text-slate-500">
+                  {access.status === 'active' || access.status === 'trial' ? (
+                    <>
+                      <span className="font-medium text-slate-700">
+                        {trainingsUsed}
+                      </span>
+                      {' usados / '}
+                      <span className="font-medium text-slate-700">
+                        {trainingsAvailable}
+                      </span>
+                      {' disponíveis'}
+                    </>
+                  ) : (
+                    'Assine um plano para ter treinos inteligentes'
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {lastActiveTraining ? (
+                <Link
+                  to={getStagePath(
+                    STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
+                    lastActiveTraining.trainingId,
+                  )}
+                  className="no-underline"
+                >
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    startIcon={<PlayIcon className="w-4 h-4" />}
+                  >
+                    Continuar treino
+                  </Button>
+                </Link>
+              ) : canCreateTraining ? (
+                <Link to="/treino/novo" className="no-underline">
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    startIcon={<PlusIcon className="w-4 h-4" />}
+                  >
+                    Criar treino
+                  </Button>
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* ═══════════ QUICK ACTIONS ═══════════ */}
@@ -450,6 +594,124 @@ function Dashboard() {
               animDelay={450}
             />
           </div>
+        </Card>
+      </div>
+
+      {/* ═══════════ EVOLUÇÃO DA NOTA INICIAL ═══════════ */}
+      <div style={{ animation: 'fade-in-up 0.5s ease-out 400ms both' }}>
+        <Card noElevation className="p-5 border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
+                <ArrowTrendingUpIcon className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-slate-800">
+                  Evolução da nota inicial
+                </h3>
+                <div className="space-y-1 mt-0.5">
+                  <p className="text-xs text-slate-500">
+                    {loadingHistory ? (
+                      'Carregando...'
+                    ) : initialScoreTrend != null ? (
+                      initialScoreTrend > 0 ? (
+                        <>
+                          Sua nota média{' '}
+                          <span className="font-medium text-emerald-600">
+                            subiu {initialScoreTrend.toFixed(1)} p.p.
+                          </span>{' '}
+                          em relação ao mês anterior
+                        </>
+                      ) : initialScoreTrend < 0 ? (
+                        <>
+                          Sua nota média{' '}
+                          <span className="font-medium text-red-600">
+                            caiu {Math.abs(initialScoreTrend).toFixed(1)} p.p.
+                          </span>{' '}
+                          em relação ao mês anterior
+                        </>
+                      ) : (
+                        'Sua nota média se manteve estável em relação ao mês anterior'
+                      )
+                    ) : scoreHistory.length === 0 ? (
+                      'Faça provas para acompanhar sua evolução'
+                    ) : (
+                      'Faça provas em dois meses para ver a tendência'
+                    )}
+                  </p>
+                  {!loadingHistory && trendSlopePerExam != null && (
+                    <p className="text-xs text-slate-500">
+                      {trendSlopePerExam > 0 ? (
+                        <>
+                          Em média, a cada nova prova sua nota{' '}
+                          <span className="font-medium text-emerald-600">
+                            sobe {trendSlopePerExam.toFixed(1)} p.p.
+                          </span>
+                        </>
+                      ) : trendSlopePerExam < 0 ? (
+                        <>
+                          Em média, a cada nova prova sua nota{' '}
+                          <span className="font-medium text-red-600">
+                            cai {Math.abs(trendSlopePerExam).toFixed(1)} p.p.
+                          </span>
+                        </>
+                      ) : (
+                        'Sua nota está estável entre as provas.'
+                      )}
+                    </p>
+                  )}
+                  <Link
+                    to="/evolucao-como-funciona"
+                    className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline inline-flex items-center gap-0.5 mt-1"
+                  >
+                    Como é calculado?
+                    <ArrowRightIcon className="w-3 h-3" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+          {scoreHistory.length > 0 ? (
+            <div className="h-[280px] w-full min-w-0">
+              <LineChart
+                dataset={scoreHistory}
+                xAxis={[
+                  {
+                    dataKey: 'date',
+                    scaleType: 'time',
+                    valueFormatter: (value: Date) =>
+                      dayjs(value).format('DD/MM/YY'),
+                  },
+                ]}
+                yAxis={[
+                  {
+                    valueFormatter: (value: number) => `${value}%`,
+                  },
+                ]}
+                series={[
+                  {
+                    dataKey: 'score',
+                    label: 'Nota (%)',
+                    color: '#2563eb',
+                    showMark: true,
+                  },
+                ]}
+                height={260}
+                margin={{ top: 20, right: 20, bottom: 40, left: 50 }}
+                grid={{ vertical: true, horizontal: true }}
+                hideLegend
+              />
+            </div>
+          ) : (
+            !loadingHistory && (
+              <div className="h-[120px] flex items-center justify-center rounded-lg bg-slate-50 border border-dashed border-slate-200">
+                <p className="text-sm text-slate-500">
+                  Nenhuma prova concluída ainda. Comece um treino ou exame para
+                  ver seu progresso aqui.
+                </p>
+              </div>
+            )
+          )}
         </Card>
       </div>
 
