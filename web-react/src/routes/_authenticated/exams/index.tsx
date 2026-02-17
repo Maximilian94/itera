@@ -2,12 +2,16 @@ import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { examBaseService } from '@/features/examBase/services/examBase.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
+import { authService } from '@/features/auth/services/auth.service'
+import { ApiError } from '@/lib/api'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { formatBRL } from '@/lib/utils'
 import dayjs from 'dayjs'
 import { useState, useMemo } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRightIcon,
   BanknotesIcon,
@@ -16,6 +20,7 @@ import {
   FunnelIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
+  PlusIcon,
   TrophyIcon,
   XMarkIcon,
   ArrowTrendingUpIcon,
@@ -25,8 +30,26 @@ import {
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
-import { Tooltip } from '@mui/material'
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Tooltip,
+} from '@mui/material'
 import { PpTooltip } from '@/components/PpTooltip'
+
+function dateInputToIso(value: string) {
+  return value
+}
 
 export const Route = createFileRoute('/_authenticated/exams/')({
   component: ExamsPage,
@@ -119,10 +142,7 @@ function ExamCard({
           animation: `fade-in-up 0.45s ease-out ${animDelay}ms both`,
         }}
       >
-        {/* Top accent bar */}
-        <div className="h-1 bg-linear-to-r from-blue-400 via-violet-400 to-emerald-400 opacity-60" />
-
-        <div className="p-4">
+        <div className="p-2">
           {/* Header row */}
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0">
@@ -230,17 +250,247 @@ function ExamCard({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Create Exam Dialog (Admin only)                                    */
+/* ------------------------------------------------------------------ */
+
+function CreateExamDialog({
+  open,
+  onClose,
+  examBoards,
+  onSuccess,
+}: {
+  open: boolean
+  onClose: () => void
+  examBoards: Array<{ id: string; name: string }>
+  onSuccess: () => void
+}) {
+  const [error, setError] = useState<string | null>(null)
+  const [createName, setCreateName] = useState('')
+  const [createRole, setCreateRole] = useState('')
+  const [createInstitution, setCreateInstitution] = useState('')
+  const [createGovernmentScope, setCreateGovernmentScope] = useState<
+    'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  >('FEDERAL')
+  const [createState, setCreateState] = useState('')
+  const [createCity, setCreateCity] = useState('')
+  const [createSalaryBase, setCreateSalaryBase] = useState('')
+  const [createMinPassingGradeNonQuota, setCreateMinPassingGradeNonQuota] =
+    useState('')
+  const [createExamDate, setCreateExamDate] = useState('')
+  const [createExamBoardId, setCreateExamBoardId] = useState<string>('')
+
+  const canCreate = useMemo(() => {
+    if (!createName.trim() || !createRole.trim() || !createExamDate.trim())
+      return false
+    if (createGovernmentScope === 'MUNICIPAL') {
+      return !!createState.trim() && !!createCity.trim()
+    }
+    if (createGovernmentScope === 'STATE') {
+      return !!createState.trim() && !createCity.trim()
+    }
+    return !createState.trim() && !createCity.trim()
+  }, [
+    createName,
+    createRole,
+    createExamDate,
+    createGovernmentScope,
+    createState,
+    createCity,
+  ])
+
+  function resetForm() {
+    setCreateName('')
+    setCreateRole('')
+    setCreateInstitution('')
+    setCreateGovernmentScope('FEDERAL')
+    setCreateState('')
+    setCreateCity('')
+    setCreateSalaryBase('')
+    setCreateMinPassingGradeNonQuota('')
+    setCreateExamDate('')
+    setCreateExamBoardId('')
+    setError(null)
+  }
+
+  async function handleCreate() {
+    setError(null)
+    try {
+      await examBaseService.create({
+        name: createName.trim(),
+        role: createRole.trim(),
+        institution: createInstitution.trim() || undefined,
+        governmentScope: createGovernmentScope,
+        state: createState.trim() ? createState.trim() : null,
+        city: createCity.trim() ? createCity.trim() : null,
+        salaryBase: createSalaryBase.trim() ? createSalaryBase.trim() : null,
+        minPassingGradeNonQuota: createMinPassingGradeNonQuota.trim()
+          ? createMinPassingGradeNonQuota.trim()
+          : null,
+        examDate: dateInputToIso(createExamDate.trim()),
+        examBoardId: createExamBoardId || undefined,
+      })
+      resetForm()
+      onClose()
+      onSuccess()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Falha ao criar exame')
+    }
+  }
+
+  function handleClose() {
+    resetForm()
+    onClose()
+  }
+
+  return (
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+      <DialogTitle>Criar exame</DialogTitle>
+      <DialogContent>
+        <Stack gap={2} mt={1}>
+          {error && (
+            <Alert severity="error" onClose={() => setError(null)}>
+              {error}
+            </Alert>
+          )}
+          <TextField
+            label="Nome"
+            value={createName}
+            onChange={(e) => setCreateName(e.target.value)}
+            autoFocus
+            fullWidth
+          />
+          <TextField
+            label="Cargo"
+            value={createRole}
+            onChange={(e) => setCreateRole(e.target.value)}
+            placeholder="ex: Analista de Sistemas"
+            fullWidth
+          />
+          <TextField
+            label="Instituição"
+            value={createInstitution}
+            onChange={(e) => setCreateInstitution(e.target.value)}
+            fullWidth
+          />
+          <FormControl fullWidth>
+            <InputLabel id="create-scope-label">Âmbito</InputLabel>
+            <Select
+              labelId="create-scope-label"
+              value={createGovernmentScope}
+              label="Âmbito"
+              onChange={(e) => {
+                const v = e.target.value as 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+                setCreateGovernmentScope(v)
+                if (v === 'FEDERAL') {
+                  setCreateState('')
+                  setCreateCity('')
+                } else if (v === 'STATE') {
+                  setCreateCity('')
+                }
+              }}
+            >
+              <MenuItem value="MUNICIPAL">Municipal</MenuItem>
+              <MenuItem value="STATE">Estadual</MenuItem>
+              <MenuItem value="FEDERAL">Federal</MenuItem>
+            </Select>
+          </FormControl>
+          <Stack direction="row" gap={2}>
+            <TextField
+              label="Estado"
+              value={createState}
+              onChange={(e) => setCreateState(e.target.value)}
+              disabled={createGovernmentScope === 'FEDERAL'}
+              fullWidth
+            />
+            <TextField
+              label="Cidade"
+              value={createCity}
+              onChange={(e) => setCreateCity(e.target.value)}
+              disabled={createGovernmentScope !== 'MUNICIPAL'}
+              fullWidth
+            />
+          </Stack>
+          <TextField
+            label="Salário base"
+            type="number"
+            value={createSalaryBase}
+            onChange={(e) => setCreateSalaryBase(e.target.value)}
+            inputProps={{ step: '0.01', min: 0 }}
+            fullWidth
+          />
+          <TextField
+            label="Nota mínima para passar (%)"
+            type="number"
+            value={createMinPassingGradeNonQuota}
+            onChange={(e) => setCreateMinPassingGradeNonQuota(e.target.value)}
+            placeholder="ex: 60"
+            inputProps={{ step: '0.01', min: 0, max: 100 }}
+            fullWidth
+          />
+          <TextField
+            label="Data do exame"
+            type="date"
+            value={createExamDate}
+            onChange={(e) => setCreateExamDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            fullWidth
+          />
+          <FormControl fullWidth>
+            <InputLabel id="create-exam-board-label">Banca</InputLabel>
+            <Select
+              labelId="create-exam-board-label"
+              value={createExamBoardId}
+              label="Banca"
+              onChange={(e) => setCreateExamBoardId(e.target.value)}
+            >
+              <MenuItem value="">Nenhuma</MenuItem>
+              {examBoards.map((b) => (
+                <MenuItem key={b.id} value={b.id}>
+                  {b.name}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        </Stack>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={handleClose}>Cancelar</Button>
+        <Button
+          variant="contained"
+          onClick={handleCreate}
+          disabled={!canCreate}
+          startIcon={<PlusIcon className="w-4 h-4" />}
+        >
+          Criar
+        </Button>
+      </DialogActions>
+    </Dialog>
+  )
+}
+
+/* ------------------------------------------------------------------ */
 /*  Main Page                                                          */
 /* ------------------------------------------------------------------ */
 
 function ExamsPage() {
+  const queryClient = useQueryClient()
   const { examBases, isLoadingExamBases } = useExamBaseFacade()
   const { examBoards, isLoadingExamBoards } = useExamBoardFacade()
   const { data: historyItems = [], isLoading: loadingHistory } =
     useExamBaseAttemptHistoryQuery()
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
 
+  const isAdmin = profileData?.user?.role === 'ADMIN'
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
+
+  async function refetchExamBases() {
+    await queryClient.invalidateQueries({ queryKey: ['examBases'] })
+  }
 
   // Board counts
   const boardCounts = useMemo(() => {
@@ -557,7 +807,7 @@ function ExamsPage() {
 
       {/* ═══════════ RESULTS HEADER ═══════════ */}
       <div
-        className="flex items-center justify-between"
+        className="flex items-center justify-between flex-wrap gap-3"
         style={{ animation: 'fade-in-up 0.5s ease-out 200ms both' }}
       >
         <div className="flex items-center gap-2">
@@ -577,12 +827,31 @@ function ExamsPage() {
             </button>
           )}
         </div>
-        {!isLoading && (
-          <span className="text-xs text-slate-400">
-            {totalExams} {totalExams === 1 ? 'prova' : 'provas'} no total
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {!isLoading && (
+            <span className="text-xs text-slate-400">
+              {totalExams} {totalExams === 1 ? 'prova' : 'provas'} no total
+            </span>
+          )}
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setCreateDialogOpen(true)}
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer"
+            >
+              <PlusIcon className="w-4 h-4" />
+              Criar exame
+            </button>
+          )}
+        </div>
       </div>
+
+      <CreateExamDialog
+        open={createDialogOpen}
+        onClose={() => setCreateDialogOpen(false)}
+        examBoards={examBoards ?? []}
+        onSuccess={refetchExamBases}
+      />
 
       {/* ═══════════ EXAM GRID ═══════════ */}
       {isLoading ? (
