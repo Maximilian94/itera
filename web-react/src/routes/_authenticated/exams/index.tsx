@@ -1,4 +1,6 @@
 import { Card } from '@/components/Card'
+import { PageHero } from '@/components/PageHero'
+import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
@@ -16,10 +18,15 @@ import {
   MapPinIcon,
   TrophyIcon,
   XMarkIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  MinusIcon,
 } from '@heroicons/react/24/outline'
+import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
 import { Tooltip } from '@mui/material'
+import { PpTooltip } from '@/components/PpTooltip'
 
 export const Route = createFileRoute('/_authenticated/exams/')({
   component: ExamsPage,
@@ -229,6 +236,8 @@ function ExamCard({
 function ExamsPage() {
   const { examBases, isLoadingExamBases } = useExamBaseFacade()
   const { examBoards, isLoadingExamBoards } = useExamBoardFacade()
+  const { data: historyItems = [], isLoading: loadingHistory } =
+    useExamBaseAttemptHistoryQuery()
 
   const [search, setSearch] = useState('')
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
@@ -278,65 +287,200 @@ function ExamsPage() {
     (e) => (e.userStats?.attemptCount ?? 0) > 0,
   ).length
 
+  const totalAttempts = historyItems.length
+  const passedAttempts = historyItems.filter((i) => i.passed === true).length
+  const failedAttempts = historyItems.filter(
+    (i) => i.finishedAt != null && i.passed !== true,
+  ).length
+
+  // Taxa de aprovação e evolução
+  const { approvalRate, evolutionPp } = useMemo(() => {
+    const finished = historyItems
+      .filter((i) => i.finishedAt != null)
+      .sort(
+        (a, b) =>
+          new Date(b.finishedAt!).getTime() -
+          new Date(a.finishedAt!).getTime(),
+      )
+    const total = finished.length
+    const passed = finished.filter((i) => i.passed === true).length
+    const rate = total > 0 ? (passed / total) * 100 : null
+
+    let evolution: number | null = null
+    if (total >= 4) {
+      const half = Math.floor(total / 2)
+      const recent = finished.slice(0, half)
+      const older = finished.slice(half)
+      const recentRate =
+        recent.length > 0
+          ? (recent.filter((i) => i.passed === true).length / recent.length) *
+            100
+          : 0
+      const olderRate =
+        older.length > 0
+          ? (older.filter((i) => i.passed === true).length / older.length) *
+            100
+          : 0
+      evolution = recentRate - olderRate
+    }
+
+    return {
+      approvalRate: rate,
+      evolutionPp: evolution,
+    }
+  }, [historyItems])
+
   const isLoading = isLoadingExamBases || isLoadingExamBoards
 
   return (
     <div className="flex flex-col gap-8 pb-6">
       {/* ═══════════ HERO ═══════════ */}
-      <div
-        className="relative overflow-hidden rounded-2xl px-6 py-8 md:px-8 md:py-10 bg-linear-to-br from-violet-700 via-violet-600 to-indigo-600"
-        style={{ animation: 'scale-in 0.45s ease-out both' }}
+      <PageHero
+        title="Exames"
+        description="Explore simulados de concursos, pratique e acompanhe sua evolução."
+        variant="violet"
+        animation="scale-in 0.45s ease-out both"
+        // padding="px-6 py-8 md:px-8 md:py-10"
       >
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-14 -right-14 w-48 h-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-white/10" />
-          <div className="absolute top-1/2 right-1/3 w-20 h-20 rounded-full bg-white/5" />
-        </div>
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-              Exames
-            </h1>
-            <p className="text-violet-200/80 text-sm mt-1.5 max-w-md">
-              Explore simulados de concursos, pratique e acompanhe sua evolução.
+        <div className="flex items-center gap-6">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading ? '—' : totalExams}
+            </p>
+            <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
+              Provas
             </p>
           </div>
-
-          {/* Quick stats in hero */}
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading ? '—' : totalExams}
-              </p>
-              <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
-                Provas
-              </p>
-            </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading
-                  ? '—'
-                  : totalQuestions > 999
-                    ? `${(totalQuestions / 1000).toFixed(1)}k`
-                    : totalQuestions}
-              </p>
-              <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
-                Questões
-              </p>
-            </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading ? '—' : examsWithAttempts}
-              </p>
-              <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
-                Praticados
-              </p>
-            </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading
+                ? '—'
+                : totalQuestions > 999
+                  ? `${(totalQuestions / 1000).toFixed(1)}k`
+                  : totalQuestions}
+            </p>
+            <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
+              Questões
+            </p>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading ? '—' : examsWithAttempts}
+            </p>
+            <p className="text-[0.65rem] text-violet-200/70 font-medium uppercase tracking-wide">
+              Praticados
+            </p>
           </div>
         </div>
+      </PageHero>
+
+      {/* ═══════════ RESUMO DE TENTATIVAS + TAXA DE APROVAÇÃO ═══════════ */}
+      <div
+        className="grid grid-cols-1 lg:grid-cols-2 gap-4"
+        style={{ animation: 'fade-in-up 0.5s ease-out 80ms both' }}
+      >
+        <Card noElevation className="p-5 border border-slate-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-slate-800">
+              Suas tentativas
+            </h3>
+            <Link
+              to="/history"
+              className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline"
+            >
+              Ver histórico
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
+                <DocumentTextIcon className="w-5 h-5 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-slate-900">
+                  {loadingHistory ? '—' : totalAttempts}
+                </p>
+                <p className="text-xs text-slate-500">Tentativas</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100">
+                <CheckCircleIcon className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-emerald-700">
+                  {loadingHistory ? '—' : passedAttempts}
+                </p>
+                <p className="text-xs text-slate-500">Aprovados</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-red-100">
+                <XCircleIcon className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-red-600">
+                  {loadingHistory ? '—' : failedAttempts}
+                </p>
+                <p className="text-xs text-slate-500">Reprovados</p>
+              </div>
+            </div>
+          </div>
+        </Card>
+
+        <Card noElevation className="p-5 border border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">
+            Taxa de aprovação
+          </h3>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 bg-violet-100">
+                <TrophyIcon className="w-6 h-6 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-2xl font-bold tabular-nums text-slate-900">
+                  {loadingHistory
+                    ? '—'
+                    : approvalRate != null
+                      ? `${approvalRate.toFixed(0)}%`
+                      : '—'}
+                </p>
+                <p className="text-xs text-slate-500">Atual</p>
+              </div>
+            </div>
+            {evolutionPp != null && (
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium ${
+                  evolutionPp > 0
+                    ? 'bg-emerald-100 text-emerald-700'
+                    : evolutionPp < 0
+                      ? 'bg-red-100 text-red-600'
+                      : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                {evolutionPp > 0 ? (
+                  <ArrowTrendingUpIcon className="w-4 h-4" />
+                ) : evolutionPp < 0 ? (
+                  <ArrowTrendingDownIcon className="w-4 h-4" />
+                ) : (
+                  <MinusIcon className="w-4 h-4" />
+                )}
+                <span>
+                  {evolutionPp > 0 ? '+' : ''}
+                  {evolutionPp.toFixed(0)}{' '}
+                  <PpTooltip className="text-inherit" />
+                </span>
+              </div>
+            )}
+          </div>
+          {evolutionPp == null && !loadingHistory && (
+            <p className="text-xs text-slate-500 mt-2">
+              Complete pelo menos 4 tentativas para ver a evolução.
+            </p>
+          )}
+        </Card>
       </div>
 
       {/* ═══════════ SEARCH & FILTERS ═══════════ */}

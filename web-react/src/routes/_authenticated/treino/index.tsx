@@ -1,13 +1,16 @@
 import { Card } from '@/components/Card'
+import { PageHero } from '@/components/PageHero'
+import { PpTooltip } from '@/components/PpTooltip'
 import {
   ArrowRightIcon,
   ArrowTrendingUpIcon,
   MinusIcon,
+  PlayIcon,
   RocketLaunchIcon,
   TrophyIcon,
 } from '@heroicons/react/24/outline'
-import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
-import { Button, Tooltip } from '@mui/material'
+import { AcademicCapIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
+import { Button } from '@mui/material'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   getStagePath,
@@ -20,6 +23,8 @@ import type {
   TrainingStage,
   TrainingListItem,
 } from '@/features/training/domain/training.types'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
+import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
 import dayjs from 'dayjs'
 
 const STAGE_TO_SLUG: Record<TrainingStage, TreinoStageSlug> = {
@@ -193,27 +198,21 @@ function ConcludedTrainingRow({
                     </div>
 
                     {/* Gain badge */}
-                    <Tooltip
-                      title="Pontos percentuais: diferença direta entre a nota inicial e a final (ex.: 60% → 80% = +20 p.p.)"
-                      placement="top"
-                      arrow
+                    <span
+                      className={`inline-flex items-center gap-1 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full ${
+                        improved
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-slate-100 text-slate-600'
+                      }`}
                     >
-                      <span
-                        className={`inline-flex items-center gap-1 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full ${
-                          improved
-                            ? 'bg-emerald-100 text-emerald-700'
-                            : 'bg-slate-100 text-slate-600'
-                        }`}
-                      >
-                        {improved ? (
-                          <ArrowTrendingUpIcon className="w-3 h-3" />
-                        ) : (
-                          <MinusIcon className="w-3 h-3" />
-                        )}
-                        {improved ? '+' : ''}
-                        {gain.toFixed(0)} p.p.
-                      </span>
-                    </Tooltip>
+                      {improved ? (
+                        <ArrowTrendingUpIcon className="w-3 h-3" />
+                      ) : (
+                        <MinusIcon className="w-3 h-3" />
+                      )}
+                      {improved ? '+' : ''}
+                      {gain.toFixed(0)} <PpTooltip />
+                    </span>
                   </div>
                 )}
 
@@ -281,6 +280,8 @@ function ConcludedTrainingRow({
 
 function TreinoIndexPage() {
   const { data: trainings = [], isLoading } = useTrainingsQuery()
+  const { isLimitReached, isEliteAtLimit } = useRequireAccess()
+  const { openPortal, loading: portalLoading } = useOpenPortal('/treino')
 
   const total = trainings.length
   const concludedTrainings = trainings.filter(
@@ -301,58 +302,85 @@ function TreinoIndexPage() {
   }, null)
 
   return (
-    <div className="flex flex-col gap-8 pb-6">
+    <div className="-m-1 p-2 flex flex-col gap-8 pb-6 overflow-visible">
       {/* ═══════════ HERO ═══════════ */}
-      <div
-        className="relative overflow-hidden rounded-2xl px-6 py-8 md:px-8 md:py-10 bg-linear-to-br from-emerald-700 via-emerald-600 to-teal-600"
-        style={{ animation: 'scale-in 0.45s ease-out both' }}
+      <div className="-m-2">
+      <PageHero
+        title="Treino"
+        description="Seu erro vira plano de estudo. Faça a prova, estude o que precisa e veja o quanto evoluiu."
+        variant="emerald"
       >
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-14 -right-14 w-48 h-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-white/10" />
-          <div className="absolute top-1/2 right-1/3 w-20 h-20 rounded-full bg-white/5" />
-        </div>
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-              Treino
-            </h1>
-            <p className="text-emerald-100/80 text-sm mt-1.5 max-w-lg">
-              Seu erro vira plano de estudo. Faça a prova, estude o que precisa
-              e veja o quanto evoluiu.
+        <div className="flex items-center gap-6">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading ? '—' : total}
+            </p>
+            <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
+              Total
             </p>
           </div>
-
-          <div className="flex items-center gap-6">
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading ? '—' : total}
-              </p>
-              <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
-                Total
-              </p>
-            </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading ? '—' : concluded}
-              </p>
-              <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
-                Concluídos
-              </p>
-            </div>
-            <div className="w-px h-10 bg-white/20" />
-            <div className="text-center">
-              <p className="text-2xl font-bold text-white tabular-nums">
-                {isLoading ? '—' : bestScore != null ? `${bestScore.toFixed(0)}%` : '—'}
-              </p>
-              <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
-                Melhor nota
-              </p>
-            </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading ? '—' : concluded}
+            </p>
+            <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
+              Concluídos
+            </p>
+          </div>
+          <div className="w-px h-10 bg-white/20" />
+          <div className="text-center">
+            <p className="text-2xl font-bold text-white tabular-nums">
+              {isLoading ? '—' : bestScore != null ? `${bestScore.toFixed(0)}%` : '—'}
+            </p>
+            <p className="text-[0.65rem] text-emerald-100/70 font-medium uppercase tracking-wide">
+              Melhor nota
+            </p>
           </div>
         </div>
+      </PageHero>
+      </div>
+
+      {/* ═══════════ RESUMO ═══════════ */}
+      <div style={{ animation: 'fade-in-up 0.5s ease-out 80ms both' }}>
+        <Card noElevation className="p-5 border border-slate-200">
+          <h3 className="text-sm font-semibold text-slate-800 mb-4">Resumo</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-slate-100">
+                <AcademicCapIcon className="w-5 h-5 text-slate-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-slate-900">
+                  {isLoading ? '—' : total}
+                </p>
+                <p className="text-xs text-slate-500">Total</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-emerald-100">
+                <CheckCircleIcon className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-emerald-700">
+                  {isLoading ? '—' : concluded}
+                </p>
+                <p className="text-xs text-slate-500">Concluídos</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-amber-100">
+                <PlayIcon className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xl font-bold tabular-nums text-amber-700">
+                  {isLoading ? '—' : inProgress}
+                </p>
+                <p className="text-xs text-slate-500">Em andamento</p>
+              </div>
+            </div>
+          </div>
+        </Card>
       </div>
 
       {/* ═══════════ CTA: CREATE NEW ═══════════ */}
@@ -362,21 +390,38 @@ function TreinoIndexPage() {
       >
         <div className="min-w-0">
           <p className="text-sm font-semibold text-emerald-800">
-            Pronto para evoluir?
+            {isLimitReached ? 'Limite do mês atingido' : 'Pronto para evoluir?'}
           </p>
           <p className="text-xs text-emerald-600/80 mt-0.5">
-            Escolha um simulado e comece um novo ciclo de treino com IA.
+            {isLimitReached
+              ? isEliteAtLimit
+                ? `Novos treinos disponíveis em ${dayjs().add(1, 'month').startOf('month').format('DD/MM/YYYY')}.`
+                : 'Faça upgrade para ter mais treinos.'
+              : 'Escolha um simulado e comece um novo ciclo de treino com IA.'}
           </p>
         </div>
-        <Link to="/treino/novo" className="shrink-0 no-underline">
+        {isLimitReached ? (
           <Button
             variant="contained"
             color="primary"
+            disabled={portalLoading}
+            onClick={openPortal}
             startIcon={<RocketLaunchIcon className="w-5 h-5" />}
+            className="shrink-0"
           >
-            Criar novo treino
+            {portalLoading ? 'Abrindo…' : isEliteAtLimit ? 'Ver assinatura' : 'Fazer upgrade'}
           </Button>
-        </Link>
+        ) : (
+          <Link to="/treino/novo" className="shrink-0 no-underline">
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<RocketLaunchIcon className="w-5 h-5" />}
+            >
+              Criar novo treino
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* ═══════════ HOW IT WORKS ═══════════ */}
@@ -474,23 +519,42 @@ function TreinoIndexPage() {
             </div>
             <div>
               <p className="text-base font-semibold text-slate-800">
-                Comece seu primeiro treino
+                {isLimitReached
+                  ? 'Limite do mês atingido'
+                  : 'Comece seu primeiro treino'}
               </p>
               <p className="text-sm text-slate-500 mt-1 max-w-sm mx-auto">
-                Escolha um simulado, faça a prova, receba diagnóstico da IA,
-                estude e refaça as questões que errou. Veja o quanto evoluiu!
+                {isLimitReached
+                  ? isEliteAtLimit
+                    ? `Novos treinos disponíveis em ${dayjs().add(1, 'month').startOf('month').format('DD/MM/YYYY')}.`
+                    : 'Faça upgrade para ter mais treinos este mês.'
+                  : 'Escolha um simulado, faça a prova, receba diagnóstico da IA, estude e refaça as questões que errou. Veja o quanto evoluiu!'}
               </p>
             </div>
-            <Link to="/treino/novo" className="no-underline mt-2">
+            {isLimitReached ? (
               <Button
                 variant="contained"
                 color="primary"
                 size="large"
+                disabled={portalLoading}
+                onClick={openPortal}
                 startIcon={<RocketLaunchIcon className="w-5 h-5" />}
+                className="mt-2"
               >
-                Criar novo treino
+                {portalLoading ? 'Abrindo…' : isEliteAtLimit ? 'Ver assinatura' : 'Fazer upgrade'}
               </Button>
-            </Link>
+            ) : (
+              <Link to="/treino/novo" className="no-underline mt-2">
+                <Button
+                  variant="contained"
+                  color="primary"
+                  size="large"
+                  startIcon={<RocketLaunchIcon className="w-5 h-5" />}
+                >
+                  Criar novo treino
+                </Button>
+              </Link>
+            )}
           </div>
         </Card>
       )}

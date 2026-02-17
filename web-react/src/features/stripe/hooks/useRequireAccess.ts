@@ -64,6 +64,24 @@ export function useRequireAccess() {
   }, [canDoFreeTraining, hasAccess, navigate, trainingLimit, trainingsUsedThisMonth])
 
   /**
+   * True when user has a plan with trainings but has reached the monthly limit.
+   */
+  const isLimitReached =
+    hasAccess &&
+    trainingLimit > 0 &&
+    trainingsUsedThisMonth >= trainingLimit
+
+  /**
+   * True when user is Elite and has reached the monthly limit (no upgrade path).
+   */
+  const isEliteAtLimit = isLimitReached && plan === 'ELITE'
+
+  /**
+   * True when blocked because plan is Essencial (no trainings). Use for "go to /planos" CTA.
+   */
+  const isBlockedByEssencial = hasAccess && trainingLimit === 0
+
+  /**
    * Message to display when the plan does not allow trainings or the limit has been reached.
    * Null when user can do free training (onboarding).
    */
@@ -85,5 +103,8 @@ export function useRequireAccess() {
     requireAccess,
     canStartTraining,
     trainingBlockedMessage,
+    isLimitReached,
+    isEliteAtLimit,
+    isBlockedByEssencial,
   }
 }

@@ -1,5 +1,6 @@
 import { AccessGate } from '@/components/AccessGate'
 import { Card } from '@/components/Card'
+import { PageHero } from '@/components/PageHero'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
@@ -286,25 +287,14 @@ function NovoPage() {
   return (
     <div className="flex flex-col gap-6 pb-6">
       {/* ═══════════ HERO ═══════════ */}
-      <div
-        className="relative overflow-hidden rounded-2xl px-6 py-8 md:px-8 md:py-10 bg-linear-to-br from-emerald-700 via-emerald-600 to-teal-600"
-        style={{ animation: 'scale-in 0.45s ease-out both' }}
-      >
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-14 -right-14 w-48 h-48 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-8 w-36 h-36 rounded-full bg-white/10" />
-        </div>
-
-        <div className="relative z-10">
-          <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">
-            Novo treino
-          </h1>
-          <p className="text-emerald-100/80 text-sm mt-1.5 max-w-lg">
-            Escolha um concurso para começar. Você vai fazer a prova, receber
-            diagnóstico da IA, estudar e refazer as questões que errou.
-          </p>
-        </div>
-      </div>
+      <PageHero
+        title="Novo treino"
+        description="Escolha um concurso para começar. Você vai fazer a prova, receber diagnóstico da IA, estudar e refazer as questões que errou."
+        variant="emerald"
+        animation="scale-in 0.45s ease-out both"
+        rounded="rounded-2xl"
+        padding="px-6 py-8 md:px-8 md:py-10"
+      />
 
       {/* ═══════════ SEARCH & FILTERS ═══════════ */}
       <div className="flex flex-col gap-3">

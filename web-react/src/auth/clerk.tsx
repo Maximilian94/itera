@@ -1,7 +1,7 @@
 import { ClerkProvider, useAuth, useClerk, useUser } from '@clerk/clerk-react'
 // import { default } from '@clerk/themes'
 import { ptBR } from '@clerk/localizations'
-import type { Appearance as ClerkAppearance } from '@clerk/types'
+import type { Appearance as ClerkAppearance, UserResource } from '@clerk/types'
 import colors from 'tailwindcss/colors'
 import tailwindConfig from 'tailwindcss/defaultTheme'
 import React from 'react'
@@ -31,20 +31,32 @@ export function ClerkWrapper({ children }: { children: React.ReactNode }) {
   )
 }
 
-export function useClerkAuth() {
+export type ClerkAuth = {
+  isAuthenticated: boolean
+  user: UserResource | null
+  isLoading: boolean
+  login: () => void
+  logout: () => Promise<void>
+}
+
+export function useClerkAuth(): ClerkAuth {
   const { isSignedIn, isLoaded } = useAuth()
   const { signOut } = useClerk()
   const { user } = useUser()
 
   return {
-    isAuthenticated: isSignedIn,
+    isAuthenticated: isSignedIn ?? false,
     user: user
       ? {
           id: user.id,
-          username:
-            user.username || user.primaryEmailAddress?.emailAddress || '',
-          email: user.primaryEmailAddress?.emailAddress || '',
-        }
+          firstName: user.firstName,
+          lastName: user.lastName,
+          emailAddresses: [
+            {
+              emailAddress: user.primaryEmailAddress?.emailAddress || '',
+            },
+          ],
+        } as UserResource
       : null,
     isLoading: !isLoaded,
     login: () => {
