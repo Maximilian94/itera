@@ -22,10 +22,52 @@ import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { StorageService } from '../storage/storage.service';
 import { jsonrepair } from 'jsonrepair';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 
 const alternativesOrderBy = { key: 'asc' as const };
+
+/** Max questions per API chunk to avoid model truncation/laziness. */
+const MAX_QUESTIONS_PER_CHUNK = 10;
+
+/**
+ * Splits markdown into chunks at question boundaries (e.g. "1.", "2.", "Questão 1").
+ * Each chunk has at most MAX_QUESTIONS_PER_CHUNK questions.
+ */
+function splitMarkdownIntoChunks(
+  markdown: string,
+): string[] {
+  const boundaries: number[] = [0];
+  const regex =
+    /(?:^|\n)\s*(?:\d+[.)]\s|Questão\s+\d+(?:\s|[-–:])|\d+\s*[-–]\s|#\s*\d+\.?\s)/gi;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(markdown)) !== null) {
+    if (m.index !== boundaries[boundaries.length - 1]) {
+      boundaries.push(m.index);
+    }
+  }
+  boundaries.push(markdown.length);
+
+  const questionCount = boundaries.length - 2;
+  if (questionCount <= 0) {
+    return [markdown];
+  }
+
+  if (questionCount <= MAX_QUESTIONS_PER_CHUNK) {
+    return [markdown];
+  }
+
+  const chunks: string[] = [];
+  for (let i = 0; i < boundaries.length - 1; i += MAX_QUESTIONS_PER_CHUNK) {
+    const start = boundaries[i];
+    const endIdx = Math.min(
+      i + MAX_QUESTIONS_PER_CHUNK,
+      boundaries.length - 1,
+    );
+    const end = boundaries[endIdx];
+    const chunk = markdown.slice(start, end).trim();
+    if (chunk) chunks.push(chunk);
+  }
+  return chunks;
+}
 
 const questionSelect = {
   id: true,
@@ -159,17 +201,51 @@ export class ExamBaseQuestionService {
 
   async parseQuestionsFromMarkdown(
     markdown: string,
+    provider: 'grok' | 'chatgpt' = 'grok',
   ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
-    const apiKey = this.config.get<string>('XAI_API_KEY');
+    const apiKey =
+      provider === 'chatgpt'
+        ? this.config.get<string>('OPENAI_API_KEY')
+        : this.config.get<string>('XAI_API_KEY');
+    const keyName = provider === 'chatgpt' ? 'OPENAI_API_KEY' : 'XAI_API_KEY';
     if (!apiKey) {
       throw new BadRequestException(
-        'XAI_API_KEY is not configured. Set it in .env to use AI parsing.',
+        `${keyName} is not configured. Set it in .env to use AI parsing with ${provider}.`,
       );
     }
 
+    const chunks = splitMarkdownIntoChunks(markdown);
+    const allQuestions: ParsedQuestionItem[] = [];
+    const rawResponses: string[] = [];
+
+    for (const chunk of chunks) {
+      const { questions, rawResponse } = await this.extractQuestionsFromChunk(
+        provider,
+        apiKey,
+        chunk,
+      );
+      allQuestions.push(...questions);
+      rawResponses.push(rawResponse);
+    }
+
+    return {
+      questions: allQuestions,
+      rawResponse: rawResponses.join('\n\n---\n\n'),
+    };
+  }
+
+  private async extractQuestionsFromChunk(
+    provider: 'grok' | 'chatgpt',
+    apiKey: string,
+    markdown: string,
+  ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
     const systemPrompt = `You are an assistant that extracts exam questions from markdown text.
 Given the markdown content, identify EVERY question and its alternatives. Return ALL of them.
 Return ONLY a valid JSON array, no other text or markdown.
+
+CRITICAL: The input markdown usually contains MULTIPLE questions (e.g., numbered 1, 2, 3... or "Questão 1", "Questão 2").
+You MUST return one array element per question. If the input has 15 questions, the array MUST have 15 elements.
+NEVER return only one question when the source clearly has more. Scan the entire document before responding.
 
 Important: PRESERVE MARKDOWN in the extracted text. In \`statement\` and in each \`alternatives[].text\`, keep the same markdown as in the source: **bold**, *italic*, line breaks, etc. Do not strip formatting to plain text.
 
@@ -181,18 +257,39 @@ JSON rules:
 - Return the complete array with every question you find, not just the first.
 Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
 
-    const userPrompt = `Extract ALL questions from this markdown. Return only the JSON array (no code block, no explanation). Preserve markdown formatting (bold, italic, line breaks) inside statement and each alternative text.\n\n${markdown}`;
+    const userPrompt = `Extract ALL questions from this markdown.
 
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+Steps: (1) Count how many distinct questions exist (look for numbering like 1., 2., 3. or "Questão 1", "Questão 2", etc.). (2) Extract each one as a separate object. The output array length must match the question count.
+
+Return only the JSON array (no code block, no explanation). Preserve markdown formatting (bold, italic, line breaks) inside statement and each alternative text.\n\n${markdown}`;
+
+    const apiUrl =
+      provider === 'chatgpt'
+        ? 'https://api.openai.com/v1/chat/completions'
+        : 'https://api.x.ai/v1/chat/completions';
+    const model =
+      provider === 'chatgpt' ? 'gpt-4o' : 'grok-4-1-fast-reasoning';
+    const maxTokens = provider === 'chatgpt' ? 16384 : 32768;
+
+    const { fetch: undiciFetch, Agent } = await import('undici');
+    const agent = new Agent({
+      connectTimeout: 30_000,
+      headersTimeout: 300_000,
+      bodyTimeout: 300_000,
+    });
+
+    const res = await undiciFetch(apiUrl, {
       method: 'POST',
+      dispatcher: agent,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 32768,
+        model,
+        max_tokens: maxTokens,
+        temperature: 0,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -202,8 +299,9 @@ Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
 
     if (!res.ok) {
       const errBody = await res.text();
+      const apiName = provider === 'chatgpt' ? 'OpenAI' : 'xAI';
       throw new BadRequestException(
-        `xAI API error (${res.status}): ${errBody.slice(0, 500)}`,
+        `${apiName} API error (${res.status}): ${errBody.slice(0, 500)}`,
       );
     }
 
@@ -216,10 +314,6 @@ Example: ${JSON.stringify(PARSED_QUESTION_EXAMPLE)}`;
     if (!content) {
       return { questions: [], rawResponse: '' };
     }
-
-    console.log('content', content);
-    const debugPath = path.join(process.cwd(), 'meu_arquivo.txt');
-    await fs.writeFile(debugPath, content, 'utf8').catch(() => {});
 
     let jsonStr = content
       .replace(/^```(?:json)?\s*/i, '')

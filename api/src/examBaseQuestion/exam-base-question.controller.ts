@@ -95,8 +95,10 @@ export class ExamBaseQuestionController {
     @Param('examBaseId') _examBaseId: string,
     @Body() dto: ParseQuestionsFromMarkdownDto,
   ) {
-    console.log('dto', dto);
-    return this.service.parseQuestionsFromMarkdown(dto.markdown);
+    return this.service.parseQuestionsFromMarkdown(
+      dto.markdown,
+      dto.provider ?? 'grok',
+    );
   }
 
   /** Extrai questões de um PDF. Apenas ADMIN. */

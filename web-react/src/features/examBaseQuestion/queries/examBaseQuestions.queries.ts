@@ -99,8 +99,14 @@ export function useCreateExamBaseQuestionMutation(examBaseId: string) {
 
 export function useParseQuestionsFromMarkdownMutation(examBaseId: string) {
   return useMutation({
-    mutationFn: (markdown: string) =>
-      examBaseQuestionsService.parseFromMarkdown(examBaseId, markdown),
+    mutationFn: ({
+      markdown,
+      provider,
+    }: {
+      markdown: string
+      provider: 'grok' | 'chatgpt'
+    }) =>
+      examBaseQuestionsService.parseFromMarkdown(examBaseId, markdown, provider),
   })
 }
 
