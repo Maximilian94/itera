@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { Card } from '@/components/Card'
+import { PpTooltip } from '@/components/PpTooltip'
 import { ArrowLeftIcon } from '@heroicons/react/24/outline'
 
 export const Route = createFileRoute('/_authenticated/evolucao-como-funciona')({
@@ -21,11 +22,11 @@ function EvolucaoComoFuncionaPage() {
 
       <div>
         <h1 className="text-xl font-bold text-slate-900">
-          Como é calculada a evolução da nota
+          Como são calculadas as métricas de evolução
         </h1>
         <p className="text-sm text-slate-500 mt-1">
-          Entenda como as métricas do card &quot;Evolução da nota inicial&quot;
-          são calculadas.
+          Entenda como as métricas dos cards &quot;Evolução da nota inicial&quot;
+          e &quot;Evolução nos treinos&quot; são calculadas.
         </p>
       </div>
 
@@ -49,7 +50,9 @@ function EvolucaoComoFuncionaPage() {
         <ul className="text-sm text-slate-600 list-disc list-inside space-y-1 mb-3">
           <li>Média janeiro: (60 + 70) / 2 = 65%</li>
           <li>Média fevereiro: (65 + 72 + 68) / 3 = 68,3%</li>
-          <li>Diferença: 68,3 − 65 = +3,3 p.p. (sua nota subiu)</li>
+          <li>
+            Diferença: 68,3 − 65 = +3,3 <PpTooltip /> (sua nota subiu)
+          </li>
         </ul>
         <p className="text-sm text-slate-500">
           <strong>Quando aparece:</strong> apenas quando você tem provas
@@ -62,8 +65,8 @@ function EvolucaoComoFuncionaPage() {
           2. Tendência por regressão linear
         </h2>
         <p className="text-sm text-slate-600 mb-3">
-          Esta métrica indica, em média, quantos pontos percentuais (p.p.) sua
-          nota sobe ou desce a cada nova prova que você faz.
+          Esta métrica indica, em média, quantos pontos percentuais (
+          <PpTooltip />) sua nota sobe ou desce a cada nova prova que você faz.
         </p>
         <p className="text-sm text-slate-600 mb-3">
           <strong>Cálculo:</strong> ajustamos uma reta aos seus dados usando o
@@ -93,7 +96,7 @@ function EvolucaoComoFuncionaPage() {
 
       <Card noElevation className="p-6 border border-slate-200">
         <h2 className="text-base font-semibold text-slate-800 mb-3">
-          3. O gráfico
+          3. O gráfico da nota inicial
         </h2>
         <p className="text-sm text-slate-600">
           O gráfico mostra a evolução das suas notas ao longo do tempo. Cada
@@ -101,6 +104,34 @@ function EvolucaoComoFuncionaPage() {
           data em que você fez a prova, e o eixo vertical (Y) mostra a nota
           obtida em porcentagem (%). Assim você pode visualizar se suas notas
           estão subindo, caindo ou se mantendo estáveis ao longo do tempo.
+        </p>
+      </Card>
+
+      <Card noElevation className="p-6 border border-slate-200">
+        <h2 className="text-base font-semibold text-slate-800 mb-3">
+          4. Evolução nos treinos
+        </h2>
+        <p className="text-sm text-slate-600 mb-3">
+          Esta métrica mostra quanto sua nota sobe (ou desce) em média do início
+          ao fim de cada treino concluído.
+        </p>
+        <p className="text-sm text-slate-600 mb-3">
+          <strong>Cálculo:</strong> para cada treino concluído, calculamos a
+          diferença entre a nota final e a nota inicial (da prova). Em seguida,
+          tiramos a média dessas diferenças.
+        </p>
+        <p className="text-sm text-slate-600 mb-2">
+          <strong>Exemplo:</strong> se você concluiu 2 treinos com ganhos de +20{' '}
+          <PpTooltip /> e +15 <PpTooltip />, a evolução média é (20 + 15) / 2 =
+          +17,5 <PpTooltip />
+        </p>
+        <p className="text-sm text-slate-600 mb-3">
+          <strong>O gráfico:</strong> cada ponto representa um treino concluído.
+          O eixo X mostra a data de conclusão e o eixo Y mostra o ganho (ou
+          perda) em pontos percentuais (<PpTooltip />) daquele treino.
+        </p>
+        <p className="text-sm text-slate-500">
+          <strong>Quando aparece:</strong> a partir de 1 treino concluído.
         </p>
       </Card>
     </div>

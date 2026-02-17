@@ -1,4 +1,5 @@
 import { Card } from '@/components/Card'
+import { PpTooltip } from '@/components/PpTooltip'
 import { Markdown } from '@/components/Markdown'
 import { Button } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
@@ -153,7 +154,7 @@ function SubjectRow({
           }`}
         >
           {delta > 0 ? '+' : ''}
-          {delta.toFixed(0)} p.p.
+          {delta.toFixed(0)} <PpTooltip />
         </span>
       </div>
 
@@ -316,7 +317,7 @@ function FinalPage() {
               <ArrowTrendingUpIcon className="w-4 h-4" />
               <span>
                 +{gainPoints} {gainPoints === 1 ? 'questão' : 'questões'} ·{' '}
-                +{gainPercent.toFixed(0)} p.p.
+                +{gainPercent.toFixed(0)} <PpTooltip />
               </span>
             </div>
           )}
