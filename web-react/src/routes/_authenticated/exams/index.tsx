@@ -7,10 +7,10 @@ import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facad
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { formatBRL } from '@/lib/utils'
 import dayjs from 'dayjs'
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRightIcon,
@@ -52,6 +52,9 @@ function dateInputToIso(value: string) {
 }
 
 export const Route = createFileRoute('/_authenticated/exams/')({
+  validateSearch: (search: Record<string, unknown>) => ({
+    board: typeof search.board === 'string' ? search.board : undefined,
+  }),
   component: ExamsPage,
 })
 
@@ -484,9 +487,26 @@ function ExamsPage() {
   })
 
   const isAdmin = profileData?.user?.role === 'ADMIN'
+  const navigate = useNavigate()
+  const { board: boardFromUrl } = Route.useSearch()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [search, setSearch] = useState('')
-  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
+  const [selectedBoardId, setSelectedBoardId] = useState<string | null>(
+    boardFromUrl ?? null,
+  )
+
+  useEffect(() => {
+    setSelectedBoardId(boardFromUrl ?? null)
+  }, [boardFromUrl])
+
+  function setBoardFilter(boardId: string | null) {
+    setSelectedBoardId(boardId)
+    navigate({
+      to: '/exams',
+      search: { board: boardId ?? undefined },
+      replace: true,
+    })
+  }
 
   async function refetchExamBases() {
     await queryClient.invalidateQueries({ queryKey: ['examBases'] })
@@ -774,7 +794,7 @@ function ExamsPage() {
 
             <button
               type="button"
-              onClick={() => setSelectedBoardId(null)}
+              onClick={() => setBoardFilter(null)}
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 cursor-pointer ${
                 selectedBoardId === null
                   ? 'border-blue-300 bg-blue-50 text-blue-700'
@@ -794,7 +814,7 @@ function ExamsPage() {
                   count={count}
                   isActive={selectedBoardId === board.id}
                   onClick={() =>
-                    setSelectedBoardId(
+                    setBoardFilter(
                       selectedBoardId === board.id ? null : board.id,
                     )
                   }
@@ -819,7 +839,7 @@ function ExamsPage() {
           {selectedBoardId && (
             <button
               type="button"
-              onClick={() => setSelectedBoardId(null)}
+              onClick={() => setBoardFilter(null)}
               className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
             >
               <XMarkIcon className="w-3.5 h-3.5" />
@@ -881,7 +901,7 @@ function ExamsPage() {
                 type="button"
                 onClick={() => {
                   setSearch('')
-                  setSelectedBoardId(null)
+                  setBoardFilter(null)
                 }}
                 className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-1 cursor-pointer"
               >

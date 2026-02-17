@@ -22,6 +22,8 @@ import type {
 export const examBaseQuestionsKeys = {
   list: (examBaseId: string) =>
     ['examBaseQuestions', examBaseId] as const,
+  statsBySubject: (examBaseId: string) =>
+    ['examBaseQuestions', 'statsBySubject', examBaseId] as const,
   availableToAdd: (examBaseId: string, subject?: string) =>
     ['examBaseQuestions', 'availableToAdd', examBaseId, subject ?? 'all'] as const,
   availableSubjects: (examBaseId: string) =>
@@ -32,6 +34,14 @@ export function useExamBaseQuestionsQuery(examBaseId: string | undefined) {
   return useQuery({
     queryKey: examBaseQuestionsKeys.list(examBaseId ?? ''),
     queryFn: () => examBaseQuestionsService.list(examBaseId!),
+    enabled: Boolean(examBaseId),
+  })
+}
+
+export function useQuestionsCountBySubjectQuery(examBaseId: string | undefined) {
+  return useQuery({
+    queryKey: examBaseQuestionsKeys.statsBySubject(examBaseId ?? ''),
+    queryFn: () => examBaseQuestionsService.getQuestionsCountBySubject(examBaseId!),
     enabled: Boolean(examBaseId),
   })
 }

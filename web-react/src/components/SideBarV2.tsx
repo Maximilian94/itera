@@ -4,10 +4,9 @@ import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
 import { Route as TreinoRoute } from '@/routes/_authenticated/treino'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
-import { Route as DatabaseRoute } from '@/routes/_authenticated/database'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
-import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, UserCircleIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, UserCircleIcon as UserCircleIconOutline, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, UserCircleIcon, BuildingLibraryIcon } from '@heroicons/react/24/solid'
+import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, UserCircleIcon as UserCircleIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import { Link, useMatchRoute, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
 
 export const SideBarV2 = () => {
@@ -25,6 +24,12 @@ export const SideBarV2 = () => {
             icon: DocumentTextIconOutline,
             activeIcon: DocumentTextIcon,
             fuzzy: true,
+        },
+        {
+            label: 'Bancas',
+            href: ExamBoardsRoute.to,
+            icon: BuildingLibraryIconOutline,
+            activeIcon: BuildingLibraryIcon,
         },
         {
             label: 'Treino',

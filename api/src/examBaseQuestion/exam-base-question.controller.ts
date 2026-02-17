@@ -59,6 +59,11 @@ export class ExamBaseQuestionController {
     return this.service.listAvailableSubjects(examBaseId);
   }
 
+  @Get('stats-by-subject')
+  getQuestionsCountBySubject(@Param('examBaseId') examBaseId: string) {
+    return this.service.getQuestionsCountBySubject(examBaseId);
+  }
+
   /** Copia uma questão de outra base. Apenas ADMIN. */
   @Post('copy')
   @Roles('ADMIN')

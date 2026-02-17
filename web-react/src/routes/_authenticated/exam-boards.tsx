@@ -1,29 +1,30 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   Alert,
-  Box,
   Button,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
-  IconButton,
   Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
   TextField,
-  Typography,
 } from '@mui/material'
-import EditIcon from '@mui/icons-material/Edit'
-import DeleteIcon from '@mui/icons-material/Delete'
-import SaveIcon from '@mui/icons-material/Save'
-import CloseIcon from '@mui/icons-material/Close'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiFetch } from '@/lib/api'
+import { authService } from '@/features/auth/services/auth.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
+import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { examBoardKeys } from '@/features/examBoard/queries/examBoard.queries'
+import { Card } from '@/components/Card'
+import {
+  BuildingLibraryIcon,
+  ChevronRightIcon,
+  DocumentTextIcon,
+  PencilSquareIcon,
+  PlusIcon,
+  TrashIcon,
+} from '@heroicons/react/24/outline'
 
 type ExamBoard = {
   id: string
@@ -36,9 +37,16 @@ export const Route = createFileRoute('/_authenticated/exam-boards')({
 })
 
 function RouteComponent() {
-  const { examBoards, isLoadingExamBoards } = useExamBoardFacade();
-  const [error, setError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+  const { examBoards, isLoadingExamBoards } = useExamBoardFacade()
+  const { examBases } = useExamBaseFacade()
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
 
+  const isAdmin = profileData?.user?.role === 'ADMIN'
+  const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState('')
   const [createLogoUrl, setCreateLogoUrl] = useState('')
@@ -47,24 +55,33 @@ function RouteComponent() {
   const [editName, setEditName] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
 
+  const boardCountsMap = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const eb of examBases ?? []) {
+      if (eb.examBoardId) {
+        map.set(eb.examBoardId, (map.get(eb.examBoardId) ?? 0) + 1)
+      }
+    }
+    return map
+  }, [examBases])
+
+  async function refetchBoards() {
+    await queryClient.invalidateQueries({ queryKey: examBoardKeys.examBoards })
+  }
+
   async function createBoard() {
     setError(null)
     try {
-      const created = await apiFetch<ExamBoard>('/exam-boards', {
+      await apiFetch<ExamBoard>('/exam-boards', {
         method: 'POST',
         body: JSON.stringify({ name: createName, logoUrl: createLogoUrl }),
       })
-      // TODO: add the exam board to the list
-      // setRows((prev) => {
-      //   const next = [...prev, created]
-      //   next.sort((a, b) => a.name.localeCompare(b.name))
-      //   return next
-      // })
       setCreateOpen(false)
       setCreateName('')
       setCreateLogoUrl('')
+      await refetchBoards()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to create exam board')
+      setError(e instanceof ApiError ? e.message : 'Falha ao criar banca')
     }
   }
 
@@ -84,152 +101,238 @@ function RouteComponent() {
     if (!editingId) return
     setError(null)
     try {
-      const updated = await apiFetch<ExamBoard>(`/exam-boards/${editingId}`, {
+      await apiFetch<ExamBoard>(`/exam-boards/${editingId}`, {
         method: 'PATCH',
         body: JSON.stringify({ name: editName, logoUrl: editLogoUrl }),
       })
-      // TODO: update the exam board in the list
-      // setRows((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
       cancelEdit()
+      await refetchBoards()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to update exam board')
+      setError(e instanceof ApiError ? e.message : 'Falha ao atualizar banca')
     }
   }
 
   async function remove(row: ExamBoard) {
     setError(null)
     try {
-      await apiFetch<{ ok: true }>(`/exam-boards/${row.id}`, { method: 'DELETE' })
-      // TODO: remove the exam board from the list
-      // setRows((prev) => prev.filter((r) => r.id !== row.id))
+      await apiFetch<{ ok: true }>(`/exam-boards/${row.id}`, {
+        method: 'DELETE',
+      })
       if (editingId === row.id) cancelEdit()
+      await refetchBoards()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Failed to delete exam board')
+      setError(e instanceof ApiError ? e.message : 'Falha ao excluir banca')
     }
   }
 
+  const totalBoards = examBoards?.length ?? 0
+  const totalExams = (examBases ?? []).length
+
   return (
-    <Box p={3}>
-      <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h4">Exam Boards</Typography>
-        <Button variant="contained" onClick={() => setCreateOpen(true)}>
-          Add exam board
-        </Button>
-      </Stack>
+    <div className="flex flex-col gap-6 pb-6">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="flex items-center">
+        <ol className="flex items-center gap-1.5 text-sm">
+          <li>
+            <Link
+              to="/exams"
+              search={{ board: undefined }}
+              className="text-slate-500 hover:text-violet-600 font-medium transition-colors no-underline"
+            >
+              Exames
+            </Link>
+          </li>
+          <li className="flex items-center gap-1.5 text-slate-400 min-w-0">
+            <ChevronRightIcon className="w-4 h-4 text-slate-300 shrink-0" />
+            <span className="text-slate-900 font-semibold">Bancas</span>
+          </li>
+        </ol>
+      </nav>
 
-      <Box mt={2}>
-        {error ? (
-          <Alert severity="error">{error}</Alert>
-        ) : isLoadingExamBoards ? (
-          <Typography>Loading...</Typography>
-        ) : null}
-      </Box>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Bancas</h1>
+          <p className="text-slate-600 text-sm mt-0.5">
+            {isLoadingExamBoards
+              ? 'Carregando…'
+              : `${totalBoards} ${totalBoards === 1 ? 'banca' : 'bancas'} · ${totalExams} ${totalExams === 1 ? 'prova' : 'provas'} no total`}
+          </p>
+        </div>
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setCreateOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer shadow-sm shrink-0"
+          >
+            <PlusIcon className="w-4 h-4" />
+            Nova banca
+          </button>
+        )}
+      </div>
 
-      <Box mt={2}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Name</TableCell>
-              <TableCell>Logo URL</TableCell>
-              <TableCell align="right" width={140}>
-                Actions
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {examBoards?.map((examBoard) => {
-              const isEditing = examBoard.id === editingId
-              return (
-                <TableRow key={examBoard.id}>
-                  <TableCell>
-                    {isEditing ? (
-                      <TextField
+      {error && (
+        <Alert severity="error" onClose={() => setError(null)}>
+          {error}
+        </Alert>
+      )}
+
+      {/* Board cards */}
+      {isLoadingExamBoards ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div key={i} className="h-40 rounded-xl bg-slate-200/60" />
+          ))}
+        </div>
+      ) : !examBoards?.length ? (
+        <Card
+          noElevation
+          className="p-12 border border-slate-200 text-center"
+        >
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-14 h-14 rounded-full bg-slate-100 flex items-center justify-center">
+              <BuildingLibraryIcon className="w-7 h-7 text-slate-400" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-slate-700">
+                Nenhuma banca cadastrada
+              </p>
+              <p className="text-xs text-slate-500 mt-1">
+                {isAdmin
+                  ? 'Clique em "Nova banca" para adicionar.'
+                  : 'Aguarde o cadastro de bancas.'}
+              </p>
+            </div>
+          </div>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {examBoards.map((board) => {
+            const count = boardCountsMap.get(board.id) ?? 0
+            const isEditing = board.id === editingId
+
+            return (
+              <Card
+                key={board.id}
+                noElevation
+                className="p-5 border border-slate-200 hover:border-slate-300 transition-all duration-200 overflow-hidden"
+              >
+                {isEditing ? (
+                  <div className="flex flex-col gap-4">
+                    <TextField
+                      label="Nome"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      size="small"
+                      fullWidth
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                    <TextField
+                      label="URL do logo"
+                      value={editLogoUrl}
+                      onChange={(e) => setEditLogoUrl(e.target.value)}
+                      size="small"
+                      fullWidth
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outlined"
                         size="small"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        fullWidth
-                      />
-                    ) : (
-                      examBoard.name
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {isEditing ? (
-                      <TextField
+                        onClick={cancelEdit}
+                        sx={{ textTransform: 'none', borderRadius: 2 }}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        variant="contained"
                         size="small"
-                        value={editLogoUrl}
-                        onChange={(e) => setEditLogoUrl(e.target.value)}
-                        fullWidth
-                      />
-                    ) : (
-                      examBoard.logoUrl
-                    )}
-                  </TableCell>
-                  <TableCell align="right">
-                    {isEditing ? (
-                      <>
-                        <IconButton
-                          aria-label="save"
-                          onClick={saveEdit}
-                          disabled={!editName.trim() || !editLogoUrl.trim()}
-                        >
-                          <SaveIcon />
-                        </IconButton>
-                        <IconButton aria-label="cancel" onClick={cancelEdit}>
-                          <CloseIcon />
-                        </IconButton>
-                      </>
-                    ) : (
-                      <>
-                        <IconButton
-                          aria-label="edit"
-                          onClick={() => startEdit(examBoard)}
-                        >
-                          <EditIcon />
-                        </IconButton>
-                        <IconButton
-                          aria-label="delete"
-                          onClick={() => remove(examBoard)}
-                        >
-                          <DeleteIcon />
-                        </IconButton>
-                      </>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-            {!isLoadingExamBoards && examBoards?.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={3}>
-                  <Typography color="text.secondary">
-                    No exam boards yet. Create one to get started.
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : null}
-          </TableBody>
-        </Table>
-      </Box>
+                        onClick={saveEdit}
+                        disabled={!editName.trim() || !editLogoUrl.trim()}
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                      >
+                        Salvar
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-start gap-4">
+                      {board.logoUrl && (
+                        <img
+                          src={board.logoUrl}
+                          alt={board.name}
+                          className="w-12 h-12 object-contain rounded-lg border border-slate-200 bg-white p-1 shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-base font-semibold text-slate-900 truncate">
+                          {board.name}
+                        </h3>
+                        <p className="text-sm text-slate-500 mt-0.5">
+                          {count} {count === 1 ? 'prova' : 'provas'}
+                        </p>
+                      </div>
+                    </div>
 
+                    <div className="flex items-center gap-2 mt-4 pt-4 border-t border-slate-100">
+                      <Link
+                        to="/exams"
+                        search={{ board: board.id }}
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 no-underline"
+                      >
+                        <DocumentTextIcon className="w-4 h-4" />
+                        Ver exames
+                        <ChevronRightIcon className="w-3.5 h-3.5" />
+                      </Link>
+                      {isAdmin && (
+                        <div className="flex items-center gap-1 ml-auto">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(board)}
+                            className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors cursor-pointer"
+                            aria-label="Editar"
+                          >
+                            <PencilSquareIcon className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => remove(board)}
+                            className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                            aria-label="Excluir"
+                          >
+                            <TrashIcon className="w-4 h-4" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </Card>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Create dialog */}
       <Dialog
         open={createOpen}
         onClose={() => setCreateOpen(false)}
         fullWidth
         maxWidth="sm"
       >
-        <DialogTitle>Add exam board</DialogTitle>
+        <DialogTitle>Nova banca</DialogTitle>
         <DialogContent>
           <Stack gap={2} mt={1}>
             <TextField
-              label="Name"
+              label="Nome"
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               autoFocus
               fullWidth
             />
             <TextField
-              label="Logo URL"
+              label="URL do logo"
               value={createLogoUrl}
               onChange={(e) => setCreateLogoUrl(e.target.value)}
               fullWidth
@@ -237,17 +340,17 @@ function RouteComponent() {
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setCreateOpen(false)}>Cancel</Button>
+          <Button onClick={() => setCreateOpen(false)}>Cancelar</Button>
           <Button
             variant="contained"
             onClick={createBoard}
             disabled={!createName.trim() || !createLogoUrl.trim()}
+            sx={{ textTransform: 'none', fontWeight: 600 }}
           >
-            Create
+            Criar
           </Button>
         </DialogActions>
       </Dialog>
-    </Box>
+    </div>
   )
 }
-
