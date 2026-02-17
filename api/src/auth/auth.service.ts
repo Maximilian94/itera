@@ -38,10 +38,10 @@ export class AuthService {
     return created;
   }
 
-  async getProfile(userId: string): Promise<{ id: string; email: string; phone: string | null }> {
+  async getProfile(userId: string): Promise<{ id: string; email: string; phone: string | null; role: string }> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { id: true, email: true, phone: true },
+      select: { id: true, email: true, phone: true, role: true },
     });
     if (!user) throw new Error('User not found');
     return user;

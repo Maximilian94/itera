@@ -15,7 +15,6 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as DatabaseRoute } from '@/routes/_authenticated/database'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
-import { Route as ExamBasesRoute } from '@/routes/_authenticated/exam-bases'
 import LogoutIcon from '@mui/icons-material/Logout'
 import { useClerk } from '@clerk/clerk-react'
 
@@ -55,11 +54,6 @@ export const SideBar = () => {
       label: 'Exam Boards',
       href: ExamBoardsRoute.to,
       icon: AccountBalanceIcon,
-    },
-    {
-      label: 'Exam Base',
-      href: ExamBasesRoute.to,
-      icon: SchoolIcon,
     },
   ]
 

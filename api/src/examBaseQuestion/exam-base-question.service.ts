@@ -547,6 +547,18 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     });
   }
 
+  async getQuestionsCountBySubject(examBaseId: string): Promise<Array<{ subject: string; count: number }>> {
+    const result = await this.prisma.examBaseQuestion.groupBy({
+      by: ['subject'],
+      where: { examBaseId },
+      _count: { id: true },
+    });
+    return result.map((r) => ({
+      subject: r.subject ?? '(sem matéria)',
+      count: (r._count as { id: number }).id,
+    }));
+  }
+
   async listAvailableToAdd(targetExamBaseId: string, subject?: string) {
     const where: Prisma.ExamBaseQuestionWhereInput = {
       examBaseId: { not: targetExamBaseId },

@@ -1,27 +1,54 @@
-import { Button, Tooltip } from '@mui/material'
+import {
+  Alert,
+  Button,
+  FormControl,
+  InputLabel,
+  MenuItem,
+  Select,
+  Stack,
+  TextField,
+  Tooltip,
+} from '@mui/material'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { examBaseService } from '@/features/examBase/services/examBase.service'
+import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateExamBaseAttemptMutation,
   useExamBaseAttemptHistoryQuery,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
+import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
-import { PageHeader } from '@/components/PageHeader'
+import { authService } from '@/features/auth/services/auth.service'
+import { ApiError } from '@/lib/api'
 import { Card } from '@/components/Card'
 import {
   ArrowTrendingDownIcon,
   ArrowTrendingUpIcon,
   BanknotesIcon,
+  BuildingLibraryIcon,
   CheckCircleIcon,
+  DocumentTextIcon,
+  MapPinIcon,
+  PencilSquareIcon,
   TrophyIcon,
 } from '@heroicons/react/24/solid'
-import { AcademicCapIcon, CalendarDaysIcon, ClockIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import {
+  AcademicCapIcon,
+  BookOpenIcon,
+  CalendarDaysIcon,
+  ChevronRightIcon,
+  ClockIcon,
+  ExclamationTriangleIcon,
+  XMarkIcon,
+} from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import dayjs from 'dayjs'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/',
@@ -29,17 +56,73 @@ export const Route = createFileRoute(
   component: RouteComponent,
 })
 
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
+  if (scope === 'MUNICIPAL') return 'Municipal'
+  if (scope === 'STATE') return 'Estadual'
+  return 'Federal'
+}
+
+function governmentScopeColor(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
+  if (scope === 'MUNICIPAL') return 'bg-blue-50 text-blue-700'
+  if (scope === 'STATE') return 'bg-violet-50 text-violet-700'
+  return 'bg-amber-50 text-amber-700'
+}
+
+function isoToDateInput(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toISOString().slice(0, 10)
+}
+
+function dateInputToIso(value: string) {
+  return value
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Page                                                          */
+/* ------------------------------------------------------------------ */
+
 function RouteComponent() {
   const { examBoard, examId } = Route.useParams()
+  const queryClient = useQueryClient()
   const [examBase, setExamBase] = useState<ExamBase | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
+  const [editName, setEditName] = useState('')
+  const [editRole, setEditRole] = useState('')
+  const [editInstitution, setEditInstitution] = useState('')
+  const [editGovernmentScope, setEditGovernmentScope] = useState<
+    'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  >('FEDERAL')
+  const [editState, setEditState] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [editSalaryBase, setEditSalaryBase] = useState('')
+  const [editMinPassingGradeNonQuota, setEditMinPassingGradeNonQuota] =
+    useState('')
+  const [editExamDate, setEditExamDate] = useState('')
+  const [editExamBoardId, setEditExamBoardId] = useState<string>('')
+  const [isSaving, setIsSaving] = useState(false)
 
   const examBaseId = examId
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
+  const { examBoards } = useExamBoardFacade()
   const navigate = useNavigate()
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
   const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
     useExamBaseAttemptHistoryQuery(examBaseId)
+  const { data: subjectStats = [], isLoading: isLoadingSubjectStats } =
+    useQuestionsCountBySubjectQuery(examBaseId)
   const { hasAccess, requireAccess } = useRequireAccess()
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+
+  const isAdmin = profileData?.user?.role === 'ADMIN'
 
   /** Starts an exam attempt. Redirects to /planos if user has no active subscription. */
   const handleStartExam = async () => {
@@ -55,173 +138,578 @@ function RouteComponent() {
     }
   }
 
+  async function refetchExamBases() {
+    await queryClient.invalidateQueries({ queryKey: ['examBases'] })
+  }
+
   useEffect(() => {
-    const examBase = examBases?.find((b) => b.id === examBaseId)
-    setExamBase(examBase ?? null)
+    const eb = examBases?.find((b) => b.id === examBaseId)
+    setExamBase(eb ?? null)
   }, [examBases, examBaseId])
 
-  const finishedAttempts = attempts.filter((a) => a.finishedAt != null && a.percentage != null)
+  useEffect(() => {
+    if (isEditing && examBase) {
+      setEditName(examBase.name ?? '')
+      setEditRole(examBase.role ?? '')
+      setEditInstitution(examBase.institution ?? '')
+      setEditGovernmentScope(examBase.governmentScope)
+      setEditState(examBase.state ?? '')
+      setEditCity(examBase.city ?? '')
+      setEditSalaryBase(examBase.salaryBase ?? '')
+      setEditMinPassingGradeNonQuota(examBase.minPassingGradeNonQuota ?? '')
+      setEditExamDate(isoToDateInput(examBase.examDate))
+      setEditExamBoardId(examBase.examBoardId ?? '')
+      setEditError(null)
+    }
+  }, [isEditing, examBase])
+
+  const canSaveEdit = useMemo(() => {
+    if (!editName.trim() || !editRole.trim() || !editExamDate.trim())
+      return false
+    if (editGovernmentScope === 'MUNICIPAL') {
+      return !!editState.trim() && !!editCity.trim()
+    }
+    if (editGovernmentScope === 'STATE') {
+      return !!editState.trim() && !editCity.trim()
+    }
+    return !editState.trim() && !editCity.trim()
+  }, [
+    editName,
+    editRole,
+    editExamDate,
+    editGovernmentScope,
+    editState,
+    editCity,
+  ])
+
+  async function handleSaveEdit() {
+    if (!examBase) return
+    setEditError(null)
+    setIsSaving(true)
+    try {
+      await examBaseService.update(examBase.id, {
+        name: editName.trim(),
+        role: editRole.trim(),
+        institution: editInstitution.trim() || null,
+        governmentScope: editGovernmentScope,
+        state: editState.trim() ? editState.trim() : null,
+        city: editCity.trim() ? editCity.trim() : null,
+        salaryBase: editSalaryBase.trim() ? editSalaryBase.trim() : null,
+        minPassingGradeNonQuota: editMinPassingGradeNonQuota.trim()
+          ? editMinPassingGradeNonQuota.trim()
+          : null,
+        examDate: dateInputToIso(editExamDate.trim()),
+        examBoardId: editExamBoardId || null,
+      })
+      await refetchExamBases()
+      setIsEditing(false)
+    } catch (e) {
+      setEditError(e instanceof ApiError ? e.message : 'Falha ao atualizar exame')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const finishedAttempts = attempts.filter(
+    (a) => a.finishedAt != null && a.percentage != null,
+  )
   const lastScore = finishedAttempts[0]?.percentage ?? null
   const previousScore = finishedAttempts[1]?.percentage ?? null
   const trendDiff =
     lastScore != null && previousScore != null ? lastScore - previousScore : null
   const hasTrend = finishedAttempts.length >= 2 && trendDiff != null
   const minPassingDisplay =
-    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+    examBase?.minPassingGradeNonQuota != null &&
+    examBase.minPassingGradeNonQuota !== ''
       ? `${examBase.minPassingGradeNonQuota}%`
       : '—'
   const minPassingNum =
-    examBase?.minPassingGradeNonQuota != null && examBase.minPassingGradeNonQuota !== ''
+    examBase?.minPassingGradeNonQuota != null &&
+    examBase.minPassingGradeNonQuota !== ''
       ? Number(examBase.minPassingGradeNonQuota)
       : null
   const lastScoreColorClass =
     lastScore == null || minPassingNum == null
       ? 'text-slate-700'
       : lastScore >= minPassingNum
-        ? 'text-green-500'
-        : 'text-red-500'
+        ? 'text-emerald-600'
+        : 'text-red-600'
+
+  const pageTitle = examBase?.institution ?? examBase?.name ?? 'Exame'
+  const questionCount = examBase?._count?.questions ?? 0
 
   return (
-    <div className="flex flex-col gap-4">
-      <PageHeader title="Exame / ExameX" />
+    <div className="flex flex-col gap-6 pb-6">
+      {/* Breadcrumb */}
+      <nav aria-label="Breadcrumb" className="flex items-center">
+        <ol className="flex items-center gap-1.5 text-sm">
+          <li>
+            <Link
+              to="/exams"
+              className="text-slate-500 hover:text-violet-600 font-medium transition-colors no-underline"
+            >
+              Exames
+            </Link>
+          </li>
+          <li className="flex items-center gap-1.5 text-slate-400 min-w-0">
+            <ChevronRightIcon className="w-4 h-4 text-slate-300 shrink-0" />
+            <span className="text-slate-900 font-semibold truncate" title={pageTitle}>
+              {pageTitle}
+            </span>
+          </li>
+        </ol>
+      </nav>
 
-      <div className="flex flex-col gap-1">
-        <div className="flex gap-4">
-          <Card noElevation className="flex-1">
-            <div className="flex gap-2">
-              <img src="https://upload.wikimedia.org/wikipedia/commons/2/28/FGV_Nacional.png" alt="Logo" className="w-18 h-18 rounded-md" />
-
-              <div className="flex flex-col gap-0">
-                <span className="text-2xl text-slate-900">{examBase?.institution}</span>
-                <span className="text-md text-slate-500">{examBase?.state ?? ''} {examBase?.city ?? ''}</span>
-                <span className="text-xs text-slate-500">{examBase?.role}</span>
+      {/* Header card: view or edit mode */}
+      {isEditing && isAdmin ? (
+        <Card
+          noElevation
+          className="p-6 border border-violet-200 overflow-hidden relative bg-violet-50/30"
+        >
+          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-indigo-50/20 pointer-events-none" />
+          <div className="relative">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Editar exame
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsEditing(false)
+                  setEditError(null)
+                }}
+                className="p-2 rounded-lg text-slate-500 hover:bg-slate-200 hover:text-slate-700 transition-colors cursor-pointer"
+                aria-label="Cancelar edição"
+              >
+                <XMarkIcon className="w-5 h-5" />
+              </button>
+            </div>
+            {editError && (
+              <Alert
+                severity="error"
+                onClose={() => setEditError(null)}
+                className="mb-4"
+              >
+                {editError}
+              </Alert>
+            )}
+            <Stack gap={2.5}>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Nome"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Cargo"
+                  value={editRole}
+                  onChange={(e) => setEditRole(e.target.value)}
+                  placeholder="ex: Analista de Sistemas"
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </div>
+              <TextField
+                label="Instituição"
+                value={editInstitution}
+                onChange={(e) => setEditInstitution(e.target.value)}
+                size="small"
+                fullWidth
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+              <FormControl size="small" fullWidth sx={{ borderRadius: 2 }}>
+                <InputLabel id="edit-scope-label">Âmbito</InputLabel>
+                <Select
+                  labelId="edit-scope-label"
+                  value={editGovernmentScope}
+                  label="Âmbito"
+                  onChange={(e) => {
+                    const v = e.target.value as 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+                    setEditGovernmentScope(v)
+                    if (v === 'FEDERAL') {
+                      setEditState('')
+                      setEditCity('')
+                    } else if (v === 'STATE') {
+                      setEditCity('')
+                    }
+                  }}
+                  sx={{ borderRadius: 2 }}
+                >
+                  <MenuItem value="MUNICIPAL">Municipal</MenuItem>
+                  <MenuItem value="STATE">Estadual</MenuItem>
+                  <MenuItem value="FEDERAL">Federal</MenuItem>
+                </Select>
+              </FormControl>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Estado"
+                  value={editState}
+                  onChange={(e) => setEditState(e.target.value)}
+                  disabled={editGovernmentScope === 'FEDERAL'}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Cidade"
+                  value={editCity}
+                  onChange={(e) => setEditCity(e.target.value)}
+                  disabled={editGovernmentScope !== 'MUNICIPAL'}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Salário base"
+                  type="number"
+                  value={editSalaryBase}
+                  onChange={(e) => setEditSalaryBase(e.target.value)}
+                  inputProps={{ step: '0.01', min: 0 }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Nota mínima para passar (%)"
+                  type="number"
+                  value={editMinPassingGradeNonQuota}
+                  onChange={(e) => setEditMinPassingGradeNonQuota(e.target.value)}
+                  placeholder="ex: 60"
+                  inputProps={{ step: '0.01', min: 0, max: 100 }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Data do exame"
+                  type="date"
+                  value={editExamDate}
+                  onChange={(e) => setEditExamDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <FormControl size="small" fullWidth sx={{ borderRadius: 2 }}>
+                  <InputLabel id="edit-exam-board-label">Banca</InputLabel>
+                  <Select
+                    labelId="edit-exam-board-label"
+                    value={editExamBoardId}
+                    label="Banca"
+                    onChange={(e) => setEditExamBoardId(e.target.value)}
+                    sx={{ borderRadius: 2 }}
+                  >
+                    <MenuItem value="">Nenhuma</MenuItem>
+                    {(examBoards ?? []).map((b) => (
+                      <MenuItem key={b.id} value={b.id}>
+                        {b.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  variant="outlined"
+                  onClick={() => {
+                    setIsEditing(false)
+                    setEditError(null)
+                  }}
+                  disabled={isSaving}
+                  sx={{ textTransform: 'none', borderRadius: 2 }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="contained"
+                  onClick={handleSaveEdit}
+                  disabled={!canSaveEdit || isSaving}
+                  startIcon={<PencilSquareIcon className="w-4 h-4" />}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                >
+                  {isSaving ? 'Salvando…' : 'Salvar'}
+                </Button>
+              </div>
+            </Stack>
+          </div>
+        </Card>
+      ) : (
+        <Card
+          noElevation
+          className="p-6 border border-slate-200 overflow-hidden relative"
+        >
+          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-indigo-50/30 pointer-events-none" />
+          <div className="relative flex flex-col sm:flex-row sm:items-start gap-5">
+            <div className="flex items-start gap-4 min-w-0">
+              {examBase?.examBoard?.logoUrl && (
+                <img
+                  src={examBase.examBoard.logoUrl}
+                  alt={examBase.examBoard.name ?? ''}
+                  className="w-14 h-14 object-contain rounded-xl border border-slate-200 bg-white p-2 shrink-0 shadow-sm"
+                />
+              )}
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold text-slate-900 truncate">
+                {pageTitle}
+              </h1>
+              <p className="text-sm text-slate-600 mt-0.5">{examBase?.role}</p>
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                {examBase && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${governmentScopeColor(examBase.governmentScope)}`}
+                  >
+                    <BuildingLibraryIcon className="w-3.5 h-3.5" />
+                    {governmentScopeLabel(examBase.governmentScope)}
+                  </span>
+                )}
+                {(examBase?.state || examBase?.city) && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                    <MapPinIcon className="w-3.5 h-3.5" />
+                    {examBase?.city ? `${examBase.city} / ` : ''}
+                    {examBase?.state ?? ''}
+                  </span>
+                )}
+                {questionCount > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
+                    <DocumentTextIcon className="w-3.5 h-3.5" />
+                    {questionCount} questões
+                  </span>
+                )}
               </div>
             </div>
-          </Card>
+          </div>
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="sm:ml-auto shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer shadow-sm"
+            >
+              <PencilSquareIcon className="w-4 h-4" />
+              Editar
+            </button>
+          )}
+        </div>
+      </Card>
+      )}
 
-          <Card noElevation className="select-none">
-            <div className="flex flex-col gap-0">
-              <span className="text-xs text-slate-900">Última nota</span>
-
-              <div className="flex items-center space-between gap-2">
-                <span className={`text-3xl font-medium ${lastScoreColorClass}`}>
+      {/* Stats cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card
+          noElevation
+          className="p-5 border border-slate-200 hover:border-slate-300 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
+              <TrophyIcon className="w-5 h-5 text-amber-500" />
+            </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Última nota</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`text-2xl font-bold ${lastScoreColorClass}`}>
                   {lastScore != null ? `${lastScore.toFixed(1)}%` : '—'}
                 </span>
-
                 {hasTrend && (
                   <Tooltip
                     title={
                       trendDiff >= 0
-                        ? `Sua nota melhorou ${trendDiff.toFixed(1)}% em relação à tentativa anterior`
-                        : `Sua nota caiu ${Math.abs(trendDiff).toFixed(1)}% em relação à tentativa anterior`
+                        ? `Melhorou ${trendDiff.toFixed(1)}% em relação à tentativa anterior`
+                        : `Caiu ${Math.abs(trendDiff).toFixed(1)}% em relação à tentativa anterior`
                     }
                   >
-                    <div
-                      className={`flex items-center gap-1 rounded-md p-1 h-min w-min cursor-pointer ${
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold ${
                         trendDiff >= 0
-                          ? 'bg-green-100 hover:bg-green-200'
-                          : 'bg-red-100 hover:bg-red-200'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : 'bg-red-100 text-red-700'
                       }`}
                     >
                       {trendDiff >= 0 ? (
-                        <ArrowTrendingUpIcon className="w-3 h-3 text-green-500" />
+                        <ArrowTrendingUpIcon className="w-3.5 h-3.5" />
                       ) : (
-                        <ArrowTrendingDownIcon className="w-3 h-3 text-red-500" />
+                        <ArrowTrendingDownIcon className="w-3.5 h-3.5" />
                       )}
-                      <span
-                        className={`text-xs font-bold ${
-                          trendDiff >= 0 ? 'text-green-500' : 'text-red-500'
-                        }`}
-                      >
-                        {trendDiff >= 0 ? '+' : ''}{trendDiff.toFixed(1)}%
-                      </span>
-                    </div>
+                      {trendDiff >= 0 ? '+' : ''}
+                      {trendDiff.toFixed(1)}%
+                    </span>
                   </Tooltip>
                 )}
               </div>
-
-              <Tooltip title="Menor nota entre os aprovados da ampla concorrência [não cotista]">
-                <span className="text-xs text-slate-500 hover:bg-slate-200 cursor-pointer">
-                  Nota de corte: {minPassingDisplay}
-                </span>
+              <Tooltip title="Nota mínima para aprovação (ampla concorrência)">
+                <p className="text-xs text-slate-500 mt-1 cursor-help">
+                  Corte: {minPassingDisplay}
+                </p>
               </Tooltip>
             </div>
-          </Card>
+          </div>
+        </Card>
 
-          <Card noElevation className="select-none bg-red-50 border-red-200">
-            <div className="flex flex-col gap-0">
-              <span className="text-xs text-slate-900">Concorrência</span>
-
-              <Tooltip title="Preencher: ex.: 400 candidatos inscritos para 10 vagas">
-                <span className="text-3xl text-slate-700 font-medium hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
-                  1/40
-                </span>
-              </Tooltip>
-
-              <Tooltip title="Preencher: ex.: Em média a concorrência é de 1/10">
-                <span className="text-xs text-slate-500 hover:bg-red-100 cursor-pointer bg-red-100/50 px-1 rounded">
-                  Acima da média
-                </span>
-              </Tooltip>
+        <Card
+          noElevation
+          className="p-5 border border-slate-200 hover:border-slate-300 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
+              <AcademicCapIcon className="w-5 h-5 text-blue-600" />
             </div>
-          </Card>
-        </div>
-
-        <div className="flex gap-1">
-        <Card noElevation className="flex-1 p-0 flex items-center gap-0">
-            <div className="flex items-center gap-1">
-              <AcademicCapIcon className="w-5 h-5 text-blue-500" />
-              <span className="text-xs font-medium text-slate-500">{examBase?.examBoard?.name}</span>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Banca</p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5">
+                {examBase?.examBoard?.name ?? '—'}
+              </p>
             </div>
-          </Card>
+          </div>
+        </Card>
 
-          <Card noElevation className="p-0 flex items-center gap-0">
-            <div className="flex items-center gap-1">
-              <BanknotesIcon className="w-5 h-5 text-green-500" />
-              <span className="text-xs font-medium text-slate-500">{formatBRL(examBase?.salaryBase ?? 0)}</span>
+        <Card
+          noElevation
+          className="p-5 border border-slate-200 hover:border-slate-300 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center shrink-0">
+              <BanknotesIcon className="w-5 h-5 text-emerald-600" />
             </div>
-          </Card>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Salário base</p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5">
+                {examBase?.salaryBase
+                  ? formatBRL(examBase.salaryBase)
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        </Card>
 
-          <Card noElevation className="p-0 flex items-center gap-0">
-            <div className="flex items-center gap-1">
-              <CalendarDaysIcon className="w-5 h-5 text-blue-500" />
-              <span className="text-xs font-medium text-slate-500">{ dayjs(examBase?.examDate).format('DD/MMMM/YYYY') }</span>
+        <Card
+          noElevation
+          className="p-5 border border-slate-200 hover:border-slate-300 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center shrink-0">
+              <CalendarDaysIcon className="w-5 h-5 text-violet-600" />
             </div>
-          </Card>
-        </div>
+            <div>
+              <p className="text-xs font-medium text-slate-500">Data do exame</p>
+              <p className="text-sm font-semibold text-slate-900 mt-0.5">
+                {examBase?.examDate
+                  ? dayjs(examBase.examDate).format('DD/MM/YYYY')
+                  : '—'}
+              </p>
+            </div>
+          </div>
+        </Card>
       </div>
 
-      {/* Seção Tentativas */}
-      <Card noElevation className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <span className="text-lg font-semibold text-slate-900">Tentativas</span>
+      {/* Questões por matéria */}
+      {questionCount > 0 && (
+        <Card noElevation className="p-6 border border-slate-200">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
+              <BookOpenIcon className="w-5 h-5 text-indigo-600" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">
+                Questões por matéria
+              </h2>
+              <p className="text-sm text-slate-500">
+                {questionCount} {questionCount === 1 ? 'questão' : 'questões'} no total
+              </p>
+            </div>
+          </div>
+          {isLoadingSubjectStats ? (
+            <div className="flex gap-2 flex-wrap">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-9 w-24 rounded-lg bg-slate-100 animate-pulse"
+                />
+              ))}
+            </div>
+          ) : subjectStats.length === 0 ? (
+            <p className="text-sm text-slate-500">
+              Nenhuma questão com matéria definida.
+            </p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {[...subjectStats]
+                .sort((a, b) => b.count - a.count)
+                .map(({ subject, count }) => {
+                  const pct =
+                    questionCount > 0 ? (count / questionCount) * 100 : 0
+                  return (
+                    <div
+                      key={subject}
+                      className="flex items-center gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="text-sm font-medium text-slate-800 truncate">
+                            {subject}
+                          </span>
+                          <span className="text-sm font-semibold text-slate-600 tabular-nums shrink-0">
+                            {count} {count === 1 ? 'questão' : 'questões'}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+                          <div
+                            className="h-full rounded-full bg-linear-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* Tentativas */}
+      <Card noElevation className="p-6 border border-slate-200">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Tentativas</h2>
+            <p className="text-sm text-slate-500 mt-0.5">
+              {attempts.length} {attempts.length === 1 ? 'tentativa' : 'tentativas'}
+            </p>
+          </div>
           <Tooltip title={!hasAccess ? 'Assine um plano para iniciar provas' : ''}>
             <span>
               <Button
                 variant="contained"
-                size="small"
+                size="medium"
                 startIcon={<PlayArrowIcon />}
                 onClick={handleStartExam}
                 disabled={createAttempt.isPending || !hasAccess}
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
               >
                 {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
               </Button>
             </span>
           </Tooltip>
         </div>
+
         {attemptsError && (
-          <span className="text-sm text-red-600">Erro ao carregar tentativas.</span>
+          <p className="text-sm text-red-600 mt-4">Erro ao carregar tentativas.</p>
         )}
         {isLoadingAttempts && (
-          <span className="text-sm text-slate-500">Carregando…</span>
+          <p className="text-sm text-slate-500 mt-4">Carregando…</p>
         )}
         {!isLoadingAttempts && !attemptsError && attempts.length === 0 && (
-          <span className="text-sm text-slate-500">
+          <p className="text-sm text-slate-500 mt-4">
             Nenhuma tentativa ainda. Clique em &quot;Iniciar prova&quot; para começar.
-          </span>
+          </p>
         )}
         {!isLoadingAttempts && !attemptsError && attempts.length > 0 && (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 mt-4">
             {attempts.map((item: ExamBaseAttemptHistoryItem) => {
               const path = item.finishedAt
                 ? '/exams/$examBoard/$examId/$attemptId/feedback'
@@ -229,10 +717,22 @@ function RouteComponent() {
               const isClickable = item.examBoardId != null
               const status =
                 item.finishedAt == null
-                  ? { label: 'Em andamento', icon: ClockIcon, className: 'text-amber-600 bg-amber-50' }
+                  ? {
+                      label: 'Em andamento',
+                      icon: ClockIcon,
+                      className: 'text-amber-600 bg-amber-50',
+                    }
                   : item.passed === true
-                    ? { label: 'Aprovado', icon: CheckCircleIcon, className: 'text-green-600 bg-green-50' }
-                    : { label: 'Reprovado', icon: ExclamationTriangleIcon, className: 'text-red-600 bg-red-100' }
+                    ? {
+                        label: 'Aprovado',
+                        icon: CheckCircleIcon,
+                        className: 'text-emerald-600 bg-emerald-50',
+                      }
+                    : {
+                        label: 'Reprovado',
+                        icon: ExclamationTriangleIcon,
+                        className: 'text-red-600 bg-red-50',
+                      }
               const StatusIcon = status.icon
               return (
                 <div
@@ -240,18 +740,27 @@ function RouteComponent() {
                   role={isClickable ? 'button' : undefined}
                   onClick={() =>
                     isClickable &&
-                    navigate({ to: path, params: { examBoard, examId, attemptId: item.id } } as any)
+                    navigate({
+                      to: path,
+                      params: { examBoard, examId, attemptId: item.id },
+                    } as any)
                   }
                   className={`
-                    flex items-center justify-between gap-4 rounded-lg border border-slate-300 p-3
-                    transition-all ease-in-out duration-200
-                    ${isClickable ? 'cursor-pointer hover:bg-slate-100 hover:shadow-sm active:shadow-none' : ''}
+                    flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-4
+                    transition-all duration-200
+                    ${isClickable ? 'cursor-pointer hover:bg-slate-50 hover:border-slate-300' : ''}
                   `}
                 >
-                  <div className="flex items-center gap-4">
-                    <Tooltip title={item.finishedAt ? dayjs(item.finishedAt).format('DD/MM/YYYY HH:mm') : dayjs(item.startedAt).format('DD/MM/YYYY HH:mm')}>
-                      <div className="flex items-center gap-1.5">
-                        <CalendarDaysIcon className="w-5 h-5 text-slate-500" />
+                  <div className="flex flex-wrap items-center gap-4">
+                    <Tooltip
+                      title={
+                        item.finishedAt
+                          ? dayjs(item.finishedAt).format('DD/MM/YYYY HH:mm')
+                          : dayjs(item.startedAt).format('DD/MM/YYYY HH:mm')
+                      }
+                    >
+                      <div className="flex items-center gap-2">
+                        <CalendarDaysIcon className="w-5 h-5 text-slate-400" />
                         <span className="text-sm text-slate-700">
                           {item.finishedAt
                             ? dayjs(item.finishedAt).format('DD/MM/YYYY HH:mm')
@@ -259,15 +768,17 @@ function RouteComponent() {
                         </span>
                       </div>
                     </Tooltip>
-                    <div className="flex items-center gap-1.5">
-                      <TrophyIcon className="w-5 h-5 text-slate-500" />
-                      <span className="text-sm font-medium text-slate-700">
-                        {item.percentage != null ? `${item.percentage.toFixed(1)}%` : '—'}
+                    <div className="flex items-center gap-2">
+                      <TrophyIcon className="w-5 h-5 text-amber-500" />
+                      <span className="text-sm font-semibold text-slate-800">
+                        {item.percentage != null
+                          ? `${item.percentage.toFixed(1)}%`
+                          : '—'}
                       </span>
                     </div>
                   </div>
                   <span
-                    className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${status.className}`}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium ${status.className}`}
                   >
                     <StatusIcon className="w-4 h-4" />
                     {status.label}
@@ -279,270 +790,19 @@ function RouteComponent() {
         )}
       </Card>
 
-      <Card noElevation className="p-4">
-        <Link
-          to="/exams/$examBoard/$examId/questoes"
-          params={{ examBoard, examId }}
-          className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium"
-        >
-          Gerenciar questões
-        </Link>
-      </Card>
-
-      {/* <Paper>
-        <Tabs value={value} onChange={handleChange} aria-label="exam tabs">
-          <Tab label="Detalhes" value={0} />
-          <Tab label="Tentativas" value={1} />
-          <Tab label="Estatísticas" value={2} />
-          <Tab label="Questions" value={QUESTIONS_TAB_INDEX} id="questions" />
-          <Tab label="Criar pergunta" value={CREATE_QUESTION_TAB_INDEX} id="create-question" />
-        </Tabs>
-
-        <CustomTabPanel value={value} hidden={value !== 0}>
-          <Stack spacing={2}>
-            <Typography variant="h6">Detalhes da prova</Typography>
-            {examBase && (
-              <Typography variant="body1">
-                {examBase.name}
-              </Typography>
-            )}
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<PlayArrowIcon />}
-              onClick={handleStartExam}
-              disabled={createAttempt.isPending}
-            >
-              {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
-            </Button>
-          </Stack>
-        </CustomTabPanel>
-
-        <CustomTabPanel value={value} hidden={value !== 1}>
-          <Stack spacing={2}>
-            <Typography variant="h6">Suas tentativas</Typography>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<PlayArrowIcon />}
-              onClick={handleStartExam}
-              disabled={createAttempt.isPending}
-            >
-              {createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'}
-            </Button>
-            <ExamBaseAttemptsList
-              items={attempts}
-              isLoading={isLoadingAttempts}
-              error={attemptsError ?? null}
-              emptyMessage='Nenhuma tentativa ainda. Clique em "Iniciar prova" para começar.'
-              showExamBaseColumns={false}
-              onRowClick={(item) => {
-                const path = item.finishedAt
-                  ? '/exams/$examBoard/$examId/$attemptId/feedback'
-                  : '/exams/$examBoard/$examId/$attemptId'
-                navigate({ to: path, params: { examBoard, examId, attemptId: item.id } } as any)
-              }}
-            />
-          </Stack>
-        </CustomTabPanel>
-
-        <CustomTabPanel value={value} hidden={value !== 2}>
-          Estatísticas
-        </CustomTabPanel>
-
-        <CustomTabPanel value={value} hidden={value !== QUESTIONS_TAB_INDEX}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            <Typography variant="h6">Extrair perguntas com IA (Grok)</Typography>
-            <Typography variant="body2" color="text.secondary">
-              Envie um PDF para converter em markdown ou cole o texto em markdown. A IA irá identificar perguntas e alternativas.
-            </Typography>
-            <input
-              ref={pdfInputRef}
-              type="file"
-              accept=".pdf,application/pdf"
-              style={{ display: 'none' }}
-              onChange={handlePdfFileChange}
-            />
-            <Button
-              variant="outlined"
-              startIcon={<UploadFileIcon />}
-              onClick={() => pdfInputRef.current?.click()}
-              disabled={extractFromPdf.isPending}
-            >
-              {extractFromPdf.isPending ? 'Convertendo PDF…' : 'Enviar PDF'}
-            </Button>
-            <TextField
-              label="Texto em Markdown"
-              fullWidth
-              multiline
-              minRows={14}
-              maxRows={30}
-              value={markdownText}
-              onChange={(e) => setMarkdownText(e.target.value)}
-              placeholder="Cole o conteúdo da prova em markdown…"
-              sx={{ fontFamily: 'monospace' }}
-            />
-            <Button
-              variant="outlined"
-              color="primary"
-              onClick={handleParseMarkdown}
-              disabled={parseFromMarkdown.isPending || !markdownText.trim()}
-            >
-              {parseFromMarkdown.isPending ? 'Extraindo…' : 'Extrair perguntas com IA'}
-            </Button>
-            {parseError && (
-              <Alert severity="error" onClose={() => setParseError(null)}>
-                {parseError}
-              </Alert>
-            )}
-
-            {draftQuestions.length > 0 && (
-              <>
-                <Typography variant="h6" sx={{ mt: 2 }}>
-                  Perguntas em rascunho ({draftQuestions.length})
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Revise e clique em &quot;Criar&quot; para salvar cada pergunta na base.
-                </Typography>
-                <Box>
-                  {draftQuestions.map((draft, index) => (
-                    <Accordion key={index}>
-                      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                        <Typography variant="body1">
-                          {draft.subject}
-                          {draft.topic ? ` — ${draft.topic}` : ''}
-                          {draft.statement
-                            ? `: ${draft.statement.slice(0, 50)}${draft.statement.length > 50 ? '…' : ''}`
-                            : ''}
-                        </Typography>
-                      </AccordionSummary>
-                      <AccordionDetails>
-                        <Stack spacing={1}>
-                          {draft.referenceText && (
-                            <>
-                              <Typography variant="subtitle2">Texto de referência</Typography>
-                              <Markdown variant="body2">{draft.referenceText}</Markdown>
-                            </>
-                          )}
-                          <Typography variant="subtitle2">Enunciado</Typography>
-                          <Markdown variant="body2">{draft.statement}</Markdown>
-                          {draft.alternatives.length > 0 && (
-                            <>
-                              <Typography variant="subtitle2" sx={{ mt: 1 }}>
-                                Alternativas
-                              </Typography>
-                              {draft.alternatives.map((alt, i) => (
-                                <Box key={i} sx={{ display: 'flex', gap: 0.5 }}>
-                                  <Typography component="span" variant="body2" fontWeight={600}>
-                                    {alt.key}.
-                                  </Typography>
-                                  <Markdown variant="body2">{alt.text}</Markdown>
-                                </Box>
-                              ))}
-                            </>
-                          )}
-                          <Button
-                            variant="contained"
-                            size="small"
-                            onClick={() => handleCreateDraft(draft, index)}
-                            disabled={createQuestion.isPending}
-                          >
-                            Criar pergunta
-                          </Button>
-                        </Stack>
-                      </AccordionDetails>
-                    </Accordion>
-                  ))}
-                </Box>
-              </>
-            )}
-
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexWrap: 'wrap',
-                gap: 1,
-                mt: draftQuestions.length > 0 ? 2 : 0,
-              }}
-            >
-              <Typography variant="h6">Exam base questions</Typography>
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={handleAddQuestionOpen}
-                disabled={createQuestion.isPending}
-              >
-                Add Question
-              </Button>
-            </Box>
-
-            {isLoading && (
-              <Typography color="text.secondary">Loading questions…</Typography>
-            )}
-            {error && (
-              <Alert severity="error">
-                {error instanceof Error ? error.message : 'Failed to load questions'}
-              </Alert>
-            )}
-            {!isLoading && !error && questions.length === 0 && (
-              <Typography color="text.secondary">
-                No questions yet. Click &quot;Add Question&quot; to create one.
-              </Typography>
-            )}
-            {!isLoading && !error && questions.length > 0 && (
-              <Box>
-                {questions.map((q) => (
-                  <Accordion key={q.id} elevation={3}>
-                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                      <Typography variant="body1">
-                        {q.subject} — {q.topic}
-                        {q.statement ? `: ${q.statement.slice(0, 60)}${q.statement.length > 60 ? '…' : ''}` : ''}
-                      </Typography>
-                    </AccordionSummary>
-                    <AccordionDetails>
-                      <Stack spacing={2}>
-                        {q.statementImageUrl && (
-                          <Box
-                            sx={{
-                              maxWidth: 480,
-                              maxHeight: 360,
-                              border: '1px solid',
-                              borderColor: 'divider',
-                              borderRadius: 1,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            <img
-                              src={q.statementImageUrl}
-                              alt="Enunciado"
-                              style={{
-                                maxWidth: '100%',
-                                height: 'auto',
-                                display: 'block',
-                              }}
-                            />
-                          </Box>
-                        )}
-                        <QuestionEditor
-                          examBaseId={examBaseId}
-                          question={q}
-                        />
-                      </Stack>
-                    </AccordionDetails>
-                  </Accordion>
-                ))}
-              </Box>
-            )}
-          </Box>
-        </CustomTabPanel>
-
-        <CustomTabPanel value={value} hidden={value !== CREATE_QUESTION_TAB_INDEX}>
-          <QuestionCreator />
-        </CustomTabPanel>
-      </Paper> */}
-
+      {/* Gerenciar questões (Admin) */}
+      {isAdmin && (
+        <Card noElevation className="p-4 border border-slate-200">
+          <Link
+            to="/exams/$examBoard/$examId/questoes"
+            params={{ examBoard, examId }}
+            className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium no-underline"
+          >
+            <DocumentTextIcon className="w-5 h-5" />
+            Gerenciar questões
+          </Link>
+        </Card>
+      )}
     </div>
   )
 }

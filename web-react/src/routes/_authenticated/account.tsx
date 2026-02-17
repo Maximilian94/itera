@@ -25,6 +25,7 @@ import {
   EnvelopeIcon,
   PhoneIcon,
   IdentificationIcon,
+  ShieldCheckIcon,
   SparklesIcon,
   AcademicCapIcon,
   RocketLaunchIcon,
@@ -226,6 +227,7 @@ function AccountPage() {
             <ProfileContent
               displayName={displayName}
               displayEmail={displayEmail}
+              role={profile?.role}
               profileLoading={profileLoading}
               phoneValue={phoneValue}
               setPhoneValue={setPhoneValue}
@@ -256,6 +258,7 @@ function AccountPage() {
 function ProfileContent({
   displayName,
   displayEmail,
+  role,
   profileLoading,
   phoneValue,
   setPhoneValue,
@@ -266,6 +269,7 @@ function ProfileContent({
 }: {
   displayName: string
   displayEmail: string
+  role?: 'ADMIN' | 'USER'
   profileLoading: boolean
   phoneValue: string
   setPhoneValue: (v: string) => void
@@ -301,6 +305,11 @@ function ProfileContent({
         <div className="flex flex-col gap-5">
           <ProfileField icon={IdentificationIcon} label="Nome" value={displayName} />
           <ProfileField icon={EnvelopeIcon} label="Email" value={displayEmail} />
+          <ProfileField
+            icon={ShieldCheckIcon}
+            label="Perfil"
+            value={profileLoading ? '—' : (role === 'ADMIN' ? 'Administrador' : role === 'USER' ? 'Usuário' : '—')}
+          />
           <div>
             <ProfileFieldLabel icon={PhoneIcon} label="Telefone" />
             {profileLoading ? (

@@ -33,6 +33,15 @@ export const examBaseQuestionsService = {
     return apiFetch<ExamBaseQuestion[]>(basePath(examBaseId), { method: 'GET' })
   },
 
+  getQuestionsCountBySubject(
+    examBaseId: string,
+  ): Promise<Array<{ subject: string; count: number }>> {
+    return apiFetch<Array<{ subject: string; count: number }>>(
+      `${basePath(examBaseId)}/stats-by-subject`,
+      { method: 'GET' },
+    )
+  },
+
   listAvailableToAdd(
     examBaseId: string,
     subject?: string,
