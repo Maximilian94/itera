@@ -16,6 +16,7 @@ import {
   FlagIcon,
   PencilSquareIcon,
   PlayIcon,
+  PlusCircleIcon,
   ScissorsIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid } from '@heroicons/react/24/solid'
@@ -108,6 +109,10 @@ export interface ExamAttemptPlayerProps {
   }) => void
   /** Enable admin edit mode. Shows "Editar" tab for ADMIN users. */
   enableEditMode?: boolean
+  /** Enable management mode. Shows questions from examBase without attempt. */
+  managementMode?: boolean
+  /** Callback when "Adicionar questão" is clicked in management mode. */
+  onAddQuestion?: () => void
 }
 
 export function ExamAttemptPlayer({
@@ -123,13 +128,16 @@ export function ExamAttemptPlayer({
   finishRef,
   onTrainingProvaStateChange,
   enableEditMode = false,
+  managementMode = false,
+  onAddQuestion,
 }: ExamAttemptPlayerProps) {
   const isRetryMode = Boolean(trainingId)
+  const isManagementMode = Boolean(managementMode)
   const queryClient = useQueryClient()
 
   const attemptQuery = useExamBaseAttemptQuery(
-    isRetryMode ? undefined : examBaseId,
-    isRetryMode ? undefined : attemptId,
+    isRetryMode || isManagementMode ? undefined : examBaseId,
+    isRetryMode || isManagementMode ? undefined : attemptId,
   )
   const upsertAttemptAnswer = useUpsertExamBaseAttemptAnswerMutation(
     examBaseId ?? '',
@@ -151,6 +159,15 @@ export function ExamAttemptPlayer({
   const upsertRetryAnswer = useUpsertRetryAnswerMutation(trainingId ?? '')
   const updateStageMutation = useUpdateTrainingStageMutation(trainingId ?? '')
 
+  // Fetch questions for management mode
+  const {
+    data: managementQuestions = [],
+    isLoading: isLoadingManagement,
+    error: managementError,
+  } = useExamBaseQuestionsQuery(
+    isManagementMode && examBaseId ? examBaseId : undefined
+  )
+
   // Admin check and full questions for edit mode
   const { data: profileData } = useQuery({
     queryKey: ['auth', 'profile'],
@@ -161,13 +178,13 @@ export function ExamAttemptPlayer({
 
   const [value, setValue] = useState(0)
 
-  // Fetch full questions when edit tab is active and user is admin
+  // Fetch full questions when edit tab is active and user is admin (not needed in management mode as we already have them)
   const {
     data: fullQuestions = [],
     isLoading: isLoadingFullQuestions,
     error: fullQuestionsError,
   } = useExamBaseQuestionsQuery(
-    enableEditMode && isAdmin && value === 6 ? examBaseId : undefined
+    !isManagementMode && enableEditMode && isAdmin && value === 6 ? examBaseId : undefined
   )
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
@@ -180,25 +197,40 @@ export function ExamAttemptPlayer({
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const explanationRefsMap = useRef<Record<string, HTMLDivElement | null>>({})
 
-  const questions: PlayerQuestion[] = isRetryMode
-    ? (retryFinished
-        ? (retryQuestionsWithFeedbackQuery.data ?? [])
-        : (retryQuestionsQuery.data ?? []))
-    : (attemptQuery.data?.questions ?? [])
-  const answers: Record<string, string | null> = isRetryMode
-    ? (retryAnswersQuery.data ?? {})
-    : (attemptQuery.data?.answers ?? {})
-  const isFinished = isRetryMode
-    ? retryFinished
-    : Boolean(attemptQuery.data?.attempt.finishedAt)
-  const isLoading = isRetryMode
-    ? retryQuestionsQuery.isLoading || (retryFinished && retryQuestionsWithFeedbackQuery.isLoading)
-    : attemptQuery.isLoading
-  const error = isRetryMode ? retryQuestionsQuery.error : attemptQuery.error
+  const questions: PlayerQuestion[] = isManagementMode
+    ? managementQuestions
+    : isRetryMode
+      ? (retryFinished
+          ? (retryQuestionsWithFeedbackQuery.data ?? [])
+          : (retryQuestionsQuery.data ?? []))
+      : (attemptQuery.data?.questions ?? [])
+  const answers: Record<string, string | null> = isManagementMode
+    ? {}
+    : isRetryMode
+      ? (retryAnswersQuery.data ?? {})
+      : (attemptQuery.data?.answers ?? {})
+  const isFinished = isManagementMode
+    ? false
+    : isRetryMode
+      ? retryFinished
+      : Boolean(attemptQuery.data?.attempt.finishedAt)
+  const isLoading = isManagementMode
+    ? isLoadingManagement
+    : isRetryMode
+      ? retryQuestionsQuery.isLoading || (retryFinished && retryQuestionsWithFeedbackQuery.isLoading)
+      : attemptQuery.isLoading
+  const error = isManagementMode
+    ? managementError
+    : isRetryMode
+      ? retryQuestionsQuery.error
+      : attemptQuery.error
 
   const currentQuestion = questions[currentQuestionIndex]
   const questionCount = questions.length
-  const fullQuestion = fullQuestions.find(q => q.id === currentQuestion?.id)
+  // In management mode, use managementQuestions (already full); in edit mode, use fullQuestions
+  const fullQuestion = isManagementMode
+    ? managementQuestions.find(q => q.id === currentQuestion?.id)
+    : fullQuestions.find(q => q.id === currentQuestion?.id)
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -218,7 +250,7 @@ export function ExamAttemptPlayer({
     alternativeId: string,
     isEliminated: boolean,
   ) => {
-    if (isEliminated) return
+    if (isEliminated || isManagementMode) return
     const current = answers[questionId]
     const nextId = current === alternativeId ? null : alternativeId
     const onError = (err: unknown, variables: { questionId: string }) => {
@@ -408,7 +440,7 @@ export function ExamAttemptPlayer({
     )
   }
 
-  if (error || (!isRetryMode && !attemptQuery.data)) {
+  if (error || (!isRetryMode && !isManagementMode && !attemptQuery.data)) {
     return (
       <div className="flex flex-col gap-4">
         <Card noElevation className="flex flex-col gap-3 p-4">
@@ -465,7 +497,7 @@ export function ExamAttemptPlayer({
     { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon, comingSoon: true },
     { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
-    ...(enableEditMode && isAdmin ? [
+    ...((enableEditMode && isAdmin) || isManagementMode ? [
       { value: 6, label: 'Editar', icon: PencilSquareIcon }
     ] : []),
   ]
@@ -654,9 +686,9 @@ export function ExamAttemptPlayer({
                               )}
                               <button
                                 type="button"
-                                className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished ? 'cursor-default' : ''}`}
+                                className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated || isManagementMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
                                 onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
-                                disabled={isEliminated || isFinished}
+                                disabled={isEliminated || isFinished || isManagementMode}
                               >
                                 <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
                                 <span className="text-sm text-slate-800 flex-1"><Markdown>{alt.text}</Markdown></span>
@@ -754,13 +786,13 @@ export function ExamAttemptPlayer({
                 <div className="py-2"><span className="text-sm text-slate-500">Notas (em breve)</span></div>
               </CustomTabPanel>
               <CustomTabPanel value={value} hidden={value !== 6}>
-                {isLoadingFullQuestions ? (
+                {(isManagementMode ? isLoadingManagement : isLoadingFullQuestions) ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="animate-pulse text-slate-400">
                       Carregando dados da questão…
                     </div>
                   </div>
-                ) : fullQuestionsError ? (
+                ) : (isManagementMode ? managementError : fullQuestionsError) ? (
                   <Alert severity="error">
                     Erro ao carregar dados da questão. Tente novamente.
                   </Alert>
@@ -784,7 +816,17 @@ export function ExamAttemptPlayer({
         <div className="flex flex-col gap-3 w-56 shrink-0 min-h-0 overflow-hidden">
           {!trainingProvaMode && (
           <div className="shrink-0">
-            {isFinished ? (
+            {isManagementMode ? (
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                onClick={onAddQuestion}
+                startIcon={<PlusCircleIcon className="w-4 h-4" />}
+              >
+                Adicionar questão
+              </Button>
+            ) : isFinished ? (
               isRetryMode && onNavigateToFinal ? (
                 <Button
                   variant="contained"

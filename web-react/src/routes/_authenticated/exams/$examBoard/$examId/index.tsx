@@ -43,6 +43,7 @@ import {
   ChevronRightIcon,
   ClockIcon,
   ExclamationTriangleIcon,
+  PlayIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
@@ -793,14 +794,24 @@ function RouteComponent() {
       {/* Gerenciar questões (Admin) */}
       {isAdmin && (
         <Card noElevation className="p-4 border border-slate-200">
-          <Link
-            to="/exams/$examBoard/$examId/questoes"
-            params={{ examBoard, examId }}
-            className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium no-underline"
-          >
-            <DocumentTextIcon className="w-5 h-5" />
-            Gerenciar questões
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link
+              to="/exams/$examBoard/$examId/questoes"
+              params={{ examBoard, examId }}
+              className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium no-underline"
+            >
+              <DocumentTextIcon className="w-5 h-5" />
+              Gerenciar questões (Accordions)
+            </Link>
+            <Link
+              to="/exams/$examBoard/$examId/questoes-v2"
+              params={{ examBoard, examId }}
+              className="inline-flex items-center gap-2 text-violet-700 hover:text-violet-900 font-medium no-underline"
+            >
+              <PlayIcon className="w-5 h-5" />
+              Gerenciar questões v2 (Player)
+            </Link>
+          </div>
         </Card>
       )}
     </div>
