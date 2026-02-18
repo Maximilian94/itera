@@ -21,6 +21,8 @@ export type ExamBaseQuestion = {
   referenceText: string | null
   correctAlternative: string | null
   skills: string[]
+  /** Posição na prova (0-based). */
+  position?: number
   alternatives: ExamBaseQuestionAlternative[]
 }
 

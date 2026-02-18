@@ -33,6 +33,13 @@ export const examBaseQuestionsService = {
     return apiFetch<ExamBaseQuestion[]>(basePath(examBaseId), { method: 'GET' })
   },
 
+  reorder(examBaseId: string, questionIds: string[]): Promise<void> {
+    return apiFetch<void>(`${basePath(examBaseId)}/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ questionIds }),
+    })
+  },
+
   getQuestionsCountBySubject(
     examBaseId: string,
   ): Promise<Array<{ subject: string; count: number }>> {

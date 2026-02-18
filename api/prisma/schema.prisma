@@ -231,6 +231,9 @@ model ExamBaseQuestion {
   // habilidades cobradas (string por enquanto)
   skills String[] @default([])
 
+  // Posição na prova (0-based)
+  position Int @default(0) @map("order")
+
   alternatives          ExamBaseQuestionAlternative[]
   attemptAnswers        ExamBaseAttemptAnswer[]
   trainingRetryAnswers  TrainingRetryAnswer[]
@@ -238,6 +241,7 @@ model ExamBaseQuestion {
   recommendationQuestionLinks SubjectFeedbackRecommendationQuestionLink[]
 
   @@index([examBaseId])
+  @@index([examBaseId, position])
   @@index([examBaseId, subject])
   @@index([examBaseId, topic])
   @@map("exam_base_questions")

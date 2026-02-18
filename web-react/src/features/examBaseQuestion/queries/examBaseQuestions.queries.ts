@@ -65,6 +65,17 @@ export function useAvailableSubjectsQuery(examBaseId: string | undefined) {
   })
 }
 
+export function useReorderQuestionsMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (questionIds: string[]) =>
+      examBaseQuestionsService.reorder(examBaseId, questionIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
+
 export function useCopyQuestionMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({

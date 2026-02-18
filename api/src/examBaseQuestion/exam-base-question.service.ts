@@ -82,6 +82,7 @@ const questionSelect = {
   referenceText: true,
   correctAlternative: true,
   skills: true,
+  position: true,
   alternatives: {
     orderBy: alternativesOrderBy,
     select: {
@@ -636,9 +637,43 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
   list(examBaseId: string) {
     return this.prisma.examBaseQuestion.findMany({
       where: { examBaseId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { position: 'asc' },
       select: questionSelect,
     });
+  }
+
+  async reorder(examBaseId: string, questionIds: string[]) {
+    if (questionIds.length === 0) return;
+
+    const allForBase = await this.prisma.examBaseQuestion.findMany({
+      where: { examBaseId },
+      select: { id: true },
+    });
+    const idsSet = new Set(questionIds);
+    if (idsSet.size !== questionIds.length) {
+      throw new BadRequestException('questionIds must not contain duplicates');
+    }
+    if (allForBase.length !== questionIds.length) {
+      throw new BadRequestException(
+        'questionIds must contain all questions of this exam base',
+      );
+    }
+    for (const q of allForBase) {
+      if (!idsSet.has(q.id)) {
+        throw new BadRequestException(
+          `Missing question ${q.id} in reorder list`,
+        );
+      }
+    }
+
+    await this.prisma.$transaction(
+      questionIds.map((id, index) =>
+        this.prisma.examBaseQuestion.update({
+          where: { id, examBaseId },
+          data: { position: index },
+        }),
+      ),
+    );
   }
 
   async getQuestionsCountBySubject(examBaseId: string): Promise<Array<{ subject: string; count: number }>> {
@@ -764,6 +799,12 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     }
 
     return this.prisma.$transaction(async (tx) => {
+      const maxPosition = await tx.examBaseQuestion.aggregate({
+        where: { examBaseId },
+        _max: { position: true },
+      });
+      const nextPosition = (maxPosition._max.position ?? -1) + 1;
+
       const question = await tx.examBaseQuestion.create({
         data: {
           examBaseId,
@@ -775,6 +816,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
           referenceText: dto.referenceText?.trim() || null,
           skills: dto.skills ?? [],
           correctAlternative: correctAlternative || null,
+          position: nextPosition,
         },
         select: questionSelect,
       });

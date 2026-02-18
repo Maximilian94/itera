@@ -36,6 +36,7 @@ import {
   useAvailableToAddQuestionsQuery,
   useAvailableSubjectsQuery,
   useCopyQuestionMutation,
+  useReorderQuestionsMutation,
   getApiMessage,
   type ParsedQuestionItem,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
@@ -43,6 +44,8 @@ import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { Card } from '@/components/Card'
 import {
   ArrowLeftIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   DocumentTextIcon,
   PlusCircleIcon,
   PencilSquareIcon,
@@ -83,6 +86,7 @@ function QuestoesPage() {
       addExistingSubject ? addExistingSubject : undefined,
     )
   const copyQuestion = useCopyQuestionMutation(examBaseId)
+  const reorderQuestions = useReorderQuestionsMutation(examBaseId)
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
   const extractFromPdf = useExtractFromPdfMutation(examBaseId)
@@ -143,6 +147,14 @@ function QuestoesPage() {
     } catch (err) {
       setParseError(getApiMessage(err))
     }
+  }
+
+  const handleMoveQuestion = (fromIndex: number, direction: 'up' | 'down') => {
+    const toIndex = direction === 'up' ? fromIndex - 1 : fromIndex + 1
+    if (toIndex < 0 || toIndex >= questions.length) return
+    const newOrder = [...questions]
+    ;[newOrder[fromIndex], newOrder[toIndex]] = [newOrder[toIndex], newOrder[fromIndex]]
+    reorderQuestions.mutate(newOrder.map((q) => q.id))
   }
 
   const handleCreateDraft = async (draft: ParsedQuestionItem, index: number) => {
@@ -268,7 +280,7 @@ function QuestoesPage() {
                       {questions.length} questão{questions.length !== 1 ? 'ões' : ''} cadastrada{questions.length !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  {questions.map((q) => (
+                  {questions.map((q, index) => (
                     <Accordion
                       key={q.id}
                       elevation={0}
@@ -284,14 +296,44 @@ function QuestoesPage() {
                         expandIcon={<ExpandMoreIcon />}
                         sx={{ borderRadius: 2 }}
                       >
-                        <div className="flex flex-col gap-1 min-w-0">
-                          <Typography variant="body2" fontWeight={600} className="text-slate-800">
-                            {q.subject} — {q.topic}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary" className="truncate">
-                            {q.statement ? q.statement.slice(0, 80) : ''}
-                            {q.statement && q.statement.length > 80 ? '…' : ''}
-                          </Typography>
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
+                          <div className="flex flex-col shrink-0 gap-0.5">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleMoveQuestion(index, 'up')
+                              }}
+                              disabled={index === 0 || reorderQuestions.isPending}
+                              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-500 hover:text-slate-700"
+                              title="Subir"
+                              aria-label="Subir questão"
+                            >
+                              <ArrowUpIcon className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleMoveQuestion(index, 'down')
+                              }}
+                              disabled={index === questions.length - 1 || reorderQuestions.isPending}
+                              className="p-1 rounded hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-500 hover:text-slate-700"
+                              title="Descer"
+                              aria-label="Descer questão"
+                            >
+                              <ArrowDownIcon className="w-4 h-4" />
+                            </button>
+                          </div>
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <Typography variant="body2" fontWeight={600} className="text-slate-800">
+                              {q.subject} — {q.topic}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" className="truncate">
+                              {q.statement ? q.statement.slice(0, 80) : ''}
+                              {q.statement && q.statement.length > 80 ? '…' : ''}
+                            </Typography>
+                          </div>
                         </div>
                       </AccordionSummary>
                       <AccordionDetails sx={{ pt: 0 }}>

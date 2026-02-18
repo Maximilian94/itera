@@ -17,6 +17,7 @@ import { CopyQuestionDto } from './dto/copy-question.dto';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
 import { CreateExamBaseQuestionDto } from './dto/create-exam-base-question.dto';
 import { ParseQuestionsFromMarkdownDto } from './dto/parse-questions-from-markdown.dto';
+import { ReorderQuestionsDto } from './dto/reorder-questions.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { ExamBaseQuestionService } from './exam-base-question.service';
@@ -76,6 +77,16 @@ export class ExamBaseQuestionController {
       dto.sourceExamBaseId,
       dto.sourceQuestionId,
     );
+  }
+
+  /** Reordena questões da base. Apenas ADMIN. */
+  @Patch('reorder')
+  @Roles('ADMIN')
+  reorder(
+    @Param('examBaseId') examBaseId: string,
+    @Body() dto: ReorderQuestionsDto,
+  ) {
+    return this.service.reorder(examBaseId, dto.questionIds);
   }
 
   /** Cria uma questão na base de prova. Apenas ADMIN. */
