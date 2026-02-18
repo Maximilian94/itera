@@ -13,12 +13,11 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { Card } from '@/components/Card'
-import { QuestionEditor } from '@/components/QuestionEditor'
 import {
   BookmarkIcon,
   BookOpenIcon,
@@ -60,7 +59,6 @@ import {
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
-import { authService } from '@/features/auth/services/auth.service'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -140,7 +138,7 @@ export interface ExamAttemptPlayerProps {
     firstUnansweredIndex: number
     goToQuestion: (index: number) => void
   }) => void
-  /** Enable admin edit mode. Shows "Editar" tab for ADMIN users. */
+  /** @deprecated Editing is only available via management mode (managementMode). Kept for backward compatibility. */
   enableEditMode?: boolean
   /** Enable management mode. Shows questions from examBase without attempt. */
   managementMode?: boolean
@@ -160,7 +158,7 @@ export function ExamAttemptPlayer({
   onNavigateToFinal,
   finishRef,
   onTrainingProvaStateChange,
-  enableEditMode = false,
+  enableEditMode: _enableEditMode = false,
   managementMode = false,
   onAddQuestion,
 }: ExamAttemptPlayerProps) {
@@ -201,24 +199,7 @@ export function ExamAttemptPlayer({
     isManagementMode && examBaseId ? examBaseId : undefined
   )
 
-  // Admin check and full questions for edit mode
-  const { data: profileData } = useQuery({
-    queryKey: ['auth', 'profile'],
-    queryFn: () => authService.getProfile(),
-    enabled: enableEditMode,
-  })
-  const isAdmin = profileData?.user?.role === 'ADMIN'
-
   const [value, setValue] = useState(0)
-
-  // Fetch full questions when edit tab is active and user is admin (not needed in management mode as we already have them)
-  const {
-    data: fullQuestions = [],
-    isLoading: isLoadingFullQuestions,
-    error: fullQuestionsError,
-  } = useExamBaseQuestionsQuery(
-    !isManagementMode && enableEditMode && isAdmin && value === 6 ? examBaseId : undefined
-  )
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward')
@@ -284,10 +265,6 @@ export function ExamAttemptPlayer({
 
   const currentQuestion = questions[currentQuestionIndex]
   const questionCount = questions.length
-  // In management mode, use managementQuestions (already full); in edit mode, use fullQuestions
-  const fullQuestion = isManagementMode
-    ? managementQuestions.find(q => q.id === currentQuestion?.id)
-    : fullQuestions.find(q => q.id === currentQuestion?.id)
 
   // Alternative mutations (now that we have currentQuestion)
   const createAlternativeMutation = useCreateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
@@ -296,8 +273,8 @@ export function ExamAttemptPlayer({
   const deleteQuestionMutation = useDeleteExamBaseQuestionMutation(examBaseId ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
-  // Check if inline editing is enabled
-  const canInlineEdit = isManagementMode || (enableEditMode && isAdmin)
+  // Check if inline editing is enabled (only in management mode; admin edits via management page only)
+  const canInlineEdit = isManagementMode
 
   // Handlers for inline editing
   const handleSaveStatement = useCallback(async () => {
@@ -687,8 +664,9 @@ export function ExamAttemptPlayer({
     const isWrong =
       isFinished && isAnswered && (correctId == null || selectedId !== correctId)
     const isIncomplete =
-      q.alternatives.length === 0 ||
-      q.alternatives.some((a) => !a.explanation?.trim())
+      canInlineEdit &&
+      (q.alternatives.length === 0 ||
+        q.alternatives.some((a) => !a.explanation?.trim()))
 
     const base = 'flex shrink-0 items-center justify-center w-full h-7 rounded text-xs font-medium cursor-pointer transition-colors'
     if (isCurrent) {
@@ -809,9 +787,6 @@ export function ExamAttemptPlayer({
     { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon, comingSoon: true },
     { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
-    ...((enableEditMode && isAdmin) || isManagementMode ? [
-      { value: 6, label: 'Editar', icon: PencilSquareIcon }
-    ] : []),
   ]
 
   return (
@@ -834,7 +809,7 @@ export function ExamAttemptPlayer({
               Q {currentQuestionIndex + 1} / {questionCount}
             </span>
             <div className="flex items-center gap-1 shrink-0">
-              {canInlineEdit && (enableEditMode ? isAdmin : true) && (
+              {canInlineEdit && (
                 <Tooltip title="Remover questão" enterDelay={300}>
                   <button
                     type="button"
@@ -991,7 +966,7 @@ export function ExamAttemptPlayer({
                       )}
 
                       {/* Subject, Topic, Subtopics, Skills */}
-                      {(canInlineEdit || currentQuestion.subject || currentQuestion.topic || (currentQuestion.subtopics?.length ?? 0) > 0 || (currentQuestion.skills?.length ?? 0) > 0) && (
+                      {canInlineEdit && (
                       <div className="flex flex-col gap-3">
                         {canInlineEdit ? (
                           <>
@@ -1588,29 +1563,6 @@ export function ExamAttemptPlayer({
               </CustomTabPanel>
               <CustomTabPanel value={value} hidden={value !== 5}>
                 <div className="py-2"><span className="text-sm text-slate-500">Notas (em breve)</span></div>
-              </CustomTabPanel>
-              <CustomTabPanel value={value} hidden={value !== 6}>
-                {(isManagementMode ? isLoadingManagement : isLoadingFullQuestions) ? (
-                  <div className="flex items-center justify-center py-12">
-                    <div className="animate-pulse text-slate-400">
-                      Carregando dados da questão…
-                    </div>
-                  </div>
-                ) : (isManagementMode ? managementError : fullQuestionsError) ? (
-                  <Alert severity="error">
-                    Erro ao carregar dados da questão. Tente novamente.
-                  </Alert>
-                ) : fullQuestion ? (
-                  <QuestionEditor
-                    examBaseId={examBaseId!}
-                    question={fullQuestion}
-                    onDeleted={handleQuestionDeleted}
-                  />
-                ) : (
-                  <Alert severity="warning">
-                    Questão não encontrada.
-                  </Alert>
-                )}
               </CustomTabPanel>
             </div>
             </div>
