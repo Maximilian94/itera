@@ -1,4 +1,15 @@
-import { Alert, Button, Snackbar, TextField, Tooltip } from '@mui/material'
+import {
+  Alert,
+  Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Snackbar,
+  TextField,
+  Tooltip,
+} from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
@@ -41,6 +52,7 @@ import {
 import {
   useExamBaseQuestionsQuery,
   useUpdateExamBaseQuestionMutation,
+  useDeleteExamBaseQuestionMutation,
   useCreateAlternativeMutation,
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
@@ -237,6 +249,7 @@ export function ExamAttemptPlayer({
   const [subtopicsStr, setSubtopicsStr] = useState('')
   const [skillsStr, setSkillsStr] = useState('')
   const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
+  const [deleteQuestionDialogOpen, setDeleteQuestionDialogOpen] = useState(false)
 
   // Inline editing mutations (question level only - alternatives are defined later)
   const updateQuestionMutation = useUpdateExamBaseQuestionMutation(examBaseId ?? '')
@@ -280,6 +293,7 @@ export function ExamAttemptPlayer({
   const createAlternativeMutation = useCreateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const updateAlternativeMutation = useUpdateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const deleteAlternativeMutation = useDeleteAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const deleteQuestionMutation = useDeleteExamBaseQuestionMutation(examBaseId ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Check if inline editing is enabled
@@ -475,10 +489,6 @@ export function ExamAttemptPlayer({
       const result = await generateExplanationsMutation.mutateAsync()
       setTopic(result.topic)
       setSubtopicsStr(arrayToStringList(result.subtopics))
-      await updateQuestionMutation.mutateAsync({
-        questionId: currentQuestion.id,
-        input: { topic: result.topic, subtopics: result.subtopics },
-      })
       const alternatives = [...currentQuestion.alternatives].sort((a, b) => a.key.localeCompare(b.key))
       const newEditById: Record<string, { text: string; explanation: string }> = {}
       for (const e of result.explanations) {
@@ -492,12 +502,12 @@ export function ExamAttemptPlayer({
         }
       }
       setEditAlternativeById(newEditById)
-      setSnackbarMessage('Explicações e metadados gerados com sucesso!')
+      setSnackbarMessage('Explicações salvas. Metadados (tópico, subtópicos) preenchidos em rascunho — revise e salve.')
       setSnackbarOpen(true)
     } catch (err) {
       setGenerateExplainError(getApiMessage(err))
     }
-  }, [currentQuestion, examBaseId, generateExplanationsMutation, updateQuestionMutation, updateAlternativeMutation])
+  }, [currentQuestion, examBaseId, generateExplanationsMutation, updateAlternativeMutation])
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -578,6 +588,18 @@ export function ExamAttemptPlayer({
     // Switch back to question tab
     setValue(0)
   }, [examBaseId, attemptId, currentQuestionIndex, questionCount, queryClient, onBack])
+
+  const handleDeleteQuestionConfirm = useCallback(async () => {
+    if (!currentQuestion) return
+    try {
+      await deleteQuestionMutation.mutateAsync(currentQuestion.id)
+      setDeleteQuestionDialogOpen(false)
+      handleQuestionDeleted()
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, deleteQuestionMutation, handleQuestionDeleted])
 
   const isFinishPending = isRetryMode
     ? updateStageMutation.isPending
@@ -664,16 +686,24 @@ export function ExamAttemptPlayer({
       isFinished && isAnswered && correctId != null && selectedId === correctId
     const isWrong =
       isFinished && isAnswered && (correctId == null || selectedId !== correctId)
+    const isIncomplete =
+      q.alternatives.length === 0 ||
+      q.alternatives.some((a) => !a.explanation?.trim())
 
     const base = 'flex shrink-0 items-center justify-center w-full h-7 rounded text-xs font-medium cursor-pointer transition-colors'
     if (isCurrent) {
       return `${base} outline outline-2 outline-blue-400 outline-offset-0.5 ${
-        isAnswered ? 'bg-blue-100 text-blue-700 border border-blue-200' : 'bg-slate-200 text-slate-700 border border-slate-300'
+        isIncomplete
+          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+          : isAnswered
+            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+            : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
     if (isCorrect) return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
     if (isWrong) return `${base} bg-red-100 text-red-700 border border-red-200 hover:bg-red-200`
     if (isAnswered) return `${base} bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200`
+    if (isIncomplete) return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
   }
 
@@ -804,6 +834,19 @@ export function ExamAttemptPlayer({
               Q {currentQuestionIndex + 1} / {questionCount}
             </span>
             <div className="flex items-center gap-1 shrink-0">
+              {canInlineEdit && (enableEditMode ? isAdmin : true) && (
+                <Tooltip title="Remover questão" enterDelay={300}>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteQuestionDialogOpen(true)}
+                    disabled={deleteQuestionMutation.isPending}
+                    aria-label="Remover questão"
+                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                  >
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </Tooltip>
+              )}
               <Tooltip title={comingSoonTooltip} enterDelay={300}>
                 <span className="inline-flex">
                   <button
@@ -1387,7 +1430,7 @@ export function ExamAttemptPlayer({
                               ) : (
                                 <button
                                   type="button"
-                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated || isManagementMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
+                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
                                   onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
                                   disabled={isEliminated || isFinished || isManagementMode}
                                 >
@@ -1654,6 +1697,36 @@ export function ExamAttemptPlayer({
         {snackbarMessage}
       </Alert>
     </Snackbar>
+
+    <Dialog
+      open={deleteQuestionDialogOpen}
+      onClose={() => setDeleteQuestionDialogOpen(false)}
+      aria-labelledby="delete-question-dialog-title"
+      aria-describedby="delete-question-dialog-description"
+    >
+      <DialogTitle id="delete-question-dialog-title">
+        Remover questão?
+      </DialogTitle>
+      <DialogContent>
+        <DialogContentText id="delete-question-dialog-description">
+          Esta ação removará permanentemente a questão e todas as suas alternativas. Não é possível desfazer.
+        </DialogContentText>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setDeleteQuestionDialogOpen(false)}>
+          Cancelar
+        </Button>
+        <Button
+          color="error"
+          variant="contained"
+          onClick={handleDeleteQuestionConfirm}
+          disabled={deleteQuestionMutation.isPending}
+          autoFocus
+        >
+          {deleteQuestionMutation.isPending ? 'Removendo…' : 'Remover'}
+        </Button>
+      </DialogActions>
+    </Dialog>
     </>
   )
 }
