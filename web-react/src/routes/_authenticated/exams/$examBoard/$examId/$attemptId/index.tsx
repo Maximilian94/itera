@@ -22,6 +22,7 @@ function RouteComponent() {
           params: { examBoard, examId },
         })
       }
+      enableEditMode={true}
     />
   )
 }

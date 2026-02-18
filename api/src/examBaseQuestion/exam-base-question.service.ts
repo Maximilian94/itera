@@ -513,6 +513,8 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
       select: {
         subject: true,
         statement: true,
+        statementImageUrl: true,
+        referenceText: true,
         correctAlternative: true,
         alternatives: {
           orderBy: { key: 'asc' },
@@ -563,10 +565,17 @@ Regras para o JSON:
 - As explicações devem ser didáticas, completas e de alto nível: por que a alternativa está correta ou incorreta, com base na prova e no conteúdo.
 - IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa (ex: "A alternativa A está correta"). Use apenas "A alternativa correta", "Esta alternativa está incorreta", "Correta porque...", "Incorreta porque...", etc. A ordem das alternativas pode ser alterada no futuro.`;
 
-    const userPrompt = `Gere as explicações para a questão abaixo.
+    const subjectInfo = question.subject
+      ? `**Matéria:** ${question.subject}\n\n`
+      : '';
+    const referenceSection = question.referenceText?.trim()
+      ? `**Texto de referência (compartilhado pela prova):**\n${question.referenceText}\n\n`
+      : '';
+
+    const userPromptText = `Gere as explicações para a questão abaixo.
 
 **Prova:** ${examLabel || 'Não informada'}
-**Enunciado:** ${question.statement}
+${subjectInfo}${referenceSection}**Enunciado:** ${question.statement}
 
 **Alternativas:**
 ${alternativesText}
@@ -574,6 +583,26 @@ ${alternativesText}
 **${correctInfo}**
 
 Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics, explanations para cada alternativa).`;
+
+    const userContent: { role: 'user'; content: string | object[] } = question
+      .statementImageUrl?.trim()
+      ? {
+          role: 'user',
+          content: [
+            {
+              type: 'image_url',
+              image_url: {
+                url: question.statementImageUrl,
+                detail: 'high',
+              },
+            },
+            {
+              type: 'text',
+              text: userPromptText,
+            },
+          ],
+        }
+      : { role: 'user', content: userPromptText };
 
     const res = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -587,7 +616,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         max_tokens: 8192,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
+          userContent,
         ],
       }),
     });

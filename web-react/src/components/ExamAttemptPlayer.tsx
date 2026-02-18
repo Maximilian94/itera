@@ -1,9 +1,11 @@
 import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { Card } from '@/components/Card'
+import { QuestionEditor } from '@/components/QuestionEditor'
 import {
   BookmarkIcon,
   BookOpenIcon,
@@ -30,7 +32,11 @@ import {
   useUpsertRetryAnswerMutation,
   useUpdateTrainingStageMutation,
 } from '@/features/training/queries/training.queries'
-import { getApiMessage } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
+import {
+  useExamBaseQuestionsQuery,
+  getApiMessage,
+} from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { authService } from '@/features/auth/services/auth.service'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -100,6 +106,8 @@ export interface ExamAttemptPlayerProps {
     firstUnansweredIndex: number
     goToQuestion: (index: number) => void
   }) => void
+  /** Enable admin edit mode. Shows "Editar" tab for ADMIN users. */
+  enableEditMode?: boolean
 }
 
 export function ExamAttemptPlayer({
@@ -114,8 +122,10 @@ export function ExamAttemptPlayer({
   onNavigateToFinal,
   finishRef,
   onTrainingProvaStateChange,
+  enableEditMode = false,
 }: ExamAttemptPlayerProps) {
   const isRetryMode = Boolean(trainingId)
+  const queryClient = useQueryClient()
 
   const attemptQuery = useExamBaseAttemptQuery(
     isRetryMode ? undefined : examBaseId,
@@ -141,7 +151,25 @@ export function ExamAttemptPlayer({
   const upsertRetryAnswer = useUpsertRetryAnswerMutation(trainingId ?? '')
   const updateStageMutation = useUpdateTrainingStageMutation(trainingId ?? '')
 
+  // Admin check and full questions for edit mode
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+    enabled: enableEditMode,
+  })
+  const isAdmin = profileData?.user?.role === 'ADMIN'
+
   const [value, setValue] = useState(0)
+
+  // Fetch full questions when edit tab is active and user is admin
+  const {
+    data: fullQuestions = [],
+    isLoading: isLoadingFullQuestions,
+    error: fullQuestionsError,
+  } = useExamBaseQuestionsQuery(
+    enableEditMode && isAdmin && value === 6 ? examBaseId : undefined
+  )
+
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward')
   const [eliminatedByQuestion, setEliminatedByQuestion] = useState<
@@ -170,6 +198,7 @@ export function ExamAttemptPlayer({
 
   const currentQuestion = questions[currentQuestionIndex]
   const questionCount = questions.length
+  const fullQuestion = fullQuestions.find(q => q.id === currentQuestion?.id)
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -226,6 +255,30 @@ export function ExamAttemptPlayer({
       })
     }
   }, [isRetryMode, updateStageMutation, finishAttemptMutation, onFinished, onFinishError])
+
+  const handleQuestionDeleted = useCallback(() => {
+    // Invalidate attempt queries to refresh question list
+    if (examBaseId && attemptId) {
+      queryClient.invalidateQueries({
+        queryKey: ['examBaseAttempt', examBaseId, attemptId]
+      })
+    }
+
+    // Navigate to next or previous question
+    if (currentQuestionIndex < questionCount - 1) {
+      setSlideDirection('forward')
+      setCurrentQuestionIndex((i) => Math.min(questionCount - 1, i + 1))
+    } else if (currentQuestionIndex > 0) {
+      setSlideDirection('backward')
+      setCurrentQuestionIndex((i) => Math.max(0, i - 1))
+    } else {
+      // Last question deleted - go back
+      onBack?.()
+    }
+
+    // Switch back to question tab
+    setValue(0)
+  }, [examBaseId, attemptId, currentQuestionIndex, questionCount, queryClient, onBack])
 
   const isFinishPending = isRetryMode
     ? updateStageMutation.isPending
@@ -412,6 +465,9 @@ export function ExamAttemptPlayer({
     { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon, comingSoon: true },
     { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
+    ...(enableEditMode && isAdmin ? [
+      { value: 6, label: 'Editar', icon: PencilSquareIcon }
+    ] : []),
   ]
 
   return (
@@ -696,6 +752,29 @@ export function ExamAttemptPlayer({
               </CustomTabPanel>
               <CustomTabPanel value={value} hidden={value !== 5}>
                 <div className="py-2"><span className="text-sm text-slate-500">Notas (em breve)</span></div>
+              </CustomTabPanel>
+              <CustomTabPanel value={value} hidden={value !== 6}>
+                {isLoadingFullQuestions ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-pulse text-slate-400">
+                      Carregando dados da questão…
+                    </div>
+                  </div>
+                ) : fullQuestionsError ? (
+                  <Alert severity="error">
+                    Erro ao carregar dados da questão. Tente novamente.
+                  </Alert>
+                ) : fullQuestion ? (
+                  <QuestionEditor
+                    examBaseId={examBaseId!}
+                    question={fullQuestion}
+                    onDeleted={handleQuestionDeleted}
+                  />
+                ) : (
+                  <Alert severity="warning">
+                    Questão não encontrada.
+                  </Alert>
+                )}
               </CustomTabPanel>
             </div>
             </div>
