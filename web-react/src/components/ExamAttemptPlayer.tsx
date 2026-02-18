@@ -1,4 +1,5 @@
-import { Alert, Button, Snackbar, Tooltip } from '@mui/material'
+import { Alert, Button, Snackbar, TextField, Tooltip } from '@mui/material'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -43,6 +44,7 @@ import {
   useCreateAlternativeMutation,
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
+  useGenerateExplanationsMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
@@ -55,8 +57,18 @@ type PlayerQuestion = {
   referenceText?: string | null
   subject?: string | null
   topic?: string | null
+  subtopics?: string[]
+  skills?: string[]
   correctAlternative?: string | null
   alternatives: Array<{ id: string; key: string; text: string; explanation?: string | null }>
+}
+
+function stringListToArray(s: string): string[] {
+  return s.split(',').map((x) => x.trim()).filter(Boolean)
+}
+
+function arrayToStringList(arr: string[]): string {
+  return (arr ?? []).join(', ')
 }
 
 const QUESTION_ALTERNATIVE_KEYS = [
@@ -211,9 +223,7 @@ export function ExamAttemptPlayer({
   const [editStatementValue, setEditStatementValue] = useState('')
   const [editingReferenceText, setEditingReferenceText] = useState(false)
   const [editReferenceTextValue, setEditReferenceTextValue] = useState('')
-  const [editingAlternativeId, setEditingAlternativeId] = useState<string | null>(null)
-  const [editAlternativeValue, setEditAlternativeValue] = useState('')
-  const [editAlternativeExplanation, setEditAlternativeExplanation] = useState('')
+  const [editAlternativeById, setEditAlternativeById] = useState<Record<string, { text: string; explanation: string }>>({})
   const [showAddAlternative, setShowAddAlternative] = useState(false)
   const [newAltKey, setNewAltKey] = useState('')
   const [newAltText, setNewAltText] = useState('')
@@ -222,6 +232,11 @@ export function ExamAttemptPlayer({
   const [statementImageLoadError, setStatementImageLoadError] = useState(false)
   const [editStatementImageUrl, setEditStatementImageUrl] = useState('')
   const statementImageFileInputRef = useRef<HTMLInputElement>(null)
+  const [subject, setSubject] = useState('')
+  const [topic, setTopic] = useState('')
+  const [subtopicsStr, setSubtopicsStr] = useState('')
+  const [skillsStr, setSkillsStr] = useState('')
+  const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
 
   // Inline editing mutations (question level only - alternatives are defined later)
   const updateQuestionMutation = useUpdateExamBaseQuestionMutation(examBaseId ?? '')
@@ -265,6 +280,7 @@ export function ExamAttemptPlayer({
   const createAlternativeMutation = useCreateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const updateAlternativeMutation = useUpdateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const deleteAlternativeMutation = useDeleteAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Check if inline editing is enabled
   const canInlineEdit = isManagementMode || (enableEditMode && isAdmin)
@@ -303,24 +319,28 @@ export function ExamAttemptPlayer({
   }, [currentQuestion, editReferenceTextValue, updateQuestionMutation])
 
   const handleSaveAlternative = useCallback(async (altId: string) => {
-    if (!editAlternativeValue.trim()) return
+    const edit = editAlternativeById[altId]
+    if (!edit?.text.trim()) return
     try {
       await updateAlternativeMutation.mutateAsync({
         alternativeId: altId,
         input: {
-          text: editAlternativeValue.trim(),
-          explanation: editAlternativeExplanation.trim(),
+          text: edit.text.trim(),
+          explanation: edit.explanation.trim(),
         },
       })
-      setEditingAlternativeId(null)
-      setEditAlternativeExplanation('')
+      setEditAlternativeById((prev) => {
+        const next = { ...prev }
+        delete next[altId]
+        return next
+      })
       setSnackbarMessage('Alternativa atualizada com sucesso!')
       setSnackbarOpen(true)
     } catch (err) {
       setSnackbarMessage(getApiMessage(err))
       setSnackbarOpen(true)
     }
-  }, [editAlternativeValue, editAlternativeExplanation, updateAlternativeMutation])
+  }, [editAlternativeById, updateAlternativeMutation])
 
   const handleAddAlternative = useCallback(async () => {
     if (!newAltKey.trim() || !newAltText.trim()) {
@@ -427,6 +447,57 @@ export function ExamAttemptPlayer({
       setSnackbarOpen(true)
     }
   }, [currentQuestion, editStatementImageUrl, updateQuestionMutation])
+
+  const handleSaveMetadata = useCallback(async () => {
+    if (!currentQuestion) return
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: {
+          subject: subject.trim(),
+          topic: topic.trim(),
+          subtopics: stringListToArray(subtopicsStr),
+          skills: stringListToArray(skillsStr),
+        },
+      })
+      setSnackbarMessage('Matéria, tópico e habilidades atualizados!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, subject, topic, subtopicsStr, skillsStr, updateQuestionMutation])
+
+  const handleGenerateExplanations = useCallback(async () => {
+    if (!currentQuestion || !examBaseId) return
+    setGenerateExplainError(null)
+    try {
+      const result = await generateExplanationsMutation.mutateAsync()
+      setTopic(result.topic)
+      setSubtopicsStr(arrayToStringList(result.subtopics))
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { topic: result.topic, subtopics: result.subtopics },
+      })
+      const alternatives = [...currentQuestion.alternatives].sort((a, b) => a.key.localeCompare(b.key))
+      const newEditById: Record<string, { text: string; explanation: string }> = {}
+      for (const e of result.explanations) {
+        const alt = alternatives.find((a) => a.key === e.key)
+        if (alt) {
+          await updateAlternativeMutation.mutateAsync({
+            alternativeId: alt.id,
+            input: { explanation: e.explanation },
+          })
+          newEditById[alt.id] = { text: alt.text, explanation: e.explanation }
+        }
+      }
+      setEditAlternativeById(newEditById)
+      setSnackbarMessage('Explicações e metadados gerados com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setGenerateExplainError(getApiMessage(err))
+    }
+  }, [currentQuestion, examBaseId, generateExplanationsMutation, updateQuestionMutation, updateAlternativeMutation])
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -568,12 +639,16 @@ export function ExamAttemptPlayer({
   useEffect(() => {
     setEditingStatement(false)
     setEditingReferenceText(false)
-    setEditingAlternativeId(null)
-    setEditAlternativeExplanation('')
+    setEditAlternativeById({})
+    setGenerateExplainError(null)
     setEditStatementImageUrl(currentQuestion?.statementImageUrl ?? '')
     setStatementImageLoadError(false)
     setUploadImageError(null)
-  }, [currentQuestion?.id, currentQuestion?.statementImageUrl])
+    setSubject(currentQuestion?.subject ?? '')
+    setTopic(currentQuestion?.topic ?? '')
+    setSubtopicsStr(arrayToStringList(currentQuestion?.subtopics ?? []))
+    setSkillsStr(arrayToStringList(currentQuestion?.skills ?? []))
+  }, [currentQuestion?.id, currentQuestion?.statementImageUrl, currentQuestion?.subject, currentQuestion?.topic, currentQuestion?.subtopics, currentQuestion?.skills])
 
   function getQuestionButtonStyle(index: number) {
     const isCurrent = currentQuestionIndex === index
@@ -830,8 +905,118 @@ export function ExamAttemptPlayer({
               <div className="flex-1 overflow-x-hidden p-5 min-h-0">
               <CustomTabPanel value={value} hidden={value !== 0}>
                 <QuestionSlide key={currentQuestionIndex} direction={slideDirection}>
-                  {currentQuestion && (
+                  {currentQuestion && (() => {
+                    const originalSubtopics = arrayToStringList(currentQuestion.subtopics ?? [])
+                    const originalSkills = arrayToStringList(currentQuestion.skills ?? [])
+                    const isSubjectChanged = subject !== (currentQuestion.subject ?? '')
+                    const isTopicChanged = topic !== (currentQuestion.topic ?? '')
+                    const isSubtopicsChanged = subtopicsStr !== originalSubtopics
+                    const isSkillsChanged = skillsStr !== originalSkills
+                    const isReferenceTextChanged = editReferenceTextValue !== (currentQuestion.referenceText ?? '')
+                    const isStatementChanged = editStatementValue !== currentQuestion.statement
+                    const isStatementImageUrlChanged = editStatementImageUrl !== (currentQuestion.statementImageUrl ?? '')
+                    const changedFieldSx = { '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'warning.main', borderWidth: 2 } } }
+                    return (
                     <div className="flex flex-col gap-6">
+                      {/* Gerar explicações por IA */}
+                      {canInlineEdit && (
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            startIcon={<AutoAwesomeIcon />}
+                            onClick={handleGenerateExplanations}
+                            disabled={
+                              generateExplanationsMutation.isPending ||
+                              currentQuestion.alternatives.length === 0 ||
+                              !currentQuestion.correctAlternative
+                            }
+                            title={
+                              !currentQuestion.correctAlternative
+                                ? 'Marque a resposta correta para gerar explicações'
+                                : undefined
+                            }
+                          >
+                            {generateExplanationsMutation.isPending ? 'Gerando…' : 'Gerar explicações e metadados por IA'}
+                          </Button>
+                          {generateExplainError && (
+                            <Alert severity="error" onClose={() => setGenerateExplainError(null)} sx={{ py: 0 }}>
+                              {generateExplainError}
+                            </Alert>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Subject, Topic, Subtopics, Skills */}
+                      {(canInlineEdit || currentQuestion.subject || currentQuestion.topic || (currentQuestion.subtopics?.length ?? 0) > 0 || (currentQuestion.skills?.length ?? 0) > 0) && (
+                      <div className="flex flex-col gap-3">
+                        {canInlineEdit ? (
+                          <>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <TextField
+                                label="Matéria"
+                                size="small"
+                                fullWidth
+                                value={subject}
+                                onChange={(e) => setSubject(e.target.value)}
+                                sx={isSubjectChanged ? changedFieldSx : undefined}
+                              />
+                              <TextField
+                                label="Tópico"
+                                size="small"
+                                fullWidth
+                                value={topic}
+                                onChange={(e) => setTopic(e.target.value)}
+                                sx={isTopicChanged ? changedFieldSx : undefined}
+                              />
+                            </div>
+                            <TextField
+                              label="Subtópicos (separados por vírgula)"
+                              size="small"
+                              fullWidth
+                              value={subtopicsStr}
+                              onChange={(e) => setSubtopicsStr(e.target.value)}
+                              placeholder="Ex: Direito Constitucional, Direitos Fundamentais"
+                              sx={isSubtopicsChanged ? changedFieldSx : undefined}
+                            />
+                            <TextField
+                              label="Habilidades (separadas por vírgula)"
+                              size="small"
+                              fullWidth
+                              value={skillsStr}
+                              onChange={(e) => setSkillsStr(e.target.value)}
+                              placeholder="Ex: Análise, Interpretação"
+                              sx={isSkillsChanged ? changedFieldSx : undefined}
+                            />
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              onClick={handleSaveMetadata}
+                              disabled={updateQuestionMutation.isPending}
+                              sx={{ alignSelf: 'flex-start' }}
+                            >
+                              {updateQuestionMutation.isPending ? 'Salvando…' : 'Salvar metadados'}
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-600">
+                            {currentQuestion.subject && (
+                              <span><span className="font-medium text-slate-500">Matéria:</span> {currentQuestion.subject}</span>
+                            )}
+                            {currentQuestion.topic && (
+                              <span><span className="font-medium text-slate-500">Tópico:</span> {currentQuestion.topic}</span>
+                            )}
+                            {(currentQuestion.subtopics?.length ?? 0) > 0 && (
+                              <span><span className="font-medium text-slate-500">Subtópicos:</span> {arrayToStringList(currentQuestion.subtopics ?? [])}</span>
+                            )}
+                            {(currentQuestion.skills?.length ?? 0) > 0 && (
+                              <span><span className="font-medium text-slate-500">Habilidades:</span> {arrayToStringList(currentQuestion.skills ?? [])}</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      )}
+
                       {(currentQuestion.referenceText || canInlineEdit) && (
                         <div className={`group/ref relative rounded-lg transition-colors ${canInlineEdit && !editingReferenceText ? 'hover:bg-slate-100 p-2' : ''}`}>
                           {canInlineEdit && !editingReferenceText && (
@@ -858,13 +1043,14 @@ export function ExamAttemptPlayer({
                             <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Texto de referência</span>
                           )}
                           {editingReferenceText && canInlineEdit ? (
-                            <div className="flex flex-col gap-2 mt-1">
+                            <div className={`flex flex-col gap-2 mt-1 rounded-lg ${isReferenceTextChanged ? 'ring-2 ring-amber-500 ring-inset p-2' : ''}`}>
                               <MarkdownEditor
                                 label=""
                                 value={editReferenceTextValue}
                                 onChange={setEditReferenceTextValue}
                                 minHeight={200}
                                 placeholder="Texto da prova ao qual a questão se refere"
+                                changed={isReferenceTextChanged}
                               />
                               <div className="flex gap-2">
                                 <Button
@@ -930,7 +1116,9 @@ export function ExamAttemptPlayer({
                                     setStatementImageLoadError(false)
                                   }}
                                   placeholder="Ou cole a URL da imagem"
-                                  className="px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                                  className={`px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] ${
+                                    isStatementImageUrlChanged ? 'border-2 border-amber-500' : 'border-slate-300'
+                                  }`}
                                 />
                                 <Button
                                   variant="outlined"
@@ -997,13 +1185,14 @@ export function ExamAttemptPlayer({
                           </button>
                         )}
                         {editingStatement && canInlineEdit ? (
-                          <div className="flex flex-col gap-2">
+                          <div className={`flex flex-col gap-2 rounded-lg ${isStatementChanged ? 'ring-2 ring-amber-500 ring-inset p-2' : ''}`}>
                             <MarkdownEditor
                               label=""
                               value={editStatementValue}
                               onChange={setEditStatementValue}
                               minHeight={200}
                               placeholder="Enunciado da questão"
+                              changed={isStatementChanged}
                             />
                             <div className="flex gap-2">
                               <Button
@@ -1049,7 +1238,10 @@ export function ExamAttemptPlayer({
                           const keyBadge = isFinished
                             ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
-                          const isEditingThis = editingAlternativeId === alt.id
+                          const isEditingThis = alt.id in editAlternativeById
+                          const editValues = editAlternativeById[alt.id] ?? { text: alt.text, explanation: alt.explanation ?? '' }
+                          const isAltTextChanged = editValues.text !== alt.text
+                          const isAltExplanationChanged = editValues.explanation !== (alt.explanation ?? '')
                           return (
                             <div key={alt.id} className={`group relative flex items-center gap-2 rounded-lg transition-colors ${canInlineEdit && !isEditingThis ? 'hover:bg-slate-100 p-1.5' : ''}`}>
                               {!isFinished && !canInlineEdit && (
@@ -1108,9 +1300,10 @@ export function ExamAttemptPlayer({
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
-                                        setEditAlternativeValue(alt.text)
-                                        setEditAlternativeExplanation(alt.explanation ?? '')
-                                        setEditingAlternativeId(alt.id)
+                                        setEditAlternativeById((prev) => ({
+                                          ...prev,
+                                          [alt.id]: { text: alt.text, explanation: alt.explanation ?? '' },
+                                        }))
                                       }}
                                       className="p-2 rounded-lg text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm"
                                     >
@@ -1132,25 +1325,39 @@ export function ExamAttemptPlayer({
                                 </div>
                               )}
                               {isEditingThis && canInlineEdit ? (
-                                <div className="flex-1 flex flex-col gap-2 p-2 border-2 border-blue-400 rounded-lg bg-white">
+                                <div className={`flex-1 flex flex-col gap-2 p-2 border-2 rounded-lg bg-white ${
+                                  isAltTextChanged || isAltExplanationChanged ? 'border-amber-500' : 'border-blue-400'
+                                }`}>
                                   <div className="flex gap-2 items-start">
                                     <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
                                     <div className="flex-1 min-w-0">
                                       <MarkdownEditor
                                         label="Texto da alternativa"
-                                        value={editAlternativeValue}
-                                        onChange={setEditAlternativeValue}
+                                        value={editValues.text}
+                                        onChange={(val) =>
+                                          setEditAlternativeById((prev) => ({
+                                            ...prev,
+                                            [alt.id]: { ...prev[alt.id], text: val },
+                                          }))
+                                        }
                                         minHeight={140}
+                                        changed={isAltTextChanged}
                                       />
                                     </div>
                                   </div>
                                   <div>
                                     <MarkdownEditor
                                       label="Explicação"
-                                      value={editAlternativeExplanation}
-                                      onChange={setEditAlternativeExplanation}
+                                      value={editValues.explanation}
+                                      onChange={(val) =>
+                                        setEditAlternativeById((prev) => ({
+                                          ...prev,
+                                          [alt.id]: { ...prev[alt.id], explanation: val },
+                                        }))
+                                      }
                                       minHeight={180}
                                       placeholder="Explicação da alternativa"
+                                      changed={isAltExplanationChanged}
                                     />
                                   </div>
                                   <div className="flex gap-2">
@@ -1166,8 +1373,11 @@ export function ExamAttemptPlayer({
                                       variant="outlined"
                                       size="small"
                                       onClick={() => {
-                                        setEditingAlternativeId(null)
-                                        setEditAlternativeExplanation('')
+                                        setEditAlternativeById((prev) => {
+                                          const next = { ...prev }
+                                          delete next[alt.id]
+                                          return next
+                                        })
                                       }}
                                     >
                                       Cancelar
@@ -1270,7 +1480,8 @@ export function ExamAttemptPlayer({
                         </div>
                       )}
                     </div>
-                  )}
+                    )
+                  })()}
                 </QuestionSlide>
               </CustomTabPanel>
 

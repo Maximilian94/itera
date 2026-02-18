@@ -9,6 +9,8 @@ export interface MarkdownEditorProps {
   placeholder?: string
   minHeight?: number
   error?: string
+  /** When true, shows amber/yellow border to indicate unsaved changes */
+  changed?: boolean
 }
 
 export function MarkdownEditor({
@@ -18,6 +20,7 @@ export function MarkdownEditor({
   placeholder,
   minHeight = 400,
   error,
+  changed,
 }: MarkdownEditorProps) {
   return (
     <Box
@@ -25,9 +28,9 @@ export function MarkdownEditor({
         '& .w-md-editor': {
           borderRadius: 1,
           border: '1px solid',
-          borderColor: error ? 'error.main' : 'divider',
+          borderColor: error ? 'error.main' : changed ? 'warning.main' : 'divider',
           '&:focus-within': {
-            borderColor: error ? 'error.main' : 'primary.main',
+            borderColor: error ? 'error.main' : changed ? 'warning.main' : 'primary.main',
             borderWidth: 2,
             boxShadow: 1,
           },
