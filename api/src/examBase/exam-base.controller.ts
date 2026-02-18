@@ -30,8 +30,11 @@ export class ExamBaseController {
   }
 
   @Get(':id')
-  getOne(@Param('id') id: string) {
-    return this.examBases.getOne(id);
+  getOne(
+    @Param('id') id: string,
+    @Req() req: { user?: { userId: string } },
+  ) {
+    return this.examBases.getOne(id, req.user?.userId);
   }
 
   /** Creates a new exam base. Admin only. */
@@ -39,6 +42,16 @@ export class ExamBaseController {
   @Roles('ADMIN')
   create(@Body() dto: CreateExamBaseDto) {
     return this.examBases.create(dto);
+  }
+
+  /** Publishes or unpublishes an exam. Admin only. Unpublished exams are not visible to non-admin users. */
+  @Patch(':id/publish')
+  @Roles('ADMIN')
+  setPublished(
+    @Param('id') id: string,
+    @Body() body: { published: boolean },
+  ) {
+    return this.examBases.setPublished(id, body.published);
   }
 
   /** Updates an existing exam base. Admin only. */

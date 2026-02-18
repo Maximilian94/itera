@@ -1,6 +1,6 @@
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
-import { useExamsQuery } from '@/features/exams/queries/exams.queries'
+import { authService } from '@/features/auth/services/auth.service'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import HourglassTopIcon from '@mui/icons-material/HourglassTop'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
@@ -16,6 +16,7 @@ import {
 } from '@mui/material'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 
@@ -35,6 +36,11 @@ function RouteComponent() {
     const { examBoard: examBoardSlug } = Route.useParams()
 
     const { examBases } = useExamBaseFacade({ examBoardId: examBoardSlug })
+    const { data: profileData } = useQuery({
+        queryKey: ['auth', 'profile'],
+        queryFn: () => authService.getProfile(),
+    })
+    const isAdmin = profileData?.user?.role === 'ADMIN'
 
     useEffect(() => {
         console.log("examBoardSlug", examBoardSlug)
@@ -130,8 +136,8 @@ function RouteComponent() {
             {/* {isLoadingExams ? <Typography>Loading exams...</Typography> : null} */}
 
             {(examBases ?? []).map((examBase) => (
-                <Link to="/exams/$examBoard/$examId" params={{ examBoard: examBoardSlug, examId: examBase.id }}>
-                <Paper key={examBase.id} className='w-full overflow-hidden pr-4 h-min'>
+                <Link key={examBase.id} to="/exams/$examBoard/$examId" params={{ examBoard: examBoardSlug, examId: examBase.id }}>
+                <Paper className='w-full overflow-hidden pr-4 h-min'>
                     <Grid container spacing={2}>
                         <Grid size={1}>
                             <div className='w-full h-12 flex items-center justify-start'>
@@ -159,6 +165,11 @@ function RouteComponent() {
                             <div className='flex flex-col h-full w-full items-start justify-center'>
                                 <Typography variant="body1">{examBase.institution}</Typography>
                                 <Typography variant="body2">{examBase.role}</Typography>
+                                {isAdmin && !(examBase.published ?? true) && (
+                                    <Typography variant="caption" className="text-amber-600 font-medium mt-1">
+                                        Não publicado
+                                    </Typography>
+                                )}
                             </div>
 
                         </Grid>

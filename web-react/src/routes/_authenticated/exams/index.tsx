@@ -26,6 +26,7 @@ import {
   ArrowTrendingUpIcon,
   ArrowTrendingDownIcon,
   MinusIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
@@ -126,9 +127,11 @@ function BoardPill({
 
 function ExamCard({
   exam,
+  isAdmin,
   animDelay = 0,
 }: {
   exam: ExamBase
+  isAdmin?: boolean
   animDelay?: number
 }) {
   const questionCount = exam._count?.questions ?? 0
@@ -168,6 +171,15 @@ function ExamCard({
 
           {/* Info pills */}
           <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            {isAdmin && !(exam.published ?? true) && (
+              <span
+                className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
+                title="Este exame não está publicado. Usuários não podem vê-lo."
+              >
+                <EyeSlashIcon className="w-3 h-3" />
+                Não publicado
+              </span>
+            )}
             <span
               className={`inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${governmentScopeColor(exam.governmentScope)}`}
             >
@@ -916,6 +928,7 @@ function ExamsPage() {
             <ExamCard
               key={exam.id}
               exam={exam}
+              isAdmin={isAdmin}
               animDelay={250 + idx * 40}
             />
           ))}
