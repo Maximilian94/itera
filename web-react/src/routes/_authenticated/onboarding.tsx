@@ -137,6 +137,9 @@ function OnboardingPage() {
                 }`}
               >
                 {exam.institution ?? exam.name}
+                {!(exam.published ?? true) && (
+                  <span className="ml-1 text-amber-600">(Rascunho)</span>
+                )}
               </button>
             ))}
           </div>

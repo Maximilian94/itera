@@ -66,7 +66,10 @@ function ProvaPage() {
             </MenuItem>
             {examBases.map((eb) => (
               <MenuItem key={eb.id} value={eb.id}>
-                {eb.name}
+                {eb.institution ?? eb.name}
+                {!(eb.published ?? true) && (
+                  <span className="ml-1.5 text-amber-600 text-xs">(Rascunho)</span>
+                )}
               </MenuItem>
             ))}
           </Select>

@@ -192,6 +192,8 @@ model ExamBase {
   salaryBase              Decimal?         @db.Decimal(10,2)
   examDate                DateTime
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
+  /// When false, exam is only visible to admins. When true, visible to all users.
+  published               Boolean          @default(false)
 
   examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
@@ -231,6 +233,9 @@ model ExamBaseQuestion {
   // habilidades cobradas (string por enquanto)
   skills String[] @default([])
 
+  // Posição na prova (0-based)
+  position Int @default(0) @map("order")
+
   alternatives          ExamBaseQuestionAlternative[]
   attemptAnswers        ExamBaseAttemptAnswer[]
   trainingRetryAnswers  TrainingRetryAnswer[]
@@ -238,6 +243,7 @@ model ExamBaseQuestion {
   recommendationQuestionLinks SubjectFeedbackRecommendationQuestionLink[]
 
   @@index([examBaseId])
+  @@index([examBaseId, position])
   @@index([examBaseId, subject])
   @@index([examBaseId, topic])
   @@map("exam_base_questions")

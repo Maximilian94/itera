@@ -41,4 +41,14 @@ export const PARSED_QUESTION_EXAMPLE: ParsedQuestionItem[] = [
       { key: 'B', text: 'a falta de investimento.' },
     ],
   },
+  {
+    subject: 'History',
+    statement: 'Em qual ano ocorreu a Independência do Brasil?',
+    topic: 'Brasil Colônia',
+    alternatives: [
+      { key: 'A', text: '1822' },
+      { key: 'B', text: '1821' },
+      { key: 'C', text: '1823' },
+    ],
+  },
 ];

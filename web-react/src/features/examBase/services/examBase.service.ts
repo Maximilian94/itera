@@ -33,6 +33,16 @@ class ExamBaseService {
       body: JSON.stringify(input),
     })
   }
+
+  async setPublished(id: string, published: boolean) {
+    return await apiFetch<Pick<ExamBase, 'id' | 'name' | 'published'>>(
+      `${this.urlPath}/${id}/publish`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ published }),
+      },
+    )
+  }
 }
 
 export const examBaseService = new ExamBaseService()

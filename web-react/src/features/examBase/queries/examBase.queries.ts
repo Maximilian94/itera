@@ -1,3 +1,4 @@
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useQuery } from '@tanstack/react-query'
 import { examBaseService } from '../services/examBase.service'
 
@@ -11,6 +12,17 @@ export function useExamBaseQueries(input?: { examBoardId?: string }) {
     queryKey: examBaseKeys.list(input?.examBoardId),
     queryFn: () => examBaseService.list(input),
     enabled: true,
+  })
+}
+
+export function useSetPublishedMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (published: boolean) =>
+      examBaseService.setPublished(examBaseId, published),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.examBases })
+    },
   })
 }
 

@@ -30,6 +30,7 @@
     "chart.js": "^4.4.6",
     "culori": "^4.0.2",
     "dayjs": "^1.11.19",
+    "@uiw/react-md-editor": "^4.0.0",
     "lucide-react": "^0.545.0",
     "react": "^19.2.0",
     "react-chartjs-2": "^5.2.0",

@@ -9,6 +9,7 @@ export type ExamBase = {
   salaryBase: string | null
   examDate: string
   minPassingGradeNonQuota: string | null
+  published?: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; logoUrl: string } | null
   _count?: { questions: number }

@@ -250,7 +250,7 @@ export class ExamBaseAttemptService {
 
     const questions = await this.prisma.examBaseQuestion.findMany({
       where: { examBaseId },
-      orderBy: { createdAt: 'asc' },
+      orderBy: { position: 'asc' },
       select: questionSelect,
     });
 

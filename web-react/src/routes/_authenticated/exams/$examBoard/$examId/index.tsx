@@ -13,6 +13,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useState } from 'react'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { useSetPublishedMutation } from '@/features/examBase/queries/examBase.queries'
 import { examBaseService } from '@/features/examBase/services/examBase.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
@@ -35,6 +36,8 @@ import {
   MapPinIcon,
   PencilSquareIcon,
   TrophyIcon,
+  GlobeAltIcon,
+  EyeSlashIcon,
 } from '@heroicons/react/24/solid'
 import {
   AcademicCapIcon,
@@ -43,6 +46,7 @@ import {
   ChevronRightIcon,
   ClockIcon,
   ExclamationTriangleIcon,
+  PlayIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
@@ -112,6 +116,7 @@ function RouteComponent() {
   const { examBoards } = useExamBoardFacade()
   const navigate = useNavigate()
   const createAttempt = useCreateExamBaseAttemptMutation(examBaseId)
+  const setPublished = useSetPublishedMutation(examBaseId)
   const { data: attempts = [], isLoading: isLoadingAttempts, error: attemptsError } =
     useExamBaseAttemptHistoryQuery(examBaseId)
   const { data: subjectStats = [], isLoading: isLoadingSubjectStats } =
@@ -483,18 +488,70 @@ function RouteComponent() {
                     {questionCount} questões
                   </span>
                 )}
+                {isAdmin && examBase && (
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                      (examBase.published ?? false)
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-amber-50 text-amber-700'
+                    }`}
+                  >
+                    {(examBase.published ?? false) ? (
+                      <GlobeAltIcon className="w-3.5 h-3.5" />
+                    ) : (
+                      <EyeSlashIcon className="w-3.5 h-3.5" />
+                    )}
+                    {(examBase.published ?? false) ? 'Publicado' : 'Rascunho'}
+                  </span>
+                )}
               </div>
             </div>
           </div>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="sm:ml-auto shrink-0 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer shadow-sm"
-            >
-              <PencilSquareIcon className="w-4 h-4" />
-              Editar
-            </button>
+          {isAdmin && examBase && (
+            <div className="sm:ml-auto shrink-0 flex flex-wrap items-center gap-2">
+              <Tooltip
+                title={
+                  (examBase.published ?? false)
+                    ? 'Despublicar exame (usuários não poderão vê-lo)'
+                    : 'Publicar exame (usuários poderão vê-lo e fazer provas)'
+                }
+              >
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPublished.mutate(!(examBase.published ?? false))
+                  }
+                  disabled={setPublished.isPending}
+                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-sm ${
+                    (examBase.published ?? false)
+                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                  } disabled:opacity-60 disabled:cursor-not-allowed`}
+                >
+                  {setPublished.isPending ? (
+                    <span className="animate-pulse">…</span>
+                  ) : (examBase.published ?? false) ? (
+                    <>
+                      <EyeSlashIcon className="w-4 h-4" />
+                      Despublicar
+                    </>
+                  ) : (
+                    <>
+                      <GlobeAltIcon className="w-4 h-4" />
+                      Publicar
+                    </>
+                  )}
+                </button>
+              </Tooltip>
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer shadow-sm"
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+                Editar
+              </button>
+            </div>
           )}
         </div>
       </Card>
@@ -793,14 +850,24 @@ function RouteComponent() {
       {/* Gerenciar questões (Admin) */}
       {isAdmin && (
         <Card noElevation className="p-4 border border-slate-200">
-          <Link
-            to="/exams/$examBoard/$examId/questoes"
-            params={{ examBoard, examId }}
-            className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium no-underline"
-          >
-            <DocumentTextIcon className="w-5 h-5" />
-            Gerenciar questões
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link
+              to="/exams/$examBoard/$examId/questoes"
+              params={{ examBoard, examId }}
+              className="inline-flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium no-underline"
+            >
+              <DocumentTextIcon className="w-5 h-5" />
+              Gerenciar questões (Accordions)
+            </Link>
+            <Link
+              to="/exams/$examBoard/$examId/questoes-v2"
+              params={{ examBoard, examId }}
+              className="inline-flex items-center gap-2 text-violet-700 hover:text-violet-900 font-medium no-underline"
+            >
+              <PlayIcon className="w-5 h-5" />
+              Gerenciar questões v2 (Player)
+            </Link>
+          </div>
         </Card>
       )}
     </div>

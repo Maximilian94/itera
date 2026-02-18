@@ -11,6 +11,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
+import { Markdown } from '@/components/Markdown'
+import { MarkdownEditor } from '@/components/MarkdownEditor'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
@@ -196,7 +198,7 @@ export function QuestionEditor({
     setEditingAltId(alt.id)
     setEditAltKey(alt.key)
     setEditAltText(alt.text)
-    setEditAltExplanation(alt.explanation)
+    setEditAltExplanation(alt.explanation ?? '')
     setAltError(null)
   }
 
@@ -297,23 +299,17 @@ export function QuestionEditor({
           value={subtopicsStr}
           onChange={(e) => setSubtopicsStr(e.target.value)}
         />
-        <TextField
-          label="Statement"
-          size="small"
-          fullWidth
-          multiline
-          minRows={3}
+        <MarkdownEditor
+          label="Enunciado"
           value={statement}
-          onChange={(e) => setStatement(e.target.value)}
+          onChange={setStatement}
+          minHeight={400}
         />
-        <TextField
+        <MarkdownEditor
           label="Texto de referência (opcional)"
-          size="small"
-          fullWidth
-          multiline
-          minRows={2}
           value={referenceText}
-          onChange={(e) => setReferenceText(e.target.value)}
+          onChange={setReferenceText}
+          minHeight={400}
           placeholder="Texto da prova ao qual a questão se refere (ex.: texto base compartilhado por várias questões)"
         />
 
@@ -467,19 +463,17 @@ export function QuestionEditor({
                   value={editAltKey}
                   onChange={(e) => setEditAltKey(e.target.value)}
                 />
-                <TextField
-                  size="small"
-                  label="Text"
-                  multiline
+                <MarkdownEditor
+                  label="Texto da alternativa"
                   value={editAltText}
-                  onChange={(e) => setEditAltText(e.target.value)}
+                  onChange={setEditAltText}
+                  minHeight={140}
                 />
-                <TextField
-                  size="small"
-                  label="Explanation"
-                  multiline
+                <MarkdownEditor
+                  label="Explicação"
                   value={editAltExplanation}
-                  onChange={(e) => setEditAltExplanation(e.target.value)}
+                  onChange={setEditAltExplanation}
+                  minHeight={180}
                 />
                 <Stack direction="row" spacing={1}>
                   <Button
@@ -501,10 +495,15 @@ export function QuestionEditor({
               </>
             ) : (
               <>
-                <Stack direction="row" alignItems="center" justifyContent="space-between">
-                  <Typography variant="body2" fontWeight="medium">
-                    {alt.key}: {alt.text}
-                  </Typography>
+                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1}>
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography variant="body2" fontWeight="medium" component="span">
+                      {alt.key}:{' '}
+                    </Typography>
+                    <Markdown variant="body2" sx={{ display: 'inline' }}>
+                      {alt.text}
+                    </Markdown>
+                  </Box>
                   <Stack direction="row">
                     <IconButton
                       size="small"
@@ -524,9 +523,16 @@ export function QuestionEditor({
                     </IconButton>
                   </Stack>
                 </Stack>
-                <Typography variant="caption" color="text.secondary">
-                  Explanation: {alt.explanation}
-                </Typography>
+                {alt.explanation && (
+                  <Box sx={{ mt: 0.5 }}>
+                    <Typography variant="caption" color="text.secondary" component="span">
+                      Explicação:{' '}
+                    </Typography>
+                    <Markdown variant="caption" sx={{ display: 'inline' }}>
+                      {alt.explanation}
+                    </Markdown>
+                  </Box>
+                )}
               </>
             )}
           </Box>
@@ -541,19 +547,17 @@ export function QuestionEditor({
             onChange={(e) => setNewAltKey(e.target.value)}
             placeholder="A"
           />
-          <TextField
-            size="small"
-            label="Text"
-            multiline
+          <MarkdownEditor
+            label="Texto da alternativa"
             value={newAltText}
-            onChange={(e) => setNewAltText(e.target.value)}
+            onChange={setNewAltText}
+            minHeight={400}
           />
-          <TextField
-            size="small"
-            label="Explanation"
-            multiline
+          <MarkdownEditor
+            label="Explicação"
             value={newAltExplanation}
-            onChange={(e) => setNewAltExplanation(e.target.value)}
+            onChange={setNewAltExplanation}
+            minHeight={400}
           />
           <Button
             variant="outlined"

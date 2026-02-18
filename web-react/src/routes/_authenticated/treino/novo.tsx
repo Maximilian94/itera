@@ -4,9 +4,11 @@ import { PageHero } from '@/components/PageHero'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
+import { authService } from '@/features/auth/services/auth.service'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Button, CircularProgress, Tooltip } from '@mui/material'
 import {
   ArrowLeftIcon,
@@ -14,6 +16,7 @@ import {
   BuildingLibraryIcon,
   CheckIcon,
   DocumentTextIcon,
+  EyeSlashIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
@@ -58,11 +61,13 @@ function SelectableExamCard({
   exam,
   selected,
   onSelect,
+  isAdmin,
   animDelay = 0,
 }: {
   exam: ExamBase
   selected: boolean
   onSelect: () => void
+  isAdmin?: boolean
   animDelay?: number
 }) {
   const questionCount = exam._count?.questions ?? 0
@@ -130,6 +135,15 @@ function SelectableExamCard({
 
             {/* Info pills */}
             <div className="flex flex-wrap items-center gap-1.5 mb-3">
+              {isAdmin && !(exam.published ?? true) && (
+                <span
+                  className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
+                  title="Este exame não está publicado. Usuários não podem vê-lo."
+                >
+                  <EyeSlashIcon className="w-3 h-3" />
+                  Não publicado
+                </span>
+              )}
               <span
                 className={`inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${governmentScopeColor(exam.governmentScope)}`}
               >
@@ -238,6 +252,11 @@ function NovoPage() {
   const { examBases, isLoadingExamBases } = useExamBaseFacade()
   const { examBoards } = useExamBoardFacade()
   const createMutation = useCreateTrainingMutation()
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+  const isAdmin = profileData?.user?.role === 'ADMIN'
 
   const selectedExam = (examBases ?? []).find(
     (e) => e.id === selectedExamBaseId,
@@ -434,6 +453,7 @@ function NovoPage() {
                   selectedExamBaseId === exam.id ? null : exam.id,
                 )
               }
+              isAdmin={isAdmin}
               animDelay={250 + idx * 30}
             />
           ))}

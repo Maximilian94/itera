@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { GovernmentScope } from '@prisma/client';
+import { GovernmentScope, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
@@ -48,12 +48,24 @@ function assertValidGovernmentScopeLocation(input: {
 export class ExamBaseService {
   constructor(private readonly prisma: PrismaService) {}
 
+  private async isAdmin(userId: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true },
+    });
+    return user?.role === UserRole.ADMIN;
+  }
+
   async list(
     input?: { examBoardId?: string },
     userId?: string,
   ) {
+    const showUnpublished = userId ? await this.isAdmin(userId) : false;
     const examBases = await this.prisma.examBase.findMany({
-      where: { examBoardId: input?.examBoardId },
+      where: {
+        examBoardId: input?.examBoardId,
+        ...(showUnpublished ? {} : { published: true }),
+      },
       orderBy: [{ examDate: 'desc' }, { name: 'asc' }],
       select: {
         id: true,
@@ -66,6 +78,7 @@ export class ExamBaseService {
         salaryBase: true,
         examDate: true,
         minPassingGradeNonQuota: true,
+        published: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
         _count: { select: { questions: true } },
@@ -203,9 +216,13 @@ export class ExamBaseService {
     });
   }
 
-  async getOne(examBaseId: string) {
-    const examBase = await this.prisma.examBase.findUnique({
-      where: { id: examBaseId },
+  async getOne(examBaseId: string, userId?: string) {
+    const showUnpublished = userId ? await this.isAdmin(userId) : false;
+    const examBase = await this.prisma.examBase.findFirst({
+      where: {
+        id: examBaseId,
+        ...(showUnpublished ? {} : { published: true }),
+      },
       select: {
         id: true,
         name: true,
@@ -217,12 +234,30 @@ export class ExamBaseService {
         salaryBase: true,
         examDate: true,
         minPassingGradeNonQuota: true,
+        published: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
     return examBase;
+  }
+
+  async setPublished(examBaseId: string, published: boolean) {
+    const exists = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('exam base not found');
+    return this.prisma.examBase.update({
+      where: { id: examBaseId },
+      data: { published },
+      select: {
+        id: true,
+        name: true,
+        published: true,
+      },
+    });
   }
 
   create(input: {

@@ -33,6 +33,13 @@ export const examBaseQuestionsService = {
     return apiFetch<ExamBaseQuestion[]>(basePath(examBaseId), { method: 'GET' })
   },
 
+  reorder(examBaseId: string, questionIds: string[]): Promise<void> {
+    return apiFetch<void>(`${basePath(examBaseId)}/reorder`, {
+      method: 'PATCH',
+      body: JSON.stringify({ questionIds }),
+    })
+  },
+
   getQuestionsCountBySubject(
     examBaseId: string,
   ): Promise<Array<{ subject: string; count: number }>> {
@@ -77,12 +84,13 @@ export const examBaseQuestionsService = {
   parseFromMarkdown(
     examBaseId: string,
     markdown: string,
+    provider: 'grok' | 'chatgpt' = 'grok',
   ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
     return apiFetch<{ questions: ParsedQuestionItem[]; rawResponse: string }>(
       `${basePath(examBaseId)}/parse-from-markdown`,
       {
         method: 'POST',
-        body: JSON.stringify({ markdown }),
+        body: JSON.stringify({ markdown, provider }),
       },
     )
   },
