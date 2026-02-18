@@ -18,6 +18,7 @@ import {
   PlayIcon,
   PlusCircleIcon,
   ScissorsIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid } from '@heroicons/react/24/solid'
 import {
@@ -35,6 +36,10 @@ import {
 } from '@/features/training/queries/training.queries'
 import {
   useExamBaseQuestionsQuery,
+  useUpdateExamBaseQuestionMutation,
+  useCreateAlternativeMutation,
+  useUpdateAlternativeMutation,
+  useDeleteAlternativeMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { authService } from '@/features/auth/services/auth.service'
@@ -197,6 +202,18 @@ export function ExamAttemptPlayer({
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const explanationRefsMap = useRef<Record<string, HTMLDivElement | null>>({})
 
+  // Inline editing state
+  const [editingStatement, setEditingStatement] = useState(false)
+  const [editStatementValue, setEditStatementValue] = useState('')
+  const [editingAlternativeId, setEditingAlternativeId] = useState<string | null>(null)
+  const [editAlternativeValue, setEditAlternativeValue] = useState('')
+  const [showAddAlternative, setShowAddAlternative] = useState(false)
+  const [newAltKey, setNewAltKey] = useState('')
+  const [newAltText, setNewAltText] = useState('')
+
+  // Inline editing mutations (question level only - alternatives are defined later)
+  const updateQuestionMutation = useUpdateExamBaseQuestionMutation(examBaseId ?? '')
+
   const questions: PlayerQuestion[] = isManagementMode
     ? managementQuestions
     : isRetryMode
@@ -231,6 +248,82 @@ export function ExamAttemptPlayer({
   const fullQuestion = isManagementMode
     ? managementQuestions.find(q => q.id === currentQuestion?.id)
     : fullQuestions.find(q => q.id === currentQuestion?.id)
+
+  // Alternative mutations (now that we have currentQuestion)
+  const createAlternativeMutation = useCreateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const updateAlternativeMutation = useUpdateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const deleteAlternativeMutation = useDeleteAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+
+  // Check if inline editing is enabled
+  const canInlineEdit = isManagementMode || (enableEditMode && isAdmin)
+
+  // Handlers for inline editing
+  const handleSaveStatement = useCallback(async () => {
+    if (!currentQuestion || !editStatementValue.trim()) return
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { statement: editStatementValue.trim() },
+      })
+      setEditingStatement(false)
+      setSnackbarMessage('Enunciado atualizado com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, editStatementValue, updateQuestionMutation])
+
+  const handleSaveAlternative = useCallback(async (altId: string) => {
+    if (!editAlternativeValue.trim()) return
+    try {
+      await updateAlternativeMutation.mutateAsync({
+        alternativeId: altId,
+        input: { text: editAlternativeValue.trim() },
+      })
+      setEditingAlternativeId(null)
+      setSnackbarMessage('Alternativa atualizada com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [editAlternativeValue, updateAlternativeMutation])
+
+  const handleAddAlternative = useCallback(async () => {
+    if (!newAltKey.trim() || !newAltText.trim()) {
+      setSnackbarMessage('Letra e texto são obrigatórios')
+      setSnackbarOpen(true)
+      return
+    }
+    try {
+      await createAlternativeMutation.mutateAsync({
+        key: newAltKey.trim().toUpperCase(),
+        text: newAltText.trim(),
+        explanation: '',
+      })
+      setNewAltKey('')
+      setNewAltText('')
+      setShowAddAlternative(false)
+      setSnackbarMessage('Alternativa criada com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [newAltKey, newAltText, createAlternativeMutation])
+
+  const handleDeleteAlternative = useCallback(async (altId: string) => {
+    if (!window.confirm('Deseja realmente deletar esta alternativa?')) return
+    try {
+      await deleteAlternativeMutation.mutateAsync(altId)
+      setSnackbarMessage('Alternativa deletada com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [deleteAlternativeMutation])
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -638,8 +731,50 @@ export function ExamAttemptPlayer({
                           <img src={currentQuestion.statementImageUrl} alt="Enunciado" className="w-full h-auto block" />
                         </div>
                       )}
-                      <div className="text-base font-medium text-slate-900">
-                        <Markdown>{currentQuestion.statement}</Markdown>
+                      <div className="group relative">
+                        {canInlineEdit && !editingStatement && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditStatementValue(currentQuestion.statement)
+                              setEditingStatement(true)
+                            }}
+                            className="absolute -right-2 -top-2 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                          >
+                            <PencilSquareIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {editingStatement && canInlineEdit ? (
+                          <div className="flex flex-col gap-2">
+                            <textarea
+                              value={editStatementValue}
+                              onChange={(e) => setEditStatementValue(e.target.value)}
+                              className="w-full p-3 text-base font-medium text-slate-900 border border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-y"
+                              autoFocus
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleSaveStatement}
+                                disabled={updateQuestionMutation.isPending}
+                              >
+                                {updateQuestionMutation.isPending ? 'Salvando…' : 'Salvar'}
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => setEditingStatement(false)}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-base font-medium text-slate-900">
+                            <Markdown>{currentQuestion.statement}</Markdown>
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-col gap-2">
                         {currentQuestion.alternatives.map((alt) => {
@@ -654,9 +789,10 @@ export function ExamAttemptPlayer({
                           const keyBadge = isFinished
                             ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
+                          const isEditingThis = editingAlternativeId === alt.id
                           return (
                             <div key={alt.id} className="group relative flex items-center gap-2">
-                              {!isFinished && (
+                              {!isFinished && !canInlineEdit && (
                                 <Tooltip title={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}>
                                   <button
                                     type="button"
@@ -668,7 +804,7 @@ export function ExamAttemptPlayer({
                                   </button>
                                 </Tooltip>
                               )}
-                              {isFinished && (
+                              {isFinished && !canInlineEdit && (
                                 <Tooltip title="Ver explicação">
                                   <button
                                     type="button"
@@ -684,18 +820,130 @@ export function ExamAttemptPlayer({
                                   </button>
                                 </Tooltip>
                               )}
-                              <button
-                                type="button"
-                                className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated || isManagementMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
-                                onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
-                                disabled={isEliminated || isFinished || isManagementMode}
-                              >
-                                <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
-                                <span className="text-sm text-slate-800 flex-1"><Markdown>{alt.text}</Markdown></span>
-                              </button>
+                              {canInlineEdit && !isEditingThis && (
+                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                  <Tooltip title="Editar alternativa">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        setEditAlternativeValue(alt.text)
+                                        setEditingAlternativeId(alt.id)
+                                      }}
+                                      className="p-2 rounded-lg text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm"
+                                    >
+                                      <PencilSquareIcon className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
+                                  <Tooltip title="Deletar alternativa">
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation()
+                                        handleDeleteAlternative(alt.id)
+                                      }}
+                                      className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
+                                    >
+                                      <XMarkIcon className="w-4 h-4" />
+                                    </button>
+                                  </Tooltip>
+                                </div>
+                              )}
+                              {isEditingThis && canInlineEdit ? (
+                                <div className="flex-1 flex flex-col gap-2 p-2 border-2 border-blue-400 rounded-lg bg-white">
+                                  <div className="flex gap-2 items-start">
+                                    <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
+                                    <textarea
+                                      value={editAlternativeValue}
+                                      onChange={(e) => setEditAlternativeValue(e.target.value)}
+                                      className="flex-1 p-2 text-sm text-slate-800 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-y"
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="contained"
+                                      size="small"
+                                      onClick={() => handleSaveAlternative(alt.id)}
+                                      disabled={updateAlternativeMutation.isPending}
+                                    >
+                                      {updateAlternativeMutation.isPending ? 'Salvando…' : 'Salvar'}
+                                    </Button>
+                                    <Button
+                                      variant="outlined"
+                                      size="small"
+                                      onClick={() => setEditingAlternativeId(null)}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated || isManagementMode ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
+                                  onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
+                                  disabled={isEliminated || isFinished || isManagementMode}
+                                >
+                                  <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
+                                  <span className="text-sm text-slate-800 flex-1"><Markdown>{alt.text}</Markdown></span>
+                                </button>
+                              )}
                             </div>
                           )
                         })}
+                        {canInlineEdit && !showAddAlternative && (
+                          <Button
+                            variant="outlined"
+                            size="small"
+                            onClick={() => setShowAddAlternative(true)}
+                            startIcon={<PlusCircleIcon className="w-4 h-4" />}
+                            sx={{ alignSelf: 'flex-start' }}
+                          >
+                            Adicionar alternativa
+                          </Button>
+                        )}
+                        {canInlineEdit && showAddAlternative && (
+                          <div className="flex flex-col gap-2 p-3 border-2 border-violet-300 rounded-lg bg-violet-50/30">
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={newAltKey}
+                                onChange={(e) => setNewAltKey(e.target.value.toUpperCase())}
+                                placeholder="Letra (ex: A)"
+                                maxLength={1}
+                                className="w-16 p-2 text-center text-sm font-semibold border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-500"
+                              />
+                              <textarea
+                                value={newAltText}
+                                onChange={(e) => setNewAltText(e.target.value)}
+                                placeholder="Texto da alternativa..."
+                                className="flex-1 p-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[60px] resize-y"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                variant="contained"
+                                size="small"
+                                onClick={handleAddAlternative}
+                                disabled={createAlternativeMutation.isPending}
+                              >
+                                {createAlternativeMutation.isPending ? 'Adicionando…' : 'Adicionar'}
+                              </Button>
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={() => {
+                                  setShowAddAlternative(false)
+                                  setNewAltKey('')
+                                  setNewAltText('')
+                                }}
+                              >
+                                Cancelar
+                              </Button>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       {trainingProvaMode && (
                         <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 mt-2">
