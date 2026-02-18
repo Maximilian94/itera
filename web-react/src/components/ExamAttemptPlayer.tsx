@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
+import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { Card } from '@/components/Card'
 import { QuestionEditor } from '@/components/QuestionEditor'
 import {
@@ -15,12 +16,14 @@ import {
   EyeIcon,
   FlagIcon,
   PencilSquareIcon,
+  PhotoIcon,
   PlayIcon,
   PlusCircleIcon,
   ScissorsIcon,
+  TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
-import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid } from '@heroicons/react/24/solid'
+import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid, CheckCircleIcon } from '@heroicons/react/24/solid'
 import {
   useExamBaseAttemptQuery,
   useUpsertExamBaseAttemptAnswerMutation,
@@ -42,6 +45,7 @@ import {
   useDeleteAlternativeMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 import { authService } from '@/features/auth/services/auth.service'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
@@ -205,11 +209,19 @@ export function ExamAttemptPlayer({
   // Inline editing state
   const [editingStatement, setEditingStatement] = useState(false)
   const [editStatementValue, setEditStatementValue] = useState('')
+  const [editingReferenceText, setEditingReferenceText] = useState(false)
+  const [editReferenceTextValue, setEditReferenceTextValue] = useState('')
   const [editingAlternativeId, setEditingAlternativeId] = useState<string | null>(null)
   const [editAlternativeValue, setEditAlternativeValue] = useState('')
+  const [editAlternativeExplanation, setEditAlternativeExplanation] = useState('')
   const [showAddAlternative, setShowAddAlternative] = useState(false)
   const [newAltKey, setNewAltKey] = useState('')
   const [newAltText, setNewAltText] = useState('')
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const [uploadImageError, setUploadImageError] = useState<string | null>(null)
+  const [statementImageLoadError, setStatementImageLoadError] = useState(false)
+  const [editStatementImageUrl, setEditStatementImageUrl] = useState('')
+  const statementImageFileInputRef = useRef<HTMLInputElement>(null)
 
   // Inline editing mutations (question level only - alternatives are defined later)
   const updateQuestionMutation = useUpdateExamBaseQuestionMutation(examBaseId ?? '')
@@ -274,21 +286,41 @@ export function ExamAttemptPlayer({
     }
   }, [currentQuestion, editStatementValue, updateQuestionMutation])
 
+  const handleSaveReferenceText = useCallback(async () => {
+    if (!currentQuestion) return
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { referenceText: editReferenceTextValue.trim() || null },
+      })
+      setEditingReferenceText(false)
+      setSnackbarMessage('Texto de referência atualizado com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, editReferenceTextValue, updateQuestionMutation])
+
   const handleSaveAlternative = useCallback(async (altId: string) => {
     if (!editAlternativeValue.trim()) return
     try {
       await updateAlternativeMutation.mutateAsync({
         alternativeId: altId,
-        input: { text: editAlternativeValue.trim() },
+        input: {
+          text: editAlternativeValue.trim(),
+          explanation: editAlternativeExplanation.trim(),
+        },
       })
       setEditingAlternativeId(null)
+      setEditAlternativeExplanation('')
       setSnackbarMessage('Alternativa atualizada com sucesso!')
       setSnackbarOpen(true)
     } catch (err) {
       setSnackbarMessage(getApiMessage(err))
       setSnackbarOpen(true)
     }
-  }, [editAlternativeValue, updateAlternativeMutation])
+  }, [editAlternativeValue, editAlternativeExplanation, updateAlternativeMutation])
 
   const handleAddAlternative = useCallback(async () => {
     if (!newAltKey.trim() || !newAltText.trim()) {
@@ -324,6 +356,77 @@ export function ExamAttemptPlayer({
       setSnackbarOpen(true)
     }
   }, [deleteAlternativeMutation])
+
+  const handleSetCorrectAlternative = useCallback(async (altKey: string) => {
+    if (!currentQuestion) return
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { correctAlternative: altKey },
+      })
+      setSnackbarMessage('Resposta correta atualizada!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, updateQuestionMutation])
+
+  const handleStatementImageFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !currentQuestion || !examBaseId) return
+    e.target.value = ''
+    setUploadImageError(null)
+    setUploadingImage(true)
+    try {
+      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { statementImageUrl: url },
+      })
+      setStatementImageLoadError(false)
+      setSnackbarMessage('Imagem enviada com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setUploadImageError(getApiMessage(err))
+    } finally {
+      setUploadingImage(false)
+    }
+  }, [currentQuestion, examBaseId, updateQuestionMutation])
+
+  const handleRemoveStatementImage = useCallback(async () => {
+    if (!currentQuestion) return
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { statementImageUrl: null },
+      })
+      setStatementImageLoadError(false)
+      setEditStatementImageUrl('')
+      setSnackbarMessage('Imagem removida com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, updateQuestionMutation])
+
+  const handleApplyStatementImageUrl = useCallback(async () => {
+    if (!currentQuestion) return
+    const url = editStatementImageUrl.trim()
+    try {
+      await updateQuestionMutation.mutateAsync({
+        questionId: currentQuestion.id,
+        input: { statementImageUrl: url || null },
+      })
+      setStatementImageLoadError(false)
+      setSnackbarMessage(url ? 'URL da imagem aplicada!' : 'Imagem removida.')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, editStatementImageUrl, updateQuestionMutation])
 
   const unansweredIndices = React.useMemo(() => {
     return questions
@@ -460,6 +563,17 @@ export function ExamAttemptPlayer({
   useEffect(() => {
     setValue(0)
   }, [currentQuestionIndex])
+
+  // Reset inline editing state when switching questions
+  useEffect(() => {
+    setEditingStatement(false)
+    setEditingReferenceText(false)
+    setEditingAlternativeId(null)
+    setEditAlternativeExplanation('')
+    setEditStatementImageUrl(currentQuestion?.statementImageUrl ?? '')
+    setStatementImageLoadError(false)
+    setUploadImageError(null)
+  }, [currentQuestion?.id, currentQuestion?.statementImageUrl])
 
   function getQuestionButtonStyle(index: number) {
     const isCurrent = currentQuestionIndex === index
@@ -718,20 +832,158 @@ export function ExamAttemptPlayer({
                 <QuestionSlide key={currentQuestionIndex} direction={slideDirection}>
                   {currentQuestion && (
                     <div className="flex flex-col gap-6">
-                      {currentQuestion.referenceText && (
-                        <div>
-                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Texto de referência</span>
-                          <div className="mt-1 text-sm text-slate-700">
-                            <Markdown>{currentQuestion.referenceText}</Markdown>
-                          </div>
+                      {(currentQuestion.referenceText || canInlineEdit) && (
+                        <div className={`group/ref relative rounded-lg transition-colors ${canInlineEdit && !editingReferenceText ? 'hover:bg-slate-100 p-2' : ''}`}>
+                          {canInlineEdit && !editingReferenceText && (
+                            <div className="flex items-start justify-between gap-2">
+                              <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                                Texto de referência
+                                {!currentQuestion.referenceText && (
+                                  <span className="ml-1 font-normal normal-case text-slate-400">(opcional)</span>
+                                )}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setEditReferenceTextValue(currentQuestion.referenceText ?? '')
+                                  setEditingReferenceText(true)
+                                }}
+                                className="p-2 rounded-lg text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm opacity-0 group-hover/ref:opacity-100 transition-opacity z-10"
+                              >
+                                <PencilSquareIcon className="w-4 h-4" />
+                              </button>
+                            </div>
+                          )}
+                          {!canInlineEdit && (
+                            <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Texto de referência</span>
+                          )}
+                          {editingReferenceText && canInlineEdit ? (
+                            <div className="flex flex-col gap-2 mt-1">
+                              <MarkdownEditor
+                                label=""
+                                value={editReferenceTextValue}
+                                onChange={setEditReferenceTextValue}
+                                minHeight={200}
+                                placeholder="Texto da prova ao qual a questão se refere"
+                              />
+                              <div className="flex gap-2">
+                                <Button
+                                  variant="contained"
+                                  size="small"
+                                  onClick={handleSaveReferenceText}
+                                  disabled={updateQuestionMutation.isPending}
+                                >
+                                  {updateQuestionMutation.isPending ? 'Salvando…' : 'Salvar'}
+                                </Button>
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={() => setEditingReferenceText(false)}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </div>
+                          ) : currentQuestion.referenceText ? (
+                            <div className="mt-1 text-sm text-slate-700">
+                              <Markdown>{currentQuestion.referenceText}</Markdown>
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-sm text-slate-400 italic">
+                              Nenhum texto de referência. Clique no ícone de editar para adicionar.
+                            </div>
+                          )}
                         </div>
                       )}
-                      {currentQuestion.statementImageUrl && (
-                        <div className="max-w-[560px] rounded-lg border border-slate-300 overflow-hidden">
-                          <img src={currentQuestion.statementImageUrl} alt="Enunciado" className="w-full h-auto block" />
+                      {(currentQuestion.statementImageUrl || canInlineEdit) && (
+                        <div className="flex flex-col gap-2">
+                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
+                            Imagem do enunciado
+                            {!currentQuestion.statementImageUrl && canInlineEdit && (
+                              <span className="ml-1 font-normal normal-case text-slate-400">(opcional)</span>
+                            )}
+                          </span>
+                          {canInlineEdit && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              <input
+                                ref={statementImageFileInputRef}
+                                type="file"
+                                accept="image/jpeg,image/png,image/gif,image/webp"
+                                onChange={handleStatementImageFile}
+                                className="hidden"
+                              />
+                              <Button
+                                variant="outlined"
+                                size="small"
+                                startIcon={<PhotoIcon className="w-4 h-4" />}
+                                onClick={() => statementImageFileInputRef.current?.click()}
+                                disabled={uploadingImage}
+                              >
+                                {uploadingImage ? 'Enviando…' : 'Enviar imagem'}
+                              </Button>
+                              <div className="flex items-center gap-1">
+                                <input
+                                  type="text"
+                                  value={editStatementImageUrl}
+                                  onChange={(e) => {
+                                    setEditStatementImageUrl(e.target.value)
+                                    setStatementImageLoadError(false)
+                                  }}
+                                  placeholder="Ou cole a URL da imagem"
+                                  className="px-2 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px]"
+                                />
+                                <Button
+                                  variant="outlined"
+                                  size="small"
+                                  onClick={handleApplyStatementImageUrl}
+                                  disabled={updateQuestionMutation.isPending}
+                                >
+                                  Aplicar
+                                </Button>
+                              </div>
+                              {currentQuestion.statementImageUrl && (
+                                <Tooltip title="Remover imagem">
+                                  <button
+                                    type="button"
+                                    onClick={handleRemoveStatementImage}
+                                    disabled={updateQuestionMutation.isPending}
+                                    className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                </Tooltip>
+                              )}
+                            </div>
+                          )}
+                          {uploadImageError && (
+                            <Alert severity="error" onClose={() => setUploadImageError(null)} sx={{ py: 0 }}>
+                              {uploadImageError}
+                            </Alert>
+                          )}
+                          {currentQuestion.statementImageUrl ? (
+                            <div className="max-w-[560px] rounded-lg border border-slate-300 overflow-hidden">
+                              {statementImageLoadError ? (
+                                <div className="p-4 text-sm text-slate-500 bg-slate-50">
+                                  Não foi possível carregar a imagem.
+                                </div>
+                              ) : (
+                                <img
+                                  src={currentQuestion.statementImageUrl}
+                                  alt="Enunciado"
+                                  className="w-full h-auto block"
+                                  onError={() => setStatementImageLoadError(true)}
+                                  onLoad={() => setStatementImageLoadError(false)}
+                                />
+                              )}
+                            </div>
+                          ) : canInlineEdit ? (
+                            <p className="text-sm text-slate-400 italic">
+                              Nenhuma imagem. Envie um arquivo ou cole a URL.
+                            </p>
+                          ) : null}
                         </div>
                       )}
-                      <div className="group relative">
+                      <div className={`group relative rounded-lg transition-colors ${canInlineEdit && !editingStatement ? 'hover:bg-slate-100 p-2' : ''}`}>
                         {canInlineEdit && !editingStatement && (
                           <button
                             type="button"
@@ -739,18 +991,19 @@ export function ExamAttemptPlayer({
                               setEditStatementValue(currentQuestion.statement)
                               setEditingStatement(true)
                             }}
-                            className="absolute -right-2 -top-2 p-2 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                            className="absolute -right-2 -top-2 p-2 rounded-lg text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity z-10"
                           >
                             <PencilSquareIcon className="w-4 h-4" />
                           </button>
                         )}
                         {editingStatement && canInlineEdit ? (
                           <div className="flex flex-col gap-2">
-                            <textarea
+                            <MarkdownEditor
+                              label=""
                               value={editStatementValue}
-                              onChange={(e) => setEditStatementValue(e.target.value)}
-                              className="w-full p-3 text-base font-medium text-slate-900 border border-blue-400 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[100px] resize-y"
-                              autoFocus
+                              onChange={setEditStatementValue}
+                              minHeight={200}
+                              placeholder="Enunciado da questão"
                             />
                             <div className="flex gap-2">
                               <Button
@@ -777,21 +1030,28 @@ export function ExamAttemptPlayer({
                         )}
                       </div>
                       <div className="flex flex-col gap-2">
+                        {canInlineEdit && !currentQuestion.correctAlternative && currentQuestion.alternatives.length > 0 && (
+                          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
+                            <CheckCircleIcon className="w-4 h-4 shrink-0" />
+                            Marque a resposta correta passando o mouse sobre a alternativa e clicando no ícone ✓
+                          </p>
+                        )}
                         {currentQuestion.alternatives.map((alt) => {
                           const isEliminated = eliminatedSet.has(alt.id)
                           const isSelected = selectedAlternativeId === alt.id
                           const isCorrect = currentQuestion.correctAlternative === alt.key
                           const isWrong = isFinished && isSelected && !isCorrect
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[currentQuestion.alternatives.findIndex((a) => a.id === alt.id)] ?? alt.key
+                          const showCorrectStyling = isCorrect && (isFinished || canInlineEdit)
                           const optionBg = isFinished
                             ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
-                            : isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-slate-300 hover:bg-slate-50'
+                            : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-slate-300 hover:bg-slate-50'
                           const keyBadge = isFinished
                             ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
-                            : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
+                            : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
                           const isEditingThis = editingAlternativeId === alt.id
                           return (
-                            <div key={alt.id} className="group relative flex items-center gap-2">
+                            <div key={alt.id} className={`group relative flex items-center gap-2 rounded-lg transition-colors ${canInlineEdit && !isEditingThis ? 'hover:bg-slate-100 p-1.5' : ''}`}>
                               {!isFinished && !canInlineEdit && (
                                 <Tooltip title={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}>
                                   <button
@@ -822,12 +1082,34 @@ export function ExamAttemptPlayer({
                               )}
                               {canInlineEdit && !isEditingThis && (
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                                  {isCorrect ? (
+                                    <Tooltip title="Resposta correta">
+                                      <span className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium text-emerald-700 bg-emerald-100 border border-emerald-200 shadow-sm">
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                        Correta
+                                      </span>
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip title="Marcar como resposta correta">
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleSetCorrectAlternative(alt.key)
+                                        }}
+                                        className="p-2 rounded-lg text-emerald-600 bg-white border border-emerald-200 hover:bg-emerald-50 hover:border-emerald-300 shadow-sm"
+                                      >
+                                        <CheckCircleIcon className="w-4 h-4" />
+                                      </button>
+                                    </Tooltip>
+                                  )}
                                   <Tooltip title="Editar alternativa">
                                     <button
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation()
                                         setEditAlternativeValue(alt.text)
+                                        setEditAlternativeExplanation(alt.explanation ?? '')
                                         setEditingAlternativeId(alt.id)
                                       }}
                                       className="p-2 rounded-lg text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 shadow-sm"
@@ -853,11 +1135,22 @@ export function ExamAttemptPlayer({
                                 <div className="flex-1 flex flex-col gap-2 p-2 border-2 border-blue-400 rounded-lg bg-white">
                                   <div className="flex gap-2 items-start">
                                     <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
-                                    <textarea
-                                      value={editAlternativeValue}
-                                      onChange={(e) => setEditAlternativeValue(e.target.value)}
-                                      className="flex-1 p-2 text-sm text-slate-800 border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 min-h-[60px] resize-y"
-                                      autoFocus
+                                    <div className="flex-1 min-w-0">
+                                      <MarkdownEditor
+                                        label="Texto da alternativa"
+                                        value={editAlternativeValue}
+                                        onChange={setEditAlternativeValue}
+                                        minHeight={140}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <MarkdownEditor
+                                      label="Explicação"
+                                      value={editAlternativeExplanation}
+                                      onChange={setEditAlternativeExplanation}
+                                      minHeight={180}
+                                      placeholder="Explicação da alternativa"
                                     />
                                   </div>
                                   <div className="flex gap-2">
@@ -872,7 +1165,10 @@ export function ExamAttemptPlayer({
                                     <Button
                                       variant="outlined"
                                       size="small"
-                                      onClick={() => setEditingAlternativeId(null)}
+                                      onClick={() => {
+                                        setEditingAlternativeId(null)
+                                        setEditAlternativeExplanation('')
+                                      }}
                                     >
                                       Cancelar
                                     </Button>
@@ -887,6 +1183,12 @@ export function ExamAttemptPlayer({
                                 >
                                   <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
                                   <span className="text-sm text-slate-800 flex-1"><Markdown>{alt.text}</Markdown></span>
+                                  {canInlineEdit && isCorrect && (
+                                    <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md">
+                                      <CheckCircleIcon className="w-3.5 h-3.5" />
+                                      Correta
+                                    </span>
+                                  )}
                                 </button>
                               )}
                             </div>
