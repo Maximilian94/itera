@@ -2,7 +2,7 @@ import { ChevronRightIcon } from '@heroicons/react/20/solid'
 
 export default function Hero() {
     return (
-        <div className="relative isolate overflow-hidden bg-white">
+        <div className="relative isolate overflow-hidden bg-slate-50">
             <svg
                 aria-hidden="true"
                 className="absolute inset-0 -z-10 size-full stroke-gray-200 [mask-image:radial-gradient(100%_100%_at_top_right,white,transparent)]"
@@ -39,8 +39,8 @@ export default function Hero() {
                     className="aspect-[1108/632] w-[69.25rem] bg-gradient-to-r from-[#80caff] to-[#4f46e5] opacity-20"
                 />
             </div>
-            <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8">
-                <div className="mx-auto max-w-2xl shrink-0 lg:mx-0 lg:pt-8">
+            <div className="mx-auto max-w-7xl p-20 lg:flex lg:px-8">
+                <div className="mx-auto max-w-2xl shrink-0 lg:mx-0">
                     {/* <img
                         alt="Your Company"
                         src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=blue&shade=600"
@@ -57,7 +57,7 @@ export default function Hero() {
                             </span>
                         </a>
                     </div> */}
-                    <h1 className="mt-10 text-pretty text-5xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                    <h1 className="text-pretty text-5xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
                         O jeito estratégico de estudar para concurso de enfermagem.
                     </h1>
                     <p className="mt-8 text-pretty text-lg font-medium text-gray-500 sm:text-xl/8">
@@ -75,17 +75,29 @@ export default function Hero() {
                         </a>
                     </div>
                 </div>
-                <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
+
+                <div>
+                    <div className="h-full w-full bg-red-800 rounded-lg overflow-hidden">
+                    <img
+                            alt="App screenshot"
+                            src="/Screenshot 2026-02-19 at 16.05.55.png"
+
+                            className="h-full w-full object-cover object-left bg-gray-50 shadow-xl ring-1 ring-gray-900/10 ov"
+                        />
+                    </div>
+
+                </div>
+                {/* <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
                     <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
                         <img
                             alt="App screenshot"
-                            src="https://tailwindcss.com/plus-assets/img/component-images/project-app-screenshot.png"
+                            src="/Screenshot 2026-02-19 at 16.05.55.png"
                             width={2432}
                             height={1442}
                             className="w-[76rem] rounded-md bg-gray-50 shadow-xl ring-1 ring-gray-900/10"
                         />
                     </div>
-                </div>
+                </div> */}
             </div>
         </div>
     )

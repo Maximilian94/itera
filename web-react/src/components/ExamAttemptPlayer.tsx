@@ -679,7 +679,7 @@ export function ExamAttemptPlayer({
       }`
     }
     if (isCorrect) return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
-    if (isWrong) return `${base} bg-red-100 text-red-700 border border-red-200 hover:bg-red-200`
+    if (isWrong) return `${base} bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200`
     if (isAnswered) return `${base} bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200`
     if (isIncomplete) return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
@@ -816,7 +816,7 @@ export function ExamAttemptPlayer({
                     onClick={() => setDeleteQuestionDialogOpen(true)}
                     disabled={deleteQuestionMutation.isPending}
                     aria-label="Remover questão"
-                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
+                    className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors"
                   >
                     <TrashIcon className="w-5 h-5" />
                   </button>
@@ -1153,7 +1153,7 @@ export function ExamAttemptPlayer({
                                     type="button"
                                     onClick={handleRemoveStatementImage}
                                     disabled={updateQuestionMutation.isPending}
-                                    className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
+                                    className="p-2 rounded-lg text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 shadow-sm"
                                   >
                                     <TrashIcon className="w-4 h-4" />
                                   </button>
@@ -1251,10 +1251,10 @@ export function ExamAttemptPlayer({
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[currentQuestion.alternatives.findIndex((a) => a.id === alt.id)] ?? alt.key
                           const showCorrectStyling = isCorrect && (isFinished || canInlineEdit)
                           const optionBg = isFinished
-                            ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
+                            ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-rose-50 border-rose-400' : 'bg-slate-50 border-slate-300'
                             : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-slate-300 hover:bg-slate-50'
                           const keyBadge = isFinished
-                            ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
+                            ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
                             : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
                           const isEditingThis = alt.id in editAlternativeById
                           const editValues = editAlternativeById[alt.id] ?? { text: alt.text, explanation: alt.explanation ?? '' }
@@ -1335,7 +1335,7 @@ export function ExamAttemptPlayer({
                                         e.stopPropagation()
                                         handleDeleteAlternative(alt.id)
                                       }}
-                                      className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
+                                      className="p-2 rounded-lg text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 shadow-sm"
                                     >
                                       <XMarkIcon className="w-4 h-4" />
                                     </button>
@@ -1518,15 +1518,15 @@ export function ExamAttemptPlayer({
                           const variant = isCorrect ? 'correct' : isWrong ? 'wrong' : 'neutral'
                           const cardStyles = {
                             correct: 'border-2 border-emerald-400 bg-emerald-100 overflow-hidden rounded-lg',
-                            wrong: 'border-2 border-red-400 bg-red-100 overflow-hidden rounded-lg',
+                            wrong: 'border-2 border-rose-400 bg-rose-100 overflow-hidden rounded-lg',
                             neutral: 'border border-slate-300 bg-slate-50 overflow-hidden rounded-lg',
                           }
-                          const headerTextStyles = { correct: 'text-emerald-800', wrong: 'text-red-800', neutral: 'text-slate-700' }
+                          const headerTextStyles = { correct: 'text-emerald-800', wrong: 'text-rose-800', neutral: 'text-slate-700' }
                           const badgeCorrect = 'text-xs font-semibold text-emerald-700 bg-emerald-200/80 px-2 py-0.5 rounded'
-                          const badgeWrong = 'text-xs font-semibold text-red-700 bg-red-200/80 px-2 py-0.5 rounded'
+                          const badgeWrong = 'text-xs font-semibold text-rose-700 bg-rose-200/80 px-2 py-0.5 rounded'
                           const explanationWrapStyles = {
                             correct: 'border-t border-emerald-300 bg-emerald-50/70',
-                            wrong: 'border-t border-red-300 bg-red-50/70',
+                            wrong: 'border-t border-rose-300 bg-rose-50/70',
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
                           return (

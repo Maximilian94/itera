@@ -7,6 +7,7 @@ import { PlansCtaSection } from "@/components/home/PlansCtaSection";
 import { CompetitorsComparisonSection } from "@/components/home/CompetitorsComparisonSection";
 import Hero from "@/components/home/Hero";
 import Features from "@/components/home/Features";
+import CTA from "@/components/home/CTA";
 
 export default function HomePage() {
   return (
@@ -16,6 +17,7 @@ export default function HomePage() {
 
         <Features></Features>
       <CompetitorsComparisonSection />
+      <CTA />
       {/* <EvidenceBasedSection /> */}
       {/* <ProblemSolutionSection /> */}
       {/* <FeaturesSection /> */}

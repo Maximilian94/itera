@@ -14,7 +14,7 @@ const trainingCycle = [
             'Responda às questões do simulado no mesmo formato que você já conhece — como uma prova real de concurso.',
         icon: ClipboardDocumentListIcon,
         color: 'text-blue-600',
-        image: undefined, // Ex: '/images/ciclo-prova.png'
+        image: "/Screenshot 2026-02-19 at 16.21.00.png", // Ex: '/images/ciclo-prova.png'
     },
     {
         step: 2,
@@ -23,7 +23,7 @@ const trainingCycle = [
             'Receba um feedback detalhado sobre seu desempenho por assunto. Identifique seus pontos fortes e onde precisa melhorar.',
         icon: ChartBarIcon,
         color: 'text-amber-600',
-        image: undefined, // Ex: '/images/ciclo-diagnostico.png'
+        image: "/Screenshot 2026-02-19 at 16.42.39.png", // Ex: '/images/ciclo-diagnostico.png'
     },
     {
         step: 3,
@@ -32,7 +32,7 @@ const trainingCycle = [
             'Para cada recomendação: explicação do conteúdo + exercícios práticos. Marque como concluído ou avance no seu ritmo.',
         icon: BookOpenIcon,
         color: 'text-emerald-600',
-        image: undefined, // Ex: '/images/ciclo-estudo.png'
+        image: '/Screenshot 2026-02-19 at 16.46.17.png', // Ex: '/images/ciclo-estudo.png'
     },
     {
         step: 4,
@@ -41,7 +41,7 @@ const trainingCycle = [
             'Segunda chance nas questões que errou — sem ver a alternativa marcada antes. Consolide o que aprendeu.',
         icon: ArrowPathIcon,
         color: 'text-violet-600',
-        image: undefined, // Ex: '/images/ciclo-retentativa.png'
+        image: '/Screenshot 2026-02-19 at 16.47.04.png', // Ex: '/images/ciclo-retentativa.png'
     },
     {
         step: 5,
@@ -50,13 +50,13 @@ const trainingCycle = [
             'Veja sua evolução: nota inicial, antes dos estudos e nota final. Celebre o progresso conquistado.',
         icon: SparklesIcon,
         color: 'text-rose-600',
-        image: undefined, // Ex: '/images/ciclo-final.png'
+        image: '/Screenshot 2026-02-19 at 16.48.01.png', // Ex: '/images/ciclo-final.png'
     },
 ]
 
 export default function Features() {
     return (
-        <div className="overflow-hidden bg-white py-24 sm:py-32">
+        <div className="overflow-hidden bg-slate-50">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
                 <div className="mx-auto max-w-2xl text-center lg:max-w-4xl">
                     <h2 className="text-base/7 font-semibold text-indigo-600">
