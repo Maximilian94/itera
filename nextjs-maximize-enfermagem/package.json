@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@heroicons/react": "^2.2.0",
     "@sanity/image-url": "^2.0.3",
     "next": "16.1.6",
     "next-sanity": "^12.1.0",
