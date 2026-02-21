@@ -152,7 +152,7 @@ export default function Features() {
                         ).
                     </p>
                     <p className="mt-4 text-lg leading-8 text-gray-600">
-                        Em vez de estudar passivamente, indo de um simulado para outro, cada prova é feedback imediato, direcionando voce sobre quais assuntos voce precisa estudar, otimizando seu tempo evitando estudar assuntos que voce já domina.
+                        Em vez de estudar passivamente, indo de um simulado para outro, cada prova vira um feedback imediato, direcionando voce sobre quais assuntos voce precisa estudar, otimizando seu tempo evitando estudar assuntos que voce já domina.
                     </p>
                     <p className="mt-4 text-lg leading-8 text-gray-600">
                         Este direcionamento é feito através de um diagnóstico detalhado feito com IA com base no seu desempenho da ultima prova.
