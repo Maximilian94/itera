@@ -19,11 +19,11 @@ const trainingCycle = [
         step: 1,
         name: 'Escolha da prova',
         description:
-            'Comece pelo concurso que você quer passar. O sistema monta um treino sob medida com questões reais da banca.',
+            'Aqui voce deverá escolher a prova que você quer treinar. O ideal é escolher uma prova recente da banca que você está estudando.',
         bullets: [
             'Filtre por banca, órgão e cargo',
-            'Questões reais de concursos anteriores',
-            'Treino 100% direcionado ao seu objetivo',
+            'Questões reais de provas anteriores',
+            'Banco de questões em constante atualização',
         ],
         icon: MagnifyingGlassIcon,
         color: 'text-sky-600',
@@ -33,11 +33,13 @@ const trainingCycle = [
         step: 2,
         name: 'Simulado',
         description:
-            'Faça a prova no mesmo formato do concurso real. Você treina o conteúdo e também o ritmo e a pressão do dia.',
+            'Aqui voce vai fazer um simulado com as questões da prova que você escolheu. Alem das questões identicas da prova, voce terá acesso a dados adicionais, como:',
         bullets: [
-            'Formato idêntico ao da banca',
-            'Controle de tempo como na prova real',
-            'Questões com o nível de dificuldade do concurso',
+            'Justificativa sobre cada alternativa',
+            'Estatisticas da questão',
+            'Veja o seu historico de acertos e erros desta questão',
+            'Comentários de outros estudantes sobre a questão',
+            'Muito mais...'
         ],
         icon: ClipboardDocumentListIcon,
         color: 'text-blue-600',
@@ -47,11 +49,12 @@ const trainingCycle = [
         step: 3,
         name: 'Diagnóstico',
         description:
-            'Saiba exatamente onde você está forte e onde precisa melhorar. A IA analisa seu desempenho por matéria e gera recomendações personalizadas.',
+            'Ao concluir o simulado, voce receberá um diagnóstico detalhado em segundos sobre seu desempenho. Aqui voce poderá ver:',
         bullets: [
+            'Se seu desempenho seria suficiente para ser aprovado',
+            'Dados detalhados sobre suas acertos e erros',
             'Análise detalhada por matéria e assunto',
-            'Feedback da IA sobre seus erros',
-            'Plano de estudo personalizado e priorizado',
+            'Recomendações de estudo com base nos seus erros',
         ],
         icon: ChartBarIcon,
         color: 'text-amber-600',
@@ -61,11 +64,12 @@ const trainingCycle = [
         step: 4,
         name: 'Estudo dirigido',
         description:
-            'Estude apenas o que você errou. Cada recomendação vem com explicação do conteúdo e exercícios práticos para fixar.',
+            'Com base no diagnótico, nossa Interligencia Artificial irá construid um plano de estudo personalizado para você, que inclui:',
         bullets: [
-            'Conteúdo explicado de forma objetiva',
+            'Lista de assuntos segmentados por matéria sobre o que voce precisa estudar',
+            'Explicações detalhadas sobre cada assunto',
             'Exercícios para fixar cada tema',
-            'Marque o que já dominou e avance no seu ritmo',
+            'Referencia das questões erradas sobre este assunto',
         ],
         icon: BookOpenIcon,
         color: 'text-emerald-600',
@@ -75,11 +79,10 @@ const trainingCycle = [
         step: 5,
         name: 'Re-tentativa',
         description:
-            'Refaça apenas as questões que errou — sem ver sua resposta anterior. É aqui que o aprendizado se consolida de verdade.',
+            'Agora que voce seguiu o plano de estudo, voce pode fazer uma nova tentativa com as questões que voce errou. Esta etapa é essencial para consolidar o aprendizado e aumentar suas chances de aprovação.',
         bullets: [
-            'Apenas as questões que você errou',
-            'Alternativa anterior oculta',
-            'Prática de recuperação ativa da memória',
+            'Apenas as questões que voce errou na ultima tentativa otimizando seu tempo de estudo',
+            'Prática de recuperação ativa da memória se cansar com assuntos ja dominados',
         ],
         icon: ArrowPathIcon,
         color: 'text-violet-600',
@@ -89,11 +92,10 @@ const trainingCycle = [
         step: 6,
         name: 'Resultado final',
         description:
-            'Compare sua nota antes e depois do estudo. Veja a evolução concreta por matéria e celebre cada avanço.',
+            'Aqui voce terá um comparativo entre o seu conhecimento antes e depois do estudo, deixando claro o quanto voce evoluiu',
         bullets: [
             'Nota inicial vs. nota após o estudo',
             'Evolução detalhada por matéria',
-            'Histórico completo dos seus treinos',
         ],
         icon: SparklesIcon,
         color: 'text-rose-600',
@@ -132,7 +134,7 @@ export default function Features() {
             <div className="mx-auto max-w-6xl px-6 lg:px-8">
                 <div className="w-full">
                     <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
-                        Ciclo de treino
+                        Como funciona o treino?
                     </p>
                     <h2
                         id="ciclo-treino-heading"
@@ -141,19 +143,22 @@ export default function Features() {
                         6 etapas para transformar erro em aprovação
                     </h2>
                     <p className="mt-6 text-lg leading-8 text-gray-600">
-                        A Maximize é construída sobre um princípio comprovado pela ciência cognitiva:{' '}
+                        A plataforma é construída sobre um método comprovado pela ciência cognitiva chamado {''}
                         <strong className="text-gray-900">
-                            você aprende mais quando tenta lembrar do que quando apenas revisa.
+                        <em>Retrieval Practice</em>
                         </strong>
+                        {' '}(
+                            <em>Prática de Recuperação</em>
+                        ).
                     </p>
                     <p className="mt-4 text-lg leading-8 text-gray-600">
-                        Esse método se chama <em>Retrieval Practice</em> (Prática de Recuperação).
-                        Em vez de estudar passivamente, você é constantemente desafiado a recuperar
-                        a informação da memória — o que fortalece o aprendizado e reduz o esquecimento.
+                        Em vez de estudar passivamente, indo de um simulado para outro, cada prova é feedback imediato, direcionando voce sobre quais assuntos voce precisa estudar, otimizando seu tempo evitando estudar assuntos que voce já domina.
                     </p>
                     <p className="mt-4 text-lg leading-8 text-gray-600">
-                        Mas metodologia sozinha não basta. O diferencial está em como ela é aplicada.
-                        Cada treino segue um ciclo completo de 6 etapas:
+                        Este direcionamento é feito através de um diagnóstico detalhado feito com IA com base no seu desempenho da ultima prova.
+                    </p>
+                    <p className="mt-4 text-lg leading-8 text-gray-600">
+                        Todo este processo é chamado de <strong className="text-gray-900"><em>"Treino"</em></strong>. Veja com mais detalhes abaixo como ele funciona :
                     </p>
                 </div>
 
