@@ -28,14 +28,6 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/planos"
-                  className="hover:text-white transition-colors"
-                >
-                  Planos
-                </Link>
-              </li>
-              <li>
-                <Link
                   href="/blog"
                   className="hover:text-white transition-colors"
                 >
@@ -48,14 +40,6 @@ export function Footer() {
                   className="hover:text-white transition-colors"
                 >
                   Concursos
-                </Link>
-              </li>
-              <li>
-                <Link
-                  href="/sobre"
-                  className="hover:text-white transition-colors"
-                >
-                  Sobre
                 </Link>
               </li>
             </ul>

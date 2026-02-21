@@ -158,7 +158,7 @@ export default function Features() {
                         Este direcionamento é feito através de um diagnóstico detalhado feito com IA com base no seu desempenho da ultima prova.
                     </p>
                     <p className="mt-4 text-lg leading-8 text-gray-600">
-                        Todo este processo é chamado de <strong className="text-gray-900"><em>"Treino"</em></strong>. Veja com mais detalhes abaixo como ele funciona :
+                        Todo este processo nos chamamos de <strong className="text-gray-900"><em>"Treino"</em></strong>. Veja com mais detalhes abaixo como ele funciona :
                     </p>
                 </div>
 
