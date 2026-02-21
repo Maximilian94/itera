@@ -83,7 +83,7 @@ function ScoreRing({
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <span
           className={`text-2xl md:text-3xl font-bold tabular-nums ${
-            passed ? 'text-emerald-700' : 'text-rose-700'
+            passed ? 'text-emerald-700' : 'text-slate-50'
           }`}
         >
           {percentage.toFixed(0)}%
