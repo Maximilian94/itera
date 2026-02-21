@@ -1,4 +1,5 @@
 import { ChevronRightIcon } from '@heroicons/react/20/solid'
+import Image from "next/image";
 
 export default function Hero() {
     return (
@@ -39,7 +40,7 @@ export default function Hero() {
                     className="aspect-[1108/632] w-[69.25rem] bg-gradient-to-r from-[#80caff] to-[#4f46e5] opacity-20"
                 />
             </div>
-            <div className="mx-auto max-w-7xl p-20 lg:flex lg:px-8">
+            <div className="mx-auto max-w-7xl pt-20 lg:flex lg:items-stretch lg:px-8">
                 <div className="mx-auto max-w-2xl shrink-0 lg:mx-0">
                     {/* <img
                         alt="Your Company"
@@ -58,32 +59,63 @@ export default function Hero() {
                         </a>
                     </div> */}
                     <h1 className="text-pretty text-5xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                        O jeito estratégico de estudar para concurso de enfermagem.
+                    Passe no concurso de enfermagem dos seus sonhos.
                     </h1>
                     <p className="mt-8 text-pretty text-lg font-medium text-gray-500 sm:text-xl/8">
-                        Estude com um sistema que analisa sua performance, identifica seus pontos fracos e cria um plano de treino personalizado para fortalecer exatamente o que você precisa melhorar.
+                    Receba um diagnóstico preciso, estude com material personalizado pela nossa IA e veja sua nota aumentar a cada treino.
                     </p>
                     <div className="mt-10 flex items-center gap-x-6">
                         <a
                             href="#"
                             className="rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
                         >
-                            Fazer um treino grátis
+                            Iniciar meu treino inteligente (grátis)
                         </a>
                     </div>
                 </div>
 
-                <div>
-                    <div className="h-full w-full bg-red-800 rounded-lg overflow-hidden">
-                    <img
-                            alt="App screenshot"
-                            src="/Screenshot 2026-02-19 at 16.05.55.png"
+                <div className="relative w-full">
+    {/* Trending (fundo) */}
+    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+      <Image
+        src="/trending.png"
+        alt=""
+        fill
+        className="object-contain opacity-25 blur-[0.2px] scale-110"
+        priority
+      />
+    </div>
 
-                            className="h-full w-full object-cover object-left bg-gray-50 shadow-xl ring-1 ring-gray-900/10 ov"
-                        />
-                    </div>
+    {/* Enfermeira (principal) — relative para definir a altura do container */}
+    <div className="relative z-20 flex justify-center items-end pointer-events-none">
+      <Image
+        src="/nursing-3.png"
+        alt="Enfermeira"
+        width={520}
+        height={520}
+        className="drop-shadow-[0_30px_60px_rgba(37,99,235,0.18)] max-h-full w-auto"
+        priority
+      />
+    </div>
 
-                </div>
+    {/* Checklist (esquerda) */}
+    <div className="absolute left-4 top-[10%] z-30 hidden sm:block float1 pointer-events-none">
+      <Image src="/checklist.png" alt="" width={190} height={190} />
+    </div>
+
+    {/* Diagnóstico (direita) */}
+    <div className="absolute right-4 bottom-[10%] z-30 hidden sm:block float2 pointer-events-none">
+      <Image src="/diagnostico.png" alt="" width={360} height={220} />
+    </div>
+
+    {/* Badge (topo direita) */}
+    <div className="absolute right-6 top-[2%] z-30 hidden md:block float3 pointer-events-none">
+      <Image src="/badge.png" alt="" width={190} height={170} />
+    </div>
+
+    {/* Glow sutil */}
+    <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl z-10 pointer-events-none" />
+</div>
                 {/* <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
                     <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
                         <img

@@ -18,3 +18,23 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
+
+@keyframes floatA {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+@keyframes floatB {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+  100% { transform: translateY(0px); }
+}
+@keyframes floatC {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+  100% { transform: translateY(0px); }
+}
+
+.float1 { animation: floatA 6s ease-in-out infinite; }
+.float2 { animation: floatB 7s ease-in-out infinite; }
+.float3 { animation: floatC 5.5s ease-in-out infinite; }
