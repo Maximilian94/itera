@@ -28,7 +28,7 @@ export function Footer() {
               </li>
               <li>
                 <Link
-                  href="/blog"
+                  href="/blogs"
                   className="hover:text-white transition-colors"
                 >
                   Blog
