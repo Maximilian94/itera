@@ -11,8 +11,9 @@ import {
   MapPinIcon,
   MagnifyingGlassIcon,
 } from "@heroicons/react/24/outline";
-import type { MockExamBase, GovernmentScope } from "@/data/mock-concursos";
-import { MOCK_EXAM_BOARDS } from "@/data/mock-concursos";
+import type { ExamBaseFromApi } from "@/lib/concursos-api";
+
+type GovernmentScope = "MUNICIPAL" | "STATE" | "FEDERAL";
 
 function governmentScopeLabel(scope: GovernmentScope) {
   if (scope === "MUNICIPAL") return "Municipal";
@@ -52,7 +53,7 @@ type Filters = {
   state: string | null;
 };
 
-export function ConcursosList({ concursos }: { concursos: MockExamBase[] }) {
+export function ConcursosList({ concursos }: { concursos: ExamBaseFromApi[] }) {
   const [filters, setFilters] = useState<Filters>({
     search: "",
     examBoardId: null,
@@ -142,7 +143,13 @@ export function ConcursosList({ concursos }: { concursos: MockExamBase[] }) {
                   Banca
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {MOCK_EXAM_BOARDS.map((board) => (
+                  {Array.from(
+                    new Map(
+                      concursos
+                        .filter((c) => c.examBoard)
+                        .map((c) => [c.examBoard!.id, c.examBoard!])
+                    ).values()
+                  ).map((board) => (
                     <button
                       key={board.id}
                       type="button"

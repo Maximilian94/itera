@@ -8,6 +8,7 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
+import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
 import { GenerateSlugDto } from './dto/generate-slug.dto';
@@ -20,6 +21,7 @@ export class ExamBaseController {
   constructor(private readonly examBases: ExamBaseService) {}
 
   @Get()
+  @Public()
   list(
     @Query() query: GetExamBasesQueryDto,
     @Req() req: { user?: { userId: string } },
@@ -32,6 +34,7 @@ export class ExamBaseController {
 
   /** Get exam base by slug (for public landing page). Must be before :id route. */
   @Get('slug/:slug')
+  @Public()
   getBySlug(
     @Param('slug') slug: string,
     @Req() req: { user?: { userId: string } },

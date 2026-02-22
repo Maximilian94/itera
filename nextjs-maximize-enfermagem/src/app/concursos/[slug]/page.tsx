@@ -9,8 +9,9 @@ import {
   MapPinIcon,
   ArrowLeftIcon,
 } from "@heroicons/react/24/outline";
-import { MOCK_CONCURSOS } from "@/data/mock-concursos";
-import type { GovernmentScope } from "@/data/mock-concursos";
+import { fetchConcursoBySlug, fetchConcursos } from "@/lib/concursos-api";
+
+type GovernmentScope = "MUNICIPAL" | "STATE" | "FEDERAL";
 
 function governmentScopeLabel(scope: GovernmentScope) {
   if (scope === "MUNICIPAL") return "Municipal";
@@ -42,13 +43,22 @@ function formatDate(dateStr: string) {
   });
 }
 
+export const revalidate = false;
+
+export async function generateStaticParams() {
+  const concursos = await fetchConcursos();
+  return concursos.map((c) => ({ slug: c.slug }));
+}
+
+export const dynamicParams = true;
+
 export async function generateMetadata({
   params,
 }: {
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const concurso = MOCK_CONCURSOS.find((c) => c.slug === slug);
+  const concurso = await fetchConcursoBySlug(slug);
 
   if (!concurso) {
     return { title: "Concurso não encontrado" };
@@ -74,7 +84,7 @@ export default async function ConcursoPage({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  const concurso = MOCK_CONCURSOS.find((c) => c.slug === slug);
+  const concurso = await fetchConcursoBySlug(slug);
 
   if (!concurso) {
     notFound();

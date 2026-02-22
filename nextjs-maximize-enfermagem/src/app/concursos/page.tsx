@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ConcursosList } from "@/components/concursos/ConcursosList";
-import { MOCK_CONCURSOS } from "@/data/mock-concursos";
+import { fetchConcursos } from "@/lib/concursos-api";
 
 export const metadata: Metadata = {
   title: "Concursos de Enfermagem",
@@ -8,7 +8,10 @@ export const metadata: Metadata = {
     "Lista de concursos públicos de enfermagem com provas reais. Filtre por banca, escopo e estado. Estude com questões comentadas e treinos inteligentes.",
 };
 
-export default function ConcursosPage() {
+export const revalidate = false;
+
+export default async function ConcursosPage() {
+  const concursos = await fetchConcursos();
   return (
     <div className="bg-slate-50 py-8">
       <div className="mx-auto max-w-7xl px-6 lg:px-8">
@@ -22,7 +25,7 @@ export default function ConcursosPage() {
           </p>
         </div>
 
-        <ConcursosList concursos={MOCK_CONCURSOS} />
+        <ConcursosList concursos={concursos} />
       </div>
     </div>
   );
