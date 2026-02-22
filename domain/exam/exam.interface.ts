@@ -1,6 +1,5 @@
-import {APIQuestionOption, Uuid} from "../../web/src/app/services/exam/domain/exam.interface";
-
 export type Exam = ExamNotStarted | ExamInProgress | ExamFinished;
+export type Uuid = string;
 
 export interface Option {
     id: string;
