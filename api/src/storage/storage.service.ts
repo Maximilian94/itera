@@ -9,7 +9,12 @@ export class StorageService {
 
   constructor(private readonly config: ConfigService) {
     this.bucketName = this.config.get<string>('GCS_BUCKET_NAME') ?? '';
-    this.storage = new Storage();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const credentials = JSON.parse(
+      this.config.get<string>('GOOGLE_APPLICATION_CREDENTIALS_JSON') ?? '{}',
+    );
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    this.storage = new Storage({ credentials });
   }
 
   /**
