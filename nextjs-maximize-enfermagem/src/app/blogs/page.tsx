@@ -72,15 +72,9 @@ export default async function BlogsPage() {
     const posts = await client.fetch<Post[]>(POSTS_QUERY, {}, options);
 
     return (
-        <div className="bg-white py-24 sm:py-32">
+        <div className="bg-slate-50 py-4">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
                 <div className="mx-auto max-w-2xl lg:max-w-4xl">
-                    <Link
-                        href="/"
-                        className="text-sm text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                    >
-                        ← Voltar ao início
-                    </Link>
                     <h2 className="mt-6 text-pretty text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
                         Blog
                     </h2>
@@ -134,7 +128,7 @@ export default async function BlogsPage() {
                                         className="relative isolate flex flex-col gap-8 lg:flex-row"
                                     >
                                         {/* Image */}
-                                        <div className="relative aspect-video sm:aspect-2/1 lg:aspect-square lg:w-64 lg:shrink-0">
+                                        <div className="relative aspect-video sm:aspect-2/1 lg:aspect-square lg:w-48 lg:shrink-0">
                                             {imgUrl ? (
                                                 <img
                                                     alt={post.title}
