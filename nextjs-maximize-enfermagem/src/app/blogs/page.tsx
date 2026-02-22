@@ -74,15 +74,7 @@ export default async function BlogsPage() {
     return (
         <div className="bg-slate-50 py-4">
             <div className="mx-auto max-w-7xl px-6 lg:px-8">
-                <div className="mx-auto max-w-2xl lg:max-w-4xl">
-                    <h2 className="mt-6 text-pretty text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
-                        Blog
-                    </h2>
-                    <p className="mt-2 text-lg/8 text-gray-600">
-                        Dicas, estratégias e informações para você conquistar
-                        sua vaga em concursos de enfermagem.
-                    </p>
-
+                <div className="mx-auto max-w-4xl lg:max-w-6xl">
                     {posts.length === 0 ? (
                         <div className="mt-16 text-center py-24">
                             <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
@@ -109,12 +101,14 @@ export default async function BlogsPage() {
                             </p>
                         </div>
                     ) : (
-                        <div className="mt-16 space-y-20 lg:mt-20">
-                            {posts.map((post) => {
+                        <div className="mt-16 space-y-16 lg:mt-20">
+                            {/* Post em destaque (mais recente) */}
+                            {(() => {
+                                const post = posts[0];
                                 const imgUrl = post.image
                                     ? urlFor(post.image)
-                                          ?.width(600)
-                                          .height(600)
+                                          ?.width(800)
+                                          .height(500)
                                           .url()
                                     : null;
                                 const mins =
@@ -125,63 +119,147 @@ export default async function BlogsPage() {
                                 return (
                                     <article
                                         key={post._id}
-                                        className="relative isolate flex flex-col gap-8 lg:flex-row"
+                                        className="relative isolate overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-gray-900/5"
                                     >
-                                        {/* Image */}
-                                        <div className="relative aspect-video sm:aspect-2/1 lg:aspect-square lg:w-48 lg:shrink-0">
-                                            {imgUrl ? (
-                                                <img
-                                                    alt={post.title}
-                                                    src={imgUrl}
-                                                    className="absolute inset-0 size-full rounded-2xl bg-gray-50 object-cover"
-                                                />
-                                            ) : (
-                                                <ImagePlaceholder />
-                                            )}
-                                            <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10" />
-                                        </div>
-
-                                        {/* Content */}
-                                        <div>
-                                            <div className="flex items-center gap-x-4 text-xs">
-                                                <time
-                                                    dateTime={post.publishedAt}
-                                                    className="text-gray-500"
-                                                >
-                                                    {formatDate(
-                                                        post.publishedAt
+                                        <Link
+                                            href={`/blogs/${post.slug.current}`}
+                                            className="group block"
+                                        >
+                                            <div className="flex flex-col sm:flex-row">
+                                                {/* Imagem em destaque */}
+                                                <div className="relative aspect-video sm:aspect-4/3 sm:w-1/2 sm:shrink-0">
+                                                    {imgUrl ? (
+                                                        <img
+                                                            alt={post.title}
+                                                            src={imgUrl}
+                                                            className="absolute inset-0 size-full object-cover transition group-hover:scale-[1.02]"
+                                                        />
+                                                    ) : (
+                                                        <ImagePlaceholder />
                                                     )}
-                                                </time>
-                                                <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600">
-                                                    <ClockIcon className="w-3 h-3" />
-                                                    {mins} min de leitura
-                                                </span>
-                                            </div>
+                                                    <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10" />
+                                                </div>
 
-                                            <div className="group relative max-w-xl">
-                                                <h3 className="mt-3 text-lg/6 font-semibold text-gray-900 group-hover:text-gray-600">
-                                                    <Link
-                                                        href={`/blogs/${post.slug.current}`}
-                                                    >
-                                                        <span className="absolute inset-0" />
+                                                {/* Conteúdo em destaque */}
+                                                <div className="flex flex-1 flex-col justify-center p-6 sm:p-8">
+                                                    <div className="flex items-center gap-x-4 text-xs">
+                                                        <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                                                            Novidade!
+                                                        </span>
+                                                        <span className="inline-flex items-center gap-1 text-gray-500">
+                                                            <ClockIcon className="w-3 h-3" />
+                                                            {mins} min de leitura
+                                                        </span>
+                                                    </div>
+                                                    <h3 className="mt-3 text-2xl font-bold text-gray-900 group-hover:text-blue-600 sm:text-3xl">
                                                         {post.title}
-                                                    </Link>
-                                                </h3>
-                                                {post.subtitle && (
-                                                    <p className="mt-1 text-sm font-medium text-gray-500">
-                                                        {post.subtitle}
-                                                    </p>
-                                                )}
-                                                {post.excerpt && (
-                                                    <p className="mt-5 text-sm/6 text-gray-600">
-                                                        {post.excerpt}
-                                                    </p>
-                                                )}
+                                                    </h3>
+                                                    {post.subtitle && (
+                                                        <p className="mt-1 line-clamp-3 text-base font-medium text-gray-500">
+                                                            {post.subtitle}
+                                                        </p>
+                                                    )}
+                                                    {post.excerpt && (
+                                                        <p className="mt-4 text-base/6 text-gray-600 line-clamp-3">
+                                                            {post.excerpt}
+                                                        </p>
+                                                    )}
+                                                    <span className="mt-4 inline-flex items-center text-sm font-semibold text-blue-600 group-hover:underline">
+                                                        Ler mais →
+                                                    </span>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </Link>
                                     </article>
                                 );
-                            })}
+                            })()}
+
+                            {/* Demais postagens em lista */}
+                            {posts.length > 1 && (
+                                <div className="space-y-12">
+                                    <h3 className="text-lg font-semibold text-gray-900">
+                                        Outras postagens
+                                    </h3>
+                                    <div className="space-y-12">
+                                        {posts.slice(1).map((post) => {
+                                            const imgUrl = post.image
+                                                ? urlFor(post.image)
+                                                      ?.width(600)
+                                                      .height(600)
+                                                      .url()
+                                                : null;
+                                            const mins =
+                                                !post.readingTime ||
+                                                post.readingTime < 1
+                                                    ? 1
+                                                    : post.readingTime;
+
+                                            return (
+                                                <article
+                                                    key={post._id}
+                                                    className="relative isolate flex flex-col gap-8 lg:flex-row"
+                                                >
+                                                    {/* Image */}
+                                                    <div className="relative aspect-video sm:aspect-2/1 lg:aspect-square lg:w-48 lg:shrink-0">
+                                                        {imgUrl ? (
+                                                            <img
+                                                                alt={post.title}
+                                                                src={imgUrl}
+                                                                className="absolute inset-0 size-full rounded-2xl bg-gray-50 object-cover"
+                                                            />
+                                                        ) : (
+                                                            <ImagePlaceholder />
+                                                        )}
+                                                        <div className="absolute inset-0 rounded-2xl ring-1 ring-inset ring-gray-900/10" />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div>
+                                                        <div className="flex items-center gap-x-4 text-xs">
+                                                            <time
+                                                                dateTime={
+                                                                    post.publishedAt
+                                                                }
+                                                                className="text-gray-500"
+                                                            >
+                                                                {formatDate(
+                                                                    post.publishedAt
+                                                                )}
+                                                            </time>
+                                                            <span className="inline-flex items-center gap-1 rounded-full bg-gray-50 px-3 py-1.5 font-medium text-gray-600">
+                                                                <ClockIcon className="w-3 h-3" />
+                                                                {mins} min de
+                                                                leitura
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="group relative max-w-xl">
+                                                            <h3 className="mt-3 text-lg/6 font-semibold text-gray-900 group-hover:text-gray-600">
+                                                                <Link
+                                                                    href={`/blogs/${post.slug.current}`}
+                                                                >
+                                                                    <span className="absolute inset-0" />
+                                                                    {post.title}
+                                                                </Link>
+                                                            </h3>
+                                                            {post.subtitle && (
+                                                                <p className="mt-1 line-clamp-3 text-sm font-medium text-gray-500">
+                                                                    {post.subtitle}
+                                                                </p>
+                                                            )}
+                                                            {post.excerpt && (
+                                                                <p className="mt-5 text-sm/6 text-gray-600">
+                                                                    {post.excerpt}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </article>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
                 </div>

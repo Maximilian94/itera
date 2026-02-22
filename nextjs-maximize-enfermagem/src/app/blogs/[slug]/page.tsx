@@ -31,11 +31,11 @@ export default async function PostPage({
     }
 
     const postImageUrl = post.image
-        ? urlFor(post.image)?.width(550).height(310).url()
+        ? urlFor(post.image)?.width(1200).height(675).url()
         : null;
 
     return (
-        <main className="container mx-auto min-h-screen max-w-3xl p-8 flex flex-col gap-4">
+        <main className="container mx-auto min-h-screen max-w-4xl p-8 flex flex-col gap-4">
             <Link href="/blogs" className="text-sky-600 hover:underline">
                 ← Voltar ao blog
             </Link>
@@ -43,13 +43,13 @@ export default async function PostPage({
                 <img
                     src={postImageUrl}
                     alt={post.title}
-                    className="aspect-video rounded-xl"
-                    width="550"
-                    height="310"
+                    className="aspect-video w-full rounded-xl object-cover"
+                    width={1200}
+                    height={675}
                 />
             )}
             <h1 className="text-4xl font-bold mb-8">{post.title}</h1>
-            <div className="prose">
+            <div className="prose blog-post-prose w-full">
                 <p>
                     Publicado em:{" "}
                     {new Date(post.publishedAt).toLocaleDateString("pt-BR")}
