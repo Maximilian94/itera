@@ -364,7 +364,6 @@ async function main() {
       {
         id: randomUUID(),
         name: 'Prefeitura - Analista de Sistemas',
-        slug: 'cebraspe-sp-sao-paulo-2026-analista-de-sistemas',
         institution: 'Prefeitura Municipal',
         role: 'Analista de Sistemas',
         governmentScope: GovernmentScope.MUNICIPAL,
@@ -377,7 +376,6 @@ async function main() {
       {
         id: randomUUID(),
         name: 'Secretaria Estadual - Desenvolvedor',
-        slug: 'fgv-mg-2026-desenvolvedor',
         institution: 'Governo do Estado',
         role: 'Desenvolvedor',
         governmentScope: GovernmentScope.STATE,
@@ -390,7 +388,6 @@ async function main() {
       {
         id: randomUUID(),
         name: 'Órgão Federal - Engenheiro de Software',
-        slug: 'cebraspe-2026-engenheiro-de-software',
         institution: 'Administração Federal',
         role: 'Engenheiro de Software',
         governmentScope: GovernmentScope.FEDERAL,

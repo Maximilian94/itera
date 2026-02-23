@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { Public } from '../common/decorators/public.decorator';
 import { CreateExamBoardDto } from './dto/create-exam-board.dto';
 import { UpdateExamBoardDto } from './dto/update-exam-board.dto';
 import { ExamBoardService } from './exam-board.service';
@@ -17,7 +16,6 @@ export class ExamBoardController {
   constructor(private readonly examBoards: ExamBoardService) {}
 
   @Get()
-  @Public()
   list() {
     return this.examBoards.list();
   }

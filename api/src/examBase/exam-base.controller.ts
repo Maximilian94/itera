@@ -8,10 +8,8 @@ import {
   Query,
   Req,
 } from '@nestjs/common';
-import { Public } from '../common/decorators/public.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
-import { GenerateSlugDto } from './dto/generate-slug.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
 import { UpdateExamBaseDto } from './dto/update-exam-base.dto';
 import { ExamBaseService } from './exam-base.service';
@@ -21,25 +19,14 @@ export class ExamBaseController {
   constructor(private readonly examBases: ExamBaseService) {}
 
   @Get()
-  @Public()
   list(
     @Query() query: GetExamBasesQueryDto,
-    @Req() req: { user?: { userId: string } },
+    @Req() req: { user: { userId: string } },
   ) {
     return this.examBases.list(
       { examBoardId: query.examBoardId },
-      req.user?.userId,
+      req.user.userId,
     );
-  }
-
-  /** Get exam base by slug (for public landing page). Must be before :id route. */
-  @Get('slug/:slug')
-  @Public()
-  getBySlug(
-    @Param('slug') slug: string,
-    @Req() req: { user?: { userId: string } },
-  ) {
-    return this.examBases.getBySlug(slug, req.user?.userId);
   }
 
   @Get(':id')
@@ -48,13 +35,6 @@ export class ExamBaseController {
     @Req() req: { user?: { userId: string } },
   ) {
     return this.examBases.getOne(id, req.user?.userId);
-  }
-
-  /** Generates a slug from exam base data. Admin only. Used by the "Gerar slug" button. */
-  @Post('generate-slug')
-  @Roles('ADMIN')
-  generateSlug(@Body() body: GenerateSlugDto) {
-    return this.examBases.generateSlug(body);
   }
 
   /** Creates a new exam base. Admin only. */

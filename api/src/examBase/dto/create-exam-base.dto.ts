@@ -6,10 +6,6 @@ export class CreateExamBaseDto {
   name: string;
 
   @IsOptional()
-  @IsString()
-  slug?: string;
-
-  @IsOptional()
   @IsUUID()
   examBoardId?: string;
 
