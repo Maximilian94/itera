@@ -43,21 +43,6 @@ class ExamBaseService {
       },
     )
   }
-
-  async generateSlug(input: {
-    examBoardId?: string
-    institution?: string | null
-    state?: string | null
-    city?: string | null
-    examDate: string
-    role: string
-    excludeSlug?: string | null
-  }) {
-    return await apiFetch<{ slug: string }>(`${this.urlPath}/generate-slug`, {
-      method: 'POST',
-      body: JSON.stringify(input),
-    })
-  }
 }
 
 export const examBaseService = new ExamBaseService()
