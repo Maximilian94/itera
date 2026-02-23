@@ -1,6 +1,6 @@
 /**
  * API client for concursos (exam bases).
- * Uses only published concursos - the API filters by published: true for unauthenticated requests.
+ * Usa o endpoint público /public/exam-bases (sem autenticação, apenas publicados).
  */
 
 const getApiBaseUrl = () => {
@@ -30,7 +30,7 @@ export type ExamBaseFromApi = {
 export async function fetchConcursos(examBoardId?: string): Promise<ExamBaseFromApi[]> {
   const base = getApiBaseUrl();
   const params = examBoardId ? `?examBoardId=${examBoardId}` : "";
-  const res = await fetch(`${base}/exam-bases${params}`, {
+  const res = await fetch(`${base}/public/exam-bases${params}`, {
     next: { revalidate: false },
   });
   if (!res.ok) {
@@ -41,7 +41,7 @@ export async function fetchConcursos(examBoardId?: string): Promise<ExamBaseFrom
 
 export async function fetchConcursoBySlug(slug: string): Promise<ExamBaseFromApi | null> {
   const base = getApiBaseUrl();
-  const res = await fetch(`${base}/exam-bases/slug/${encodeURIComponent(slug)}`, {
+  const res = await fetch(`${base}/public/exam-bases/slug/${encodeURIComponent(slug)}`, {
     next: { revalidate: false },
   });
   if (res.status === 404) return null;
