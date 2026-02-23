@@ -7,6 +7,10 @@ export class UpdateExamBaseDto {
   name?: string;
 
   @IsOptional()
+  @IsString()
+  slug?: string | null;
+
+  @IsOptional()
   @IsUUID()
   examBoardId?: string | null;
 

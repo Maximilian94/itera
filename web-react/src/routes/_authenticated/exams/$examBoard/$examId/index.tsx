@@ -109,7 +109,9 @@ function RouteComponent() {
     useState('')
   const [editExamDate, setEditExamDate] = useState('')
   const [editExamBoardId, setEditExamBoardId] = useState<string>('')
+  const [editSlug, setEditSlug] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [isGeneratingSlug, setIsGeneratingSlug] = useState(false)
 
   const examBaseId = examId
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
@@ -164,6 +166,7 @@ function RouteComponent() {
       setEditMinPassingGradeNonQuota(examBase.minPassingGradeNonQuota ?? '')
       setEditExamDate(isoToDateInput(examBase.examDate))
       setEditExamBoardId(examBase.examBoardId ?? '')
+      setEditSlug(examBase.slug ?? '')
       setEditError(null)
     }
   }, [isEditing, examBase])
@@ -187,6 +190,27 @@ function RouteComponent() {
     editCity,
   ])
 
+  async function handleGenerateSlug() {
+    if (!editExamDate.trim() || !editRole.trim()) return
+    setIsGeneratingSlug(true)
+    try {
+      const { slug } = await examBaseService.generateSlug({
+        examBoardId: editExamBoardId || undefined,
+        institution: editInstitution.trim() || null,
+        state: editState.trim() || null,
+        city: editCity.trim() || null,
+        examDate: dateInputToIso(editExamDate.trim()),
+        role: editRole.trim(),
+        excludeSlug: examBase?.slug ?? null,
+      })
+      setEditSlug(slug)
+    } catch {
+      setEditError('Falha ao gerar slug')
+    } finally {
+      setIsGeneratingSlug(false)
+    }
+  }
+
   async function handleSaveEdit() {
     if (!examBase) return
     setEditError(null)
@@ -205,6 +229,7 @@ function RouteComponent() {
           : null,
         examDate: dateInputToIso(editExamDate.trim()),
         examBoardId: editExamBoardId || null,
+        slug: editSlug.trim() ? editSlug.trim() : null,
       })
       await refetchExamBases()
       setIsEditing(false)
@@ -420,6 +445,36 @@ function RouteComponent() {
                     ))}
                   </Select>
                 </FormControl>
+              </div>
+              <div className="flex gap-2 items-start">
+                <TextField
+                  label="Slug (URL)"
+                  value={editSlug}
+                  onChange={(e) => setEditSlug(e.target.value)}
+                  placeholder="ex: cebraspe-sp-2024-enfermeiro"
+                  helperText="Usado na URL: /concursos/{slug}. Deixe vazio para manter o atual."
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <Button
+                  variant="outlined"
+                  onClick={handleGenerateSlug}
+                  disabled={
+                    !editExamDate.trim() ||
+                    !editRole.trim() ||
+                    isGeneratingSlug ||
+                    isSaving
+                  }
+                  sx={{
+                    textTransform: 'none',
+                    borderRadius: 2,
+                    minWidth: 120,
+                    mt: 0.5,
+                  }}
+                >
+                  {isGeneratingSlug ? 'Gerando…' : 'Gerar slug'}
+                </Button>
               </div>
               <div className="flex justify-end gap-2 pt-2">
                 <Button

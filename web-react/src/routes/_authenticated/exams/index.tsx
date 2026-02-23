@@ -293,6 +293,8 @@ function CreateExamDialog({
     useState('')
   const [createExamDate, setCreateExamDate] = useState('')
   const [createExamBoardId, setCreateExamBoardId] = useState<string>('')
+  const [createSlug, setCreateSlug] = useState('')
+  const [isGeneratingSlug, setIsGeneratingSlug] = useState(false)
 
   const canCreate = useMemo(() => {
     if (!createName.trim() || !createRole.trim() || !createExamDate.trim())
@@ -324,7 +326,29 @@ function CreateExamDialog({
     setCreateMinPassingGradeNonQuota('')
     setCreateExamDate('')
     setCreateExamBoardId('')
+    setCreateSlug('')
     setError(null)
+  }
+
+  async function handleGenerateSlug() {
+    if (!createExamDate.trim() || !createRole.trim()) return
+    setIsGeneratingSlug(true)
+    setError(null)
+    try {
+      const { slug } = await examBaseService.generateSlug({
+        examBoardId: createExamBoardId || undefined,
+        institution: createInstitution.trim() || null,
+        state: createState.trim() || null,
+        city: createCity.trim() || null,
+        examDate: dateInputToIso(createExamDate.trim()),
+        role: createRole.trim(),
+      })
+      setCreateSlug(slug)
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Falha ao gerar slug')
+    } finally {
+      setIsGeneratingSlug(false)
+    }
   }
 
   async function handleCreate() {
@@ -343,6 +367,7 @@ function CreateExamDialog({
           : null,
         examDate: dateInputToIso(createExamDate.trim()),
         examBoardId: createExamBoardId || undefined,
+        slug: createSlug.trim() || undefined,
       })
       resetForm()
       onClose()
@@ -466,6 +491,28 @@ function CreateExamDialog({
               ))}
             </Select>
           </FormControl>
+          <div className="flex gap-2 items-start">
+            <TextField
+              label="Slug (URL)"
+              value={createSlug}
+              onChange={(e) => setCreateSlug(e.target.value)}
+              placeholder="ex: cebraspe-sp-2024-enfermeiro (opcional)"
+              helperText="Usado na URL: /concursos/{slug}. Deixe vazio para gerar automaticamente."
+              fullWidth
+            />
+            <Button
+              variant="outlined"
+              onClick={handleGenerateSlug}
+              disabled={
+                !createExamDate.trim() ||
+                !createRole.trim() ||
+                isGeneratingSlug
+              }
+              sx={{ textTransform: 'none', minWidth: 120, mt: 0.5 }}
+            >
+              {isGeneratingSlug ? 'Gerando…' : 'Gerar slug'}
+            </Button>
+          </div>
         </Stack>
       </DialogContent>
       <DialogActions>
