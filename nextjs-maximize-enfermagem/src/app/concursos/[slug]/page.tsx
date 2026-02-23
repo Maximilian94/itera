@@ -103,24 +103,31 @@ export default async function ConcursoPage({
 
         <article className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           {/* Header */}
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-            <div>
+          <div className="space-y-4">
+            {/* Primeira linha: imagem, ano, instituição */}
+            <div className="flex flex-wrap items-center gap-6">
               {concurso.examBoard?.logoUrl && (
                 <img
                   src={concurso.examBoard.logoUrl}
                   alt={concurso.examBoard.name}
-                  className="mb-4 h-12 w-12 rounded-xl object-contain"
+                  className="h-12 w-12 rounded-xl object-contain"
                 />
               )}
-              <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                {concurso.name}
-              </h1>
-              <p className="mt-1 text-lg text-slate-600">
-                {concurso.institution ?? concurso.name}
-              </p>
-              <p className="mt-1 text-slate-500">{concurso.role}</p>
+
+              <div className="flex items-center gap-2">
+                <span className="text-3xl text-slate-500 sm:text-4xl">
+                  {new Date(concurso.examDate).getFullYear()}
+                </span>
+                <span className="text-slate-300" aria-hidden>
+                  •
+                </span>
+                <span className="text-3xl font-bold text-slate-900 sm:text-4xl">
+                  {concurso.institution ?? concurso.name}
+                </span>
+              </div>
             </div>
 
+            {/* Segunda linha: chips */}
             <div className="flex flex-wrap gap-2">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium ${governmentScopeColor(concurso.governmentScope)}`}
@@ -128,13 +135,21 @@ export default async function ConcursoPage({
                 <BuildingLibraryIcon className="h-4 w-4" />
                 {governmentScopeLabel(concurso.governmentScope)}
               </span>
-              {(concurso.state || concurso.city) && (
+              {concurso.state && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
                   <MapPinIcon className="h-4 w-4" />
-                  {concurso.city ? `${concurso.city} / ` : ""}
-                  {concurso.state ?? ""}
+                  {concurso.state}
                 </span>
               )}
+              {concurso.city && (
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+                  <MapPinIcon className="h-4 w-4" />
+                  {concurso.city}
+                </span>
+              )}
+              <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-600">
+                {concurso.role}
+              </span>
             </div>
           </div>
 
