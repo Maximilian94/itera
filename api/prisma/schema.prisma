@@ -184,6 +184,7 @@ model ExamBoard {
 model ExamBase {
   id                      String           @id @default(uuid()) @db.Uuid
   name                    String
+  slug                    String?          @unique
   institution             String?
   role                    String
   governmentScope         GovernmentScope
