@@ -91,8 +91,8 @@ export default async function ConcursoPage({
   }
 
   return (
-    <div className="bg-slate-50 py-8">
-      <div className="mx-auto max-w-4xl px-6 lg:px-8">
+    <div className="flex min-h-full flex-1 flex-col bg-slate-50 py-8">
+      <div className="mx-auto w-full max-w-7xl flex-1 px-6 lg:px-8">
         <Link
           href="/concursos"
           className="mb-6 inline-flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-blue-600"
@@ -101,7 +101,7 @@ export default async function ConcursoPage({
           Voltar aos concursos
         </Link>
 
-        <article className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+        <article className="flex flex-1 flex-col rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
           {/* Header */}
           <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -201,21 +201,21 @@ export default async function ConcursoPage({
             )}
           </div>
 
-          {/* CTA */}
+          {/* Spacer + CTA */}
+          <div className="mt-10 flex-1" />
           <div className="mt-10 rounded-xl bg-blue-50 p-6">
             <h2 className="text-lg font-semibold text-slate-900">
-              Praticar com provas reais
+              Simule a prova e descubra se você teria passado
             </h2>
-            <p className="mt-2 text-slate-600">
-              Acesse a plataforma e treine com as questões deste concurso.
-              Explicações detalhadas, diagnóstico por matéria e plano de estudo
-              personalizado.
+            <p className="mt-2 text-sm text-slate-600">
+              Faça sua tentativa, compare com a nota de corte e receba um plano
+              de estudo personalizado por IA.
             </p>
             <Link
               href="https://app.maximizeenfermagem.com.br"
               className="mt-4 inline-flex rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700"
             >
-              Acessar plataforma
+              Fazer meu primeiro treino grátis
             </Link>
           </div>
         </article>
