@@ -1,10 +1,14 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { GovernmentScope, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
-  return t === '' ? null : t ?? null;
+  return t === '' ? null : (t ?? null);
 }
 
 function assertValidGovernmentScopeLocation(input: {
@@ -70,6 +74,7 @@ export class ExamBaseService {
       select: {
         id: true,
         name: true,
+        slug: true,
         institution: true,
         role: true,
         governmentScope: true,
@@ -226,6 +231,7 @@ export class ExamBaseService {
       select: {
         id: true,
         name: true,
+        slug: true,
         institution: true,
         role: true,
         governmentScope: true,
@@ -237,6 +243,35 @@ export class ExamBaseService {
         published: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, logoUrl: true } },
+      },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+    return examBase;
+  }
+
+  async getBySlug(slug: string, userId?: string) {
+    const showUnpublished = userId ? await this.isAdmin(userId) : false;
+    const examBase = await this.prisma.examBase.findFirst({
+      where: {
+        slug,
+        ...(showUnpublished ? {} : { published: true }),
+      },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        institution: true,
+        role: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        salaryBase: true,
+        examDate: true,
+        minPassingGradeNonQuota: true,
+        published: true,
+        examBoardId: true,
+        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        _count: { select: { questions: true } },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
