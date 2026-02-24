@@ -138,19 +138,42 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
           )}
         </div>
 
-        <div className="mt-10 rounded-xl border border-blue-100 bg-blue-50 p-6">
-          <h3 className="font-semibold text-gray-900">
-            Simule a prova e descubra se você teria passado
-          </h3>
-          <p className="mt-2 text-sm text-gray-600">
-            Treine com questões reais desta prova e receba feedback imediato. Ideal para se preparar para o próximo concurso.
-          </p>
-          <Link
-            href="https://app.maximizeenfermagem.com.br"
-            className="mt-4 inline-flex rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
-          >
-            Fazer meu primeiro treino grátis
-          </Link>
+        <div className="mt-10 flex flex-col overflow-hidden rounded-xl border border-blue-100 bg-blue-50 sm:flex-row sm:items-center">
+          <div className="relative shrink-0 p-4 sm:pl-4 sm:pt-4 sm:pb-4 sm:pr-0">
+            <img
+              src="/enfermeira-estudando.png"
+              alt="Enfermeira estudando"
+              className="h-48 w-full object-cover object-center sm:h-56 sm:w-64"
+            />
+            {/* Fade na borda direita (desktop) — transição suave para o fundo azul */}
+            <div
+              className="absolute inset-y-0 right-0 hidden w-24 pointer-events-none sm:block"
+              style={{
+                background: "linear-gradient(to right, transparent 0%, rgb(239 246 255) 100%)",
+              }}
+            />
+            {/* Fade na borda inferior (mobile) — transição suave para o conteúdo abaixo */}
+            <div
+              className="absolute bottom-0 left-0 right-0 h-20 pointer-events-none sm:hidden"
+              style={{
+                background: "linear-gradient(to top, rgb(239 246 255) 0%, transparent 100%)",
+              }}
+            />
+          </div>
+          <div className="flex flex-1 flex-col p-6">
+            <h3 className="font-semibold text-gray-900">
+              Simule a prova e descubra se você teria passado
+            </h3>
+            <p className="mt-2 text-sm text-gray-600">
+              Treine com questões reais desta prova e receba feedback imediato. Ideal para se preparar para o próximo concurso.
+            </p>
+            <Link
+              href="https://app.maximizeenfermagem.com.br"
+              className="mt-4 inline-flex w-fit rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+            >
+              Fazer meu primeiro treino grátis
+            </Link>
+          </div>
         </div>
       </article>
     </>
