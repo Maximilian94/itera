@@ -43,6 +43,13 @@ class ExamBaseService {
       },
     )
   }
+
+  async generateSlug(id: string) {
+    return await apiFetch<{ slug: string }>(
+      `${this.urlPath}/${id}/generate-slug`,
+      { method: 'POST' },
+    )
+  }
 }
 
 export const examBaseService = new ExamBaseService()

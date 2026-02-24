@@ -258,7 +258,7 @@ export class StripeService {
   /**
    * Creates a Stripe Checkout session for recurring subscription.
    *
-   * Flow: validate phone → load user → get or create Stripe Customer →
+   * Flow: load user → get or create Stripe Customer →
    * create Checkout Session with mode: 'subscription' → return URL.
    *
    * After payment, Stripe sends webhook checkout.session.completed and
@@ -266,12 +266,12 @@ export class StripeService {
    *
    * @param userId – User ID in the application
    * @param email – User email (for creating Customer in Stripe)
-   * @param phone – Phone (required for post-refund contact)
+   * @param phone – Phone (optional; used for post-refund contact)
    * @param priceId – Stripe price ID (price_xxx) chosen by the user
    * @param successUrl – Redirect URL after successful payment
    * @param cancelUrl – Redirect URL if user abandons checkout
    * @returns Stripe checkout session URL
-   * @throws BadRequestException if phone missing, invalid priceId, or Stripe rejects
+   * @throws BadRequestException if invalid priceId or Stripe rejects
    */
   async createCheckoutSession(
     userId: string,
@@ -281,10 +281,6 @@ export class StripeService {
     successUrl: string,
     cancelUrl: string,
   ): Promise<{ url: string }> {
-    if (!phone?.trim()) {
-      throw new BadRequestException('Telefone é obrigatório para assinar.');
-    }
-
     // Validate the priceId is in our mapping
     this.resolvePlanFromPriceId(priceId);
 
@@ -301,7 +297,7 @@ export class StripeService {
       if (!customerId) {
         const customer = await this.stripe.customers.create({
           email,
-          phone: phone.trim(),
+          ...(phone?.trim() ? { phone: phone.trim() } : {}),
           metadata: { userId },
         });
         customerId = customer.id;

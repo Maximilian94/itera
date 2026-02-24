@@ -44,6 +44,13 @@ export class ExamBaseController {
     return this.examBases.create(dto);
   }
 
+  /** Generates and saves slug for the exam base (banca-estado-cidade-ano-cargo). Admin only. */
+  @Post(':id/generate-slug')
+  @Roles('ADMIN')
+  generateSlug(@Param('id') id: string) {
+    return this.examBases.generateSlug(id);
+  }
+
   /** Publishes or unpublishes an exam. Admin only. Unpublished exams are not visible to non-admin users. */
   @Patch(':id/publish')
   @Roles('ADMIN')

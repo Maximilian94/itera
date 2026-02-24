@@ -353,7 +353,7 @@ function ProfileContent({
           </div>
         </div>
         <p className="text-xs text-slate-500 mt-4 pt-4 border-t border-slate-100">
-          O telefone é obrigatório para assinar. Também usamos para contato em caso de reembolso.
+          O telefone pode ser usado para contato em caso de reembolso.
         </p>
       </Card>
     </div>

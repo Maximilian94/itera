@@ -11,6 +11,18 @@ function normalizeOptionalText(v: string | null | undefined) {
   return t === '' ? null : (t ?? null);
 }
 
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+}
+
 function assertValidGovernmentScopeLocation(input: {
   governmentScope: GovernmentScope;
   state: string | null | undefined;
@@ -278,6 +290,39 @@ export class ExamBaseService {
     return examBase;
   }
 
+  async generateSlug(examBaseId: string): Promise<{ slug: string }> {
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: {
+        id: true,
+        role: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        examDate: true,
+        examBoard: { select: { name: true } },
+      },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+
+    const year = new Date(examBase.examDate).getFullYear().toString();
+    const parts: string[] = [];
+    if (examBase.examBoard?.name) parts.push(slugify(examBase.examBoard.name));
+    if (examBase.state) parts.push(slugify(examBase.state));
+    if (examBase.city) parts.push(slugify(examBase.city));
+    parts.push(year);
+    parts.push(slugify(examBase.role));
+
+    const slug = parts.filter(Boolean).join('-');
+    if (!slug) throw new BadRequestException('Não foi possível gerar slug (banca, estado/cidade e cargo são necessários).');
+
+    await this.prisma.examBase.update({
+      where: { id: examBaseId },
+      data: { slug },
+    });
+    return { slug };
+  }
+
   async setPublished(examBaseId: string, published: boolean) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
@@ -356,6 +401,7 @@ export class ExamBaseService {
       salaryBase?: string | number | null;
       examDate?: string;
       minPassingGradeNonQuota?: string | number | null;
+      slug?: string | null;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -392,10 +438,12 @@ export class ExamBaseService {
           input.minPassingGradeNonQuota === undefined
             ? undefined
             : input.minPassingGradeNonQuota,
+        slug: input.slug === undefined ? undefined : input.slug,
       },
       select: {
         id: true,
         name: true,
+        slug: true,
         institution: true,
         role: true,
         governmentScope: true,
