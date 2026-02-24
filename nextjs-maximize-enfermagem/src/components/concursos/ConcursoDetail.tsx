@@ -180,13 +180,21 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
   );
 }
 
-export function ConcursoDetail() {
+type ConcursoDetailProps = {
+  /** Concurso pré-carregado no servidor (SSR/SSG). Quando fornecido, não faz fetch no cliente. */
+  concurso?: ExamBaseFromApi | null;
+};
+
+export function ConcursoDetail({ concurso: initialConcurso }: ConcursoDetailProps = {}) {
   const params = useParams();
   const slug = params?.slug as string | undefined;
-  const [concurso, setConcurso] = useState<ExamBaseFromApi | null | "loading">("loading");
+  const [concurso, setConcurso] = useState<ExamBaseFromApi | null | "loading">(
+    initialConcurso ?? "loading"
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (initialConcurso) return;
     if (!slug) {
       setConcurso(null);
       return;
@@ -199,7 +207,11 @@ export function ConcursoDetail() {
         setError(err instanceof Error ? err.message : "Erro ao carregar");
         setConcurso(null);
       });
-  }, [slug]);
+  }, [slug, initialConcurso]);
+
+  if (initialConcurso) {
+    return <ConcursoContent concurso={initialConcurso} />;
+  }
 
   if (!slug) {
     return (

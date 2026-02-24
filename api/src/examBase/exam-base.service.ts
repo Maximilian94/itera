@@ -3,6 +3,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -62,7 +63,28 @@ function assertValidGovernmentScopeLocation(input: {
 
 @Injectable()
 export class ExamBaseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private async triggerRevalidate(slug?: string | null): Promise<void> {
+    const baseUrl = this.config.get<string>('NEXTJS_URL');
+    const secret = this.config.get<string>('REVALIDATE_SECRET');
+    if (!baseUrl?.trim() || !secret?.trim()) return;
+    try {
+      const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/revalidate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret, slug: slug ?? undefined }),
+      });
+      if (!res.ok) {
+        console.warn('[ExamBaseService] Revalidate failed:', res.status);
+      }
+    } catch (err) {
+      console.warn('[ExamBaseService] Revalidate error:', err);
+    }
+  }
 
   private async isAdmin(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
@@ -320,16 +342,17 @@ export class ExamBaseService {
       where: { id: examBaseId },
       data: { slug },
     });
+    await this.triggerRevalidate(slug);
     return { slug };
   }
 
   async setPublished(examBaseId: string, published: boolean) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     if (!exists) throw new NotFoundException('exam base not found');
-    return this.prisma.examBase.update({
+    const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: { published },
       select: {
@@ -338,6 +361,8 @@ export class ExamBaseService {
         published: true,
       },
     });
+    await this.triggerRevalidate(exists.slug);
+    return result;
   }
 
   create(input: {
@@ -422,7 +447,7 @@ export class ExamBaseService {
       city: mergedCity,
     });
 
-    return this.prisma.examBase.update({
+    const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: {
         name: input.name,
@@ -456,6 +481,8 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
     });
+    await this.triggerRevalidate(result.slug);
+    return result;
   }
 }
 
