@@ -5,6 +5,17 @@ import type { ExamBaseFromApi } from "@/lib/concursos-api";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { fetchConcursoBySlug } from "@/lib/concursos-api";
+import {
+  CalendarDaysIcon,
+  DocumentTextIcon,
+  BanknotesIcon,
+  TrophyIcon,
+  BuildingLibraryIcon,
+  MapPinIcon,
+  BuildingOffice2Icon,
+  BriefcaseIcon,
+  AcademicCapIcon,
+} from "@heroicons/react/24/outline";
 
 const SCOPE_LABELS: Record<string, string> = {
   MUNICIPAL: "Municipal",
@@ -37,56 +48,95 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
       </Link>
 
       <article className="mt-6 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
-        <div className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+        <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-gray-900">
           <span>{year}</span>
-          <span>·</span>
+          <span className="text-slate-400 font-normal">·</span>
+          {concurso.governmentScope === "MUNICIPAL" && concurso.city && (
+            <>
+              <span>{concurso.city}</span>
+              <span className="text-slate-400 font-normal">·</span>
+            </>
+          )}
+          {concurso.governmentScope === "STATE" && concurso.state && (
+            <>
+              <span>{concurso.state}</span>
+              <span className="text-slate-400 font-normal">·</span>
+            </>
+          )}
           <span>{concurso.institution ?? "Concurso"}</span>
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+        <div className="mt-3 flex flex-wrap gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+            <BuildingLibraryIcon className="h-4 w-4 text-slate-500" />
             {SCOPE_LABELS[concurso.governmentScope] ?? concurso.governmentScope}
           </span>
           {concurso.state && (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+              <MapPinIcon className="h-4 w-4 text-slate-500" />
               {concurso.state}
-              {concurso.city ? ` - ${concurso.city}` : ""}
             </span>
           )}
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+          {concurso.city && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+              <BuildingOffice2Icon className="h-4 w-4 text-slate-500" />
+              {concurso.city}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+            <BriefcaseIcon className="h-4 w-4 text-slate-500" />
             {concurso.role}
           </span>
           {concurso.examBoard && (
-            <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-medium text-slate-700">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-sm font-medium text-slate-700">
+              <AcademicCapIcon className="h-4 w-4 text-slate-500" />
               {concurso.examBoard.name}
             </span>
           )}
         </div>
 
-        <h1 className="mt-6 text-2xl font-bold text-gray-900">{concurso.name}</h1>
-
-        <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Data da prova</dt>
-            <dd className="mt-1 text-gray-900">{formatDate(concurso.examDate)}</dd>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
+              <CalendarDaysIcon className="h-5 w-5 text-blue-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Data da prova</p>
+              <p className="mt-1 font-semibold text-gray-900">{formatDate(concurso.examDate)}</p>
+            </div>
           </div>
-          <div>
-            <dt className="text-sm font-medium text-gray-500">Questões</dt>
-            <dd className="mt-1 text-gray-900">{concurso._count.questions}</dd>
+          <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100">
+              <DocumentTextIcon className="h-5 w-5 text-emerald-600" />
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Questões</p>
+              <p className="mt-1 font-semibold text-gray-900">{concurso._count.questions}</p>
+            </div>
           </div>
           {concurso.salaryBase && (
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Remuneração base</dt>
-              <dd className="mt-1 text-gray-900">{concurso.salaryBase}</dd>
+            <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                <BanknotesIcon className="h-5 w-5 text-amber-600" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Remuneração base</p>
+                <p className="mt-1 font-semibold text-gray-900">{concurso.salaryBase}</p>
+              </div>
             </div>
           )}
           {concurso.minPassingGradeNonQuota && (
-            <div>
-              <dt className="text-sm font-medium text-gray-500">Nota mínima (ampla)</dt>
-              <dd className="mt-1 text-gray-900">{concurso.minPassingGradeNonQuota}</dd>
+            <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                <TrophyIcon className="h-5 w-5 text-violet-600" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Nota mínima (ampla)</p>
+                <p className="mt-1 font-semibold text-gray-900">{concurso.minPassingGradeNonQuota}</p>
+              </div>
             </div>
           )}
-        </dl>
+        </div>
 
         <div className="mt-10 rounded-xl border border-blue-100 bg-blue-50 p-6">
           <h3 className="font-semibold text-gray-900">

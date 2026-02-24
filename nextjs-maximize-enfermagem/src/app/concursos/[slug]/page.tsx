@@ -11,7 +11,7 @@ export const dynamicParams = true;
 export default function ConcursoPage() {
   return (
     <div className="flex-1 bg-slate-50 py-8">
-      <div className="mx-auto max-w-3xl px-6 lg:px-8">
+      <div className="w-full max-w-full px-6 lg:px-8">
         <ConcursoDetail />
       </div>
     </div>
