@@ -41,5 +41,9 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsDecimal({ decimal_digits: '0,2' })
   minPassingGradeNonQuota?: string | null;
+
+  @IsOptional()
+  @IsString()
+  slug?: string | null;
 }
 

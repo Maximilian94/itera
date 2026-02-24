@@ -372,6 +372,8 @@ async function main() {
         salaryBase: new Prisma.Decimal('8500.00'),
         examDate: new Date('2026-06-15T00:00:00.000Z'),
         examBoardId: cespe.id,
+        published: true,
+        slug: 'cebraspe-sp-sao-paulo-2026-analista-de-sistemas',
       },
       {
         id: randomUUID(),
@@ -384,6 +386,8 @@ async function main() {
         salaryBase: new Prisma.Decimal('10500.50'),
         examDate: new Date('2026-08-20T00:00:00.000Z'),
         examBoardId: fgv.id,
+        published: true,
+        slug: 'fgv-mg-2026-desenvolvedor',
       },
       {
         id: randomUUID(),
@@ -396,6 +400,8 @@ async function main() {
         salaryBase: new Prisma.Decimal('14500.00'),
         examDate: new Date('2026-10-05T00:00:00.000Z'),
         examBoardId: cespe.id,
+        published: true,
+        slug: 'cebraspe-2026-engenheiro-de-software',
       },
     ],
   });

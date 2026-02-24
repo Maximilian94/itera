@@ -3,12 +3,25 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
   return t === '' ? null : (t ?? null);
+}
+
+function slugify(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 }
 
 function assertValidGovernmentScopeLocation(input: {
@@ -50,7 +63,28 @@ function assertValidGovernmentScopeLocation(input: {
 
 @Injectable()
 export class ExamBaseService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService,
+  ) {}
+
+  private async triggerRevalidate(slug?: string | null): Promise<void> {
+    const baseUrl = this.config.get<string>('NEXTJS_URL');
+    const secret = this.config.get<string>('REVALIDATE_SECRET');
+    if (!baseUrl?.trim() || !secret?.trim()) return;
+    try {
+      const res = await fetch(`${baseUrl.replace(/\/+$/, '')}/api/revalidate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ secret, slug: slug ?? undefined }),
+      });
+      if (!res.ok) {
+        console.warn('[ExamBaseService] Revalidate failed:', res.status);
+      }
+    } catch (err) {
+      console.warn('[ExamBaseService] Revalidate error:', err);
+    }
+  }
 
   private async isAdmin(userId: string): Promise<boolean> {
     const user = await this.prisma.user.findUnique({
@@ -278,13 +312,47 @@ export class ExamBaseService {
     return examBase;
   }
 
+  async generateSlug(examBaseId: string): Promise<{ slug: string }> {
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: {
+        id: true,
+        role: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        examDate: true,
+        examBoard: { select: { name: true } },
+      },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+
+    const year = new Date(examBase.examDate).getFullYear().toString();
+    const parts: string[] = [];
+    if (examBase.examBoard?.name) parts.push(slugify(examBase.examBoard.name));
+    if (examBase.state) parts.push(slugify(examBase.state));
+    if (examBase.city) parts.push(slugify(examBase.city));
+    parts.push(year);
+    parts.push(slugify(examBase.role));
+
+    const slug = parts.filter(Boolean).join('-');
+    if (!slug) throw new BadRequestException('Não foi possível gerar slug (banca, estado/cidade e cargo são necessários).');
+
+    await this.prisma.examBase.update({
+      where: { id: examBaseId },
+      data: { slug },
+    });
+    await this.triggerRevalidate(slug);
+    return { slug };
+  }
+
   async setPublished(examBaseId: string, published: boolean) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
-      select: { id: true },
+      select: { id: true, slug: true },
     });
     if (!exists) throw new NotFoundException('exam base not found');
-    return this.prisma.examBase.update({
+    const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: { published },
       select: {
@@ -293,6 +361,8 @@ export class ExamBaseService {
         published: true,
       },
     });
+    await this.triggerRevalidate(exists.slug);
+    return result;
   }
 
   create(input: {
@@ -356,6 +426,7 @@ export class ExamBaseService {
       salaryBase?: string | number | null;
       examDate?: string;
       minPassingGradeNonQuota?: string | number | null;
+      slug?: string | null;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -376,7 +447,7 @@ export class ExamBaseService {
       city: mergedCity,
     });
 
-    return this.prisma.examBase.update({
+    const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: {
         name: input.name,
@@ -392,10 +463,12 @@ export class ExamBaseService {
           input.minPassingGradeNonQuota === undefined
             ? undefined
             : input.minPassingGradeNonQuota,
+        slug: input.slug === undefined ? undefined : input.slug,
       },
       select: {
         id: true,
         name: true,
+        slug: true,
         institution: true,
         role: true,
         governmentScope: true,
@@ -408,6 +481,8 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, logoUrl: true } },
       },
     });
+    await this.triggerRevalidate(result.slug);
+    return result;
   }
 }
 

@@ -109,7 +109,9 @@ function RouteComponent() {
     useState('')
   const [editExamDate, setEditExamDate] = useState('')
   const [editExamBoardId, setEditExamBoardId] = useState<string>('')
+  const [editSlug, setEditSlug] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  const [generateSlugLoading, setGenerateSlugLoading] = useState(false)
 
   const examBaseId = examId
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
@@ -164,6 +166,7 @@ function RouteComponent() {
       setEditMinPassingGradeNonQuota(examBase.minPassingGradeNonQuota ?? '')
       setEditExamDate(isoToDateInput(examBase.examDate))
       setEditExamBoardId(examBase.examBoardId ?? '')
+      setEditSlug(examBase.slug ?? '')
       setEditError(null)
     }
   }, [isEditing, examBase])
@@ -205,6 +208,7 @@ function RouteComponent() {
           : null,
         examDate: dateInputToIso(editExamDate.trim()),
         examBoardId: editExamBoardId || null,
+        slug: editSlug.trim() || null,
       })
       await refetchExamBases()
       setIsEditing(false)
@@ -403,7 +407,40 @@ function RouteComponent() {
                   fullWidth
                   sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                 />
-                <FormControl size="small" fullWidth sx={{ borderRadius: 2 }}>
+              <div className="w-full">
+                <div className="flex gap-2 w-full">
+                  <TextField
+                    label="Slug (URL)"
+                    value={editSlug}
+                    onChange={(e) => setEditSlug(e.target.value)}
+                    placeholder="ex: cebraspe-sp-sao-paulo-2026-enfermeiro"
+                    size="small"
+                    fullWidth
+                    sx={{ flex: 1, minWidth: 0, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={async () => {
+                      if (!examBase) return
+                      setGenerateSlugLoading(true)
+                      try {
+                        const { slug } = await examBaseService.generateSlug(examBase.id)
+                        setEditSlug(slug)
+                        await refetchExamBases()
+                      } finally {
+                        setGenerateSlugLoading(false)
+                      }
+                    }}
+                    disabled={generateSlugLoading}
+                    sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, flexShrink: 0 }}
+                  >
+                    {generateSlugLoading ? '…' : 'Gerar slug'}
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-500 mt-1">Usado na página pública de concursos.</p>
+              </div>
+              <FormControl size="small" fullWidth sx={{ borderRadius: 2 }}>
                   <InputLabel id="edit-exam-board-label">Banca</InputLabel>
                   <Select
                     labelId="edit-exam-board-label"
@@ -486,6 +523,11 @@ function RouteComponent() {
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-700">
                     <DocumentTextIcon className="w-3.5 h-3.5" />
                     {questionCount} questões
+                  </span>
+                )}
+                {examBase?.slug && (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600" title="Slug para página pública">
+                    /{examBase.slug}
                   </span>
                 )}
                 {isAdmin && examBase && (

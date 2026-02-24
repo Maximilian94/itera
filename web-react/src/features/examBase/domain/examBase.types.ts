@@ -1,6 +1,7 @@
 export type ExamBase = {
   id: string
   name: string
+  slug: string | null
   institution: string | null
   role: string
   governmentScope: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
@@ -31,6 +32,7 @@ export type CreateExamBaseInput = {
 
 export type UpdateExamBaseInput = {
   name?: string
+  slug?: string | null
   role?: string
   governmentScope?: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
   state?: string | null
