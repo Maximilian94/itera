@@ -452,7 +452,9 @@ function RouteComponent() {
                     <MenuItem value="">Nenhuma</MenuItem>
                     {(examBoards ?? []).map((b) => (
                       <MenuItem key={b.id} value={b.id}>
-                        {b.name}
+                        <Tooltip title={b.name} placement="right">
+                          <span>{b.alias ?? b.name}</span>
+                        </Tooltip>
                       </MenuItem>
                     ))}
                   </Select>
@@ -492,11 +494,13 @@ function RouteComponent() {
           <div className="relative flex flex-col sm:flex-row sm:items-start gap-5">
             <div className="flex items-start gap-4 min-w-0">
               {examBase?.examBoard?.logoUrl && (
-                <img
-                  src={examBase.examBoard.logoUrl}
-                  alt={examBase.examBoard.name ?? ''}
-                  className="w-14 h-14 object-contain rounded-xl border border-slate-200 bg-white p-2 shrink-0 shadow-sm"
-                />
+                <Tooltip title={examBase.examBoard.name ?? ''}>
+                  <img
+                    src={examBase.examBoard.logoUrl}
+                    alt={examBase.examBoard.alias ?? examBase.examBoard.name ?? ''}
+                    className="w-14 h-14 object-contain rounded-xl border border-slate-200 bg-white p-2 shrink-0 shadow-sm"
+                  />
+                </Tooltip>
               )}
             <div className="min-w-0">
               <h1 className="text-xl font-bold text-slate-900 truncate">
@@ -660,9 +664,11 @@ function RouteComponent() {
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">Banca</p>
-              <p className="text-sm font-semibold text-slate-900 mt-0.5">
-                {examBase?.examBoard?.name ?? '—'}
-              </p>
+              <Tooltip title={examBase?.examBoard?.name ?? ''}>
+                <p className="text-sm font-semibold text-slate-900 mt-0.5 cursor-default">
+                  {examBase?.examBoard?.alias ?? examBase?.examBoard?.name ?? '—'}
+                </p>
+              </Tooltip>
             </div>
           </div>
         </Card>

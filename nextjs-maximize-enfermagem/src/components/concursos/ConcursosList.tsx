@@ -39,7 +39,8 @@ export function ConcursosList() {
   const bancas = useMemo(() => {
     const set = new Set<string>();
     for (const c of concursos) {
-      if (c.examBoard?.name) set.add(c.examBoard.name);
+      const label = c.examBoard?.alias ?? c.examBoard?.name;
+      if (label) set.add(label);
     }
     return Array.from(set).sort();
   }, [concursos]);
@@ -54,6 +55,7 @@ export function ConcursosList() {
 
   const filtered = useMemo(() => {
     return concursos.filter((c) => {
+      const bancaLabel = c.examBoard?.alias ?? c.examBoard?.name;
       const matchSearch =
         !search ||
         [
@@ -61,12 +63,13 @@ export function ConcursosList() {
           c.institution,
           c.role,
           c.examBoard?.name,
+          c.examBoard?.alias,
           c.state,
           c.city,
         ]
           .filter(Boolean)
           .some((v) => String(v).toLowerCase().includes(search.toLowerCase()));
-      const matchBanca = !banca || c.examBoard?.name === banca;
+      const matchBanca = !banca || bancaLabel === banca;
       const matchEscopo = !escopo || c.governmentScope === escopo;
       const matchEstado = !estado || c.state === estado;
       return matchSearch && matchBanca && matchEscopo && matchEstado;
@@ -164,8 +167,11 @@ export function ConcursosList() {
                     </p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {c.examBoard && (
-                        <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
-                          {c.examBoard.name}
+                        <span
+                          className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700 cursor-default"
+                          title={c.examBoard.name}
+                        >
+                          {c.examBoard.alias ?? c.examBoard.name}
                         </span>
                       )}
                       <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">

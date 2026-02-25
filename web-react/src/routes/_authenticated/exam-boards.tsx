@@ -8,6 +8,7 @@ import {
   DialogTitle,
   Stack,
   TextField,
+  Tooltip,
 } from '@mui/material'
 import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -29,6 +30,8 @@ import {
 type ExamBoard = {
   id: string
   name: string
+  alias?: string | null
+  websiteUrl?: string | null
   logoUrl: string
 }
 
@@ -49,10 +52,14 @@ function RouteComponent() {
   const [error, setError] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createName, setCreateName] = useState('')
+  const [createAlias, setCreateAlias] = useState('')
+  const [createWebsiteUrl, setCreateWebsiteUrl] = useState('')
   const [createLogoUrl, setCreateLogoUrl] = useState('')
 
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editName, setEditName] = useState('')
+  const [editAlias, setEditAlias] = useState('')
+  const [editWebsiteUrl, setEditWebsiteUrl] = useState('')
   const [editLogoUrl, setEditLogoUrl] = useState('')
 
   const boardCountsMap = useMemo(() => {
@@ -74,10 +81,17 @@ function RouteComponent() {
     try {
       await apiFetch<ExamBoard>('/exam-boards', {
         method: 'POST',
-        body: JSON.stringify({ name: createName, logoUrl: createLogoUrl }),
+        body: JSON.stringify({
+          name: createName,
+          alias: createAlias.trim() || undefined,
+          websiteUrl: createWebsiteUrl.trim() || undefined,
+          logoUrl: createLogoUrl,
+        }),
       })
       setCreateOpen(false)
       setCreateName('')
+      setCreateAlias('')
+      setCreateWebsiteUrl('')
       setCreateLogoUrl('')
       await refetchBoards()
     } catch (e) {
@@ -88,12 +102,16 @@ function RouteComponent() {
   function startEdit(row: ExamBoard) {
     setEditingId(row.id)
     setEditName(row.name)
+    setEditAlias(row.alias ?? '')
+    setEditWebsiteUrl(row.websiteUrl ?? '')
     setEditLogoUrl(row.logoUrl)
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditName('')
+    setEditAlias('')
+    setEditWebsiteUrl('')
     setEditLogoUrl('')
   }
 
@@ -103,7 +121,12 @@ function RouteComponent() {
     try {
       await apiFetch<ExamBoard>(`/exam-boards/${editingId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ name: editName, logoUrl: editLogoUrl }),
+        body: JSON.stringify({
+          name: editName,
+          alias: editAlias.trim() || undefined,
+          websiteUrl: editWebsiteUrl.trim() || undefined,
+          logoUrl: editLogoUrl,
+        }),
       })
       cancelEdit()
       await refetchBoards()
@@ -228,6 +251,24 @@ function RouteComponent() {
                       sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
                     />
                     <TextField
+                      label="Alias"
+                      value={editAlias}
+                      onChange={(e) => setEditAlias(e.target.value)}
+                      placeholder="Ex: CESPE, FGV"
+                      size="small"
+                      fullWidth
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                    <TextField
+                      label="URL do site"
+                      value={editWebsiteUrl}
+                      onChange={(e) => setEditWebsiteUrl(e.target.value)}
+                      placeholder="https://..."
+                      size="small"
+                      fullWidth
+                      sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                    />
+                    <TextField
                       label="URL do logo"
                       value={editLogoUrl}
                       onChange={(e) => setEditLogoUrl(e.target.value)}
@@ -261,14 +302,16 @@ function RouteComponent() {
                       {board.logoUrl && (
                         <img
                           src={board.logoUrl}
-                          alt={board.name}
+                          alt={board.alias ?? board.name}
                           className="w-12 h-12 object-contain rounded-lg border border-slate-200 bg-white p-1 shrink-0"
                         />
                       )}
                       <div className="min-w-0 flex-1">
-                        <h3 className="text-base font-semibold text-slate-900 truncate">
-                          {board.name}
-                        </h3>
+                        <Tooltip title={board.name}>
+                          <h3 className="text-base font-semibold text-slate-900 truncate cursor-default">
+                            {board.alias ?? board.name}
+                          </h3>
+                        </Tooltip>
                         <p className="text-sm text-slate-500 mt-0.5">
                           {count} {count === 1 ? 'prova' : 'provas'}
                         </p>
@@ -329,6 +372,20 @@ function RouteComponent() {
               value={createName}
               onChange={(e) => setCreateName(e.target.value)}
               autoFocus
+              fullWidth
+            />
+            <TextField
+              label="Alias"
+              value={createAlias}
+              onChange={(e) => setCreateAlias(e.target.value)}
+              placeholder="Ex: CESPE, FGV"
+              fullWidth
+            />
+            <TextField
+              label="URL do site"
+              value={createWebsiteUrl}
+              onChange={(e) => setCreateWebsiteUrl(e.target.value)}
+              placeholder="https://..."
               fullWidth
             />
             <TextField

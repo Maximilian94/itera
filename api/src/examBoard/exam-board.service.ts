@@ -8,29 +8,34 @@ export class ExamBoardService {
   list() {
     return this.prisma.examBoard.findMany({
       orderBy: { name: 'asc' },
-      select: { id: true, name: true, logoUrl: true },
+      select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true },
     });
   }
 
   async getOne(examBoardId: string) {
     const examBoard = await this.prisma.examBoard.findUnique({
       where: { id: examBoardId },
-      select: { id: true, name: true, logoUrl: true },
+      select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true },
     });
     if (!examBoard) throw new NotFoundException('exam board not found');
     return examBoard;
   }
 
-  create(input: { name: string; logoUrl: string }) {
+  create(input: { name: string; logoUrl: string; alias?: string; websiteUrl?: string }) {
     return this.prisma.examBoard.create({
-      data: { name: input.name, logoUrl: input.logoUrl },
-      select: { id: true, name: true, logoUrl: true },
+      data: {
+        name: input.name,
+        logoUrl: input.logoUrl,
+        alias: input.alias,
+        websiteUrl: input.websiteUrl,
+      },
+      select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true },
     });
   }
 
   async update(
     examBoardId: string,
-    input: { name?: string; logoUrl?: string },
+    input: { name?: string; logoUrl?: string; alias?: string; websiteUrl?: string },
   ) {
     const exists = await this.prisma.examBoard.findUnique({
       where: { id: examBoardId },
@@ -40,8 +45,13 @@ export class ExamBoardService {
 
     return this.prisma.examBoard.update({
       where: { id: examBoardId },
-      data: { name: input.name, logoUrl: input.logoUrl },
-      select: { id: true, name: true, logoUrl: true },
+      data: {
+        name: input.name,
+        logoUrl: input.logoUrl,
+        alias: input.alias,
+        websiteUrl: input.websiteUrl,
+      },
+      select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true },
     });
   }
 

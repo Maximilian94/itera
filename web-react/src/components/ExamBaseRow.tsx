@@ -53,7 +53,7 @@ export function ExamBaseRow({ examBase, selectable, selected, onSelect }: ExamBa
           <Tooltip title={examBase.examBoard?.name ?? 'Banca'}>
             <img
               src={examBase.examBoard?.logoUrl ?? ''}
-              alt={examBase.examBoard?.name ?? 'Exame'}
+              alt={examBase.examBoard?.alias ?? examBase.examBoard?.name ?? 'Exame'}
               className="w-10 h-10 object-contain rounded-md"
             />
           </Tooltip>

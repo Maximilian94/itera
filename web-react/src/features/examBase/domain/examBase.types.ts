@@ -12,7 +12,7 @@ export type ExamBase = {
   minPassingGradeNonQuota: string | null
   published?: boolean
   examBoardId: string | null
-  examBoard: { id: string; name: string; logoUrl: string } | null
+  examBoard: { id: string; name: string; alias?: string | null; logoUrl: string; websiteUrl?: string | null } | null
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
 }

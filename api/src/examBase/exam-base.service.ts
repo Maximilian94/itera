@@ -119,7 +119,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         published: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
         _count: { select: { questions: true } },
       },
     });
@@ -276,7 +276,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         published: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
@@ -304,7 +304,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         published: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
         _count: { select: { questions: true } },
       },
     });
@@ -322,14 +322,15 @@ export class ExamBaseService {
         state: true,
         city: true,
         examDate: true,
-        examBoard: { select: { name: true } },
+        examBoard: { select: { name: true, alias: true } },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
 
     const year = new Date(examBase.examDate).getFullYear().toString();
     const parts: string[] = [];
-    if (examBase.examBoard?.name) parts.push(slugify(examBase.examBoard.name));
+    const boardLabel = examBase.examBoard?.alias ?? examBase.examBoard?.name;
+    if (boardLabel) parts.push(slugify(boardLabel));
     if (examBase.state) parts.push(slugify(examBase.state));
     if (examBase.city) parts.push(slugify(examBase.city));
     parts.push(year);
@@ -408,7 +409,7 @@ export class ExamBaseService {
         examDate: true,
         minPassingGradeNonQuota: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
   }
@@ -478,7 +479,7 @@ export class ExamBaseService {
         examDate: true,
         minPassingGradeNonQuota: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, logoUrl: true } },
+        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
     await this.triggerRevalidate(result.slug);

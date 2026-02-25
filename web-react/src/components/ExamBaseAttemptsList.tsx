@@ -11,6 +11,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  Tooltip,
   Typography,
 } from '@mui/material'
 import dayjs from 'dayjs'
@@ -124,7 +125,13 @@ export function ExamBaseAttemptsList({
               </TableCell>
               {showExamBaseColumns && (
                 <>
-                  <TableCell>{item.examBoardName ?? '—'}</TableCell>
+                  <TableCell>
+                    <Tooltip title={item.examBoardName ?? ''}>
+                      <span className="cursor-default">
+                        {item.examBoardAlias ?? item.examBoardName ?? '—'}
+                      </span>
+                    </Tooltip>
+                  </TableCell>
                   <TableCell>{item.institution ?? '—'}</TableCell>
                   <TableCell>{formatDate(item.examDate)}</TableCell>
                 </>
