@@ -19,6 +19,7 @@ async function bootstrap() {
       'http://localhost:3002',
       'https://www.maximizeenfermagem.com.br',
       'https://maximizeenfermagem.com.br',
+      'https://app.maximizeenfermagem.com.br',
     ],
   });
   app.useGlobalPipes(
