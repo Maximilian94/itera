@@ -171,9 +171,11 @@ model ExamQuestion {
 }
 
 model ExamBoard {
-  id      String @id @default(uuid()) @db.Uuid
-  name    String
-  logoUrl String
+  id         String  @id @default(uuid()) @db.Uuid
+  name       String
+  alias      String?
+  websiteUrl String?
+  logoUrl    String
 
   exams      Exam[]
   examBases  ExamBase[]

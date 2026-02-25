@@ -28,6 +28,7 @@ export type ExamBaseAttemptHistoryItem = {
   institution: string | null
   examDate: string
   examBoardName: string | null
+  examBoardAlias: string | null
   examBoardId: string | null
   /** Logo URL of the exam board (banca). */
   examBoardLogoUrl?: string | null

@@ -85,39 +85,41 @@ function BoardPill({
   isActive,
   onClick,
 }: {
-  board: { id: string; name: string; logoUrl: string }
+  board: { id: string; name: string; alias?: string | null; logoUrl: string }
   count: number
   isActive: boolean
   onClick: () => void
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all duration-200 text-left shrink-0 cursor-pointer ${
-        isActive
-          ? 'border-blue-300 bg-blue-50 shadow-sm'
-          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-      }`}
-    >
-      <img
-        src={board.logoUrl}
-        alt={board.name}
-        className="w-7 h-7 object-contain rounded"
-      />
-      <div className="min-w-0">
-        <p
-          className={`text-xs font-semibold truncate ${
-            isActive ? 'text-blue-800' : 'text-slate-700'
-          }`}
-        >
-          {board.name}
-        </p>
+    <Tooltip title={board.name}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all duration-200 text-left shrink-0 cursor-pointer ${
+          isActive
+            ? 'border-blue-300 bg-blue-50 shadow-sm'
+            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+        }`}
+      >
+        <img
+          src={board.logoUrl}
+          alt={board.alias ?? board.name}
+          className="w-7 h-7 object-contain rounded"
+        />
+        <div className="min-w-0">
+          <p
+            className={`text-xs font-semibold truncate ${
+              isActive ? 'text-blue-800' : 'text-slate-700'
+            }`}
+          >
+            {board.alias ?? board.name}
+          </p>
         <p className="text-[0.65rem] text-slate-400">
           {count} {count === 1 ? 'prova' : 'provas'}
         </p>
       </div>
     </button>
+    </Tooltip>
   )
 }
 
@@ -153,11 +155,13 @@ function ExamCard({
           <div className="flex items-start justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0">
               {exam.examBoard?.logoUrl && (
-                <img
-                  src={exam.examBoard.logoUrl}
-                  alt={exam.examBoard.name ?? ''}
-                  className="w-9 h-9 object-contain rounded-lg shrink-0"
-                />
+                <Tooltip title={exam.examBoard.name ?? ''}>
+                  <img
+                    src={exam.examBoard.logoUrl}
+                    alt={exam.examBoard.alias ?? exam.examBoard.name ?? ''}
+                    className="w-9 h-9 object-contain rounded-lg shrink-0"
+                  />
+                </Tooltip>
               )}
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">
@@ -276,7 +280,7 @@ function CreateExamDialog({
 }: {
   open: boolean
   onClose: () => void
-  examBoards: Array<{ id: string; name: string }>
+  examBoards: Array<{ id: string; name: string; alias?: string | null }>
   onSuccess: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
@@ -461,7 +465,9 @@ function CreateExamDialog({
               <MenuItem value="">Nenhuma</MenuItem>
               {examBoards.map((b) => (
                 <MenuItem key={b.id} value={b.id}>
-                  {b.name}
+                  <Tooltip title={b.name} placement="right">
+                    <span>{b.alias ?? b.name}</span>
+                  </Tooltip>
                 </MenuItem>
               ))}
             </Select>
@@ -552,7 +558,8 @@ function ExamsPage() {
           (e.role ?? '').toLowerCase().includes(q) ||
           (e.state ?? '').toLowerCase().includes(q) ||
           (e.city ?? '').toLowerCase().includes(q) ||
-          (e.examBoard?.name ?? '').toLowerCase().includes(q),
+          (e.examBoard?.name ?? '').toLowerCase().includes(q) ||
+          (e.examBoard?.alias ?? '').toLowerCase().includes(q),
       )
     }
 

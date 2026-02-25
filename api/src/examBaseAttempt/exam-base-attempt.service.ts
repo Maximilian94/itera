@@ -89,7 +89,7 @@ export class ExamBaseAttemptService {
             examBoardId: true,
             state: true,
             city: true,
-            examBoard: { select: { id: true, name: true, logoUrl: true } },
+            examBoard: { select: { id: true, name: true, alias: true, logoUrl: true } },
           },
         },
         answers: {
@@ -156,6 +156,7 @@ export class ExamBaseAttemptService {
         institution: examBase.institution ?? null,
         examDate: examBase.examDate,
         examBoardName: examBase.examBoard?.name ?? null,
+        examBoardAlias: examBase.examBoard?.alias ?? null,
         examBoardId: examBase.examBoardId ?? null,
         examBoardLogoUrl: examBase.examBoard?.logoUrl ?? null,
         state: examBase.state ?? null,

@@ -1,4 +1,5 @@
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
+import { Tooltip } from '@mui/material'
 import { ClockIcon, TrophyIcon } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import dayjs from 'dayjs'
@@ -39,7 +40,13 @@ export function AttemptListItem({ item, onClick }: AttemptListItemProps) {
           </p>
           <p className="text-xs text-slate-500">
             {date.format('DD/MM/YYYY HH:mm')}
-            {item.examBoardName && ` · ${item.examBoardName}`}
+            {(item.examBoardAlias ?? item.examBoardName) && (
+              <Tooltip title={item.examBoardName ?? ''}>
+                <span className="cursor-default">
+                  {` · ${item.examBoardAlias ?? item.examBoardName}`}
+                </span>
+              </Tooltip>
+            )}
           </p>
         </div>
       </div>

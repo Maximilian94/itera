@@ -347,6 +347,8 @@ async function main() {
       data: {
         id: randomUUID(),
         name: 'CEBRASPE',
+        alias: 'CEBRASPE',
+        websiteUrl: 'https://www.cebraspe.org.br',
         logoUrl: 'https://example.com/logos/cebraspe.png',
       },
     }),
@@ -354,6 +356,8 @@ async function main() {
       data: {
         id: randomUUID(),
         name: 'FGV',
+        alias: 'FGV',
+        websiteUrl: 'https://www.fgv.br',
         logoUrl: 'https://example.com/logos/fgv.png',
       },
     }),
