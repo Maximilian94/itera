@@ -14,6 +14,10 @@ export interface GenerateExplanationsResponse {
   topic: string;
   subtopics: string[];
   explanations: AlternativeExplanationItem[];
+  /** Indica se a IA concorda com a alternativa marcada como correta na questão. */
+  agreesWithCorrectAnswer: boolean;
+  /** Preenchido quando agreesWithCorrectAnswer é false, com breve justificativa da discordância. */
+  disagreementWarning?: string;
 }
 
 export const GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE: GenerateExplanationsResponse =
@@ -32,4 +36,5 @@ export const GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE: GenerateExplanationsRespons
           'A alternativa correta. Explicação completa e de alto nível: ...',
       },
     ],
+    agreesWithCorrectAnswer: true,
   };

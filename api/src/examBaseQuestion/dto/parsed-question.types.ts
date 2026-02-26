@@ -23,16 +23,16 @@ export interface ParsedQuestionItem {
 /** Example used in the AI prompt so the model returns this shape. */
 export const PARSED_QUESTION_EXAMPLE: ParsedQuestionItem[] = [
   {
-    subject: 'Math',
-    statement: 'What is 2+2?',
-    topic: 'Arithmetic',
+    subject: 'Matemática',
+    statement: 'Quanto é 2+2?',
+    topic: 'Aritmética',
     alternatives: [
       { key: 'A', text: '3' },
       { key: 'B', text: '4' },
     ],
   },
   {
-    subject: 'Portuguese',
+    subject: 'Língua Portuguesa',
     statement: 'De acordo com o texto, a principal crítica do autor é:',
     topic: 'Interpretação',
     referenceText: 'O Brasil enfrenta desafios históricos na área de educação. A qualidade do ensino varia muito entre regiões.',
@@ -42,7 +42,7 @@ export const PARSED_QUESTION_EXAMPLE: ParsedQuestionItem[] = [
     ],
   },
   {
-    subject: 'History',
+    subject: 'História',
     statement: 'Em qual ano ocorreu a Independência do Brasil?',
     topic: 'Brasil Colônia',
     alternatives: [
