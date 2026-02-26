@@ -41,6 +41,7 @@ import {
 } from '@heroicons/react/24/solid'
 import {
   AcademicCapIcon,
+  ArrowTopRightOnSquareIcon,
   BookOpenIcon,
   CalendarDaysIcon,
   ChevronRightIcon,
@@ -111,6 +112,10 @@ function RouteComponent() {
   const [editExamDate, setEditExamDate] = useState('')
   const [editExamBoardId, setEditExamBoardId] = useState<string>('')
   const [editSlug, setEditSlug] = useState('')
+  const [editEditalUrl, setEditEditalUrl] = useState('')
+  const [isEditingAdminNotes, setIsEditingAdminNotes] = useState(false)
+  const [adminNotesDraft, setAdminNotesDraft] = useState('')
+  const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [generateSlugLoading, setGenerateSlugLoading] = useState(false)
 
@@ -150,6 +155,22 @@ function RouteComponent() {
     await queryClient.invalidateQueries({ queryKey: ['examBases'] })
   }
 
+  async function handleSaveAdminNotes() {
+    if (!examBase) return
+    setIsSavingAdminNotes(true)
+    try {
+      await examBaseService.update(examBase.id, {
+        adminNotes: adminNotesDraft.trim() || null,
+      })
+      await refetchExamBases()
+      setIsEditingAdminNotes(false)
+    } catch {
+      // could add toast
+    } finally {
+      setIsSavingAdminNotes(false)
+    }
+  }
+
   useEffect(() => {
     const eb = examBases?.find((b) => b.id === examBaseId)
     setExamBase(eb ?? null)
@@ -168,6 +189,7 @@ function RouteComponent() {
       setEditExamDate(isoToDateInput(examBase.examDate))
       setEditExamBoardId(examBase.examBoardId ?? '')
       setEditSlug(examBase.slug ?? '')
+      setEditEditalUrl(examBase.editalUrl ?? '')
       setEditError(null)
     }
   }, [isEditing, examBase])
@@ -210,6 +232,7 @@ function RouteComponent() {
         examDate: dateInputToIso(editExamDate.trim()),
         examBoardId: editExamBoardId || null,
         slug: editSlug.trim() || null,
+        editalUrl: editEditalUrl.trim() || null,
       })
       await refetchExamBases()
       setIsEditing(false)
@@ -431,6 +454,15 @@ function RouteComponent() {
                 </div>
                 <p className="text-xs text-slate-500 mt-1">Usado na página pública de concursos.</p>
               </div>
+              <TextField
+                label="URL do edital"
+                value={editEditalUrl}
+                onChange={(e) => setEditEditalUrl(e.target.value)}
+                placeholder="https://exemplo.gov.br/edital.pdf"
+                size="small"
+                fullWidth
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
               <FormControl size="small" fullWidth sx={{ borderRadius: 2 }}>
                   <InputLabel id="edit-exam-board-label">Banca</InputLabel>
                   <Select
@@ -544,8 +576,21 @@ function RouteComponent() {
               </div>
             </div>
           </div>
-          {isAdmin && examBase && (
+          {(examBase?.editalUrl || (isAdmin && examBase)) && (
             <div className="sm:ml-auto shrink-0 flex flex-wrap items-center gap-2">
+              {examBase?.editalUrl && (
+                <a
+                  href={examBase.editalUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                >
+                  <ArrowTopRightOnSquareIcon className="w-4 h-4" />
+                  Ver edital
+                </a>
+              )}
+              {isAdmin && examBase && (
+              <>
               <Tooltip
                 title={
                   (examBase.published ?? false)
@@ -588,6 +633,8 @@ function RouteComponent() {
                 <PencilSquareIcon className="w-4 h-4" />
                 Editar
               </button>
+              </>
+              )}
             </div>
           )}
         </div>
@@ -702,6 +749,85 @@ function RouteComponent() {
           </div>
         </Card>
       </div>
+
+      {/* Notas internas (só para admins) */}
+      {isAdmin && (
+        <Card noElevation className="p-6 border border-amber-200 bg-amber-50/30">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
+                <PencilSquareIcon className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">
+                  Notas internas
+                </h2>
+                <p className="text-sm text-slate-500">
+                  Visível apenas para administradores
+                </p>
+              </div>
+            </div>
+            {!isEditingAdminNotes && (
+              <button
+                type="button"
+                onClick={() => {
+                  setAdminNotesDraft(examBase?.adminNotes ?? '')
+                  setIsEditingAdminNotes(true)
+                }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-100 text-amber-800 text-sm font-medium hover:bg-amber-200 transition-colors cursor-pointer"
+              >
+                <PencilSquareIcon className="w-4 h-4" />
+                Editar
+              </button>
+            )}
+          </div>
+          {isEditingAdminNotes ? (
+            <div className="flex flex-col gap-3">
+              <TextField
+                value={adminNotesDraft}
+                onChange={(e) => setAdminNotesDraft(e.target.value)}
+                placeholder="Ex: Ainda não foi disponibilizado o PDF da prova..."
+                multiline
+                minRows={3}
+                size="small"
+                fullWidth
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
+              <div className="flex gap-2">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => {
+                    setIsEditingAdminNotes(false)
+                    setAdminNotesDraft('')
+                  }}
+                  disabled={isSavingAdminNotes}
+                  sx={{ textTransform: 'none', borderRadius: 2 }}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={handleSaveAdminNotes}
+                  disabled={isSavingAdminNotes}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                >
+                  {isSavingAdminNotes ? 'Salvando…' : 'Salvar'}
+                </Button>
+              </div>
+            </div>
+          ) : examBase?.adminNotes ? (
+            <p className="text-sm text-slate-700 whitespace-pre-wrap">
+              {examBase.adminNotes}
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500 italic">
+              Nenhuma nota. Clique em Editar para adicionar.
+            </p>
+          )}
+        </Card>
+      )}
 
       {/* Questões por matéria */}
       {questionCount > 0 && (

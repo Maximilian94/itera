@@ -22,6 +22,7 @@ export type ExamBaseFromApi = {
   examDate: string;
   minPassingGradeNonQuota: string | null;
   published: boolean;
+  editalUrl: string | null;
   examBoardId: string | null;
   examBoard: { id: string; name: string; alias?: string | null; logoUrl: string; websiteUrl?: string | null } | null;
   _count: { questions: number };
