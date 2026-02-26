@@ -47,6 +47,7 @@ import {
   Tooltip,
 } from '@mui/material'
 import { PpTooltip } from '@/components/PpTooltip'
+import { StateCitySelect } from '@/components/StateCitySelect'
 
 function dateInputToIso(value: string) {
   return value
@@ -413,22 +414,14 @@ function CreateExamDialog({
               <MenuItem value="FEDERAL">Federal</MenuItem>
             </Select>
           </FormControl>
-          <Stack direction="row" gap={2}>
-            <TextField
-              label="Estado"
-              value={createState}
-              onChange={(e) => setCreateState(e.target.value)}
-              disabled={createGovernmentScope === 'FEDERAL'}
-              fullWidth
-            />
-            <TextField
-              label="Cidade"
-              value={createCity}
-              onChange={(e) => setCreateCity(e.target.value)}
-              disabled={createGovernmentScope !== 'MUNICIPAL'}
-              fullWidth
-            />
-          </Stack>
+          <StateCitySelect
+            governmentScope={createGovernmentScope}
+            state={createState}
+            city={createCity}
+            onStateChange={setCreateState}
+            onCityChange={setCreateCity}
+            fullWidth
+          />
           <TextField
             label="Salário base"
             type="number"
