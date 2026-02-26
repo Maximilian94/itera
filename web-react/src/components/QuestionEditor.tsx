@@ -90,6 +90,7 @@ export function QuestionEditor({
   const [newAltExplanation, setNewAltExplanation] = useState('')
   const [altError, setAltError] = useState<string | null>(null)
   const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
+  const [disagreementWarning, setDisagreementWarning] = useState<string | null>(null)
   const [editAltKey, setEditAltKey] = useState('')
   const [editAltText, setEditAltText] = useState('')
   const [editAltExplanation, setEditAltExplanation] = useState('')
@@ -237,6 +238,7 @@ export function QuestionEditor({
 
   const handleGenerateExplanations = async () => {
     setGenerateExplainError(null)
+    setDisagreementWarning(null)
     try {
       const result = await generateExplanations.mutateAsync()
       setTopic(result.topic)
@@ -253,6 +255,12 @@ export function QuestionEditor({
             input: { explanation: e.explanation },
           })
         }
+      }
+      if (result.agreesWithCorrectAnswer === false) {
+        setDisagreementWarning(
+          result.disagreementWarning ??
+            'A IA identificou possível inconsistência na resposta marcada como correta.',
+        )
       }
     } catch (err) {
       setGenerateExplainError(getApiMessage(err))
@@ -275,6 +283,18 @@ export function QuestionEditor({
         {generateExplainError && (
           <Alert severity="error" onClose={() => setGenerateExplainError(null)}>
             {generateExplainError}
+          </Alert>
+        )}
+        {disagreementWarning && (
+          <Alert
+            severity="warning"
+            onClose={() => setDisagreementWarning(null)}
+            sx={{ '& .MuiAlert-message': { fontWeight: 600 } }}
+          >
+            <strong>Atenção:</strong> A IA identificou possível inconsistência na resposta marcada como correta. Recomendamos revisar a questão.
+            <br />
+            <br />
+            {disagreementWarning}
           </Alert>
         )}
 

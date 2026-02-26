@@ -230,6 +230,7 @@ export function ExamAttemptPlayer({
   const [subtopicsStr, setSubtopicsStr] = useState('')
   const [skillsStr, setSkillsStr] = useState('')
   const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
+  const [disagreementWarning, setDisagreementWarning] = useState<string | null>(null)
   const [deleteQuestionDialogOpen, setDeleteQuestionDialogOpen] = useState(false)
 
   // Inline editing mutations (question level only - alternatives are defined later)
@@ -462,6 +463,7 @@ export function ExamAttemptPlayer({
   const handleGenerateExplanations = useCallback(async () => {
     if (!currentQuestion || !examBaseId) return
     setGenerateExplainError(null)
+    setDisagreementWarning(null)
     try {
       const result = await generateExplanationsMutation.mutateAsync()
       setTopic(result.topic)
@@ -481,6 +483,12 @@ export function ExamAttemptPlayer({
       setEditAlternativeById(newEditById)
       setSnackbarMessage('Explicações salvas. Metadados (tópico, subtópicos) preenchidos em rascunho — revise e salve.')
       setSnackbarOpen(true)
+      if (result.agreesWithCorrectAnswer === false) {
+        setDisagreementWarning(
+          result.disagreementWarning ??
+            'A IA identificou possível inconsistência na resposta marcada como correta.',
+        )
+      }
     } catch (err) {
       setGenerateExplainError(getApiMessage(err))
     }
@@ -640,6 +648,7 @@ export function ExamAttemptPlayer({
     setEditingReferenceText(false)
     setEditAlternativeById({})
     setGenerateExplainError(null)
+    setDisagreementWarning(null)
     setEditStatementImageUrl(currentQuestion?.statementImageUrl ?? '')
     setStatementImageLoadError(false)
     setUploadImageError(null)
@@ -972,6 +981,18 @@ export function ExamAttemptPlayer({
                           {generateExplainError && (
                             <Alert severity="error" onClose={() => setGenerateExplainError(null)} sx={{ py: 0 }}>
                               {generateExplainError}
+                            </Alert>
+                          )}
+                          {disagreementWarning && (
+                            <Alert
+                              severity="warning"
+                              onClose={() => setDisagreementWarning(null)}
+                              sx={{ py: 0, '& .MuiAlert-message': { fontWeight: 600 } }}
+                            >
+                              <strong>Atenção:</strong> A IA identificou possível inconsistência na resposta marcada como correta. Recomendamos revisar a questão.
+                              <br />
+                              <br />
+                              {disagreementWarning}
                             </Alert>
                           )}
                         </div>

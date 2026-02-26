@@ -20,6 +20,8 @@ export type GenerateExplanationsResponse = {
   topic: string
   subtopics: string[]
   explanations: Array<{ key: string; explanation: string }>
+  agreesWithCorrectAnswer: boolean
+  disagreementWarning?: string
 }
 
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/questions`

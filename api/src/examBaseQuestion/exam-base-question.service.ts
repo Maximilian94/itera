@@ -189,7 +189,19 @@ function normalizeGenerateExplanationsResponse(
           explanation: String(e.explanation ?? ''),
         }))
     : [];
-  return { topic, subtopics, explanations };
+  const agreesWithCorrectAnswer =
+    o.agreesWithCorrectAnswer === false ? false : true;
+  const disagreementWarning =
+    agreesWithCorrectAnswer === false && o.disagreementWarning != null
+      ? String(o.disagreementWarning)
+      : undefined;
+  return {
+    topic,
+    subtopics,
+    explanations,
+    agreesWithCorrectAnswer,
+    disagreementWarning,
+  };
 }
 
 @Injectable()
@@ -249,6 +261,8 @@ You MUST return one array element per question. If the input has 15 questions, t
 NEVER return only one question when the source clearly has more. Scan the entire document before responding.
 
 Important: PRESERVE MARKDOWN in the extracted text. In \`statement\` and in each \`alternatives[].text\`, keep the same markdown as in the source: **bold**, *italic*, line breaks, etc. Do not strip formatting to plain text.
+
+IMPORTANTE: Todo o conteúdo retornado (subject, topic, statement, referenceText, alternatives[].text) deve estar SEMPRE em português brasileiro.
 
 JSON rules:
 - Each item: subject (string), statement (string), topic (string, optional), referenceText (string, optional), alternatives (array of { key: string, text: string }).
@@ -549,11 +563,13 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
       ? `A alternativa correta é: ${question.correctAlternative}.`
       : 'Nenhuma alternativa correta foi indicada.';
 
-    const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateExplanationsResponse {\n  topic: string;        // nome TÉCNICO do tópico (ver regra abaixo)\n  subtopics: string[]; // nomes TÉCNICOS dos subtópicos\n  explanations: Array<{ key: string; explanation: string }>; // uma entrada por alternativa (key: "A", "B", ...)\n}\nExemplo: ${JSON.stringify(GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE)}`;
+    const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateExplanationsResponse {\n  topic: string;\n  subtopics: string[];\n  explanations: Array<{ key: string; explanation: string }>;\n  agreesWithCorrectAnswer: boolean;  // true se você concorda com a alternativa marcada como correta; false se discorda\n  disagreementWarning?: string;     // obrigatório quando agreesWithCorrectAnswer é false: breve justificativa da discordância\n}\nExemplo: ${JSON.stringify(GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE)}`;
 
     const systemPrompt = `Você é um especialista em elaboração de questões de concurso. Sua tarefa é gerar explicações de alto nível e bem completas para cada alternativa de uma questão de múltipla escolha.
 
 ${responseTypeDescription}
+
+VALIDAÇÃO DA RESPOSTA CORRETA: Antes de gerar as explicações, analise a questão e determine qual alternativa VOCÊ considera correta com base no enunciado e no conteúdo. Se a alternativa que você considera correta for DIFERENTE da indicada na questão, defina agreesWithCorrectAnswer como false e preencha disagreementWarning com uma explicação objetiva (ex.: "A alternativa X parece mais adequada porque..."). Se concordar, defina agreesWithCorrectAnswer como true e omita disagreementWarning.
 
 Regras para topic e subtopics:
 - Use SEMPRE o nome técnico da matéria/assunto, não uma descrição em linguagem comum. Exemplos: em vez de "Pronúncia correta das palavras" use "Prosódia" ou "Ortografia e prosódia"; em vez de "Escrita correta" use "Ortografia"; em vez de "Concordância entre sujeito e verbo" use "Concordância verbal". O nome técnico é usado para recomendações de estudo, então deve ser o termo pelo qual o conteúdo é conhecido em programas de ensino e materiais didáticos.
