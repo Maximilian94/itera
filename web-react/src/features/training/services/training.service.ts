@@ -13,8 +13,16 @@ export const trainingService = {
     return apiFetch('/training', { method: 'GET' })
   },
 
-  create(examBaseId: string): Promise<CreateTrainingResponse> {
-    return apiFetch(`/training/exam-bases/${examBaseId}`, { method: 'POST' })
+  create(
+    examBaseId: string,
+    subjectFilter?: string[],
+  ): Promise<CreateTrainingResponse> {
+    return apiFetch(`/training/exam-bases/${examBaseId}`, {
+      method: 'POST',
+      body: JSON.stringify(
+        subjectFilter && subjectFilter.length > 0 ? { subjectFilter } : {},
+      ),
+    })
   },
 
   getOne(trainingId: string): Promise<TrainingState> {

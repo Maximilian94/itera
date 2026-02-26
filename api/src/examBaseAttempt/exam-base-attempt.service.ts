@@ -188,17 +188,27 @@ export class ExamBaseAttemptService {
     return attempts;
   }
 
-  async create(examBaseId: string, userId: string) {
+  async create(
+    examBaseId: string,
+    userId: string,
+    dto?: { subjectFilter?: string[] },
+  ) {
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
       select: { id: true },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
 
+    const subjectFilter =
+      dto?.subjectFilter && dto.subjectFilter.length > 0
+        ? dto.subjectFilter
+        : [];
+
     const attempt = await this.prisma.examBaseAttempt.create({
       data: {
         examBaseId,
         userId,
+        subjectFilter,
       },
       select: {
         id: true,
@@ -234,6 +244,7 @@ export class ExamBaseAttemptService {
         startedAt: true,
         finishedAt: true,
         subjectFeedback: true,
+        subjectFilter: true,
         answers: {
           select: {
             examBaseQuestionId: true,
@@ -249,8 +260,17 @@ export class ExamBaseAttemptService {
     if (attempt.userId !== userId)
       throw new ForbiddenException('attempt does not belong to user');
 
+    const subjectFilter = attempt.subjectFilter ?? [];
+    const hasSubjectFilter =
+      Array.isArray(subjectFilter) && subjectFilter.length > 0;
+
     const questions = await this.prisma.examBaseQuestion.findMany({
-      where: { examBaseId },
+      where: {
+        examBaseId,
+        ...(hasSubjectFilter
+          ? { subject: { in: subjectFilter } }
+          : {}),
+      },
       orderBy: { position: 'asc' },
       select: questionSelect,
     });

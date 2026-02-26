@@ -1,9 +1,11 @@
 import { AccessGate } from '@/components/AccessGate'
 import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
+import { StartExamDialog } from '@/components/StartExamDialog'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
+import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { authService } from '@/features/auth/services/auth.service'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
@@ -24,7 +26,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
-import { getStagePath } from './stages.config'
+import { getStagePath } from './-stages.config'
 import { formatBRL } from '@/lib/utils'
 import dayjs from 'dayjs'
 
@@ -250,6 +252,7 @@ function NovoPage() {
   const [selectedExamBaseId, setSelectedExamBaseId] = useState<string | null>(
     null,
   )
+  const [startDialogOpen, setStartDialogOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(null)
 
@@ -265,6 +268,8 @@ function NovoPage() {
   const selectedExam = (examBases ?? []).find(
     (e) => e.id === selectedExamBaseId,
   )
+  const { data: subjectStats = [], isLoading: isLoadingSubjectStats } =
+    useQuestionsCountBySubjectQuery(selectedExamBaseId ?? undefined)
 
   // Board counts
   const boardCounts = useMemo(() => {
@@ -299,13 +304,22 @@ function NovoPage() {
     return list
   }, [examBases, selectedBoardId, search])
 
-  const handleCreateAndContinue = () => {
+  const handleOpenCreate = () => {
     if (!selectedExamBaseId) return
-    createMutation.mutate(selectedExamBaseId, {
-      onSuccess: (res) => {
-        navigate({ to: getStagePath('prova', res.trainingId) })
+    setStartDialogOpen(true)
+  }
+
+  const handleCreateAndContinue = (subjectFilter: string[]) => {
+    if (!selectedExamBaseId) return
+    createMutation.mutate(
+      { examBaseId: selectedExamBaseId, subjectFilter },
+      {
+        onSuccess: (res) => {
+          setStartDialogOpen(false)
+          navigate({ to: getStagePath('prova', res.trainingId) })
+        },
       },
-    })
+    )
   }
 
   return (
@@ -494,7 +508,7 @@ function NovoPage() {
                   <RocketLaunchIcon className="w-5 h-5" />
                 )
               }
-              onClick={handleCreateAndContinue}
+              onClick={handleOpenCreate}
               disabled={!selectedExamBaseId || createMutation.isPending}
             >
               {createMutation.isPending ? 'Criando...' : 'Criar e avançar'}
@@ -502,6 +516,17 @@ function NovoPage() {
           </div>
         </div>
       </div>
+
+      <StartExamDialog
+        open={startDialogOpen}
+        onClose={() => setStartDialogOpen(false)}
+        onConfirm={handleCreateAndContinue}
+        subjectStats={subjectStats}
+        isLoading={isLoadingSubjectStats}
+        isSubmitting={createMutation.isPending}
+        title="Como deseja fazer o treino?"
+        confirmLabel="Criar e avançar"
+      />
     </div>
   )
 }

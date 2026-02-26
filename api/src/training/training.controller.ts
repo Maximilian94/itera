@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AccessGuard } from '../common/guards/access.guard';
 import { TrainingService } from './training.service';
+import { CreateTrainingDto } from './dto/create-training.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { UpdateStudyDto } from './dto/update-study.dto';
 import { UpsertRetryAnswerDto } from './dto/upsert-retry-answer.dto';
@@ -30,8 +31,9 @@ export class TrainingController {
   create(
     @Param('examBaseId') examBaseId: string,
     @Req() req: { user: { userId: string } },
+    @Body() dto?: CreateTrainingDto,
   ) {
-    return this.service.create(examBaseId, req.user.userId);
+    return this.service.create(examBaseId, req.user.userId, dto);
   }
 
   @Get(':trainingId/study-items')

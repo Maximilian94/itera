@@ -16,8 +16,8 @@ import {
   getStagePath,
   getStageBySlug,
   TREINO_STAGES,
-} from './stages.config'
-import type { TreinoStageSlug } from './stages.config'
+} from './-stages.config'
+import type { TreinoStageSlug } from './-stages.config'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import type {
   TrainingStage,

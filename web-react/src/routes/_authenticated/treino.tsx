@@ -1,6 +1,6 @@
 import { Outlet, createFileRoute, useRouterState } from '@tanstack/react-router'
-import { TreinoStepper } from './treino/TreinoStepper'
-import { TREINO_STAGES } from './treino/stages.config'
+import { TreinoStepper } from './treino/-TreinoStepper'
+import { TREINO_STAGES } from './treino/-stages.config'
 import { useTrainingQuery } from '@/features/training/queries/training.queries'
 
 export const Route = createFileRoute('/_authenticated/treino')({

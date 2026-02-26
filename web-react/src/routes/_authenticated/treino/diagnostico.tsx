@@ -10,7 +10,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
-import { getStageById, TREINO_STAGES, getStagePath } from './stages.config'
+import { getStageById, TREINO_STAGES, getStagePath } from './-stages.config'
 import {
   useTrainingsQuery,
   useTrainingQuery,

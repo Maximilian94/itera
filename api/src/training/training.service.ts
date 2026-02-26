@@ -336,7 +336,11 @@ export class TrainingService {
    * @throws ForbiddenException if the plan does not include trainings or the limit is reached.
    * @throws NotFoundException if the exam base does not exist.
    */
-  async create(examBaseId: string, userId: string) {
+  async create(
+    examBaseId: string,
+    userId: string,
+    dto?: { subjectFilter?: string[] },
+  ) {
     // ---- Plan & limit enforcement ----
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -396,8 +400,13 @@ export class TrainingService {
     });
     if (!examBase) throw new NotFoundException('exam base not found');
 
+    const subjectFilter =
+      dto?.subjectFilter && dto.subjectFilter.length > 0
+        ? dto.subjectFilter
+        : [];
+
     const attempt = await this.prisma.examBaseAttempt.create({
-      data: { examBaseId, userId },
+      data: { examBaseId, userId, subjectFilter },
       select: { id: true, examBaseId: true },
     });
 

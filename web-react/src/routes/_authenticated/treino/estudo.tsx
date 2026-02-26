@@ -12,7 +12,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon } from '@heroicons/react/24/solid'
 import { useState } from 'react'
-import { getStageById, TREINO_STAGES } from './stages.config'
+import { getStageById, TREINO_STAGES } from './-stages.config'
 
 export const Route = createFileRoute('/_authenticated/treino/estudo')({
   component: EstudoPage,

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@mui/material'
 import {
   AcademicCapIcon,
@@ -8,11 +8,12 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
-import { getStagePath } from './treino/stages.config'
+import { getStagePath } from './treino/-stages.config'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
-import { useState } from 'react'
+import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { Card } from '@/components/Card'
+import { StartExamDialog } from '@/components/StartExamDialog'
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
   component: OnboardingPage,
@@ -41,14 +42,26 @@ function OnboardingPage() {
   const firstExamBase = examBases?.[0]
   const selectedExam = (examBases ?? []).find((e) => e.id === selectedExamBaseId)
   const examToUse = selectedExam ?? firstExamBase
+  const [startDialogOpen, setStartDialogOpen] = useState(false)
+  const { data: subjectStats = [], isLoading: isLoadingSubjectStats } =
+    useQuestionsCountBySubjectQuery(examToUse?.id)
 
-  const handleStartFreeTraining = () => {
+  const handleOpenStartFreeTraining = () => {
     if (!examToUse?.id) return
-    createMutation.mutate(examToUse.id, {
-      onSuccess: (res) => {
-        navigate({ to: getStagePath('prova', res.trainingId) })
+    setStartDialogOpen(true)
+  }
+
+  const handleStartFreeTraining = (subjectFilter: string[]) => {
+    if (!examToUse?.id) return
+    createMutation.mutate(
+      { examBaseId: examToUse.id, subjectFilter },
+      {
+        onSuccess: (res) => {
+          setStartDialogOpen(false)
+          navigate({ to: getStagePath('prova', res.trainingId) })
+        },
       },
-    })
+    )
   }
 
   if (isLoading || !canDoFreeTraining) {
@@ -160,7 +173,7 @@ function OnboardingPage() {
               <RocketLaunchIcon className="w-5 h-5" />
             )
           }
-          onClick={handleStartFreeTraining}
+          onClick={handleOpenStartFreeTraining}
           disabled={!examToUse || createMutation.isPending}
           sx={{ py: 1.5, fontSize: '1rem' }}
         >
@@ -168,6 +181,17 @@ function OnboardingPage() {
             ? 'Criando treino...'
             : 'Fazer meu primeiro treino'}
         </Button>
+
+        <StartExamDialog
+          open={startDialogOpen}
+          onClose={() => setStartDialogOpen(false)}
+          onConfirm={handleStartFreeTraining}
+          subjectStats={subjectStats}
+          isLoading={isLoadingSubjectStats}
+          isSubmitting={createMutation.isPending}
+          title="Como deseja fazer o treino?"
+          confirmLabel="Iniciar treino"
+        />
 
         <Link to="/planos" className="no-underline">
           <Button variant="text" color="inherit" fullWidth size="medium">

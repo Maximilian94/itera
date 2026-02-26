@@ -5,8 +5,8 @@ import {
   getStagePath,
   getAllowedStageIndex,
   TRAINING_STAGE_TO_SLUG,
-} from './stages.config'
-import type { TreinoStageSlug } from './stages.config'
+} from './-stages.config'
+import type { TreinoStageSlug } from './-stages.config'
 import { useTrainingQuery } from '@/features/training/queries/training.queries'
 
 /**

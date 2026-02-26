@@ -11,7 +11,7 @@ import {
   DocumentTextIcon,
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline'
-import { getStageById, TREINO_STAGES } from './stages.config'
+import { getStageById, TREINO_STAGES } from './-stages.config'
 
 export const Route = createFileRoute('/_authenticated/treino/final')({
   component: FinalPage,

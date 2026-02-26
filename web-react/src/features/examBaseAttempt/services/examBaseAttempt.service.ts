@@ -24,8 +24,16 @@ export const examBaseAttemptService = {
     return apiFetch(basePath(examBaseId), { method: 'GET' })
   },
 
-  create(examBaseId: string): Promise<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt'>> {
-    return apiFetch(basePath(examBaseId), { method: 'POST' })
+  create(
+    examBaseId: string,
+    subjectFilter?: string[],
+  ): Promise<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt'>> {
+    return apiFetch(basePath(examBaseId), {
+      method: 'POST',
+      body: JSON.stringify(
+        subjectFilter && subjectFilter.length > 0 ? { subjectFilter } : {},
+      ),
+    })
   },
 
   getOne(
