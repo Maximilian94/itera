@@ -752,11 +752,23 @@ export function ExamAttemptPlayer({
       <div className="flex flex-col gap-4">
         <Card noElevation className="flex flex-col gap-3 p-4">
           <span className="text-sm text-slate-600">Esta prova não tem questões.</span>
-          {onBack && (
-            <Button variant="outlined" onClick={onBack}>
-              Voltar
-            </Button>
-          )}
+          <div className="flex flex-wrap gap-2">
+            {isManagementMode && onAddQuestion && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={onAddQuestion}
+                startIcon={<PlusCircleIcon className="w-4 h-4" />}
+              >
+                Adicionar questão
+              </Button>
+            )}
+            {onBack && (
+              <Button variant="outlined" onClick={onBack}>
+                Voltar
+              </Button>
+            )}
+          </div>
         </Card>
       </div>
     )
