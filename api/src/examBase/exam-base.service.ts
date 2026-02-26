@@ -358,6 +358,11 @@ export class ExamBaseService {
       select: { id: true, slug: true },
     });
     if (!exists) throw new NotFoundException('exam base not found');
+    if (published && (!exists.slug || !exists.slug.trim())) {
+      throw new BadRequestException(
+        'Não é possível publicar um exam base sem ter um slug definido. Use o endpoint POST /:id/generate-slug para gerar o slug.',
+      );
+    }
     const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: { published },
