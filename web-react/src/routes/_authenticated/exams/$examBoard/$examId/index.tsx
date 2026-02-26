@@ -50,6 +50,7 @@ import {
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { formatBRL } from '@/lib/utils'
+import { StateCitySelect } from '@/components/StateCitySelect'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import dayjs from 'dayjs'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -353,26 +354,16 @@ function RouteComponent() {
                   <MenuItem value="FEDERAL">Federal</MenuItem>
                 </Select>
               </FormControl>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <TextField
-                  label="Estado"
-                  value={editState}
-                  onChange={(e) => setEditState(e.target.value)}
-                  disabled={editGovernmentScope === 'FEDERAL'}
-                  size="small"
-                  fullWidth
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                />
-                <TextField
-                  label="Cidade"
-                  value={editCity}
-                  onChange={(e) => setEditCity(e.target.value)}
-                  disabled={editGovernmentScope !== 'MUNICIPAL'}
-                  size="small"
-                  fullWidth
-                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
-                />
-              </div>
+              <StateCitySelect
+                governmentScope={editGovernmentScope}
+                state={editState}
+                city={editCity}
+                onStateChange={setEditState}
+                onCityChange={setEditCity}
+                size="small"
+                fullWidth
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField
                   label="Salário base"
