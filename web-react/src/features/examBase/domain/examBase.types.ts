@@ -11,6 +11,8 @@ export type ExamBase = {
   examDate: string
   minPassingGradeNonQuota: string | null
   published?: boolean
+  editalUrl: string | null
+  adminNotes?: string | null
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl: string; websiteUrl?: string | null } | null
   _count?: { questions: number }
@@ -33,6 +35,8 @@ export type CreateExamBaseInput = {
 export type UpdateExamBaseInput = {
   name?: string
   slug?: string | null
+  editalUrl?: string | null
+  adminNotes?: string | null
   role?: string
   governmentScope?: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
   state?: string | null

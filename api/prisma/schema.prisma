@@ -197,6 +197,10 @@ model ExamBase {
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
   /// When false, exam is only visible to admins. When true, visible to all users.
   published               Boolean          @default(false)
+  /// URL pública do edital (PDF ou página)
+  editalUrl               String?
+  /// Notas internas visíveis apenas para administradores (ex: motivo de não ter adicionado o PDF ainda)
+  adminNotes              String?
 
   examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)

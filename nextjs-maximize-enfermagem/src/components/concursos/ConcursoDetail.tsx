@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { fetchConcursoBySlug } from "@/lib/concursos-api";
 import {
+  ArrowTopRightOnSquareIcon,
   CalendarDaysIcon,
   DocumentTextIcon,
   BanknotesIcon,
@@ -117,6 +118,22 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
               <p className="mt-1 font-semibold text-gray-900">{concurso._count.questions}</p>
             </div>
           </div>
+          {concurso.editalUrl && (
+            <a
+              href={concurso.editalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 hover:bg-slate-100/50 transition-colors"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
+                <ArrowTopRightOnSquareIcon className="h-5 w-5 text-indigo-600" />
+              </div>
+              <div>
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Edital</p>
+                <p className="mt-1 font-semibold text-indigo-600">Ver edital</p>
+              </div>
+            </a>
+          )}
           {concurso.salaryBase && (
             <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100">

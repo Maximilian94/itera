@@ -118,6 +118,8 @@ export class ExamBaseService {
         examDate: true,
         minPassingGradeNonQuota: true,
         published: true,
+        editalUrl: true,
+        ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
         _count: { select: { questions: true } },
@@ -275,6 +277,8 @@ export class ExamBaseService {
         examDate: true,
         minPassingGradeNonQuota: true,
         published: true,
+        editalUrl: true,
+        ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
@@ -303,6 +307,7 @@ export class ExamBaseService {
         examDate: true,
         minPassingGradeNonQuota: true,
         published: true,
+        editalUrl: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
         _count: { select: { questions: true } },
@@ -377,6 +382,8 @@ export class ExamBaseService {
     salaryBase?: string | number | null;
     examDate: string;
     minPassingGradeNonQuota?: string | number | null;
+    editalUrl?: string | null;
+    adminNotes?: string | null;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -396,6 +403,8 @@ export class ExamBaseService {
         salaryBase: input.salaryBase ?? undefined,
         examDate: new Date(input.examDate),
         minPassingGradeNonQuota: input.minPassingGradeNonQuota ?? undefined,
+        editalUrl: normalizeOptionalText(input.editalUrl),
+        adminNotes: normalizeOptionalText(input.adminNotes),
       },
       select: {
         id: true,
@@ -408,6 +417,8 @@ export class ExamBaseService {
         salaryBase: true,
         examDate: true,
         minPassingGradeNonQuota: true,
+        editalUrl: true,
+        adminNotes: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
@@ -428,6 +439,8 @@ export class ExamBaseService {
       examDate?: string;
       minPassingGradeNonQuota?: string | number | null;
       slug?: string | null;
+      editalUrl?: string | null;
+      adminNotes?: string | null;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -465,6 +478,8 @@ export class ExamBaseService {
             ? undefined
             : input.minPassingGradeNonQuota,
         slug: input.slug === undefined ? undefined : input.slug,
+        editalUrl: input.editalUrl === undefined ? undefined : normalizeOptionalText(input.editalUrl),
+        adminNotes: input.adminNotes === undefined ? undefined : normalizeOptionalText(input.adminNotes),
       },
       select: {
         id: true,
@@ -478,6 +493,8 @@ export class ExamBaseService {
         salaryBase: true,
         examDate: true,
         minPassingGradeNonQuota: true,
+        editalUrl: true,
+        adminNotes: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },

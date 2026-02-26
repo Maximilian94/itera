@@ -1,5 +1,5 @@
 import { GovernmentScope } from '@prisma/client';
-import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUUID } from 'class-validator';
+import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
 
 export class CreateExamBaseDto {
   @IsString()
@@ -38,5 +38,13 @@ export class CreateExamBaseDto {
   @IsOptional()
   @IsDecimal({ decimal_digits: '0,2' })
   minPassingGradeNonQuota?: string | null;
+
+  @IsOptional()
+  @IsUrl()
+  editalUrl?: string | null;
+
+  @IsOptional()
+  @IsString()
+  adminNotes?: string | null;
 }
 
