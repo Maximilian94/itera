@@ -1,5 +1,5 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router'
-import { useRequireTrainingStage } from '../useRequireTrainingStage'
+import { useRequireTrainingStage } from '../-useRequireTrainingStage'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/estudo')({
   component: EstudoLayout,

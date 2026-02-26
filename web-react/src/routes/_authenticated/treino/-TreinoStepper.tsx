@@ -7,7 +7,7 @@ import {
   getStagePath,
   getAllowedStageIndex,
   type TreinoStageSlug,
-} from './stages.config'
+} from './-stages.config'
 import type { TrainingStage } from '@/features/training/domain/training.types'
 
 const TRAINING_STAGE_PATHS: Record<TreinoStageSlug, `/treino/$trainingId/${TreinoStageSlug}`> = {

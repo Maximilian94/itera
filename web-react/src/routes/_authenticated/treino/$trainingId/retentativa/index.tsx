@@ -9,7 +9,7 @@ import {
 } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowLeftIcon, ChartBarIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
-import { getStagePath } from '../../stages.config'
+import { getStagePath } from '../../-stages.config'
 import { ExamAttemptPlayer } from '@/components/ExamAttemptPlayer'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'

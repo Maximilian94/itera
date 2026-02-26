@@ -22,8 +22,8 @@ import { Button } from '@mui/material'
 import { LineChart } from '@mui/x-charts/LineChart'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { getStagePath } from './treino/stages.config'
-import type { TreinoStageSlug } from './treino/stages.config'
+import { getStagePath } from './treino/-stages.config'
+import type { TreinoStageSlug } from './treino/-stages.config'
 import dayjs from 'dayjs'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({

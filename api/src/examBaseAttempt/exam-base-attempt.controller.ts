@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
 import { AccessGuard } from '../common/guards/access.guard';
 import { ExamBaseAttemptService } from './exam-base-attempt.service';
+import { CreateAttemptDto } from './dto/create-attempt.dto';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
 
 /**
@@ -24,8 +25,9 @@ export class ExamBaseAttemptController {
   create(
     @Param('examBaseId') examBaseId: string,
     @Req() req: { user: { userId: string } },
+    @Body() dto?: CreateAttemptDto,
   ) {
-    return this.service.create(examBaseId, req.user.userId);
+    return this.service.create(examBaseId, req.user.userId, dto);
   }
 
   /**

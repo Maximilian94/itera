@@ -2,7 +2,7 @@ import { Card } from '@/components/Card'
 import { Button } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ArrowPathIcon, ArrowLeftIcon, ArrowRightIcon } from '@heroicons/react/24/outline'
-import { getStageById, TREINO_STAGES } from './stages.config'
+import { getStageById, TREINO_STAGES } from './-stages.config'
 
 export const Route = createFileRoute('/_authenticated/treino/retentativa')({
   component: RetentativaPage,

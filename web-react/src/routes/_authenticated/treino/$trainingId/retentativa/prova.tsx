@@ -4,7 +4,7 @@
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { ExamAttemptPlayer } from '@/components/ExamAttemptPlayer'
-import { getStagePath } from '../../stages.config'
+import { getStagePath } from '../../-stages.config'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'
 

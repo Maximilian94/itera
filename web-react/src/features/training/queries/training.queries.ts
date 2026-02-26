@@ -40,7 +40,13 @@ export function useTrainingQuery(trainingId: string | undefined) {
 export function useCreateTrainingMutation() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (examBaseId: string) => trainingService.create(examBaseId),
+    mutationFn: ({
+      examBaseId,
+      subjectFilter,
+    }: {
+      examBaseId: string
+      subjectFilter?: string[]
+    }) => trainingService.create(examBaseId, subjectFilter),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
       queryClient.invalidateQueries({ queryKey: ['training'] })

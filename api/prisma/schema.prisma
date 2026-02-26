@@ -285,6 +285,8 @@ model ExamBaseAttempt {
   finishedAt       DateTime?
   scorePercentage  Decimal?  @db.Decimal(5, 2)
   subjectFeedback  Json?
+  /// When set, only questions from these subjects are included. When null/empty, all questions.
+  subjectFilter    String[]  @default([])
 
   examBaseId String   @db.Uuid
   examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)

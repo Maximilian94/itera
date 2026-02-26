@@ -9,8 +9,8 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
-import { getStagePath } from '../stages.config'
-import { useRequireTrainingStage } from '../useRequireTrainingStage'
+import { getStagePath } from '../-stages.config'
+import { useRequireTrainingStage } from '../-useRequireTrainingStage'
 import {
   useTrainingQuery,
   useUpdateTrainingStageMutation,

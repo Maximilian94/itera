@@ -10,8 +10,8 @@ import {
   SparklesIcon,
   HomeIcon,
 } from '@heroicons/react/24/outline'
-import { getStagePath } from '../stages.config'
-import { useRequireTrainingStage } from '../useRequireTrainingStage'
+import { getStagePath } from '../-stages.config'
+import { useRequireTrainingStage } from '../-useRequireTrainingStage'
 import {
   useTrainingQuery,
   trainingKeys,

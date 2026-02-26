@@ -1,12 +1,14 @@
 import { AccessGate } from '@/components/AccessGate'
 import { Card } from '@/components/Card'
+import { StartExamDialog } from '@/components/StartExamDialog'
 import { Button, FormControl, InputLabel, MenuItem, Select } from '@mui/material'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
 import { ClipboardDocumentListIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
-import { getStageById, TREINO_STAGES, getStagePath } from './stages.config'
+import { getStageById, TREINO_STAGES, getStagePath } from './-stages.config'
 import { useExamBaseQueries } from '@/features/examBase/queries/examBase.queries'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
+import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 
 export const Route = createFileRoute('/_authenticated/treino/prova')({
   /** Training exam selection page. Requires plan with trainings (Estratégico/Elite). */
@@ -20,17 +22,29 @@ export const Route = createFileRoute('/_authenticated/treino/prova')({
 function ProvaPage() {
   const navigate = useNavigate()
   const [selectedExamBaseId, setSelectedExamBaseId] = useState<string>('')
+  const [startDialogOpen, setStartDialogOpen] = useState(false)
   const { data: examBases = [], isLoading: loadingBases } = useExamBaseQueries()
   const createMutation = useCreateTrainingMutation()
+  const { data: subjectStats = [], isLoading: isLoadingSubjectStats } =
+    useQuestionsCountBySubjectQuery(selectedExamBaseId || undefined)
   const stage = getStageById(1)!
 
-  const handleStart = () => {
+  const handleOpenStart = () => {
     if (!selectedExamBaseId) return
-    createMutation.mutate(selectedExamBaseId, {
-      onSuccess: (res) => {
-        navigate({ to: getStagePath('prova', res.trainingId) })
+    setStartDialogOpen(true)
+  }
+
+  const handleStart = (subjectFilter: string[]) => {
+    if (!selectedExamBaseId) return
+    createMutation.mutate(
+      { examBaseId: selectedExamBaseId, subjectFilter },
+      {
+        onSuccess: (res) => {
+          setStartDialogOpen(false)
+          navigate({ to: getStagePath('prova', res.trainingId) })
+        },
       },
-    })
+    )
   }
 
   return (
@@ -79,13 +93,24 @@ function ProvaPage() {
             variant="contained"
             color="primary"
             startIcon={<ClipboardDocumentListIcon className="w-5 h-5" />}
-            onClick={handleStart}
+            onClick={handleOpenStart}
             disabled={!selectedExamBaseId || createMutation.isPending}
           >
             {createMutation.isPending ? 'Criando sessão...' : 'Iniciar prova'}
           </Button>
         </div>
       </Card>
+
+      <StartExamDialog
+        open={startDialogOpen}
+        onClose={() => setStartDialogOpen(false)}
+        onConfirm={handleStart}
+        subjectStats={subjectStats}
+        isLoading={isLoadingSubjectStats}
+        isSubmitting={createMutation.isPending}
+        title="Como deseja fazer o treino?"
+        confirmLabel="Iniciar treino"
+      />
 
       <div className="flex flex-wrap gap-3 justify-between">
         <Button

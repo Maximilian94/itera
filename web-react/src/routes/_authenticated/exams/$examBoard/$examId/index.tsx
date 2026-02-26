@@ -53,6 +53,7 @@ import {
 import { formatBRL } from '@/lib/utils'
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
+import { StartExamDialog } from '@/components/StartExamDialog'
 import dayjs from 'dayjs'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -118,6 +119,7 @@ function RouteComponent() {
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [generateSlugLoading, setGenerateSlugLoading] = useState(false)
+  const [startExamDialogOpen, setStartExamDialogOpen] = useState(false)
 
   const examBaseId = examId
   const { examBases } = useExamBaseFacade({ examBoardId: examBoard })
@@ -137,11 +139,17 @@ function RouteComponent() {
 
   const isAdmin = profileData?.user?.role === 'ADMIN'
 
-  /** Starts an exam attempt. Redirects to /planos if user has no active subscription. */
-  const handleStartExam = async () => {
+  /** Opens the start exam dialog to choose full exam or subject filter. */
+  const handleOpenStartExam = () => {
     if (!requireAccess()) return
+    setStartExamDialogOpen(true)
+  }
+
+  /** Starts an exam attempt with optional subject filter. */
+  const handleStartExam = async (subjectFilter: string[]) => {
     try {
-      const attempt = await createAttempt.mutateAsync()
+      const attempt = await createAttempt.mutateAsync(subjectFilter)
+      setStartExamDialogOpen(false)
       await navigate({
         to: '/exams/$examBoard/$examId/$attemptId',
         params: { examBoard, examId, attemptId: attempt.id },
@@ -909,7 +917,7 @@ function RouteComponent() {
                 variant="contained"
                 size="medium"
                 startIcon={<PlayArrowIcon />}
-                onClick={handleStartExam}
+                onClick={handleOpenStartExam}
                 disabled={createAttempt.isPending || !hasAccess}
                 sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
               >
@@ -1011,6 +1019,17 @@ function RouteComponent() {
           </div>
         )}
       </Card>
+
+      <StartExamDialog
+        open={startExamDialogOpen}
+        onClose={() => setStartExamDialogOpen(false)}
+        onConfirm={handleStartExam}
+        subjectStats={subjectStats}
+        isLoading={isLoadingSubjectStats}
+        isSubmitting={createAttempt.isPending}
+        title="Como deseja fazer a prova?"
+        confirmLabel="Iniciar prova"
+      />
 
       {/* Gerenciar questões (Admin) */}
       {isAdmin && (

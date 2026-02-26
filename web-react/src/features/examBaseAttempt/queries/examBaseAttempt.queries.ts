@@ -30,7 +30,8 @@ export function useExamBaseAttemptsQuery(examBaseId: string | undefined) {
 export function useCreateExamBaseAttemptMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: () => examBaseAttemptService.create(examBaseId),
+    mutationFn: (subjectFilter?: string[]) =>
+      examBaseAttemptService.create(examBaseId, subjectFilter),
     onSuccess: () => {
       if (examBaseId) {
         queryClient.invalidateQueries({
