@@ -26,6 +26,7 @@ import { getStagePath } from './treino/-stages.config'
 import type { TreinoStageSlug } from './treino/-stages.config'
 import dayjs from 'dayjs'
 import { formatExamBaseTitle } from '@/lib/utils'
+import colors from 'tailwindcss/colors'
 
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: Dashboard,
@@ -95,7 +96,7 @@ function ActionCard({
         noElevation={!primary}
         className={`p-5 border transition-all duration-200 cursor-pointer group h-full ${
           primary
-            ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50 hover:border-emerald-300 hover:shadow-md'
+            ? 'border-cyan-200 bg-cyan-50/60 hover:bg-cyan-50 hover:border-cyan-300 hover:shadow-md'
             : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm'
         }`}
       >
@@ -113,14 +114,14 @@ function ActionCard({
             </div>
             <ArrowRightIcon
               className={`w-4 h-4 transition-transform duration-200 group-hover:translate-x-1 ${
-                primary ? 'text-emerald-400' : 'text-slate-300'
+                primary ? 'text-cyan-500' : 'text-slate-300'
               }`}
             />
           </div>
           <div>
             <p
               className={`text-sm font-semibold ${
-                primary ? 'text-emerald-800' : 'text-slate-800'
+                primary ? 'text-cyan-600' : 'text-sky-900'
               }`}
             >
               {title}
@@ -146,7 +147,7 @@ const STAGE_LABELS: Record<string, string> = {
 }
 
 const STAGE_COLORS: Record<string, string> = {
-  EXAM: 'bg-blue-100 text-blue-700',
+  EXAM: 'bg-cyan-100 text-cyan-700',
   DIAGNOSIS: 'bg-amber-100 text-amber-700',
   STUDY: 'bg-emerald-100 text-emerald-700',
   RETRY: 'bg-violet-100 text-violet-700',
@@ -411,8 +412,8 @@ function Dashboard() {
         <Card noElevation className="p-5 border border-slate-200">
           <div className="mb-4">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                <ArrowTrendingUpIcon className="w-5 h-5 text-blue-600" />
+              <div className="w-11 h-11 rounded-xl bg-cyan-100 flex items-center justify-center shrink-0">
+                <ArrowTrendingUpIcon className="w-5 h-5 text-cyan-600" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-slate-800">
@@ -435,7 +436,7 @@ function Dashboard() {
                       ) : initialScoreTrend < 0 ? (
                         <>
                           Sua nota média{' '}
-                          <span className="font-medium text-red-600">
+                          <span className="font-medium text-rose-600">
                             caiu {Math.abs(initialScoreTrend).toFixed(1)}{' '}
                             <PpTooltip />
                           </span>{' '}
@@ -463,7 +464,7 @@ function Dashboard() {
                       ) : trendSlopePerExam < 0 ? (
                         <>
                           Em média, a cada nova prova sua nota{' '}
-                          <span className="font-medium text-red-600">
+                          <span className="font-medium text-rose-600">
                             cai {Math.abs(trendSlopePerExam).toFixed(1)}{' '}
                             <PpTooltip />
                           </span>
@@ -475,7 +476,7 @@ function Dashboard() {
                   )}
                   <Link
                     to="/evolucao-como-funciona"
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline inline-flex items-center gap-0.5 mt-1"
+                    className="text-xs text-cyan-600 hover:text-cyan-700 font-medium no-underline inline-flex items-center gap-0.5 mt-1"
                   >
                     Como é calculado?
                     <ArrowRightIcon className="w-3 h-3" />
@@ -505,7 +506,7 @@ function Dashboard() {
                   {
                     dataKey: 'score',
                     label: 'Nota (%)',
-                    color: '#2563eb',
+                    color: colors.cyan[600],
                     showMark: true,
                   },
                 ]}
@@ -554,7 +555,7 @@ function Dashboard() {
                       ) : avgTrainingImprovement < 0 ? (
                         <>
                           Em média, sua nota{' '}
-                          <span className="font-medium text-red-600">
+                          <span className="font-medium text-rose-600">
                             cai {Math.abs(avgTrainingImprovement).toFixed(1)}{' '}
                             <PpTooltip />
                           </span>{' '}
@@ -571,7 +572,7 @@ function Dashboard() {
                   </p>
                   <Link
                     to="/evolucao-como-funciona"
-                    className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline inline-flex items-center gap-0.5 mt-1"
+                    className="text-xs text-cyan-600 hover:text-cyan-700 font-medium no-underline inline-flex items-center gap-0.5 mt-1"
                   >
                     Como é calculado?
                     <ArrowRightIcon className="w-3 h-3" />
@@ -637,8 +638,8 @@ function Dashboard() {
             icon={RocketLaunchIcon}
             title="Criar novo treino"
             description="Escolha um simulado e comece a evoluir"
-            accent="text-emerald-600"
-            iconBg="bg-emerald-100"
+            accent="text-cyan-600"
+            iconBg="bg-cyan-100"
             primary
             animDelay={150}
           />
@@ -651,8 +652,8 @@ function Dashboard() {
                 ? `${totalTrainings} treino${totalTrainings !== 1 ? 's' : ''} · ${concludedTrainings} concluído${concludedTrainings !== 1 ? 's' : ''}`
                 : 'Veja seus treinos e continue onde parou'
             }
-            accent="text-blue-600"
-            iconBg="bg-blue-100"
+            accent="text-cyan-600"
+            iconBg="bg-cyan-100"
             animDelay={200}
           />
           <ActionCard
@@ -685,7 +686,7 @@ function Dashboard() {
             </h2>
             <Link
               to="/treino"
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline"
+              className="text-xs text-cyan-600 hover:text-cyan-500 font-medium no-underline"
             >
               Ver todos
             </Link>
@@ -725,7 +726,7 @@ function Dashboard() {
                       {/* Progress bar */}
                       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden mb-2.5">
                         <div
-                          className="h-full rounded-full bg-blue-500 transition-all duration-500"
+                          className="h-full rounded-full bg-cyan-500 transition-all duration-500"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
@@ -753,18 +754,18 @@ function Dashboard() {
       {activeAttempt && (
         <Card
           noElevation
-          className="p-5 border-2 border-blue-200 bg-blue-50/50"
+          className="p-5 border-2 border-cyan-200 bg-cyan-50/50"
         >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-11 h-11 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                <PlayIcon className="w-5 h-5 text-blue-600" />
+              <div className="w-11 h-11 rounded-xl bg-cyan-100 flex items-center justify-center shrink-0">
+                <PlayIcon className="w-5 h-5 text-cyan-600" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-blue-800">
+                <p className="text-sm font-semibold text-cyan-800">
                   Você tem um exame em andamento
                 </p>
-                <p className="text-xs text-blue-600/70 truncate">
+                <p className="text-xs text-cyan-600/70 truncate">
                   {formatExamBaseTitle({
                     examDate: activeAttempt.examDate,
                     institution: activeAttempt.institution,

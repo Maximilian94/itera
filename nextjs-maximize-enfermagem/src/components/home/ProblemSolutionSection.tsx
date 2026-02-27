@@ -4,7 +4,7 @@ export function ProblemSolutionSection() {
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-red-500">
+            <p className="text-sm font-semibold uppercase tracking-wider text-rose-500">
               O problema
             </p>
             <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">
@@ -19,7 +19,7 @@ export function ProblemSolutionSection() {
               ].map((item) => (
                 <li key={item} className="flex items-start gap-3">
                   <svg
-                    className="h-6 w-6 text-red-400 shrink-0 mt-0.5"
+                    className="h-6 w-6 text-rose-400 shrink-0 mt-0.5"
                     fill="none"
                     viewBox="0 0 24 24"
                     strokeWidth={2}

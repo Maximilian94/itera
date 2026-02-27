@@ -86,7 +86,7 @@ export function FeaturesSection() {
     <section className="py-20 sm:py-24 bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto">
-          <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
             Funcionalidades
           </p>
           <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">
@@ -100,7 +100,7 @@ export function FeaturesSection() {
               key={feature.title}
               className="flex gap-5 bg-white rounded-2xl p-6 shadow-sm border border-gray-100"
             >
-              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-blue-50 text-blue-600 shrink-0">
+              <div className="flex items-center justify-center w-12 h-12 rounded-xl bg-cyan-50 text-cyan-600 shrink-0">
                 {feature.icon}
               </div>
               <div>

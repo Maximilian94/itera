@@ -149,7 +149,7 @@ function SubjectRow({
             delta > 0
               ? 'bg-emerald-50 text-emerald-700'
               : delta < 0
-                ? 'bg-red-50 text-red-600'
+                ? 'bg-rose-50 text-rose-600'
                 : 'bg-slate-100 text-slate-500'
           }`}
         >
@@ -187,7 +187,7 @@ function SubjectRow({
               delta > 0
                 ? 'bg-emerald-500'
                 : delta < 0
-                  ? 'bg-red-400'
+                  ? 'bg-rose-400'
                   : 'bg-slate-400'
             }`}
             style={{

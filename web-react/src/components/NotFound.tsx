@@ -21,7 +21,7 @@ export function NotFound() {
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 px-4 py-12 relative overflow-hidden">
       {/* Decoração de fundo sutil */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-slate-700/20 blur-3xl" />
       </div>
@@ -37,14 +37,14 @@ export function NotFound() {
               404
             </div>
             <div className="absolute inset-0 flex items-center justify-center">
-              <MagnifyingGlassCircleIcon className="w-16 h-16 text-emerald-500/70" />
+              <MagnifyingGlassCircleIcon className="w-16 h-16 text-cyan-500/70" />
             </div>
           </div>
         </div>
 
         {/* Título e descrição */}
         <h1
-          className="text-2xl font-semibold text-slate-800 mb-2"
+          className="text-2xl font-semibold text-sky-900 mb-2"
           style={{ animation: 'fade-in-up 0.5s ease-out 100ms both' }}
         >
           Página não encontrada
@@ -64,7 +64,7 @@ export function NotFound() {
         >
           <Link
             to={primaryDestination}
-            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors shadow-lg shadow-emerald-900/30"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors shadow-lg shadow-cyan-900/30"
           >
             <HomeIcon className="w-5 h-5" />
             {primaryLabel}
@@ -86,7 +86,7 @@ export function NotFound() {
             style={{ animation: 'fade-in-up 0.5s ease-out 250ms both' }}
           >
             Já tem conta?{' '}
-            <Link to="/sign-in" className="text-emerald-600 hover:text-emerald-700 underline underline-offset-2">
+            <Link to="/sign-in" className="text-cyan-600 hover:text-cyan-500 underline underline-offset-2">
               Entrar
             </Link>
           </p>

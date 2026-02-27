@@ -26,7 +26,7 @@ const trainingCycle = [
             'Banco de questões em constante atualização',
         ],
         icon: MagnifyingGlassIcon,
-        color: 'text-sky-600',
+        color: 'text-cyan-600',
         image: '/Screenshot 2026-02-20 at 18.41.47.png',
     },
     {
@@ -42,7 +42,7 @@ const trainingCycle = [
             'Muito mais...'
         ],
         icon: ClipboardDocumentListIcon,
-        color: 'text-blue-600',
+        color: 'text-cyan-500',
         image: '/Screenshot 2026-02-19 at 16.21.00.png',
     },
     {
@@ -128,37 +128,37 @@ export default function Features() {
 
     return (
         <section
-            className="overflow-hidden bg-slate-200/80 py-20 sm:py-24"
+            className="overflow-hidden bg-slate-100 py-20 sm:py-24"
             aria-labelledby="ciclo-treino-heading"
         >
             <div className="mx-auto max-w-6xl px-6 lg:px-8">
                 <div className="w-full">
-                    <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+                    <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
                         Como funciona o treino?
                     </p>
                     <h2
                         id="ciclo-treino-heading"
-                        className="mt-2 text-pretty text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl"
+                        className="mt-2 text-pretty text-4xl font-semibold tracking-tight text-sky-900 sm:text-5xl"
                     >
                         6 etapas para transformar erro em aprovação
                     </h2>
-                    <p className="mt-6 text-lg leading-8 text-gray-600">
+                    <p className="mt-6 text-lg leading-8 text-slate-600">
                         A plataforma é construída sobre um método comprovado pela ciência cognitiva chamado {''}
-                        <strong className="text-gray-900">
+                        <strong className="text-sky-900">
                         <em>Retrieval Practice</em>
                         </strong>
                         {' '}(
                             <em>Prática de Recuperação</em>
                         ).
                     </p>
-                    <p className="mt-4 text-lg leading-8 text-gray-600">
+                    <p className="mt-4 text-lg leading-8 text-slate-600">
                         Em vez de estudar passivamente, indo de um simulado para outro, cada prova vira um feedback imediato, direcionando voce sobre quais assuntos voce precisa estudar, otimizando seu tempo evitando estudar assuntos que voce já domina.
                     </p>
-                    <p className="mt-4 text-lg leading-8 text-gray-600">
+                    <p className="mt-4 text-lg leading-8 text-slate-600">
                         Este direcionamento é feito através de um diagnóstico detalhado feito com IA com base no seu desempenho da ultima prova.
                     </p>
-                    <p className="mt-4 text-lg leading-8 text-gray-600">
-                        Todo este processo nos chamamos de <strong className="text-gray-900"><em>"Treino"</em></strong>. Veja com mais detalhes abaixo como ele funciona :
+                    <p className="mt-4 text-lg leading-8 text-slate-600">
+                        Todo este processo nos chamamos de <strong className="text-sky-900"><em>"Treino"</em></strong>. Veja com mais detalhes abaixo como ele funciona :
                     </p>
                 </div>
 
@@ -189,24 +189,24 @@ export default function Features() {
                                                         />
                                                     </span>
                                                     <div>
-                                                        <span className="text-sm font-medium text-gray-500">
+                                                        <span className="text-sm font-medium text-slate-500">
                                                             Etapa {stage.step} de 6
                                                         </span>
-                                                        <h3 className="text-xl font-semibold text-gray-900">
+                                                        <h3 className="text-xl font-semibold text-sky-900">
                                                             {stage.name}
                                                         </h3>
                                                     </div>
                                                 </div>
-                                                <p className="mt-4 text-base leading-7 text-gray-600">
+                                                <p className="mt-4 text-base leading-7 text-slate-600">
                                                     {stage.description}
                                                 </p>
                                                 <ul className="mt-4 space-y-2" role="list">
                                                     {stage.bullets.map((bullet) => (
                                                         <li
                                                             key={bullet}
-                                                            className="flex items-start gap-2 text-sm text-gray-600"
+                                                            className="flex items-start gap-2 text-sm text-slate-600"
                                                         >
-                                                            <CheckIcon className="mt-0.5 size-4 shrink-0 text-blue-600" aria-hidden />
+                                                            <CheckIcon className="mt-0.5 size-4 shrink-0 text-cyan-600" aria-hidden />
                                                             <span>{bullet}</span>
                                                         </li>
                                                     ))}
@@ -237,7 +237,7 @@ export default function Features() {
                         <button
                             type="button"
                             onClick={scrollPrev}
-                            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 rounded-full bg-white p-2 shadow-lg ring-1 ring-gray-900/10 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:-translate-x-4"
+                            className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-2 rounded-full bg-white p-2 shadow-lg ring-1 ring-slate-200 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 sm:-translate-x-4"
                             aria-label="Etapa anterior"
                         >
                             <ChevronLeftIcon className="size-6 text-gray-700" aria-hidden="true" />
@@ -245,7 +245,7 @@ export default function Features() {
                         <button
                             type="button"
                             onClick={scrollNext}
-                            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 rounded-full bg-white p-2 shadow-lg ring-1 ring-gray-900/10 transition hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 sm:translate-x-4"
+                            className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-2 rounded-full bg-white p-2 shadow-lg ring-1 ring-slate-200 transition hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-offset-2 sm:translate-x-4"
                             aria-label="Próxima etapa"
                         >
                             <ChevronRightIcon className="size-6 text-gray-700" aria-hidden="true" />
@@ -268,8 +268,8 @@ export default function Features() {
                                 onClick={() => emblaApi?.scrollTo(index)}
                                 className={`h-2.5 rounded-full transition-all duration-300 ${
                                     selectedIndex === index
-                                        ? 'w-8 bg-blue-600'
-                                        : 'w-2.5 bg-gray-300 hover:bg-gray-400'
+                                        ? 'w-8 bg-cyan-600'
+                                        : 'w-2.5 bg-slate-300 hover:bg-slate-400'
                                 }`}
                             />
                         ))}

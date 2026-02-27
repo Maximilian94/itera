@@ -184,7 +184,7 @@ function AccountPage() {
                       search={{ ...searchForLinks, tab: 'perfil' }}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
                         tab === 'perfil'
-                          ? 'border-l-blue-500 bg-blue-50/50 text-slate-900'
+                          ? 'border-l-cyan-500 bg-cyan-50/50 text-slate-900'
                           : 'border-l-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
@@ -207,7 +207,7 @@ function AccountPage() {
                       search={{ ...searchForLinks, tab: 'assinatura' }}
                       className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors border-l-[3px] ${
                         tab === 'assinatura'
-                          ? 'border-l-blue-500 bg-blue-50/50 text-slate-900'
+                          ? 'border-l-cyan-500 bg-cyan-50/50 text-slate-900'
                           : 'border-l-transparent text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                       }`}
                     >
@@ -282,7 +282,7 @@ function ProfileContent({
     <div className="animate-[fade-in-up_0.4s_ease-out_0.05s_both]">
       <header className="mb-8">
         <div className="flex items-center gap-4">
-          <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-blue-500 to-blue-700 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-blue-200/50">
+          <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-cyan-500 to-cyan-700 flex items-center justify-center text-white text-lg font-bold shadow-lg shadow-cyan-200/50">
             {getInitials(displayName)}
           </div>
           <div>
@@ -346,7 +346,7 @@ function ProfileContent({
                   </span>
                 )}
                 {phoneMessage === 'error' && (
-                  <span className="text-sm text-red-600 font-medium">Erro ao salvar</span>
+                  <span className="text-sm text-rose-600 font-medium">Erro ao salvar</span>
                 )}
               </div>
             )}
@@ -411,8 +411,8 @@ function SubscriptionContent({
             onRequestRefund={onRequestRefund}
           />
           {(access.status === 'active' || access.status === 'trial') && (
-            <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 px-4 py-4">
-              <p className="text-sm text-blue-800">
+            <div className="mt-6 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-4">
+              <p className="text-sm text-cyan-800">
                 Os botões acima redirecionam para o portal do Stripe, onde você pode alterar seu plano,
                 trocar entre cobrança mensal e anual, atualizar o método de pagamento e cancelar sua assinatura.
               </p>
@@ -421,11 +421,11 @@ function SubscriptionContent({
           {isMock && (
             <p className="text-xs text-slate-500 mt-4 flex flex-wrap gap-x-2 gap-y-1 items-center">
               <span>Testar:</span>
-              <Link to="/account" search={{ ...searchForLinks, access: 'active' }} className="text-blue-600 hover:underline font-medium">Ativo</Link>
+              <Link to="/account" search={{ ...searchForLinks, access: 'active' }} className="text-cyan-600 hover:underline font-medium">Ativo</Link>
               <span className="text-slate-300">|</span>
-              <Link to="/account" search={{ ...searchForLinks, access: 'trial' }} className="text-blue-600 hover:underline font-medium">Trial</Link>
+              <Link to="/account" search={{ ...searchForLinks, access: 'trial' }} className="text-cyan-600 hover:underline font-medium">Trial</Link>
               <span className="text-slate-300">|</span>
-              <Link to="/account" search={{ ...searchForLinks, access: 'inactive' }} className="text-blue-600 hover:underline font-medium">Não ativo</Link>
+              <Link to="/account" search={{ ...searchForLinks, access: 'inactive' }} className="text-cyan-600 hover:underline font-medium">Não ativo</Link>
             </p>
           )}
         </>
@@ -544,7 +544,7 @@ function AccessCard({
               </div>
               <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
                 <div
-                  className="h-full rounded-full bg-linear-to-r from-blue-500 to-blue-600 transition-all duration-500"
+                  className="h-full rounded-full bg-linear-to-r from-cyan-500 to-cyan-600 transition-all duration-500"
                   style={{ width: `${Math.min(100, (access.trainingsUsedThisMonth / access.trainingLimit) * 100)}%` }}
                 />
               </div>
@@ -552,7 +552,7 @@ function AccessCard({
           )}
 
           {error && (
-            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3" role="alert">
+            <div className="mt-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" role="alert">
               {error}
             </div>
           )}
@@ -657,7 +657,7 @@ function AccessCard({
           )}
 
           {error && (
-            <div className="mt-4 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3" role="alert">
+            <div className="mt-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" role="alert">
               {error}
             </div>
           )}

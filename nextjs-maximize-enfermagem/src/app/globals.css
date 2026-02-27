@@ -4,20 +4,20 @@
 :root {
   color-scheme: light;
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0c4a6e; /* sky-900 */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-manrope);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
 }
 
 /* Blog post - texto ocupa toda a largura disponível */

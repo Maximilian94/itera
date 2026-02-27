@@ -86,9 +86,9 @@ export function ConcursosList() {
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-medium text-red-800">{error}</p>
-        <p className="mt-2 text-sm text-red-600">
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
+        <p className="font-medium text-rose-800">{error}</p>
+        <p className="mt-2 text-sm text-rose-600">
           Verifique se a API está rodando e se NEXT_PUBLIC_API_URL está correto no .env.local
         </p>
       </div>
@@ -104,12 +104,12 @@ export function ConcursosList() {
           placeholder="Buscar por nome, instituição, cargo..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm w-full sm:w-64 focus:outline-none focus:ring-2 focus:ring-cyan-500"
         />
         <select
           value={banca}
           onChange={(e) => setBanca(e.target.value)}
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
         >
           <option value="">Todas as bancas</option>
           {bancas.map((b) => (
@@ -121,7 +121,7 @@ export function ConcursosList() {
         <select
           value={escopo}
           onChange={(e) => setEscopo(e.target.value)}
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
         >
           <option value="">Todos os escopos</option>
           <option value="FEDERAL">Federal</option>
@@ -131,7 +131,7 @@ export function ConcursosList() {
         <select
           value={estado}
           onChange={(e) => setEstado(e.target.value)}
-          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="rounded-lg border border-gray-200 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-cyan-500"
         >
           <option value="">Todos os estados</option>
           {estados.map((e) => (
@@ -153,7 +153,7 @@ export function ConcursosList() {
             <li key={c.id}>
               <Link
                 href={c.slug ? `/concursos/${c.slug}` : "#"}
-                className="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-blue-200 hover:shadow-md"
+                className="block rounded-xl border border-gray-200 bg-white p-5 shadow-sm transition hover:border-cyan-200 hover:shadow-md"
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>

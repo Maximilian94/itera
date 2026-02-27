@@ -20,7 +20,7 @@ function getSubjectBarColor(
 ): string {
   if (percentage >= minPassing) return 'bg-green-500'
   if (percentage >= minPassing - 15) return 'bg-amber-500'
-  return 'bg-red-500'
+  return 'bg-rose-500'
 }
 
 function getSubjectTextColor(
@@ -29,7 +29,7 @@ function getSubjectTextColor(
 ): string {
   if (percentage >= minPassing) return 'text-green-700'
   if (percentage >= minPassing - 15) return 'text-amber-700'
-  return 'text-red-700'
+  return 'text-rose-700'
 }
 
 export const Route = createFileRoute(
@@ -110,7 +110,7 @@ function RouteComponent() {
           className={`p-6 ${
             passed
               ? 'border-green-300 bg-green-50'
-              : 'border-red-300 bg-red-50'
+              : 'border-rose-300 bg-rose-50'
           }`}
         >
           <div className="flex flex-col gap-4">
@@ -125,14 +125,14 @@ function RouteComponent() {
                   <CheckCircleIcon className="w-8 h-8 text-green-600" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-200">
-                  <XCircleIcon className="w-8 h-8 text-red-600" />
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-rose-200">
+                  <XCircleIcon className="w-8 h-8 text-rose-600" />
                 </div>
               )}
               <div>
                 <p
                   className={`text-lg font-semibold ${
-                    passed ? 'text-green-800' : 'text-red-800'
+                    passed ? 'text-green-800' : 'text-rose-800'
                   }`}
                 >
                   {passed ? 'Aprovado' : 'Reprovado'}
@@ -198,8 +198,8 @@ function RouteComponent() {
       {subjectStats.length > 0 && !hasAnyFeedback && (
         <Card noElevation className="p-5 border border-slate-200 bg-slate-50/50">
           <div className="flex items-start gap-3">
-            <div className="shrink-0 w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
-              <SparklesIcon className="w-5 h-5 text-blue-600" />
+            <div className="shrink-0 w-10 h-10 rounded-lg bg-cyan-100 flex items-center justify-center">
+              <SparklesIcon className="w-5 h-5 text-cyan-600" />
             </div>
             <div className="flex-1 min-w-0">
               <h2 className="text-base font-semibold text-slate-800 mb-1">
@@ -259,12 +259,12 @@ function RouteComponent() {
               const cardBorder = isGreen
                 ? 'border-green-200'
                 : isRed
-                  ? 'border-red-200'
+                  ? 'border-rose-200'
                   : 'border-amber-200'
               const cardBg = isGreen
                 ? 'bg-green-50/50'
                 : isRed
-                  ? 'bg-red-50/50'
+                  ? 'bg-rose-50/50'
                   : 'bg-amber-50/50'
               return (
                 <Card

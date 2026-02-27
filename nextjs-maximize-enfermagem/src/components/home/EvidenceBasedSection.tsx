@@ -6,7 +6,7 @@ const PILLARS = [
       "Resolver questões é a forma mais eficaz de fixar conhecimento. Ao se esforçar para recuperar a informação da memória, você fortalece as conexões neurais e aprende de verdade.",
     icon: (
       <svg
-        className="h-8 w-8 text-blue-600"
+        className="h-8 w-8 text-cyan-600"
         fill="none"
         viewBox="0 0 24 24"
         strokeWidth={1.5}
@@ -27,7 +27,7 @@ const PILLARS = [
       "O sistema agenda revisões no momento ideal antes que você esqueça. Baseado na curva do esquecimento, você revisa menos e memoriza mais, otimizando seu tempo de estudo.",
     icon: (
       <svg
-        className="h-8 w-8 text-blue-600"
+        className="h-8 w-8 text-cyan-600"
         fill="none"
         viewBox="0 0 24 24"
         strokeWidth={1.5}
@@ -48,7 +48,7 @@ const PILLARS = [
       "Após cada questão, veja a resposta correta com explicação detalhada. Corrigir erros no momento certo evita que você memorize informações incorretas.",
     icon: (
       <svg
-        className="h-8 w-8 text-blue-600"
+        className="h-8 w-8 text-cyan-600"
         fill="none"
         viewBox="0 0 24 24"
         strokeWidth={1.5}
@@ -69,7 +69,7 @@ export function EvidenceBasedSection() {
     <section className="py-20 sm:py-24 bg-gray-50">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto">
-          <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
             Metodologia
           </p>
           <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">
@@ -87,13 +87,13 @@ export function EvidenceBasedSection() {
               key={pillar.title}
               className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow"
             >
-              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-blue-50">
+              <div className="flex items-center justify-center w-14 h-14 rounded-xl bg-cyan-50">
                 {pillar.icon}
               </div>
               <h3 className="mt-5 text-xl font-bold text-gray-900">
                 {pillar.title}
               </h3>
-              <p className="text-sm text-blue-600 font-medium">
+              <p className="text-sm text-cyan-600 font-medium">
                 {pillar.subtitle}
               </p>
               <p className="mt-3 text-gray-600 leading-relaxed">

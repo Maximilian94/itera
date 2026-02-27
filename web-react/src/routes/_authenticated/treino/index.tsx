@@ -78,7 +78,7 @@ function ActiveTrainingCard({
           {/* Progress bar at top */}
           <div className="h-1.5 w-full bg-slate-100">
             <div
-              className={`h-full transition-all duration-500 ${stage?.activeBg ?? 'bg-blue-500'}`}
+              className={`h-full transition-all duration-500 ${stage?.activeBg ?? 'bg-cyan-500'}`}
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -116,7 +116,7 @@ function ActiveTrainingCard({
               <span className="text-[0.65rem] text-slate-400">
                 {dayjs(item.updatedAt).format('DD/MM/YY HH:mm')}
               </span>
-              <span className="text-[0.65rem] font-medium text-blue-600 group-hover:text-blue-700">
+              <span className="text-[0.65rem] font-medium text-cyan-600 group-hover:text-cyan-700">
                 Continuar
               </span>
             </div>
@@ -237,7 +237,7 @@ function ConcludedTrainingRow({
                   className={`inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${
                     passedBefore
                       ? 'bg-emerald-50 text-emerald-600'
-                      : 'bg-red-50 text-red-600'
+                      : 'bg-rose-50 text-rose-600'
                   }`}
                 >
                   {passedBefore ? (
@@ -255,7 +255,7 @@ function ConcludedTrainingRow({
                   className={`inline-flex items-center gap-1 text-[0.65rem] font-semibold px-2 py-0.5 rounded-full ${
                     passedAfter
                       ? 'bg-emerald-50 text-emerald-700'
-                      : 'bg-red-50 text-red-600'
+                      : 'bg-rose-50 text-rose-600'
                   }`}
                 >
                   {passedAfter ? (
@@ -308,7 +308,7 @@ function TreinoIndexPage() {
       <PageHero
         title="Treino"
         description="Seu erro vira plano de estudo. Faça a prova, estude o que precisa e veja o quanto evoluiu."
-        variant="emerald"
+        variant="cyan"
       >
         <div className="flex items-center gap-6">
           <div className="text-center">

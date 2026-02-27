@@ -44,7 +44,7 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
     <>
       <Link
         href="/concursos"
-        className="text-sm font-medium text-blue-600 hover:text-blue-700"
+        className="text-sm font-medium text-cyan-600 hover:text-cyan-700"
       >
         ← Voltar para concursos
       </Link>
@@ -88,12 +88,12 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
 
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-100">
-              <CalendarDaysIcon className="h-5 w-5 text-blue-600" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-100">
+              <CalendarDaysIcon className="h-5 w-5 text-cyan-600" />
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Data da prova</p>
-              <p className="mt-1 font-semibold text-gray-900">{formatDate(concurso.examDate)}</p>
+              <p className="mt-1 font-semibold text-sky-900">{formatDate(concurso.examDate)}</p>
             </div>
           </div>
           <div className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4">
@@ -102,7 +102,7 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
             </div>
             <div>
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Questões</p>
-              <p className="mt-1 font-semibold text-gray-900">{concurso._count.questions}</p>
+              <p className="mt-1 font-semibold text-sky-900">{concurso._count.questions}</p>
             </div>
           </div>
           {concurso.editalUrl && (
@@ -112,12 +112,12 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
               rel="noopener noreferrer"
               className="flex items-start gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-4 hover:bg-slate-100/50 transition-colors"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100">
-                <ArrowTopRightOnSquareIcon className="h-5 w-5 text-indigo-600" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-cyan-100">
+                <ArrowTopRightOnSquareIcon className="h-5 w-5 text-cyan-600" />
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Edital</p>
-                <p className="mt-1 font-semibold text-indigo-600">Ver edital</p>
+                <p className="mt-1 font-semibold text-cyan-600">Ver edital</p>
               </div>
             </a>
           )}
@@ -128,7 +128,7 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Remuneração base</p>
-                <p className="mt-1 font-semibold text-gray-900">{concurso.salaryBase}</p>
+                <p className="mt-1 font-semibold text-sky-900">{concurso.salaryBase}</p>
               </div>
             </div>
           )}
@@ -139,13 +139,13 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
               </div>
               <div>
                 <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Nota mínima (ampla)</p>
-                <p className="mt-1 font-semibold text-gray-900">{concurso.minPassingGradeNonQuota}</p>
+                <p className="mt-1 font-semibold text-sky-900">{concurso.minPassingGradeNonQuota}</p>
               </div>
             </div>
           )}
         </div>
 
-        <div className="mt-10 flex flex-col overflow-hidden rounded-xl border border-blue-100 bg-blue-50 sm:flex-row sm:items-center">
+        <div className="mt-10 flex flex-col overflow-hidden rounded-xl border border-cyan-100 bg-cyan-50 sm:flex-row sm:items-center">
           <div className="relative shrink-0 p-4 sm:pl-4 sm:pt-4 sm:pb-4 sm:pr-0">
             <img
               src="/enfermeira-estudando.png"
@@ -176,7 +176,7 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
             </p>
             <Link
               href="https://app.maximizeenfermagem.com.br"
-              className="mt-4 inline-flex w-fit rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              className="mt-4 inline-flex w-fit rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-cyan-700 transition-colors"
             >
               Fazer meu primeiro treino grátis
             </Link>
@@ -222,16 +222,16 @@ export function ConcursoDetail({ concurso: initialConcurso }: ConcursoDetailProp
 
   if (!slug) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-medium text-red-800">Slug inválido</p>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
+        <p className="font-medium text-rose-800">Slug inválido</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
-        <p className="font-medium text-red-800">{error}</p>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 p-6 text-center">
+        <p className="font-medium text-rose-800">{error}</p>
       </div>
     );
   }
@@ -248,7 +248,7 @@ export function ConcursoDetail({ concurso: initialConcurso }: ConcursoDetailProp
     return (
       <div className="rounded-xl border border-gray-200 bg-white p-12 text-center">
         <p className="font-medium text-gray-900">Concurso não encontrado</p>
-        <Link href="/concursos" className="mt-4 inline-block text-sm text-blue-600 hover:text-blue-700">
+        <Link href="/concursos" className="mt-4 inline-block text-sm text-cyan-600 hover:text-cyan-700">
           ← Voltar para concursos
         </Link>
       </div>

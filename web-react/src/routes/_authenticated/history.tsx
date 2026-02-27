@@ -49,7 +49,7 @@ function RouteComponent() {
 
       {error && (
         <Card noElevation className="p-5">
-          <p className="text-sm text-red-600">Erro ao carregar o histórico.</p>
+          <p className="text-sm text-rose-600">Erro ao carregar o histórico.</p>
         </Card>
       )}
 

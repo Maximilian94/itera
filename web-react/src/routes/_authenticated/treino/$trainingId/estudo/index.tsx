@@ -136,8 +136,8 @@ function StudyItemRow({
                 <CheckCircleIcon className="w-6 h-6 text-emerald-600" />
               </div>
             ) : (
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 transition-colors duration-200">
-                <BookOpenIcon className="w-5 h-5 text-slate-500 group-hover:text-indigo-600 transition-colors duration-200" />
+              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0 group-hover:bg-cyan-50 transition-colors duration-200">
+                <BookOpenIcon className="w-5 h-5 text-slate-500 group-hover:text-cyan-600 transition-colors duration-200" />
               </div>
             )}
             <div className="flex-1 min-w-0">
@@ -238,7 +238,7 @@ function EstudoListPage() {
     <div className="flex flex-col gap-6 pb-4">
       {/* ═══════════ HERO BANNER ═══════════ */}
       <div
-        className="relative overflow-hidden rounded-2xl px-6 py-8 md:px-8 bg-linear-to-br from-indigo-600 via-indigo-500 to-violet-500"
+        className="relative overflow-hidden rounded-2xl px-6 py-8 md:px-8 bg-linear-to-br from-cyan-600 via-cyan-500 to-violet-500"
         style={{ animation: 'scale-in 0.45s ease-out both' }}
       >
         {/* decorative shapes */}
@@ -311,7 +311,7 @@ function EstudoListPage() {
       >
         <div className="flex-1 h-2.5 rounded-full bg-slate-200 overflow-hidden">
           <div
-            className="h-full bg-indigo-500 rounded-full transition-all duration-700 ease-out"
+            className="h-full bg-cyan-500 rounded-full transition-all duration-700 ease-out"
             style={{ width: `${progresso}%` }}
           />
         </div>
@@ -374,11 +374,11 @@ function EstudoListPage() {
       {/* ═══════════ CTA TO RETRY ═══════════ */}
       <Card
         noElevation
-        className="p-5 border border-indigo-200 bg-indigo-50/50"
+        className="p-5 border border-cyan-200 bg-cyan-50/50"
       >
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
-            <RocketLaunchIcon className="w-5 h-5 text-indigo-600" />
+          <div className="w-9 h-9 rounded-lg bg-cyan-100 flex items-center justify-center shrink-0 mt-0.5">
+            <RocketLaunchIcon className="w-5 h-5 text-cyan-600" />
           </div>
           <div>
             <p className="text-sm font-semibold text-slate-800 mb-1">

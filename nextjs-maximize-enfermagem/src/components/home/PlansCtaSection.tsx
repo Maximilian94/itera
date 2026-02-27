@@ -38,7 +38,7 @@ export function PlansCtaSection() {
     <section className="py-20 sm:py-24">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="text-center max-w-3xl mx-auto">
-          <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
             Planos
           </p>
           <h2 className="mt-2 text-3xl sm:text-4xl font-bold text-gray-900">
@@ -55,25 +55,25 @@ export function PlansCtaSection() {
               key={plan.name}
               className={`rounded-2xl p-8 ${
                 plan.highlighted
-                  ? "bg-blue-600 text-white ring-4 ring-blue-600 ring-offset-2"
+                  ? "bg-cyan-600 text-white ring-4 ring-cyan-600 ring-offset-2"
                   : "bg-white border border-gray-200"
               }`}
             >
               <h3
-                className={`text-lg font-semibold ${plan.highlighted ? "text-blue-100" : "text-gray-600"}`}
+                className={`text-lg font-semibold ${plan.highlighted ? "text-cyan-100" : "text-gray-600"}`}
               >
                 {plan.name}
               </h3>
               <div className="mt-2 flex items-baseline gap-1">
                 <span className="text-4xl font-extrabold">{plan.price}</span>
                 <span
-                  className={`text-sm ${plan.highlighted ? "text-blue-200" : "text-gray-500"}`}
+                  className={`text-sm ${plan.highlighted ? "text-cyan-200" : "text-gray-500"}`}
                 >
                   {plan.period}
                 </span>
               </div>
               <p
-                className={`mt-2 text-sm ${plan.highlighted ? "text-blue-100" : "text-gray-500"}`}
+                className={`mt-2 text-sm ${plan.highlighted ? "text-cyan-100" : "text-gray-500"}`}
               >
                 {plan.description}
               </p>
@@ -81,7 +81,7 @@ export function PlansCtaSection() {
                 {plan.features.map((feature) => (
                   <li key={feature} className="flex items-start gap-2 text-sm">
                     <svg
-                      className={`h-5 w-5 shrink-0 ${plan.highlighted ? "text-blue-200" : "text-blue-600"}`}
+                      className={`h-5 w-5 shrink-0 ${plan.highlighted ? "text-cyan-200" : "text-cyan-600"}`}
                       fill="none"
                       viewBox="0 0 24 24"
                       strokeWidth={2}
@@ -101,8 +101,8 @@ export function PlansCtaSection() {
                 href={plan.href}
                 className={`mt-8 block w-full rounded-lg py-3 text-center text-sm font-semibold transition-colors ${
                   plan.highlighted
-                    ? "bg-white text-blue-700 hover:bg-blue-50"
-                    : "bg-blue-600 text-white hover:bg-blue-700"
+                    ? "bg-white text-cyan-700 hover:bg-cyan-50"
+                    : "bg-cyan-600 text-white hover:bg-cyan-700"
                 }`}
               >
                 {plan.cta}

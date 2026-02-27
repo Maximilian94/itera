@@ -12,10 +12,10 @@ export function Header() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-gray-100">
+    <header className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-100">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          <Link href="/" className="text-xl font-bold text-blue-600">
+          <Link href="/" className="text-xl font-bold text-cyan-600">
             Maximize Enfermagem
           </Link>
 
@@ -24,21 +24,21 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-sm font-medium text-slate-600 hover:text-cyan-600 transition-colors"
               >
                 {link.label}
               </Link>
             ))}
             <Link
               href="https://app.maximizeenfermagem.com.br"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 transition-colors"
             >
               Acessar Plataforma
             </Link>
           </nav>
 
           <button
-            className="md:hidden p-2 text-gray-600"
+            className="md:hidden p-2 text-slate-600"
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label="Abrir menu"
           >
@@ -72,7 +72,7 @@ export function Header() {
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm font-medium text-gray-600 hover:text-blue-600 transition-colors"
+                className="text-sm font-medium text-slate-600 hover:text-cyan-600 transition-colors"
                 onClick={() => setMobileOpen(false)}
               >
                 {link.label}
@@ -80,7 +80,7 @@ export function Header() {
             ))}
             <Link
               href="https://app.maximizeenfermagem.com.br"
-              className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white text-center hover:bg-blue-700 transition-colors"
+              className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white text-center hover:bg-cyan-500 transition-colors"
               onClick={() => setMobileOpen(false)}
             >
               Acessar Plataforma

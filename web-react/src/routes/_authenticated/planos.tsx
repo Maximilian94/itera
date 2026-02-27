@@ -166,8 +166,8 @@ function PlanosPage() {
 
       {/* Active user: Gerenciar via Portal */}
       {isActive && (
-        <div className="w-full max-w-2xl bg-blue-50 border border-blue-200 rounded-xl px-4 py-4">
-          <p className="text-sm text-blue-800 mb-3">
+        <div className="w-full max-w-2xl bg-cyan-50 border border-cyan-200 rounded-xl px-4 py-4">
+          <p className="text-sm text-cyan-800 mb-3">
             Você já possui uma assinatura ativa. Para alterar seu plano, forma de cobrança ou método de pagamento, use o portal do Stripe.
           </p>
           <Button
@@ -183,7 +183,7 @@ function PlanosPage() {
 
       {/* Error */}
       {error && (
-        <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-4 py-3 max-w-md text-center">
+        <div className="text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-4 py-3 max-w-md text-center">
           {error}
         </div>
       )}
@@ -205,12 +205,12 @@ function PlanosPage() {
                 key={plan.plan}
                 className={`relative flex flex-col rounded-2xl border-2 p-6 transition-shadow ${
                   isPopular
-                    ? 'border-blue-500 shadow-lg shadow-blue-100'
+                    ? 'border-cyan-500 shadow-lg shadow-cyan-100'
                     : 'border-slate-200 hover:shadow-md'
                 } ${isCurrent ? 'ring-2 ring-green-400' : ''}`}
               >
                 {isPopular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-500 text-white text-xs font-bold rounded-full">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1 bg-cyan-500 text-white text-xs font-bold rounded-full">
                     Mais Popular
                   </div>
                 )}
@@ -222,9 +222,9 @@ function PlanosPage() {
 
                 <div className="flex items-center gap-3 mb-4">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    isPopular ? 'bg-blue-100' : 'bg-slate-100'
+                    isPopular ? 'bg-cyan-100' : 'bg-slate-100'
                   }`}>
-                    <Icon className={`w-6 h-6 ${isPopular ? 'text-blue-600' : 'text-slate-600'}`} />
+                    <Icon className={`w-6 h-6 ${isPopular ? 'text-cyan-600' : 'text-slate-600'}`} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
@@ -250,7 +250,7 @@ function PlanosPage() {
                   {plan.features.map((feature, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-slate-700">
                       <CheckIcon className={`w-4 h-4 mt-0.5 shrink-0 ${
-                        isPopular ? 'text-blue-500' : 'text-green-500'
+                        isPopular ? 'text-cyan-500' : 'text-green-500'
                       }`} />
                       <span>{feature}</span>
                     </li>
@@ -370,7 +370,7 @@ function ComparisonTable() {
                 <th
                   key={c}
                   className={`px-3 py-3 font-semibold text-center min-w-[110px] ${
-                    c === 'itera' ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
+                    c === 'itera' ? 'bg-cyan-50 text-cyan-700' : 'text-slate-600'
                   }`}
                 >
                   {headers[c]}
@@ -383,7 +383,7 @@ function ComparisonTable() {
               <tr key={i} className={`border-t border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                 <td className="px-4 py-3 text-slate-700 font-medium">{row.feature}</td>
                 {competitors.map((c) => (
-                  <td key={c} className={`px-3 py-3 ${c === 'itera' ? 'bg-blue-50/50' : ''}`}>
+                  <td key={c} className={`px-3 py-3 ${c === 'itera' ? 'bg-cyan-50/50' : ''}`}>
                     <SupportIcon level={row[c]} note={row.partialNotes?.[c]} />
                   </td>
                 ))}

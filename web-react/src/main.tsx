@@ -22,9 +22,12 @@ import { ClerkWrapper, useClerkAuth } from '@/auth/clerk'
 const toHex = (color: string) => formatHex(converter('rgb')(color))
 
 const darkTheme = createTheme({
+  typography: {
+    fontFamily: '"Manrope", ui-sans-serif, system-ui, sans-serif',
+  },
   palette: {
     primary: {
-      main: toHex(colors.blue[600]) ?? '',
+      main: toHex(colors.cyan[600]) ?? '',
     }
   },
   components: {

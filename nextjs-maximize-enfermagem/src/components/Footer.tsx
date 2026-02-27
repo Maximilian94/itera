@@ -2,14 +2,14 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="bg-gray-900 text-gray-300">
+    <footer className="bg-sky-900 text-slate-300">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <h3 className="text-lg font-bold text-white mb-3">
               Maximize Enfermagem
             </h3>
-            <p className="text-sm text-gray-400 leading-relaxed">
+            <p className="text-sm text-slate-400 leading-relaxed">
               Plataforma de questões exclusiva para concursos públicos de
               enfermagem. Estude com metodologia baseada em evidências
               científicas.
@@ -70,7 +70,7 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="mt-10 pt-8 border-t border-gray-800 text-center text-sm text-gray-500">
+        <div className="mt-10 pt-8 border-t border-sky-800 text-center text-sm text-slate-500">
           &copy; {new Date().getFullYear()} Maximize Enfermagem. Todos os
           direitos reservados.
         </div>

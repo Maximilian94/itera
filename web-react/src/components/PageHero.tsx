@@ -11,8 +11,8 @@ interface PageHeroProps {
   animation?: string
   /** Gradient/color: full Tailwind class (e.g. "bg-linear-to-br from-rose-600 to-pink-500"). Overrides variant when provided. */
   gradient?: string
-  /** Gradient variant. Used when gradient is not provided. Default: blue */
-  variant?: 'blue' | 'emerald' | 'violet' | 'indigo' | 'rose' | 'slate'
+  /** Gradient variant. Used when gradient is not provided. Default: cyan */
+  variant?: 'cyan' | 'blue' | 'emerald' | 'violet' | 'indigo' | 'rose' | 'slate'
   /** Rounded corners. Default: rounded-lg (dashboard style) */
   rounded?: string
   /** Padding. Default: px-6 py-6 (dashboard style) */
@@ -20,19 +20,21 @@ interface PageHeroProps {
 }
 
 const variantClasses: Record<NonNullable<PageHeroProps['variant']>, string> = {
-  blue: 'bg-linear-to-br from-blue-600 via-blue-900 to-blue-950',
+  cyan: 'bg-linear-to-br from-cyan-600 via-cyan-700 to-sky-900',
+  blue: 'bg-linear-to-br from-cyan-600 via-cyan-900 to-cyan-950',
   emerald: 'bg-linear-to-br from-emerald-700 via-emerald-600 to-teal-600',
-  violet: 'bg-linear-to-br from-violet-700 via-violet-600 to-indigo-600',
-  indigo: 'bg-linear-to-br from-indigo-600 via-indigo-500 to-violet-500',
+  violet: 'bg-linear-to-br from-violet-700 via-violet-600 to-cyan-600',
+  indigo: 'bg-linear-to-br from-cyan-600 via-cyan-500 to-violet-500',
   rose: 'bg-linear-to-br from-rose-600 via-rose-500 to-pink-500',
   slate: 'bg-linear-to-br from-slate-600 via-slate-500 to-slate-400',
 }
 
 const descriptionOpacityClasses: Record<NonNullable<PageHeroProps['variant']>, string> = {
+  cyan: 'text-cyan-100/80',
   blue: 'text-white/50',
   emerald: 'text-emerald-100/80',
   violet: 'text-violet-200/80',
-  indigo: 'text-indigo-100/80',
+  indigo: 'text-cyan-100/80',
   rose: 'text-white/70',
   slate: 'text-white/70',
 }
@@ -43,7 +45,7 @@ export function PageHero({
   description,
   children,
   gradient,
-  variant = 'blue',
+  variant = 'cyan',
 }: PageHeroProps) {
   const animation = 'fade-in-down 0.5s ease-out both'
   const gradientClass = gradient ?? variantClasses[variant]

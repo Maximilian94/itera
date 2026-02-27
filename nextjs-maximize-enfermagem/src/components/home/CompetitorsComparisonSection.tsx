@@ -56,7 +56,7 @@ export function CompetitorsComparisonSection() {
     <section className="overflow-hidden py-24 px-6 bg-slate-50">
       <div className="mx-auto max-w-7xl">
         <div className="text-center max-w-3xl mx-auto mb-16">
-          <p className="text-sm font-semibold uppercase tracking-wider text-blue-600">
+          <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
             Compare
           </p>
           <h2 className="mt-2 text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
@@ -76,7 +76,7 @@ export function CompetitorsComparisonSection() {
                   <th
                     key={c}
                     className={`px-3 py-3 font-semibold text-center min-w-[110px] ${
-                      c === 'itera' ? 'bg-blue-50 text-blue-700' : 'text-slate-600'
+                      c === 'itera' ? 'bg-cyan-50 text-cyan-600' : 'text-slate-600'
                     }`}
                   >
                     {headers[c]}
@@ -89,7 +89,7 @@ export function CompetitorsComparisonSection() {
                 <tr key={i} className={`border-t border-slate-100 ${i % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'}`}>
                   <td className="px-4 py-3 text-slate-700 font-medium">{row.feature}</td>
                   {competitors.map((c) => (
-                    <td key={c} className={`px-3 py-3 ${c === 'itera' ? 'bg-blue-50/50' : ''}`}>
+                    <td key={c} className={`px-3 py-3 ${c === 'itera' ? 'bg-cyan-50/50' : ''}`}>
                       <SupportIcon level={row[c]} note={row.partialNotes?.[c]} />
                     </td>
                   ))}

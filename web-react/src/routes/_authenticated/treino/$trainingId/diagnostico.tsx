@@ -125,7 +125,7 @@ function SubjectBar({
     ? 'bg-emerald-50 text-emerald-700'
     : isClose
       ? 'bg-amber-50 text-amber-700'
-      : 'bg-red-50 text-red-600'
+      : 'bg-rose-50 text-rose-600'
 
   return (
     <div
@@ -367,12 +367,12 @@ function DiagnosticoPage() {
             const accentBg = isAbove
               ? 'bg-emerald-50'
               : isBelow
-                ? 'bg-red-50'
+                ? 'bg-rose-50'
                 : 'bg-amber-50'
             const accentText = isAbove
               ? 'text-emerald-700'
               : isBelow
-                ? 'text-red-600'
+                ? 'text-rose-600'
                 : 'text-amber-700'
 
             return (
