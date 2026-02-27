@@ -92,6 +92,7 @@ function RouteComponent() {
     minPassingGradeNonQuota,
     overall,
     passed,
+    isPartial = false,
     subjectStats,
     subjectFeedback = {},
   } = data
@@ -113,6 +114,11 @@ function RouteComponent() {
           }`}
         >
           <div className="flex flex-col gap-4">
+            {isPartial && (
+              <span className="inline-flex items-center gap-1.5 rounded-md bg-slate-200/80 px-2.5 py-1 text-xs font-medium text-slate-700 w-fit">
+                Prova parcial (apenas algumas matérias)
+              </span>
+            )}
             <div className="flex items-center gap-3">
               {passed ? (
                 <div className="flex items-center justify-center w-12 h-12 rounded-full bg-green-200">
@@ -130,6 +136,7 @@ function RouteComponent() {
                   }`}
                 >
                   {passed ? 'Aprovado' : 'Reprovado'}
+                  {isPartial && ' (parcial)'}
                 </p>
                 <p className="text-sm text-slate-600">
                   {overall.correct} de {overall.total} questões corretas

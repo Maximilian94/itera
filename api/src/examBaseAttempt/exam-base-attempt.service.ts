@@ -79,6 +79,8 @@ export class ExamBaseAttemptService {
         examBaseId: true,
         startedAt: true,
         finishedAt: true,
+        subjectFilter: true,
+        scorePercentage: true,
         examBase: {
           select: {
             id: true,
@@ -107,6 +109,7 @@ export class ExamBaseAttemptService {
       select: {
         id: true,
         examBaseId: true,
+        subject: true,
         correctAlternative: true,
         alternatives: { select: { id: true, key: true } },
       },
@@ -125,26 +128,48 @@ export class ExamBaseAttemptService {
           ? Number(examBase.minPassingGradeNonQuota)
           : 60;
 
+      const subjectFilter = Array.isArray(a.subjectFilter)
+        ? a.subjectFilter
+        : [];
+      const isPartial = subjectFilter.length > 0;
+
       let percentage: number | null = null;
       let passed: boolean | null = null;
 
       if (a.finishedAt != null && examBase) {
-        const total = questionsByBase.filter(
-          (q) => q.examBaseId === a.examBaseId,
-        ).length;
-        let correct = 0;
-        for (const ans of a.answers) {
-          const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
-          if (
-            correctId != null &&
-            ans.selectedAlternativeId != null &&
-            ans.selectedAlternativeId === correctId
-          ) {
-            correct += 1;
+        // Use stored scorePercentage when available (always set by finish).
+        // For partial exams, scorePercentage is already proportional (correct/total of filtered questions).
+        const storedScore = a.scorePercentage != null
+          ? Number(a.scorePercentage)
+          : null;
+
+        if (storedScore != null) {
+          percentage = storedScore;
+          passed = percentage >= minPassing;
+        } else {
+          // Fallback for older attempts without scorePercentage
+          const baseQuestions = questionsByBase.filter(
+            (q) => q.examBaseId === a.examBaseId,
+          );
+          const total = isPartial
+            ? baseQuestions.filter(
+                (q) => q.subject != null && subjectFilter.includes(q.subject),
+              ).length
+            : baseQuestions.length;
+          let correct = 0;
+          for (const ans of a.answers) {
+            const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
+            if (
+              correctId != null &&
+              ans.selectedAlternativeId != null &&
+              ans.selectedAlternativeId === correctId
+            ) {
+              correct += 1;
+            }
           }
+          percentage = total > 0 ? (correct / total) * 100 : 0;
+          passed = percentage >= minPassing;
         }
-        percentage = total > 0 ? (correct / total) * 100 : 0;
-        passed = percentage >= minPassing;
       }
 
       return {
@@ -164,6 +189,7 @@ export class ExamBaseAttemptService {
         minPassingGradeNonQuota: minPassing,
         percentage,
         passed,
+        isPartial,
       };
     });
   }
@@ -286,6 +312,7 @@ export class ExamBaseAttemptService {
         examBaseId: attempt.examBaseId,
         startedAt: attempt.startedAt,
         finishedAt: attempt.finishedAt,
+        subjectFilter: attempt.subjectFilter ?? [],
         subjectFeedback: attempt.subjectFeedback as Record<
           string,
           { evaluation: string; recommendations: string }
@@ -672,6 +699,11 @@ export class ExamBaseAttemptService {
       );
     }
 
+    const subjectFilter = Array.isArray(data.attempt.subjectFilter)
+      ? data.attempt.subjectFilter
+      : [];
+    const isPartial = subjectFilter.length > 0;
+
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
       select: {
@@ -731,6 +763,7 @@ export class ExamBaseAttemptService {
         percentage: overallPercentage,
       },
       passed,
+      isPartial,
       subjectStats: subjectPerformanceSummary,
       subjectFeedback,
     };
