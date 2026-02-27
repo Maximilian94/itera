@@ -37,6 +37,8 @@ export type ExamBaseAttemptHistoryItem = {
   minPassingGradeNonQuota: number
   percentage: number | null
   passed: boolean | null
+  /** When true, the attempt was done with a subject filter (partial exam). Score is proportional to answered questions only. */
+  isPartial?: boolean
   /** Trend vs previous attempt (e.g. +5 or -2). When present, percentage change. */
   trendPercentage?: number | null
 }
@@ -51,6 +53,8 @@ export type ExamAttemptFeedback = {
     percentage: number
   }
   passed: boolean
+  /** When true, the attempt was done with a subject filter (partial exam). */
+  isPartial?: boolean
   subjectStats: Array<{
     subject: string
     correct: number

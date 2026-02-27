@@ -954,12 +954,12 @@ function RouteComponent() {
                     }
                   : item.passed === true
                     ? {
-                        label: 'Aprovado',
+                        label: item.isPartial ? 'Aprovado (parcial)' : 'Aprovado',
                         icon: CheckCircleIcon,
                         className: 'text-emerald-600 bg-emerald-50',
                       }
                     : {
-                        label: 'Reprovado',
+                        label: item.isPartial ? 'Reprovado (parcial)' : 'Reprovado',
                         icon: ExclamationTriangleIcon,
                         className: 'text-red-600 bg-red-50',
                       }

@@ -48,7 +48,7 @@ function statusChip(item: ExamBaseAttemptHistoryItem) {
         size="small"
         color="success"
         icon={<CheckCircleIcon />}
-        label="Aprovado"
+        label={item.isPartial ? 'Aprovado (parcial)' : 'Aprovado'}
       />
     )
   }
@@ -57,7 +57,7 @@ function statusChip(item: ExamBaseAttemptHistoryItem) {
       size="small"
       color="error"
       icon={<CancelIcon />}
-      label="Reprovado"
+      label={item.isPartial ? 'Reprovado (parcial)' : 'Reprovado'}
     />
   )
 }

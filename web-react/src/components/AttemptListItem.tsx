@@ -15,8 +15,16 @@ export function AttemptListItem({ item, onClick }: AttemptListItemProps) {
     item.finishedAt == null
       ? { label: 'Em andamento', icon: ClockIcon, className: 'text-amber-600 bg-amber-50' }
       : item.passed === true
-        ? { label: 'Aprovado', icon: CheckCircleIcon, className: 'text-green-600 bg-green-50' }
-        : { label: 'Reprovado', icon: XCircleIcon, className: 'text-red-600 bg-red-50' }
+        ? {
+            label: item.isPartial ? 'Aprovado (parcial)' : 'Aprovado',
+            icon: CheckCircleIcon,
+            className: 'text-green-600 bg-green-50',
+          }
+        : {
+            label: item.isPartial ? 'Reprovado (parcial)' : 'Reprovado',
+            icon: XCircleIcon,
+            className: 'text-red-600 bg-red-50',
+          }
   const StatusIcon = status.icon
   const date = item.finishedAt ? dayjs(item.finishedAt) : dayjs(item.startedAt)
 
