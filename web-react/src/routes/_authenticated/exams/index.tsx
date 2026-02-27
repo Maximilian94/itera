@@ -143,7 +143,6 @@ function ExamCard({
 
   const content = (
     <Card
-      noElevation
       className="p-0 border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all duration-200 cursor-pointer group overflow-hidden h-full"
     >
       <div
