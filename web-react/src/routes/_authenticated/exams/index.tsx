@@ -8,7 +8,7 @@ import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 import dayjs from 'dayjs'
 import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -166,7 +166,7 @@ function ExamCard({
               )}
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-slate-800 truncate">
-                  {exam.institution ?? exam.name}
+                  {formatExamBaseTitle(exam)}
                 </p>
                 <p className="text-xs text-slate-500 truncate">{exam.role}</p>
               </div>

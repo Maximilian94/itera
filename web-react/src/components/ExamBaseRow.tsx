@@ -8,7 +8,7 @@ import { Tooltip } from '@mui/material'
 import dayjs from 'dayjs'
 import { CalendarDaysIcon, TrophyIcon } from '@heroicons/react/24/solid'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 
 const baseRowClasses = `
   border border-solid rounded-lg shadow-md
@@ -60,10 +60,8 @@ export function ExamBaseRow({ examBase, selectable, selected, onSelect }: ExamBa
           <div className="flex flex-col items-start justify-center">
             <div className="flex items-center gap-1">
               <span className="text-md font-medium select-none">
-                {examBase.institution ?? examBase.name}
+                {formatExamBaseTitle(examBase)}
               </span>
-              <span className="text-md font-medium select-none">·</span>
-              <span className="text-xs text-slate-500 select-none">{examBase.state ?? ''} {examBase.city ? `- ${examBase.city}` : ''}</span>
             </div>
             <span className="text-xs text-slate-400 select-none">
               {governmentScopeLabel(examBase.governmentScope)} · {examBase.role}

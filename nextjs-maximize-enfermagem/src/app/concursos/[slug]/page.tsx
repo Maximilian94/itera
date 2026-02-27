@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { ConcursoDetail } from "@/components/concursos/ConcursoDetail";
-import { fetchConcursos, fetchConcursoBySlug } from "@/lib/concursos-api";
+import { fetchConcursos, fetchConcursoBySlug, formatExamBaseTitle } from "@/lib/concursos-api";
 
 type Props = {
   params: Promise<{ slug: string }>;
@@ -23,10 +23,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const concurso = await fetchConcursoBySlug(slug);
   if (!concurso) return { title: "Concurso não encontrado" };
-  const year = new Date(concurso.examDate).getFullYear();
+  const title = formatExamBaseTitle(concurso);
   return {
-    title: `${concurso.name} | Maximize Enfermagem`,
-    description: `Prova de ${concurso.role} - ${concurso.institution ?? "Concurso"} - ${year}. Treine com questões reais.`,
+    title: `${title} | Maximize Enfermagem`,
+    description: `Prova de ${concurso.role} - ${concurso.institution ?? "Concurso"} - ${new Date(concurso.examDate).getFullYear()}. Treine com questões reais.`,
   };
 }
 

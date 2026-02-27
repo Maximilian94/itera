@@ -19,6 +19,7 @@ import { useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
+import { formatExamBaseTitle } from '@/lib/utils'
 
 function slugify(value: string) {
     return value
@@ -163,7 +164,7 @@ function RouteComponent() {
                         </Grid>
                         <Grid size={5}>
                             <div className='flex flex-col h-full w-full items-start justify-center'>
-                                <Typography variant="body1">{examBase.institution}</Typography>
+                                <Typography variant="body1">{formatExamBaseTitle(examBase)}</Typography>
                                 <Typography variant="body2">{examBase.role}</Typography>
                                 {isAdmin && !(examBase.published ?? true) && (
                                     <Typography variant="caption" className="text-amber-600 font-medium mt-1">

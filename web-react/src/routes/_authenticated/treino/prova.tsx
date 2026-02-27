@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { ClipboardDocumentListIcon, ArrowLeftIcon } from '@heroicons/react/24/outline'
 import { getStageById, TREINO_STAGES, getStagePath } from './-stages.config'
 import { useExamBaseQueries } from '@/features/examBase/queries/examBase.queries'
+import { formatExamBaseTitle } from '@/lib/utils'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
 import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 
@@ -80,7 +81,7 @@ function ProvaPage() {
             </MenuItem>
             {examBases.map((eb) => (
               <MenuItem key={eb.id} value={eb.id}>
-                {eb.institution ?? eb.name}
+                {formatExamBaseTitle(eb)}
                 {!(eb.published ?? true) && (
                   <span className="ml-1.5 text-amber-600 text-xs">(Rascunho)</span>
                 )}

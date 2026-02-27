@@ -14,6 +14,7 @@ import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { Card } from '@/components/Card'
 import { StartExamDialog } from '@/components/StartExamDialog'
+import { formatExamBaseTitle } from '@/lib/utils'
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
   component: OnboardingPage,
@@ -149,7 +150,7 @@ function OnboardingPage() {
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
                 }`}
               >
-                {exam.institution ?? exam.name}
+                {formatExamBaseTitle(exam)}
                 {!(exam.published ?? true) && (
                   <span className="ml-1 text-amber-600">(Rascunho)</span>
                 )}

@@ -42,6 +42,7 @@ import {
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { Card } from '@/components/Card'
+import { formatExamBaseTitle } from '@/lib/utils'
 import {
   ArrowLeftIcon,
   ArrowDownIcon,
@@ -204,7 +205,7 @@ function QuestoesPage() {
             Gerenciar questões
           </h1>
           <p className="text-sm text-slate-500">
-            {examBase ? examBase.institution ?? examBase.name : 'Carregando...'}
+            {examBase ? formatExamBaseTitle(examBase) : 'Carregando...'}
           </p>
         </div>
       </div>

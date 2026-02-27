@@ -27,7 +27,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
 import { getStagePath } from './-stages.config'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 import dayjs from 'dayjs'
 
 export const Route = createFileRoute('/_authenticated/treino/novo')({
@@ -117,7 +117,7 @@ function SelectableExamCard({
                 )}
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-slate-800 truncate">
-                    {exam.institution ?? exam.name}
+                    {formatExamBaseTitle(exam)}
                   </p>
                   <p className="text-xs text-slate-500 truncate">
                     {exam.role}
@@ -494,7 +494,7 @@ function NovoPage() {
           <div className="flex items-center gap-3">
             {selectedExam && (
               <span className="hidden sm:block text-xs text-slate-500 truncate max-w-[200px]">
-                {selectedExam.institution ?? selectedExam.name}
+                {formatExamBaseTitle(selectedExam)}
               </span>
             )}
             <Button

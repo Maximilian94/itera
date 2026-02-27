@@ -50,7 +50,7 @@ import {
   PlayIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
-import { formatBRL } from '@/lib/utils'
+import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { StartExamDialog } from '@/components/StartExamDialog'
@@ -276,7 +276,9 @@ function RouteComponent() {
         ? 'text-emerald-600'
         : 'text-red-600'
 
-  const pageTitle = examBase?.institution ?? examBase?.name ?? 'Exame'
+  const pageTitle = examBase
+    ? formatExamBaseTitle(examBase)
+    : 'Exame'
   const questionCount = examBase?._count?.questions ?? 0
 
   return (

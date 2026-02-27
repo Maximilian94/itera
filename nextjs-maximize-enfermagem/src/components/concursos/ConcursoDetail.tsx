@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { ExamBaseFromApi } from "@/lib/concursos-api";
+import { formatExamBaseTitle } from "@/lib/concursos-api";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { fetchConcursoBySlug } from "@/lib/concursos-api";
@@ -33,11 +34,11 @@ function formatDate(dateStr: string) {
 }
 
 function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
-  const year = new Date(concurso.examDate).getFullYear();
+  const title = formatExamBaseTitle(concurso);
 
   useEffect(() => {
-    document.title = `${concurso.name} | Maximize Enfermagem`;
-  }, [concurso.name]);
+    document.title = `${title} | Maximize Enfermagem`;
+  }, [title]);
 
   return (
     <>
@@ -50,21 +51,7 @@ function ConcursoContent({ concurso }: { concurso: ExamBaseFromApi }) {
 
       <article className="mt-6 rounded-2xl border border-gray-200 bg-white p-8 shadow-sm">
         <div className="flex flex-wrap items-center gap-2 text-lg font-semibold text-gray-900">
-          <span>{year}</span>
-          <span className="text-slate-400 font-normal">·</span>
-          {concurso.governmentScope === "MUNICIPAL" && concurso.city && (
-            <>
-              <span>{concurso.city}</span>
-              <span className="text-slate-400 font-normal">·</span>
-            </>
-          )}
-          {concurso.governmentScope === "STATE" && concurso.state && (
-            <>
-              <span>{concurso.state}</span>
-              <span className="text-slate-400 font-normal">·</span>
-            </>
-          )}
-          <span>{concurso.institution ?? "Concurso"}</span>
+          {title}
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">

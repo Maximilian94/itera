@@ -1,4 +1,5 @@
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
+import { formatExamBaseTitle } from '@/lib/utils'
 import { Tooltip } from '@mui/material'
 import { ClockIcon, TrophyIcon } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
@@ -44,7 +45,13 @@ export function AttemptListItem({ item, onClick }: AttemptListItemProps) {
         </div>
         <div className="min-w-0">
           <p className="text-sm font-medium text-slate-900 truncate">
-            {item.institution ?? item.examBaseName ?? 'Prova'}
+            {formatExamBaseTitle({
+              examDate: item.examDate,
+              institution: item.institution,
+              name: item.examBaseName,
+              state: item.state,
+              city: item.city,
+            })}
           </p>
           <p className="text-xs text-slate-500">
             {date.format('DD/MM/YYYY HH:mm')}
