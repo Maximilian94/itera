@@ -48,6 +48,7 @@ import {
   useUpsertRetryAnswerMutation,
   useUpdateTrainingStageMutation,
 } from '@/features/training/queries/training.queries'
+import { useExamBaseQuery } from '@/features/examBase/queries/examBase.queries'
 import {
   useExamBaseQuestionsQuery,
   useUpdateExamBaseQuestionMutation,
@@ -59,6 +60,7 @@ import {
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
+import { formatExamBaseTitle } from '@/lib/utils'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -181,6 +183,8 @@ export function ExamAttemptPlayer({
 
   const { data: training } = useTrainingQuery(trainingId)
   const retryFinished = Boolean(training?.retryFinishedAt)
+  const effectiveExamBaseId = examBaseId ?? training?.examBaseId
+  const { data: examBase } = useExamBaseQuery(effectiveExamBaseId)
   const retryQuestionsQuery = useRetryQuestionsQuery(trainingId)
   const retryQuestionsWithFeedbackQuery = useRetryQuestionsWithFeedbackQuery(
     trainingId,
@@ -810,9 +814,20 @@ export function ExamAttemptPlayer({
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
   ]
 
+  const examTitle = examBase ? formatExamBaseTitle(examBase) : null
+  const showPlayerTitleBar = examTitle && !trainingProvaMode
+
   return (
     <>
     <div className="flex flex-col gap-3 h-full min-h-0 overflow-hidden">
+      {/* Barra fixa com nome da prova — sempre visível (no treino, o layout já exibe) */}
+      {showPlayerTitleBar && (
+        <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-200">
+          <p className="text-sm font-semibold text-slate-800 truncate min-w-0" title={examTitle}>
+            {examTitle}
+          </p>
+        </div>
+      )}
       <div className="flex gap-4 flex-1 min-h-0 overflow-hidden">
         <div className="flex flex-col gap-3 flex-1 min-w-0 min-h-0 overflow-hidden">
           <div className="flex items-center justify-between gap-3">
