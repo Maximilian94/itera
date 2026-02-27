@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { fetchConcursos, type ExamBaseFromApi } from "@/lib/concursos-api";
+import { fetchConcursos, formatExamBaseTitle, type ExamBaseFromApi } from "@/lib/concursos-api";
 
 const SCOPE_LABELS: Record<string, string> = {
   MUNICIPAL: "Municipal",
@@ -157,14 +157,8 @@ export function ConcursosList() {
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <h3 className="font-semibold text-gray-900">{c.name}</h3>
-                    <p className="mt-1 text-sm text-gray-600">
-                      {c.institution && (
-                        <span>{c.institution}</span>
-                      )}
-                      {c.institution && c.role && " · "}
-                      {c.role}
-                    </p>
+                    <h3 className="font-semibold text-gray-900">{formatExamBaseTitle(c)}</h3>
+                    <p className="mt-1 text-sm text-gray-600">{c.role}</p>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {c.examBoard && (
                         <span

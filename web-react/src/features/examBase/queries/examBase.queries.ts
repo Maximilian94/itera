@@ -5,6 +5,15 @@ import { examBaseService } from '../services/examBase.service'
 export const examBaseKeys = {
   examBases: ['examBases'] as const,
   list: (examBoardId?: string) => ['examBases', examBoardId ?? 'all'] as const,
+  one: (id: string) => ['examBase', id] as const,
+}
+
+export function useExamBaseQuery(examBaseId: string | undefined) {
+  return useQuery({
+    queryKey: examBaseKeys.one(examBaseId ?? ''),
+    queryFn: () => examBaseService.getOne(examBaseId!),
+    enabled: Boolean(examBaseId),
+  })
 }
 
 export function useExamBaseQueries(input?: { examBoardId?: string }) {
