@@ -1,0 +1,82 @@
+<svg width="512" height="512" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="100%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#0E7490"/>
+      <stop offset="50%" stop-color="#0891B2"/>
+      <stop offset="100%" stop-color="#22D3EE"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Base -->
+  <circle cx="50" cy="50" r="50" fill="url(#grad)" />
+
+  <!-- Gabarito bubbles (mais densas, centro mais livre) -->
+  <g opacity="0.16" fill="white" stroke="white" stroke-width="0.9">
+    <!-- Top-left cluster -->
+    <circle cx="16" cy="18" r="2.4" fill="none"/>
+    <circle cx="24" cy="18" r="2.4" />
+    <circle cx="32" cy="18" r="2.4" fill="none"/>
+    <circle cx="40" cy="18" r="2.4" fill="none"/>
+
+    <circle cx="16" cy="26" r="2.4" />
+    <circle cx="24" cy="26" r="2.4" fill="none"/>
+    <circle cx="32" cy="26" r="2.4" fill="none"/>
+    <circle cx="40" cy="26" r="2.4" />
+
+    <circle cx="16" cy="34" r="2.4" fill="none"/>
+    <circle cx="24" cy="34" r="2.4" fill="none"/>
+    <circle cx="32" cy="34" r="2.4" />
+    <circle cx="40" cy="34" r="2.4" fill="none"/>
+
+    <!-- Top-right cluster -->
+    <circle cx="60" cy="18" r="2.4" fill="none"/>
+    <circle cx="68" cy="18" r="2.4" fill="none"/>
+    <circle cx="76" cy="18" r="2.4" />
+    <circle cx="84" cy="18" r="2.4" fill="none"/>
+
+    <circle cx="60" cy="26" r="2.4" />
+    <circle cx="68" cy="26" r="2.4" fill="none"/>
+    <circle cx="76" cy="26" r="2.4" fill="none"/>
+    <circle cx="84" cy="26" r="2.4" />
+
+    <circle cx="60" cy="34" r="2.4" fill="none"/>
+    <circle cx="68" cy="34" r="2.4" />
+    <circle cx="76" cy="34" r="2.4" fill="none"/>
+    <circle cx="84" cy="34" r="2.4" fill="none"/>
+
+    <!-- Bottom-left cluster -->
+    <circle cx="18" cy="66" r="2.2" fill="none"/>
+    <circle cx="26" cy="66" r="2.2" />
+    <circle cx="34" cy="66" r="2.2" fill="none"/>
+
+    <circle cx="18" cy="74" r="2.2" />
+    <circle cx="26" cy="74" r="2.2" fill="none"/>
+    <circle cx="34" cy="74" r="2.2" fill="none"/>
+
+    <circle cx="18" cy="82" r="2.2" fill="none"/>
+    <circle cx="26" cy="82" r="2.2" fill="none"/>
+    <circle cx="34" cy="82" r="2.2" />
+
+    <!-- Bottom-right cluster -->
+    <circle cx="66" cy="66" r="2.2" fill="none"/>
+    <circle cx="74" cy="66" r="2.2" />
+    <circle cx="82" cy="66" r="2.2" fill="none"/>
+
+    <circle cx="66" cy="74" r="2.2" />
+    <circle cx="74" cy="74" r="2.2" fill="none"/>
+    <circle cx="82" cy="74" r="2.2" />
+
+    <circle cx="66" cy="82" r="2.2" fill="none"/>
+    <circle cx="74" cy="82" r="2.2" fill="none"/>
+    <circle cx="82" cy="82" r="2.2" />
+  </g>
+
+  <!-- Batimento (protagonista) -->
+  <path d="M10 58 L24 58 L30 42 L36 62 L50 24 L64 62 L70 42 L76 58 L90 58"
+        fill="none"
+        stroke="white"
+        stroke-width="4"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="0.95"/>
+</svg>
