@@ -322,7 +322,7 @@ function RouteComponent() {
                       <Link
                         to="/exams"
                         search={{ board: board.id }}
-                        className="inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 no-underline"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-cyan-600 hover:text-cyan-700 no-underline"
                       >
                         <DocumentTextIcon className="w-4 h-4" />
                         Ver exames
@@ -341,7 +341,7 @@ function RouteComponent() {
                           <button
                             type="button"
                             onClick={() => remove(board)}
-                            className="p-2 rounded-lg text-slate-500 hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                            className="p-2 rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer"
                             aria-label="Excluir"
                           >
                             <TrashIcon className="w-4 h-4" />

@@ -2,16 +2,16 @@ import Image from "next/image";
 
 export default function CTA() {
   return (
-    <div className="overflow-hidden bg-slate-50 py-24 pt-0">
+    <div className="overflow-hidden bg-slate-100 py-24 pt-0">
       <div className="mx-auto max-w-7xl px-6 lg:flex lg:px-8">
         <div className="mx-auto grid max-w-2xl grid-cols-1 gap-x-12 gap-y-16 lg:mx-0 lg:min-w-full lg:max-w-none lg:flex-none lg:gap-y-8">
           <div className="lg:col-end-1 lg:w-full lg:max-w-lg lg:pb-8">
-            <h2 className="text-4xl font-semibold tracking-tight text-gray-900 sm:text-5xl">O primeiro treino é por nossa conta.</h2>
-            <p className="mt-6 text-lg leading-8 text-gray-600">
+            <h2 className="text-4xl font-semibold tracking-tight text-sky-900 sm:text-5xl">O primeiro treino é por nossa conta.</h2>
+            <p className="mt-6 text-lg leading-8 text-slate-600">
               Assinar um compromisso é uma decisao que exige bastante reflexao e analise, e ao mesmo tempo entendemos sua urgencia em definir sua estratégia para seu concurso.
             </p>
 
-            <p className="mt-6 text-lg leading-8 text-gray-600">
+            <p className="mt-6 text-lg leading-8 text-slate-600">
               Sabendo disto, decidimos oferecer o primeiro treino por nossa conta, para que voce possa testar a plataforma e ver se ela é para voce.
             </p>
             {/* <p className="mt-6 text-base/7 text-gray-600">
@@ -21,7 +21,7 @@ export default function CTA() {
             <div className="mt-10 flex">
               <a
                 href="#"
-                className="rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                className="rounded-md bg-cyan-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
               >
                 Fazer um treino grátis {''}
                 <span aria-hidden="true">&rarr;</span>
@@ -43,7 +43,7 @@ export default function CTA() {
                 width={520}
                 height={520}
                 className="
-  drop-shadow-[0_0_12px_rgba(37,99,235,0.18)]
+  drop-shadow-[0_0_12px_rgba(8,145,178,0.18)]
   drop-shadow-[0_22px_55px_rgba(0,0,0,0.16)]
 "
               />

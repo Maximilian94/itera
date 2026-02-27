@@ -225,7 +225,7 @@ export function ExamAnalysisOverlay({
                     className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0
                       text-[9px] font-bold transition-colors duration-400
                       ${isScanned
-                        ? 'bg-blue-500 text-white'
+                        ? 'bg-cyan-500 text-white'
                         : 'bg-slate-100 text-slate-400 border border-slate-200'
                       }`}
                     style={
@@ -259,7 +259,7 @@ export function ExamAnalysisOverlay({
                   {/* "Text" bar */}
                   <div
                     className={`h-2 rounded-full transition-all duration-500
-                      ${isScanned ? 'bg-blue-100' : 'bg-slate-100'}`}
+                      ${isScanned ? 'bg-cyan-100' : 'bg-slate-100'}`}
                     style={{
                       width: `${45 + ((i * 19) % 55)}%`,
                       ...(isScanned
@@ -328,7 +328,7 @@ export function ExamAnalysisOverlay({
         <h2 className="text-[22px] font-bold text-white mb-2.5 leading-tight">
           {phase.title}
         </h2>
-        <p className="text-[15px] text-blue-200/80 leading-relaxed">
+        <p className="text-[15px] text-cyan-200/80 leading-relaxed">
           {phase.description}
         </p>
       </div>
@@ -340,9 +340,9 @@ export function ExamAnalysisOverlay({
             key={i}
             className={`rounded-full transition-all duration-500 ${
               i === currentPhase
-                ? 'w-7 h-2 bg-blue-400'
+                ? 'w-7 h-2 bg-cyan-400'
                 : i < currentPhase
-                  ? 'w-2 h-2 bg-blue-500/50'
+                  ? 'w-2 h-2 bg-cyan-500/50'
                   : 'w-2 h-2 bg-slate-600/60'
             }`}
             style={

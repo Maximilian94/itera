@@ -50,9 +50,9 @@ function formatDate(dateStr: string) {
 
 function ImagePlaceholder() {
     return (
-        <div className="absolute inset-0 size-full rounded-2xl bg-linear-to-br from-blue-50 to-slate-100 flex items-center justify-center">
+        <div className="absolute inset-0 size-full rounded-2xl bg-linear-to-br from-cyan-50 to-slate-100 flex items-center justify-center">
             <svg
-                className="w-12 h-12 text-blue-200"
+                className="w-12 h-12 text-cyan-200"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -77,9 +77,9 @@ export default async function BlogsPage() {
                 <div className="mx-auto max-w-4xl lg:max-w-6xl">
                     {posts.length === 0 ? (
                         <div className="mt-16 text-center py-24">
-                            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                            <div className="w-16 h-16 bg-cyan-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                                 <svg
-                                    className="w-8 h-8 text-blue-300"
+                                    className="w-8 h-8 text-cyan-300"
                                     fill="none"
                                     viewBox="0 0 24 24"
                                     stroke="currentColor"
@@ -143,7 +143,7 @@ export default async function BlogsPage() {
                                                 {/* Conteúdo em destaque */}
                                                 <div className="flex flex-1 flex-col justify-center p-6 sm:p-8">
                                                     <div className="flex items-center gap-x-4 text-xs">
-                                                        <span className="inline-flex items-center rounded-full bg-blue-100 px-3 py-1 font-medium text-blue-700">
+                                                        <span className="inline-flex items-center rounded-full bg-cyan-100 px-3 py-1 font-medium text-cyan-700">
                                                             Novidade!
                                                         </span>
                                                         <span className="inline-flex items-center gap-1 text-gray-500">
@@ -151,7 +151,7 @@ export default async function BlogsPage() {
                                                             {mins} min de leitura
                                                         </span>
                                                     </div>
-                                                    <h3 className="mt-3 text-2xl font-bold text-gray-900 group-hover:text-blue-600 sm:text-3xl">
+                                                    <h3 className="mt-3 text-2xl font-bold text-gray-900 group-hover:text-cyan-600 sm:text-3xl">
                                                         {post.title}
                                                     </h3>
                                                     {post.subtitle && (
@@ -164,7 +164,7 @@ export default async function BlogsPage() {
                                                             {post.excerpt}
                                                         </p>
                                                     )}
-                                                    <span className="mt-4 inline-flex items-center text-sm font-semibold text-blue-600 group-hover:underline">
+                                                    <span className="mt-4 inline-flex items-center text-sm font-semibold text-cyan-600 group-hover:underline">
                                                         Ler mais →
                                                     </span>
                                                 </div>

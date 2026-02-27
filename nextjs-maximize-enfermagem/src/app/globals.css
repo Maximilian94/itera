@@ -4,7 +4,7 @@
 :root {
   color-scheme: light;
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #0c4a6e; /* sky-900 */
 }
 
 @theme inline {

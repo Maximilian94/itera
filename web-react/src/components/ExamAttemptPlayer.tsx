@@ -683,17 +683,17 @@ export function ExamAttemptPlayer({
 
     const base = 'flex shrink-0 items-center justify-center w-full h-7 rounded text-xs font-medium cursor-pointer transition-colors'
     if (isCurrent) {
-      return `${base} outline outline-2 outline-blue-400 outline-offset-0.5 ${
+      return `${base} outline outline-2 outline-cyan-400 outline-offset-0.5 ${
         isIncomplete
           ? 'bg-amber-100 text-amber-800 border border-amber-300'
           : isAnswered
-            ? 'bg-blue-100 text-blue-700 border border-blue-200'
+            ? 'bg-cyan-100 text-cyan-700 border border-cyan-200'
             : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
     if (isCorrect) return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
     if (isWrong) return `${base} bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200`
-    if (isAnswered) return `${base} bg-blue-100 text-blue-700 border border-blue-200 hover:bg-blue-200`
+    if (isAnswered) return `${base} bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200`
     if (isIncomplete) return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
   }
@@ -920,7 +920,7 @@ export function ExamAttemptPlayer({
                 const showWrongAnswerHighlight = isExplanationTab && currentQuestionHasWrongAnswer
                 const tabClasses = [
                   'flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors',
-                  isActive ? 'border-blue-500 text-blue-600 bg-blue-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50',
+                  isActive ? 'border-cyan-500 text-cyan-600 bg-cyan-50/50' : 'border-transparent text-slate-600 hover:text-slate-900 hover:bg-slate-50',
                   isDisabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
                 ].join(' ')
                 const isViewingExplanation = value === 1
@@ -1182,7 +1182,7 @@ export function ExamAttemptPlayer({
                                     setStatementImageLoadError(false)
                                   }}
                                   placeholder="Ou cole a URL da imagem"
-                                  className={`px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 min-w-[200px] ${
+                                  className={`px-2 py-1.5 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-cyan-500 min-w-[200px] ${
                                     isStatementImageUrlChanged ? 'border-2 border-amber-500' : 'border-slate-300'
                                   }`}
                                 />
@@ -1300,10 +1300,10 @@ export function ExamAttemptPlayer({
                           const showCorrectStyling = isCorrect && (isFinished || canInlineEdit)
                           const optionBg = isFinished
                             ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-rose-50 border-rose-400' : 'bg-slate-50 border-slate-300'
-                            : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-blue-50 border-blue-400' : 'bg-white border-slate-300 hover:bg-slate-50'
+                            : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-cyan-50 border-cyan-400' : 'bg-white border-slate-300 hover:bg-slate-50'
                           const keyBadge = isFinished
                             ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
-                            : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'
+                            : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-200 text-slate-700'
                           const isEditingThis = alt.id in editAlternativeById
                           const editValues = editAlternativeById[alt.id] ?? { text: alt.text, explanation: alt.explanation ?? '' }
                           const isAltTextChanged = editValues.text !== alt.text
@@ -1392,7 +1392,7 @@ export function ExamAttemptPlayer({
                               )}
                               {isEditingThis && canInlineEdit ? (
                                 <div className={`flex-1 flex flex-col gap-2 p-2 border-2 rounded-lg bg-white ${
-                                  isAltTextChanged || isAltExplanationChanged ? 'border-amber-500' : 'border-blue-400'
+                                  isAltTextChanged || isAltExplanationChanged ? 'border-amber-500' : 'border-cyan-400'
                                 }`}>
                                   <div className="flex gap-2 items-start">
                                     <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
@@ -1453,7 +1453,7 @@ export function ExamAttemptPlayer({
                               ) : (
                                 <button
                                   type="button"
-                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
+                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cyan-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
                                   onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
                                   disabled={isEliminated || isFinished || isManagementMode}
                                 >

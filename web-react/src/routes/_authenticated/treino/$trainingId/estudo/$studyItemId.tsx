@@ -61,7 +61,7 @@ function TabButton({
       onClick={onClick}
       className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
         isActive
-          ? 'border-indigo-500 text-indigo-600 bg-indigo-50/50'
+          ? 'border-cyan-500 text-cyan-600 bg-cyan-50/50'
           : 'border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50'
       }`}
     >
@@ -71,7 +71,7 @@ function TabButton({
         <span
           className={`text-[0.65rem] font-bold px-1.5 py-0.5 rounded-full leading-none ${
             isActive
-              ? 'bg-indigo-100 text-indigo-600'
+              ? 'bg-cyan-100 text-cyan-600'
               : 'bg-slate-100 text-slate-500'
           }`}
         >
@@ -114,9 +114,9 @@ function QuestionNavigator({
             key={i}
             className={`h-1.5 rounded-full transition-all duration-300 ${
               i === current
-                ? 'w-6 bg-indigo-500'
+                ? 'w-6 bg-cyan-500'
                 : i < current
-                  ? 'w-1.5 bg-indigo-300'
+                  ? 'w-1.5 bg-cyan-300'
                   : 'w-1.5 bg-slate-300'
             }`}
           />
@@ -172,20 +172,20 @@ function StudyExerciseBlock({
             ? isCorrect
               ? 'bg-emerald-50 border-emerald-400 ring-1 ring-emerald-200'
               : isWrong
-                ? 'bg-red-50 border-red-400 ring-1 ring-red-200'
+                ? 'bg-rose-50 border-rose-400 ring-1 ring-rose-200'
                 : 'bg-slate-50 border-slate-200'
             : isSelected
-              ? 'bg-indigo-50 border-indigo-400 ring-1 ring-indigo-200'
+              ? 'bg-cyan-50 border-cyan-400 ring-1 ring-cyan-200'
               : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50'
 
           const keyBadge = showResult
             ? isCorrect
               ? 'bg-emerald-500 text-white'
               : isWrong
-                ? 'bg-red-500 text-white'
+                ? 'bg-rose-500 text-white'
                 : 'bg-slate-200 text-slate-600'
             : isSelected
-              ? 'bg-indigo-500 text-white'
+              ? 'bg-cyan-500 text-white'
               : 'bg-slate-100 text-slate-600'
 
           return (
@@ -337,7 +337,7 @@ function StudyItemDetailPage() {
     <div className="flex flex-col gap-5 pb-4">
       {/* ═══════════ HEADER ═══════════ */}
       <div
-        className="relative overflow-hidden rounded-2xl px-6 py-6 bg-linear-to-br from-indigo-600 via-indigo-500 to-violet-500"
+        className="relative overflow-hidden rounded-2xl px-6 py-6 bg-linear-to-br from-cyan-600 via-cyan-500 to-violet-500"
         style={{ animation: 'scale-in 0.4s ease-out both' }}
       >
         {/* decorative */}
@@ -457,8 +457,8 @@ function StudyItemDetailPage() {
             >
               {!item.explanation && !generateMutation.isPending && (
                 <div className="flex flex-col items-center gap-4 py-8 text-center">
-                  <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center">
-                    <SparklesIcon className="w-8 h-8 text-indigo-400" />
+                  <div className="w-16 h-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                    <SparklesIcon className="w-8 h-8 text-cyan-400" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-700 mb-1">
@@ -565,8 +565,8 @@ function StudyItemDetailPage() {
             >
               {totalExercises === 0 ? (
                 <div className="flex flex-col items-center gap-4 py-8 text-center">
-                  <div className="w-16 h-16 rounded-full bg-indigo-50 flex items-center justify-center">
-                    <PencilSquareIcon className="w-8 h-8 text-indigo-400" />
+                  <div className="w-16 h-16 rounded-full bg-cyan-50 flex items-center justify-center">
+                    <PencilSquareIcon className="w-8 h-8 text-cyan-400" />
                   </div>
                   <div>
                     <p className="text-sm font-medium text-slate-700 mb-1">

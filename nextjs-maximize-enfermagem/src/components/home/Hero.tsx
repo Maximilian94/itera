@@ -37,7 +37,7 @@ export default function Hero() {
                         clipPath:
                             'polygon(73.6% 51.7%, 91.7% 11.8%, 100% 46.4%, 97.4% 82.2%, 92.5% 84.9%, 75.7% 64%, 55.3% 47.5%, 46.5% 49.4%, 45% 62.9%, 50.3% 87.2%, 21.3% 64.1%, 0.1% 100%, 5.4% 51.1%, 21.4% 63.9%, 58.9% 0.2%, 73.6% 51.7%)',
                     }}
-                    className="aspect-[1108/632] w-[69.25rem] bg-gradient-to-r from-[#80caff] to-[#4f46e5] opacity-20"
+                    className="aspect-[1108/632] w-[69.25rem] bg-gradient-to-r from-cyan-400 to-sky-800 opacity-20"
                 />
             </div>
             <div className="mx-auto max-w-7xl pt-20 lg:flex lg:items-stretch lg:px-8">
@@ -49,7 +49,7 @@ export default function Hero() {
                     /> */}
                     {/* <div className="mt-24 sm:mt-32 lg:mt-16">
                         <a href="#" className="inline-flex space-x-6">
-                            <span className="rounded-full bg-blue-50 px-3 py-1 text-sm/6 font-semibold text-blue-600 ring-1 ring-inset ring-blue-600/20">
+                            <span className="rounded-full bg-cyan-50 px-3 py-1 text-sm/6 font-semibold text-cyan-600 ring-1 ring-inset ring-cyan-600/20">
                              What's new
                             </span>
                             <span className="inline-flex items-center space-x-2 text-sm/6 font-medium text-gray-600">
@@ -58,16 +58,16 @@ export default function Hero() {
                             </span>
                         </a>
                     </div> */}
-                    <h1 className="text-pretty text-5xl font-semibold tracking-tight text-gray-900 sm:text-5xl">
+                    <h1 className="text-pretty text-5xl font-semibold tracking-tight text-sky-900 sm:text-5xl">
                     Passe no concurso de enfermagem dos seus sonhos.
                     </h1>
-                    <p className="mt-8 text-pretty text-lg font-medium text-gray-500 sm:text-xl/8">
+                    <p className="mt-8 text-pretty text-lg font-medium text-slate-600 sm:text-xl/8">
                     Receba um diagnóstico preciso, estude com material personalizado pela nossa IA e veja sua nota aumentar a cada treino.
                     </p>
                     <div className="mt-10 flex items-center gap-x-6">
                         <a
                             href="#"
-                            className="rounded-md bg-blue-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
+                            className="rounded-md bg-cyan-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-cyan-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
                         >
                             Iniciar meu treino inteligente (grátis)
                         </a>
@@ -93,7 +93,7 @@ export default function Hero() {
         alt="Enfermeira"
         width={520}
         height={520}
-        className="drop-shadow-[0_30px_60px_rgba(37,99,235,0.18)] max-h-full w-auto"
+        className="drop-shadow-[0_30px_60px_rgba(8,145,178,0.18)] max-h-full w-auto"
         priority
       />
     </div>
@@ -114,7 +114,7 @@ export default function Hero() {
     </div>
 
     {/* Glow sutil */}
-    <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-blue-600/20 blur-3xl z-10 pointer-events-none" />
+    <div className="absolute -bottom-24 left-1/2 -translate-x-1/2 h-72 w-72 rounded-full bg-cyan-600/20 blur-3xl z-10 pointer-events-none" />
 </div>
                 {/* <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
                     <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">

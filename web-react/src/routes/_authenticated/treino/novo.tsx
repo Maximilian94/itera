@@ -50,7 +50,7 @@ function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
 }
 
 function governmentScopeColor(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
-  if (scope === 'MUNICIPAL') return 'bg-blue-50 text-blue-700'
+  if (scope === 'MUNICIPAL') return 'bg-cyan-50 text-cyan-700'
   if (scope === 'STATE') return 'bg-violet-50 text-violet-700'
   return 'bg-amber-50 text-amber-700'
 }
@@ -328,7 +328,7 @@ function NovoPage() {
       <PageHero
         title="Novo treino"
         description="Escolha um concurso para começar. Você vai fazer a prova, receber diagnóstico da IA, estudar e refazer as questões que errou."
-        variant="emerald"
+        variant="cyan"
         animation="scale-in 0.45s ease-out both"
         rounded="rounded-2xl"
         padding="px-6 py-8 md:px-8 md:py-10"

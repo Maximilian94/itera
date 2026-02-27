@@ -70,8 +70,8 @@ export class HomePage implements OnInit {
             type: 'line',
             label: 'Average',
             data: [5, 6, 4, 6, 7, 5, 3],
-            backgroundColor: documentStyle.getPropertyValue('--p-blue-500'),
-            borderColor: documentStyle.getPropertyValue('--p-blue-500'),
+            backgroundColor: documentStyle.getPropertyValue('--p-cyan-500'),
+            borderColor: documentStyle.getPropertyValue('--p-cyan-500'),
             tension: 0.4,
           },
           {

@@ -109,7 +109,7 @@ export const SideBarV2 = () => {
     return (
         <div className="h-full">
             <div
-                className={'w-13 bg-linear-to-b from-blue-600 to-blue-900 h-full rounded-lg flex flex-col items-center justify-between py-2 gap-2'}
+                className={'w-13 bg-linear-to-b from-cyan-600 to-sky-900 h-full rounded-lg flex flex-col items-center justify-between py-2 gap-2'}
             >
                 <div className='flex flex-col items-center justify-center gap-2'>
                     {pages.map((page) => (
@@ -154,7 +154,7 @@ export const SideBarV2 = () => {
                     MenuListProps={{ sx: { py: 0 } }}
                 >
                     <div className="px-3 py-2.5">
-                        <p className="text-sm font-medium text-slate-800 truncate">{displayName}</p>
+                        <p className="text-sm font-medium text-sky-900 truncate">{displayName}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{planLabel}</p>
                     
                     </div>
@@ -179,7 +179,7 @@ const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label, fuzzy }: { h
     return (
         <Link to={href}>
             <div className="cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ease-in-out duration-200 ${isActive ? 'bg-white text-blue-600' : 'bg-inherit text-white hover:bg-white/10'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ease-in-out duration-200 ${isActive ? 'bg-white text-cyan-600' : 'bg-inherit text-white hover:bg-white/10'}`}>
                     {isActive ? <ActiveIcon className='size-4' strokeWidth={2} /> : <Icon className='size-5' strokeWidth={1.5} />}
                 </div>
                 <div className='text-[10px] text-white flex items-center justify-center font-bold'>

@@ -14,7 +14,7 @@ export function AuthLayout({ children }: AuthLayoutProps) {
     <div className="min-h-screen w-full flex flex-col items-center justify-center bg-slate-50 px-4 py-8">
       {/* Decoração de fundo sutil */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-emerald-500/10 blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 rounded-full bg-cyan-500/10 blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl" />
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full bg-slate-700/20 blur-3xl" />
       </div>

@@ -71,7 +71,7 @@ function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
 }
 
 function governmentScopeColor(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
-  if (scope === 'MUNICIPAL') return 'bg-blue-50 text-blue-700'
+  if (scope === 'MUNICIPAL') return 'bg-cyan-50 text-cyan-700'
   if (scope === 'STATE') return 'bg-violet-50 text-violet-700'
   return 'bg-amber-50 text-amber-700'
 }
@@ -98,7 +98,7 @@ function BoardPill({
         onClick={onClick}
         className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all duration-200 text-left shrink-0 cursor-pointer ${
           isActive
-            ? 'border-blue-300 bg-blue-50 shadow-sm'
+            ? 'border-cyan-300 bg-cyan-50 shadow-sm'
             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
@@ -110,7 +110,7 @@ function BoardPill({
         <div className="min-w-0">
           <p
             className={`text-xs font-semibold truncate ${
-              isActive ? 'text-blue-800' : 'text-slate-700'
+              isActive ? 'text-cyan-800' : 'text-slate-700'
             }`}
           >
             {board.alias ?? board.name}
@@ -670,7 +670,7 @@ function ExamsPage() {
             </h3>
             <Link
               to="/history"
-              className="text-xs text-blue-600 hover:text-blue-700 font-medium no-underline"
+              className="text-xs text-cyan-600 hover:text-cyan-700 font-medium no-underline"
             >
               Ver histórico
             </Link>
@@ -699,11 +699,11 @@ function ExamsPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-red-100">
-                <XCircleIcon className="w-5 h-5 text-red-500" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0 bg-rose-100">
+                <XCircleIcon className="w-5 h-5 text-rose-500" />
               </div>
               <div>
-                <p className="text-xl font-bold tabular-nums text-red-600">
+                <p className="text-xl font-bold tabular-nums text-rose-600">
                   {loadingHistory ? '—' : failedAttempts}
                 </p>
                 <p className="text-xs text-slate-500">Reprovados</p>
@@ -738,7 +738,7 @@ function ExamsPage() {
                   evolutionPp > 0
                     ? 'bg-emerald-100 text-emerald-700'
                     : evolutionPp < 0
-                      ? 'bg-red-100 text-red-600'
+                      ? 'bg-rose-100 text-rose-600'
                       : 'bg-slate-100 text-slate-600'
                 }`}
               >
@@ -809,7 +809,7 @@ function ExamsPage() {
               onClick={() => setBoardFilter(null)}
               className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 cursor-pointer ${
                 selectedBoardId === null
-                  ? 'border-blue-300 bg-blue-50 text-blue-700'
+                  ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
                   : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
               }`}
             >
@@ -852,7 +852,7 @@ function ExamsPage() {
             <button
               type="button"
               onClick={() => setBoardFilter(null)}
-              className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
+              className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-medium cursor-pointer"
             >
               <XMarkIcon className="w-3.5 h-3.5" />
               Limpar filtro
@@ -915,7 +915,7 @@ function ExamsPage() {
                   setSearch('')
                   setBoardFilter(null)
                 }}
-                className="text-xs text-blue-600 hover:text-blue-700 font-medium mt-1 cursor-pointer"
+                className="text-xs text-cyan-600 hover:text-cyan-700 font-medium mt-1 cursor-pointer"
               >
                 Limpar filtros
               </button>

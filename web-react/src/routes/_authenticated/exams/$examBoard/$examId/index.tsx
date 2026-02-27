@@ -74,7 +74,7 @@ function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
 }
 
 function governmentScopeColor(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
-  if (scope === 'MUNICIPAL') return 'bg-blue-50 text-blue-700'
+  if (scope === 'MUNICIPAL') return 'bg-cyan-50 text-cyan-700'
   if (scope === 'STATE') return 'bg-violet-50 text-violet-700'
   return 'bg-amber-50 text-amber-700'
 }
@@ -274,7 +274,7 @@ function RouteComponent() {
       ? 'text-slate-700'
       : lastScore >= minPassingNum
         ? 'text-emerald-600'
-        : 'text-red-600'
+        : 'text-rose-600'
 
   const pageTitle = examBase
     ? formatExamBaseTitle(examBase)
@@ -309,7 +309,7 @@ function RouteComponent() {
           noElevation
           className="p-6 border border-violet-200 overflow-hidden relative bg-violet-50/30"
         >
-          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-indigo-50/20 pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-cyan-50/20 pointer-events-none" />
           <div className="relative">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-lg font-semibold text-slate-900">
@@ -523,7 +523,7 @@ function RouteComponent() {
           noElevation
           className="p-6 border border-slate-200 overflow-hidden relative"
         >
-          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-indigo-50/30 pointer-events-none" />
+          <div className="absolute inset-0 bg-linear-to-br from-violet-50/50 via-transparent to-cyan-50/30 pointer-events-none" />
           <div className="relative flex flex-col sm:flex-row sm:items-start gap-5">
             <div className="flex items-start gap-4 min-w-0">
               {examBase?.examBoard?.logoUrl && (
@@ -593,7 +593,7 @@ function RouteComponent() {
                   href={examBase.editalUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors shadow-sm"
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-600 text-white text-sm font-medium hover:bg-cyan-700 transition-colors shadow-sm"
                 >
                   <ArrowTopRightOnSquareIcon className="w-4 h-4" />
                   Ver edital
@@ -679,7 +679,7 @@ function RouteComponent() {
                       className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-semibold ${
                         trendDiff >= 0
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-red-100 text-red-700'
+                          : 'bg-rose-100 text-rose-700'
                       }`}
                     >
                       {trendDiff >= 0 ? (
@@ -707,8 +707,8 @@ function RouteComponent() {
           className="p-5 border border-slate-200 hover:border-slate-300 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center shrink-0">
-              <AcademicCapIcon className="w-5 h-5 text-blue-600" />
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
+              <AcademicCapIcon className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
               <p className="text-xs font-medium text-slate-500">Banca</p>
@@ -843,8 +843,8 @@ function RouteComponent() {
       {questionCount > 0 && (
         <Card noElevation className="p-6 border border-slate-200">
           <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center shrink-0">
-              <BookOpenIcon className="w-5 h-5 text-indigo-600" />
+            <div className="w-10 h-10 rounded-xl bg-cyan-50 flex items-center justify-center shrink-0">
+              <BookOpenIcon className="w-5 h-5 text-cyan-600" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
@@ -891,7 +891,7 @@ function RouteComponent() {
                         </div>
                         <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-linear-to-r from-indigo-500 to-violet-500 transition-all duration-500"
+                            className="h-full rounded-full bg-linear-to-r from-cyan-500 to-violet-500 transition-all duration-500"
                             style={{ width: `${pct}%` }}
                           />
                         </div>
@@ -930,7 +930,7 @@ function RouteComponent() {
         </div>
 
         {attemptsError && (
-          <p className="text-sm text-red-600 mt-4">Erro ao carregar tentativas.</p>
+          <p className="text-sm text-rose-600 mt-4">Erro ao carregar tentativas.</p>
         )}
         {isLoadingAttempts && (
           <p className="text-sm text-slate-500 mt-4">Carregando…</p>
@@ -963,7 +963,7 @@ function RouteComponent() {
                     : {
                         label: item.isPartial ? 'Reprovado (parcial)' : 'Reprovado',
                         icon: ExclamationTriangleIcon,
-                        className: 'text-red-600 bg-red-50',
+                        className: 'text-rose-600 bg-rose-50',
                       }
               const StatusIcon = status.icon
               return (

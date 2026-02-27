@@ -35,7 +35,7 @@ export function ExamBaseRow({ examBase, selectable, selected, onSelect }: ExamBa
   const questionCount = examBase._count?.questions ?? 0
   const canNavigate = Boolean(examBoardId) && !selectable
   const rowClasses = `${baseRowClasses} ${
-    selected ? 'border-blue-500 bg-blue-50 ring-1 ring-inset ring-blue-500' : 'border-slate-300 hover:bg-slate-100'
+    selected ? 'border-cyan-500 bg-cyan-50 ring-1 ring-inset ring-cyan-500' : 'border-slate-300 hover:bg-slate-100'
   }`
 
   const content = (
@@ -83,8 +83,8 @@ export function ExamBaseRow({ examBase, selectable, selected, onSelect }: ExamBa
               </Tooltip>
               <Tooltip title="Tentativas realizadas">
                 <div className="flex flex-col items-center justify-center group">
-                  <ArrowPathIcon className="w-5 h-5 text-slate-500 group-hover:text-indigo-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
-                  <span className="text-xs text-slate-500 group-hover:text-indigo-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
+                  <ArrowPathIcon className="w-5 h-5 text-slate-500 group-hover:text-cyan-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
+                  <span className="text-xs text-slate-500 group-hover:text-cyan-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
                     {examBase.userStats!.attemptCount} Tentativas
                   </span>
                 </div>
@@ -93,8 +93,8 @@ export function ExamBaseRow({ examBase, selectable, selected, onSelect }: ExamBa
           )}
           <Tooltip title="Quantidade de questões">
             <div className="flex flex-col items-center justify-center group">
-              <DocumentTextIcon className="w-5 h-5 text-slate-500 group-hover:text-blue-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
-              <span className="text-xs text-slate-500 group-hover:text-blue-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
+              <DocumentTextIcon className="w-5 h-5 text-slate-500 group-hover:text-cyan-500 group-hover:rotate-10 transition-all ease-in-out duration-200" />
+              <span className="text-xs text-slate-500 group-hover:text-cyan-500 group-hover:text-sm group-hover:font-medium transition-all ease-in-out duration-200 select-none">
                 {questionCount} Questões
               </span>
             </div>

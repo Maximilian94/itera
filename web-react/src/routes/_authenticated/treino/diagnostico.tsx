@@ -26,13 +26,13 @@ export const Route = createFileRoute('/_authenticated/treino/diagnostico')({
 function getSubjectBarColor(percentage: number, minPassing: number): string {
   if (percentage >= minPassing) return 'bg-green-500'
   if (percentage >= minPassing - 15) return 'bg-amber-500'
-  return 'bg-red-500'
+  return 'bg-rose-500'
 }
 
 function getSubjectTextColor(percentage: number, minPassing: number): string {
   if (percentage >= minPassing) return 'text-green-700'
   if (percentage >= minPassing - 15) return 'text-amber-700'
-  return 'text-red-700'
+  return 'text-rose-700'
 }
 
 function DiagnosticoPage() {
@@ -161,7 +161,7 @@ function DiagnosticoPage() {
           className={`p-6 ${
             passed
               ? 'border-green-300 bg-green-50'
-              : 'border-red-300 bg-red-50'
+              : 'border-rose-300 bg-rose-50'
           }`}
         >
           <div className="flex flex-col gap-4">
@@ -171,14 +171,14 @@ function DiagnosticoPage() {
                   <CheckCircleIcon className="w-8 h-8 text-green-600" />
                 </div>
               ) : (
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-red-200">
-                  <XCircleIcon className="w-8 h-8 text-red-600" />
+                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-rose-200">
+                  <XCircleIcon className="w-8 h-8 text-rose-600" />
                 </div>
               )}
               <div>
                 <p
                   className={`text-lg font-semibold ${
-                    passed ? 'text-green-800' : 'text-red-800'
+                    passed ? 'text-green-800' : 'text-rose-800'
                   }`}
                 >
                   {passed ? 'Aprovado' : 'Reprovado'}
@@ -241,8 +241,8 @@ function DiagnosticoPage() {
 
       <div className="flex flex-col gap-4">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-            <SparklesIcon className="w-4 h-4 text-blue-600" />
+          <div className="w-8 h-8 rounded-lg bg-cyan-100 flex items-center justify-center">
+            <SparklesIcon className="w-4 h-4 text-cyan-600" />
           </div>
           <h3 className="text-base font-semibold text-slate-800">
             Feedback e recomendações por matéria
@@ -257,12 +257,12 @@ function DiagnosticoPage() {
             const cardBorder = isGreen
               ? 'border-green-200'
               : isRed
-                ? 'border-red-200'
+                ? 'border-rose-200'
                 : 'border-amber-200'
             const cardBg = isGreen
               ? 'bg-green-50/50'
               : isRed
-                ? 'bg-red-50/50'
+                ? 'bg-rose-50/50'
                 : 'bg-amber-50/50'
             return (
               <Card

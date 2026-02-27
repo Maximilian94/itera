@@ -24,7 +24,7 @@ export function AttemptListItem({ item, onClick }: AttemptListItemProps) {
         : {
             label: item.isPartial ? 'Reprovado (parcial)' : 'Reprovado',
             icon: XCircleIcon,
-            className: 'text-red-600 bg-red-50',
+            className: 'text-rose-600 bg-rose-50',
           }
   const StatusIcon = status.icon
   const date = item.finishedAt ? dayjs(item.finishedAt) : dayjs(item.startedAt)
