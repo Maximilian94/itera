@@ -58,6 +58,14 @@ export function Footer() {
                   Termos de Uso
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/exclusao-de-dados"
+                  className="hover:text-white transition-colors"
+                >
+                  Exclusão de Dados
+                </Link>
+              </li>
             </ul>
           </div>
 
