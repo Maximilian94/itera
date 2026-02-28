@@ -16,7 +16,13 @@ const clerkAppearance:ClerkAppearance = {
   },
   layout: {
     logoImageUrl: '/logo.jpg',
-  }
+    termsPageUrl: import.meta.env.VITE_PUBLIC_SITE_URL
+      ? `${import.meta.env.VITE_PUBLIC_SITE_URL}/termos-de-uso`
+      : 'https://maximizeenfermagem.com.br/termos-de-uso',
+    privacyPageUrl: import.meta.env.VITE_PUBLIC_SITE_URL
+      ? `${import.meta.env.VITE_PUBLIC_SITE_URL}/politica-de-privacidade`
+      : 'https://maximizeenfermagem.com.br/politica-de-privacidade',
+  },
 }
 
 export function ClerkWrapper({ children }: { children: React.ReactNode }) {
