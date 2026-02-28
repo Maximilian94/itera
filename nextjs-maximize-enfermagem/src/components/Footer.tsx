@@ -42,6 +42,22 @@ export function Footer() {
                   Concursos
                 </Link>
               </li>
+              <li>
+                <Link
+                  href="/politica-de-privacidade"
+                  className="hover:text-white transition-colors"
+                >
+                  Política de Privacidade
+                </Link>
+              </li>
+              <li>
+                <Link
+                  href="/termos-de-uso"
+                  className="hover:text-white transition-colors"
+                >
+                  Termos de Uso
+                </Link>
+              </li>
             </ul>
           </div>
 
