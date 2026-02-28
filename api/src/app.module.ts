@@ -18,6 +18,7 @@ import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.modul
 import { TrainingModule } from './training/training.module';
 import { StorageModule } from './storage/storage.module';
 import { StripeModule } from './stripe/stripe.module';
+import { ClerkModule } from './clerk/clerk.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { StripeModule } from './stripe/stripe.module';
     TrainingModule,
     StorageModule,
     StripeModule,
+    ClerkModule,
   ],
   controllers: [AppController],
   providers: [
