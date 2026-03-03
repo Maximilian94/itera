@@ -19,6 +19,7 @@ import { TrainingModule } from './training/training.module';
 import { StorageModule } from './storage/storage.module';
 import { StripeModule } from './stripe/stripe.module';
 import { ClerkModule } from './clerk/clerk.module';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { ClerkModule } from './clerk/clerk.module';
     StorageModule,
     StripeModule,
     ClerkModule,
+    EmailModule,
   ],
   controllers: [AppController],
   providers: [
