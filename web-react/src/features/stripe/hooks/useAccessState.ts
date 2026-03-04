@@ -41,6 +41,11 @@ function apiResponseToAccessState(res: AccessApiResponse): AccessState {
       lastPurchaseId: res.lastPurchaseId,
       trainingLimit: res.trainingLimit,
       trainingsUsedThisMonth: res.trainingsUsedThisMonth,
+      refundDeadline: res.refundDeadline,
+      refundRemainingDays: res.refundRemainingDays,
+      refundRemainingHours: res.refundRemainingHours,
+      refundAmount: res.refundAmount,
+      refundAmountFormatted: res.refundAmountFormatted,
     }
   }
   return {
@@ -69,18 +74,26 @@ function getMockAccessState(status: AccessSearchParam): AccessState {
       }
     }
     case 'trial': {
-      const date = new Date()
-      date.setDate(date.getDate() + 5)
+      const periodEnd = new Date()
+      periodEnd.setDate(periodEnd.getDate() + 30)
+      const deadline = new Date()
+      deadline.setDate(deadline.getDate() + 5)
+      deadline.setHours(deadline.getHours() + 6)
       return {
         status: 'trial',
         plan: 'ESTRATEGICO',
         billingInterval: 'month',
         stripePriceId: undefined,
-        currentPeriodEnd: date.toISOString(),
+        currentPeriodEnd: periodEnd.toISOString(),
         canRequestRefund: true,
         lastPurchaseId: 'mock-purchase-id',
         trainingLimit: 5,
         trainingsUsedThisMonth: 0,
+        refundDeadline: deadline.toISOString(),
+        refundRemainingDays: 5,
+        refundRemainingHours: 6,
+        refundAmount: 4990,
+        refundAmountFormatted: 'R$\u00a049,90',
       }
     }
     default:

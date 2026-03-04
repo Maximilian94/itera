@@ -110,8 +110,7 @@ export class StripeController {
     if (!purchaseId || typeof purchaseId !== 'string') {
       throw new BadRequestException('purchaseId é obrigatório.');
     }
-    await this.stripe.requestRefund(req.user.userId, purchaseId.trim());
-    return { ok: true };
+    return this.stripe.requestRefund(req.user.userId, purchaseId.trim());
   }
 
 }
