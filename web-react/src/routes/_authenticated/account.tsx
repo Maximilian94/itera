@@ -3,7 +3,7 @@ import { Card } from '@/components/Card'
 import { authService } from '@/features/auth/services/auth.service'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { stripeService } from '@/features/stripe/services/stripe.service'
-import type { AccessState } from '@/features/stripe/domain/stripe.types'
+import type { AccessState, RefundResponse } from '@/features/stripe/domain/stripe.types'
 import { ApiError } from '@/lib/api'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -31,6 +31,7 @@ import {
   RocketLaunchIcon,
   Cog6ToothIcon,
   BanknotesIcon,
+  CheckCircleIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon as CheckCircleSolid } from '@heroicons/react/24/solid'
 import type { SubscriptionPlan } from '@/features/stripe/domain/stripe.types'
@@ -96,9 +97,9 @@ function AccountPage() {
   }, [profile?.phone])
 
   const { access, isLoading: accessLoading, isMock } = useAccessState()
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [portalLoading, setPortalLoading] = useState(false)
+  const [refundResult, setRefundResult] = useState<RefundResponse | null>(null)
 
   const handleSavePhone = async () => {
     setPhoneMessage(null)
@@ -139,21 +140,9 @@ function AccountPage() {
     }
   }
 
-  const handleRequestRefund = async (purchaseId: string) => {
-    setLoading(true)
-    setError(null)
-    try {
-      await stripeService.requestRefund(purchaseId)
-      queryClient.invalidateQueries({ queryKey: ['stripe', 'access'] })
-    } catch (err) {
-      if (err instanceof ApiError) {
-        setError(err.message || 'Erro ao solicitar reembolso.')
-      } else {
-        setError('Erro ao conectar.')
-      }
-    } finally {
-      setLoading(false)
-    }
+  const handleRefundSuccess = (result: RefundResponse) => {
+    setRefundResult(result)
+    queryClient.invalidateQueries({ queryKey: ['stripe', 'access'] })
   }
 
   const searchForLinks = { access: accessParam, tab }
@@ -241,10 +230,10 @@ function AccountPage() {
               access={access}
               accessLoading={accessLoading}
               error={error}
-              loading={loading}
               portalLoading={portalLoading}
               onManageSubscription={handleManageSubscription}
-              onRequestRefund={handleRequestRefund}
+              onRefundSuccess={handleRefundSuccess}
+              refundResult={refundResult}
               isMock={isMock}
               searchForLinks={searchForLinks}
             />
@@ -364,20 +353,20 @@ function SubscriptionContent({
   access,
   accessLoading,
   error,
-  loading,
   portalLoading,
   onManageSubscription,
-  onRequestRefund,
+  onRefundSuccess,
+  refundResult,
   isMock,
   searchForLinks,
 }: {
   access: AccessState
   accessLoading: boolean
   error: string | null
-  loading: boolean
   portalLoading: boolean
   onManageSubscription: () => void
-  onRequestRefund: (purchaseId: string) => void
+  onRefundSuccess: (result: RefundResponse) => void
+  refundResult: RefundResponse | null
   isMock: boolean
   searchForLinks: { access?: string; tab: AccountTab }
 }) {
@@ -400,15 +389,16 @@ function SubscriptionContent({
             <div className="h-3 w-48 rounded bg-slate-100 animate-pulse" />
           </div>
         </Card>
+      ) : refundResult ? (
+        <RefundSuccessCard result={refundResult} />
       ) : (
         <>
           <AccessCard
             access={access}
             error={error}
-            loading={loading}
             portalLoading={portalLoading}
             onManageSubscription={onManageSubscription}
-            onRequestRefund={onRequestRefund}
+            onRefundSuccess={onRefundSuccess}
           />
           {(access.status === 'active' || access.status === 'trial') && (
             <div className="mt-6 rounded-xl border border-cyan-200 bg-cyan-50 px-4 py-4">
@@ -467,307 +457,349 @@ function ProfileFieldLabel({
 }
 
 /**
+ * Exibe confirmação de cancelamento e reembolso após o fluxo ser concluído.
+ */
+function RefundSuccessCard({ result }: { result: RefundResponse }) {
+  return (
+    <Card noElevation className="overflow-hidden border border-emerald-200 rounded-2xl">
+      <div className="p-8 sm:p-10 flex flex-col items-center text-center">
+        <div className="w-16 h-16 rounded-2xl bg-emerald-50 flex items-center justify-center mb-4">
+          <CheckCircleIcon className="w-10 h-10 text-emerald-500" />
+        </div>
+        <h3 className="text-xl font-bold text-slate-900">Cancelamento realizado</h3>
+        <p className="text-slate-600 text-sm mt-3 max-w-sm">
+          O reembolso de <strong>{result.formattedAmount}</strong> foi solicitado e será processado
+          em até 7 dias úteis no mesmo método de pagamento.
+        </p>
+        <p className="text-slate-500 text-sm mt-2">
+          Sentiremos sua falta! Caso queira voltar, estaremos aqui.
+        </p>
+        <Link to="/" className="mt-6">
+          <Button
+            variant="outlined"
+            color="inherit"
+            sx={{
+              textTransform: 'none',
+              fontWeight: 500,
+              borderRadius: 2,
+              borderColor: 'rgb(203 213 225)',
+              color: 'rgb(51 65 85)',
+            }}
+          >
+            Voltar para a página inicial
+          </Button>
+        </Link>
+      </div>
+    </Card>
+  )
+}
+
+/**
+ * Seção discreta de garantia de satisfação (CDC Art. 49).
+ * Exibida abaixo do card principal somente enquanto o usuário está no período de 7 dias.
+ */
+function SatisfactionGuaranteeSection({
+  refundDeadline,
+  refundRemainingDays,
+  refundAmountFormatted,
+  purchaseId,
+  onSuccess,
+}: {
+  refundDeadline: string
+  refundRemainingDays: number
+  refundAmountFormatted: string
+  purchaseId: string
+  onSuccess: (result: RefundResponse) => void
+}) {
+  const [step, setStep] = useState<'idle' | 'info' | 'confirm' | 'loading'>('idle')
+  const [error, setError] = useState<string | null>(null)
+
+  const isNearDeadline = refundRemainingDays <= 2
+  const deadlineDate = new Date(refundDeadline)
+  const formattedDate = deadlineDate.toLocaleDateString('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+  const formattedTime = deadlineDate.toLocaleTimeString('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+
+  const handleConfirm = async () => {
+    setStep('loading')
+    setError(null)
+    try {
+      const result = await stripeService.requestRefund(purchaseId)
+      onSuccess(result)
+    } catch (err) {
+      const message =
+        err instanceof ApiError
+          ? err.message
+          : 'Erro ao processar. Tente novamente ou entre em contato com o suporte.'
+      setError(message)
+      setStep('confirm')
+    }
+  }
+
+  return (
+    <div className="mt-4 px-4 py-4 rounded-xl border border-slate-200 bg-slate-50">
+      <p className="text-sm font-medium text-slate-600">Garantia de satisfação</p>
+      {isNearDeadline ? (
+        <p className="text-sm text-slate-500 mt-1">
+          Sua garantia de satisfação está disponível até {formattedDate}.
+          Caso precise, você pode solicitar o reembolso integral.
+        </p>
+      ) : (
+        <p className="text-sm text-slate-500 mt-1">
+          Você tem até {formattedDate} para avaliar a plataforma com tranquilidade.
+          Caso sinta que não é o momento ideal, você pode solicitar o reembolso integral.
+        </p>
+      )}
+      <button
+        className="text-sm text-slate-400 hover:text-slate-600 underline mt-2 transition-colors"
+        onClick={() => setStep('info')}
+      >
+        Saiba mais
+      </button>
+
+      {/* Modal informativo */}
+      <Dialog
+        open={step === 'info'}
+        onClose={() => setStep('idle')}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+          Garantia de satisfação
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div" sx={{ color: 'text.primary' }}>
+            <p className="mb-3">
+              De acordo com o Código de Defesa do Consumidor (Art. 49), você pode cancelar
+              sua assinatura e receber o reembolso integral de{' '}
+              <strong>{refundAmountFormatted}</strong> em até 7 dias após a contratação.
+            </p>
+            <p className="mb-3">
+              Seu prazo vai até <strong>{formattedDate}</strong> às <strong>{formattedTime}</strong>.
+            </p>
+            <p className="text-slate-600 text-sm">
+              Caso deseje prosseguir, clique no botão abaixo.
+            </p>
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button
+            onClick={() => setStep('idle')}
+            variant="text"
+            sx={{ textTransform: 'none', color: 'text.secondary' }}
+          >
+            Fechar
+          </Button>
+          <Button
+            onClick={() => setStep('confirm')}
+            variant="outlined"
+            color="error"
+            sx={{ textTransform: 'none', fontWeight: 500 }}
+          >
+            Solicitar cancelamento e reembolso
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Modal de confirmação */}
+      <Dialog
+        open={step === 'confirm' || step === 'loading'}
+        onClose={() => step !== 'loading' && setStep('info')}
+        maxWidth="sm"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 2 } }}
+      >
+        <DialogTitle sx={{ fontWeight: 700, fontSize: '1.1rem' }}>
+          Tem certeza?
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText component="div" sx={{ color: 'text.primary' }}>
+            <p>
+              Ao confirmar, sua assinatura será cancelada imediatamente e o valor de{' '}
+              <strong>{refundAmountFormatted}</strong> será reembolsado.
+              O acesso à plataforma será encerrado.
+            </p>
+            {error && (
+              <p className="mt-3 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-lg px-3 py-2">
+                {error}
+              </p>
+            )}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1 }}>
+          <Button
+            onClick={() => setStep('info')}
+            disabled={step === 'loading'}
+            variant="contained"
+            color="primary"
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            Voltar
+          </Button>
+          <Button
+            onClick={handleConfirm}
+            disabled={step === 'loading'}
+            variant="contained"
+            color="error"
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            {step === 'loading' ? 'Processando…' : 'Confirmar cancelamento'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </div>
+  )
+}
+
+/**
  * Card que exibe o estado da assinatura do usuário.
  */
 function AccessCard({
   access,
   error,
-  loading,
   portalLoading,
   onManageSubscription,
-  onRequestRefund,
+  onRefundSuccess,
 }: {
   access: AccessState
   error: string | null
-  loading: boolean
   portalLoading: boolean
   onManageSubscription: () => void
-  onRequestRefund: (purchaseId: string) => void
+  onRefundSuccess: (result: RefundResponse) => void
 }) {
-  const [refundDialogOpen, setRefundDialogOpen] = useState(false)
-  if (access.status === 'active') {
+  if (access.status === 'active' || access.status === 'trial') {
     const PlanIcon = PLAN_ICONS[access.plan]
     const billingLabel = access.billingInterval === 'year' ? 'Cobrança anual' : 'Cobrança mensal'
-    return (
-      <Card noElevation className="overflow-hidden border border-slate-200/80 rounded-2xl">
-        <div className="p-6 sm:p-8">
-          {/* Plano atual em destaque */}
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
-              <PlanIcon className="w-6 h-6 text-slate-600" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Plano atual</p>
-              <p className="text-lg font-bold text-slate-900">
-                {planDisplayName(access.plan)} · {billingLabel}
-              </p>
-            </div>
-          </div>
+    const showGuarantee =
+      access.canRequestRefund &&
+      access.lastPurchaseId != null &&
+      access.refundDeadline != null &&
+      access.refundRemainingDays != null &&
+      access.refundAmountFormatted != null
 
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-200/40">
-                <CheckCircleSolid className="w-8 h-8 text-white" />
+    return (
+      <>
+        <Card noElevation className="overflow-hidden border border-slate-200/80 rounded-2xl">
+          <div className="p-6 sm:p-8">
+            {/* Plano atual em destaque */}
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-slate-50 border border-slate-200 mb-6">
+              <div className="w-12 h-12 rounded-xl bg-slate-200 flex items-center justify-center shrink-0">
+                <PlanIcon className="w-6 h-6 text-slate-600" />
               </div>
               <div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Ativo
-                </span>
-                <h3 className="text-xl font-bold text-slate-900 mt-2">
-                  Assinatura ativa
-                </h3>
-                <p className="text-slate-600 text-sm mt-0.5">
-                  Renova em {formatDateBR(access.currentPeriodEnd)}
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">Plano atual</p>
+                <p className="text-lg font-bold text-slate-900">
+                  {planDisplayName(access.plan)} · {billingLabel}
                 </p>
               </div>
             </div>
-          </div>
 
-          {access.scheduledPlan && access.scheduledChangeDate && (
-            <div className="mt-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
-              <ClockIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800">
-                Mudança agendada para {formatDateBR(access.scheduledChangeDate)}.
-                Abra o portal para gerenciar.
-              </p>
-            </div>
-          )}
-
-          {access.trainingLimit > 0 && (
-            <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-100">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-slate-700">Treinos este mês</span>
-                <span className="text-sm font-bold text-slate-900 tabular-nums">
-                  {access.trainingsUsedThisMonth}/{access.trainingLimit}
-                </span>
-              </div>
-              <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-linear-to-r from-cyan-500 to-cyan-600 transition-all duration-500"
-                  style={{ width: `${Math.min(100, (access.trainingsUsedThisMonth / access.trainingLimit) * 100)}%` }}
-                />
+            <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-emerald-400 to-green-600 flex items-center justify-center shadow-lg shadow-green-200/40">
+                  <CheckCircleSolid className="w-8 h-8 text-white" />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Ativo
+                  </span>
+                  <h3 className="text-xl font-bold text-slate-900 mt-2">
+                    Assinatura ativa
+                  </h3>
+                  <p className="text-slate-600 text-sm mt-0.5">
+                    Renova em {formatDateBR(access.currentPeriodEnd)}
+                  </p>
+                </div>
               </div>
             </div>
-          )}
 
-          {error && (
-            <div className="mt-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" role="alert">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3">
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              startIcon={<Cog6ToothIcon className="w-5 h-5" />}
-              disabled={portalLoading}
-              onClick={onManageSubscription}
-              fullWidth
-              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, py: 1.5 }}
-            >
-              {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              size="large"
-              startIcon={<BanknotesIcon className="w-5 h-5" />}
-              disabled={portalLoading}
-              onClick={onManageSubscription}
-              fullWidth
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500,
-                borderRadius: 2,
-                borderColor: 'rgb(203 213 225)',
-                color: 'rgb(51 65 85)',
-                '&:hover': { borderColor: 'rgb(148 163 184)', backgroundColor: 'rgb(248 250 252)' },
-              }}
-            >
-              {portalLoading ? 'Abrindo…' : 'Atualizar pagamento'}
-            </Button>
-          </div>
-        </div>
-      </Card>
-    )
-  }
-
-  if (access.status === 'trial') {
-    const PlanIcon = PLAN_ICONS[access.plan]
-    const billingLabel = access.billingInterval === 'year' ? 'Cobrança anual' : 'Cobrança mensal'
-    return (
-      <Card noElevation className="overflow-hidden border border-amber-200/80 rounded-2xl">
-        <div className="p-6 sm:p-8 bg-linear-to-b from-amber-50/50 to-white">
-          {/* Plano atual em destaque */}
-          <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50/80 border border-amber-200 mb-6">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center shrink-0">
-              <PlanIcon className="w-6 h-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-amber-700 uppercase tracking-wider">Plano atual</p>
-              <p className="text-lg font-bold text-slate-900">
-                {planDisplayName(access.plan)} · {billingLabel}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-linear-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg shadow-amber-200/40">
-                <ClockIcon className="w-8 h-8 text-white" />
-              </div>
-              <div>
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-amber-700 bg-amber-100 px-2.5 py-1 rounded-full">
-                  Período CDC
-                </span>
-                <h3 className="text-xl font-bold text-slate-900 mt-2">
-                  Período de arrependimento
-                </h3>
-                <p className="text-slate-600 text-sm mt-0.5">
-                  Você pode cancelar e receber reembolso total até 7 dias. Renova em {formatDateBR(access.currentPeriodEnd)}.
+            {access.scheduledPlan && access.scheduledChangeDate && (
+              <div className="mt-4 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3">
+                <ClockIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-sm text-amber-800">
+                  Mudança agendada para {formatDateBR(access.scheduledChangeDate)}.
+                  Abra o portal para gerenciar.
                 </p>
               </div>
-            </div>
-          </div>
-
-          {access.scheduledPlan && access.scheduledChangeDate && (
-            <div className="mt-4 px-4 py-3 rounded-xl bg-amber-100/80 border border-amber-200 flex items-start gap-3">
-              <ClockIcon className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <p className="text-sm text-amber-800">
-                Mudança agendada para {formatDateBR(access.scheduledChangeDate)}.
-              </p>
-            </div>
-          )}
-
-          {access.trainingLimit > 0 && (
-            <div className="mt-5 p-4 rounded-xl bg-white/80 border border-amber-100">
-              <p className="text-sm text-slate-600">
-                Treinos este mês: <strong className="text-slate-900">{access.trainingsUsedThisMonth}/{access.trainingLimit}</strong>
-              </p>
-              <div className="w-full bg-slate-200 rounded-full h-2.5 mt-2">
-                <div
-                  className="bg-amber-500 h-2.5 rounded-full transition-all"
-                  style={{ width: `${Math.min(100, (access.trainingsUsedThisMonth / access.trainingLimit) * 100)}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" role="alert">
-              {error}
-            </div>
-          )}
-
-          <div className="mt-6 flex flex-col gap-3">
-            <Button
-              variant="contained"
-              color="primary"
-              size="large"
-              startIcon={<Cog6ToothIcon className="w-5 h-5" />}
-              disabled={portalLoading}
-              onClick={onManageSubscription}
-              fullWidth
-              sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, py: 1.5 }}
-            >
-              {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
-            </Button>
-            <Button
-              variant="outlined"
-              color="inherit"
-              size="large"
-              startIcon={<BanknotesIcon className="w-5 h-5" />}
-              disabled={portalLoading}
-              onClick={onManageSubscription}
-              fullWidth
-              sx={{
-                textTransform: 'none',
-                fontWeight: 500,
-                borderRadius: 2,
-                borderColor: 'rgb(203 213 225)',
-                color: 'rgb(51 65 85)',
-                '&:hover': { borderColor: 'rgb(148 163 184)', backgroundColor: 'rgb(248 250 252)' },
-              }}
-            >
-              {portalLoading ? 'Abrindo…' : 'Atualizar pagamento'}
-            </Button>
-            {access.canRequestRefund && access.lastPurchaseId && (
-              <>
-                <Button
-                  variant="outlined"
-                  color="error"
-                  size="large"
-                  startIcon={<XCircleIcon className="w-5 h-5" />}
-                  disabled={loading}
-                  onClick={() => setRefundDialogOpen(true)}
-                  fullWidth
-                  sx={{ textTransform: 'none', fontWeight: 500, borderRadius: 2 }}
-                >
-                  {loading ? 'Cancelando…' : 'Cancelar e reembolsar'}
-                </Button>
-
-                <Dialog
-                  open={refundDialogOpen}
-                  onClose={() => !loading && setRefundDialogOpen(false)}
-                  maxWidth="sm"
-                  fullWidth
-                  PaperProps={{ sx: { borderRadius: 2 } }}
-                >
-                  <DialogTitle sx={{ fontWeight: 700, fontSize: '1.2rem' }}>
-                    Tem certeza que deseja cancelar?
-                  </DialogTitle>
-                  <DialogContent>
-                    <DialogContentText component="div" sx={{ color: 'text.primary' }}>
-                      <p className="mb-3">
-                        Ao confirmar, você <strong>perderá imediatamente</strong> o acesso a:
-                      </p>
-                      <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-700">
-                        <li>Provas reais de concursos</li>
-                        <li>Treinos inteligentes guiados por IA</li>
-                        <li>Diagnóstico personalizado dos seus pontos fracos</li>
-                        <li>Seu histórico de progresso e desempenho</li>
-                      </ul>
-                      <p className="mb-2">
-                        O reembolso será processado em até 10 dias úteis.
-                      </p>
-                      <p className="text-slate-600 text-sm">
-                        Se algo não está funcionando como esperado, entre em contato conosco antes de cancelar — podemos ajudar.
-                      </p>
-                    </DialogContentText>
-                  </DialogContent>
-                  <DialogActions sx={{ px: 3, pb: 2, pt: 1, gap: 1, flexWrap: 'wrap' }}>
-                    <Button
-                      onClick={() => setRefundDialogOpen(false)}
-                      variant="contained"
-                      color="primary"
-                      sx={{ textTransform: 'none', fontWeight: 600 }}
-                    >
-                      Continuar assinando
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        if (access.lastPurchaseId) {
-                          onRequestRefund(access.lastPurchaseId)
-                          setRefundDialogOpen(false)
-                        }
-                      }}
-                      variant="contained"
-                      color="error"
-                      disabled={loading}
-                      sx={{ textTransform: 'none', fontWeight: 600 }}
-                    >
-                      {loading ? 'Cancelando…' : 'Sim, quero cancelar'}
-                    </Button>
-                  </DialogActions>
-                </Dialog>
-              </>
             )}
+
+            {access.trainingLimit > 0 && (
+              <div className="mt-5 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm font-medium text-slate-700">Treinos este mês</span>
+                  <span className="text-sm font-bold text-slate-900 tabular-nums">
+                    {access.trainingsUsedThisMonth}/{access.trainingLimit}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full bg-linear-to-r from-cyan-500 to-cyan-600 transition-all duration-500"
+                    style={{ width: `${Math.min(100, (access.trainingsUsedThisMonth / access.trainingLimit) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-4 text-sm text-rose-600 bg-rose-50 border border-rose-200 rounded-xl px-4 py-3" role="alert">
+                {error}
+              </div>
+            )}
+
+            <div className="mt-6 flex flex-col gap-3">
+              <Button
+                variant="contained"
+                color="primary"
+                size="large"
+                startIcon={<Cog6ToothIcon className="w-5 h-5" />}
+                disabled={portalLoading}
+                onClick={onManageSubscription}
+                fullWidth
+                sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, py: 1.5 }}
+              >
+                {portalLoading ? 'Abrindo…' : 'Gerenciar assinatura'}
+              </Button>
+              <Button
+                variant="outlined"
+                color="inherit"
+                size="large"
+                startIcon={<BanknotesIcon className="w-5 h-5" />}
+                disabled={portalLoading}
+                onClick={onManageSubscription}
+                fullWidth
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 500,
+                  borderRadius: 2,
+                  borderColor: 'rgb(203 213 225)',
+                  color: 'rgb(51 65 85)',
+                  '&:hover': { borderColor: 'rgb(148 163 184)', backgroundColor: 'rgb(248 250 252)' },
+                }}
+              >
+                {portalLoading ? 'Abrindo…' : 'Atualizar pagamento'}
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+
+        {showGuarantee && (
+          <SatisfactionGuaranteeSection
+            refundDeadline={access.refundDeadline!}
+            refundRemainingDays={access.refundRemainingDays!}
+            refundAmountFormatted={access.refundAmountFormatted!}
+            purchaseId={access.lastPurchaseId!}
+            onSuccess={onRefundSuccess}
+          />
+        )}
+      </>
     )
   }
 

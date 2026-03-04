@@ -67,6 +67,11 @@ export type AccessState =
       lastPurchaseId?: string
       trainingLimit: number
       trainingsUsedThisMonth: number
+      refundDeadline?: string
+      refundRemainingDays?: number
+      refundRemainingHours?: number
+      refundAmount?: number
+      refundAmountFormatted?: string
     }
   | {
       status: 'trial'
@@ -81,6 +86,11 @@ export type AccessState =
       lastPurchaseId?: string
       trainingLimit: number
       trainingsUsedThisMonth: number
+      refundDeadline?: string
+      refundRemainingDays?: number
+      refundRemainingHours?: number
+      refundAmount?: number
+      refundAmountFormatted?: string
     }
   | {
       status: 'inactive'
@@ -105,5 +115,18 @@ export type AccessApiResponse = {
   trainingsUsedThisMonth?: number
   /** When inactive: true if user can do 1 free onboarding training. */
   canDoFreeTraining?: boolean
+  refundDeadline?: string
+  refundRemainingDays?: number
+  refundRemainingHours?: number
+  refundAmount?: number
+  refundAmountFormatted?: string
+}
+
+/** Response from POST /stripe/request-refund. */
+export type RefundResponse = {
+  status: string
+  refundAmount: number
+  formattedAmount: string
+  message: string
 }
 

@@ -6,6 +6,8 @@ import type {
   CreateCustomerPortalBody,
   CreateCustomerPortalResponse,
   PlanInfo,
+
+  RefundResponse,
 } from '../domain/stripe.types'
 
 /**
@@ -56,8 +58,8 @@ class StripeService {
   }
 
   /** Requests a refund for a payment (CDC 7 days). */
-  async requestRefund(purchaseId: string): Promise<{ ok: boolean }> {
-    return apiFetch<{ ok: boolean }>(
+  async requestRefund(purchaseId: string): Promise<RefundResponse> {
+    return apiFetch<RefundResponse>(
       `${this.urlPath}/request-refund`,
       {
         method: 'POST',

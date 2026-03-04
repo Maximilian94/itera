@@ -78,6 +78,16 @@ export type AccessResponse = {
   trainingsUsedThisMonth?: number;
   /** When inactive: true if user has 0 trainings and can do 1 free onboarding training. */
   canDoFreeTraining?: boolean;
+  /** ISO 8601 deadline for refund (only when canRequestRefund is true). */
+  refundDeadline?: string;
+  /** Full days remaining until refund deadline. */
+  refundRemainingDays?: number;
+  /** Hours remaining in the last partial day. */
+  refundRemainingHours?: number;
+  /** Amount of the first purchase in cents (for refund display). */
+  refundAmount?: number;
+  /** Formatted refund amount (e.g. "R$ 49,90"). */
+  refundAmountFormatted?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -761,7 +771,7 @@ export class StripeService {
           where: { refundedAt: null },
           orderBy: { purchasedAt: 'desc' },
           take: 1,
-          select: { id: true, purchasedAt: true },
+          select: { id: true, purchasedAt: true, amount: true },
         },
       },
     });
@@ -787,11 +797,33 @@ export class StripeService {
 
     // Check if refund can be requested
     let canRequestRefund = false;
+    let refundDeadline: string | undefined;
+    let refundRemainingDays: number | undefined;
+    let refundRemainingHours: number | undefined;
+    let refundAmount: number | undefined;
+    let refundAmountFormatted: string | undefined;
+
     if (firstPurchase && isTrialPeriod) {
       const completedRefunds = await this.prisma.refundRequest.count({
         where: { purchaseId: firstPurchase.id, status: 'completed' },
       });
       canRequestRefund = completedRefunds === 0;
+
+      if (canRequestRefund) {
+        const deadline = new Date(
+          firstPurchase.purchasedAt.getTime() + REFUND_DAYS_CDC * 24 * 60 * 60 * 1000,
+        );
+        const remainingMs = deadline.getTime() - now.getTime();
+        const remainingTotalHours = Math.max(0, Math.floor(remainingMs / (60 * 60 * 1000)));
+        refundDeadline = deadline.toISOString();
+        refundRemainingDays = Math.floor(remainingTotalHours / 24);
+        refundRemainingHours = remainingTotalHours % 24;
+        refundAmount = firstPurchase.amount;
+        refundAmountFormatted = new Intl.NumberFormat('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        }).format(firstPurchase.amount / 100);
+      }
     }
 
     // Count training sessions in current month
@@ -827,6 +859,11 @@ export class StripeService {
       lastPurchaseId: firstPurchase?.id,
       trainingLimit,
       trainingsUsedThisMonth,
+      refundDeadline,
+      refundRemainingDays,
+      refundRemainingHours,
+      refundAmount,
+      refundAmountFormatted,
     };
   }
 
@@ -842,7 +879,10 @@ export class StripeService {
    * @param purchaseId – ID of the Purchase to be refunded
    * @throws BadRequestException if past deadline, already refunded, or charge not found
    */
-  async requestRefund(userId: string, purchaseId: string): Promise<void> {
+  async requestRefund(
+    userId: string,
+    purchaseId: string,
+  ): Promise<{ status: string; refundAmount: number; formattedAmount: string; message: string }> {
     const purchase = await this.prisma.purchase.findFirst({
       where: { id: purchaseId, userId },
       include: { refundRequests: true, subscription: true },
@@ -870,11 +910,11 @@ export class StripeService {
       throw new BadRequestException('Charge não encontrado para esta compra.');
     }
 
-    // Create refund in Stripe
-    const refund = await this.stripe.refunds.create({
-      charge: purchase.stripeChargeId,
-      reason: 'requested_by_customer',
-    });
+    // Create refund in Stripe (idempotency key prevents duplicate refunds)
+    const refund = await this.stripe.refunds.create(
+      { charge: purchase.stripeChargeId, reason: 'requested_by_customer' },
+      { idempotencyKey: `refund-${purchaseId}` },
+    );
 
     // Cancel subscription in Stripe (immediately)
     if (purchase.subscription?.stripeSubscriptionId) {
@@ -912,5 +952,17 @@ export class StripeService {
           ]
         : []),
     ]);
+
+    const formattedAmount = new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(purchase.amount / 100);
+
+    return {
+      status: 'cancelled_and_refunded',
+      refundAmount: purchase.amount,
+      formattedAmount,
+      message: 'Assinatura cancelada. O reembolso será processado em até 7 dias úteis.',
+    };
   }
 }
