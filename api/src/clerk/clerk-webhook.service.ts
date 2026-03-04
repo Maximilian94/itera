@@ -125,8 +125,13 @@ export class ClerkWebhookService {
       await this.auth.syncUserFromClerk(mapped.clerkUserId, mapped.email);
     }
 
-    // Email verified: send only if primary email is verified AND we haven't sent yet
-    if (mapped.isPrimaryEmailVerified && mapped.email) {
+    // Email verified: send only when user actually verified via email (code/link), NOT when verified via SSO
+    const shouldSendEmailVerified =
+      mapped.isPrimaryEmailVerified &&
+      !mapped.isVerifiedViaSSO &&
+      mapped.email;
+
+    if (shouldSendEmailVerified && mapped.email) {
       const alreadySent = await this.prisma.userEmailEvent.findUnique({
         where: {
           userId_type: { userId: mapped.clerkUserId, type: 'email_verified' },

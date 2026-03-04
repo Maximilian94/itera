@@ -24,11 +24,13 @@ export interface ClerkUserPayload {
     id: string;
     email_address?: string;
     emailAddress?: string;
-    verification?: { status?: string };
+    verification?: { status?: string; strategy?: string };
   }>;
   emailAddresses?: ClerkUserPayload['email_addresses'];
   primary_email_address_id?: string;
   primaryEmailAddressId?: string;
+  external_accounts?: unknown[];
+  externalAccounts?: unknown[];
   first_name?: string;
   firstName?: string;
   last_name?: string;
@@ -40,6 +42,8 @@ export interface MappedClerkUser {
   email: string | null;
   firstName: string | null;
   isPrimaryEmailVerified: boolean;
+  /** True when email was verified via OAuth/SSO (from_oauth_*). We should NOT send "email verified" in that case. */
+  isVerifiedViaSSO: boolean;
 }
 
 /**
@@ -68,12 +72,25 @@ export function mapClerkUserPayload(data: ClerkUserPayload): MappedClerkUser | n
 
   const verificationStatus =
     primaryEmail?.verification?.status ?? 'unverified';
+  const verificationStrategy =
+    primaryEmail?.verification?.strategy ?? '';
   const isPrimaryEmailVerified = verificationStatus === 'verified';
+  const externalAccounts =
+    (data.external_accounts ?? data.externalAccounts) as unknown[] | undefined;
+  const hasExternalAccounts = (externalAccounts?.length ?? 0) > 0;
+  // from_oauth, from_oauth_google, etc. = email came from OAuth provider
+  // Also treat as SSO when user has OAuth accounts (signed up with Google, etc.)
+  const isVerifiedViaSSO =
+    isPrimaryEmailVerified &&
+    (verificationStrategy.startsWith('from_oauth') ||
+      verificationStrategy === 'oauth' ||
+      hasExternalAccounts);
 
   return {
     clerkUserId,
     email,
     firstName: firstName ?? null,
     isPrimaryEmailVerified,
+    isVerifiedViaSSO,
   };
 }
