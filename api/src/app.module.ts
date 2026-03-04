@@ -18,6 +18,7 @@ import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.modul
 import { TrainingModule } from './training/training.module';
 import { StorageModule } from './storage/storage.module';
 import { StripeModule } from './stripe/stripe.module';
+import { StripeWebhookModule } from './stripe-webhook/stripe-webhook.module';
 import { ClerkModule } from './clerk/clerk.module';
 import { EmailModule } from './email/email.module';
 
@@ -39,6 +40,7 @@ import { EmailModule } from './email/email.module';
     TrainingModule,
     StorageModule,
     StripeModule,
+    StripeWebhookModule,
     ClerkModule,
     EmailModule,
   ],
