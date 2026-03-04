@@ -11,6 +11,19 @@ import { Public } from '../common/decorators/public.decorator';
 import { verifyClerkWebhook } from './utils/verify-clerk-webhook';
 import { ClerkWebhookService } from './clerk-webhook.service';
 
+function getHeader(
+  headers: Record<string, string | string[] | undefined>,
+  name: string,
+): string | undefined {
+  const lower = name.toLowerCase();
+  for (const [key, value] of Object.entries(headers)) {
+    if (key.toLowerCase() === lower) {
+      return Array.isArray(value) ? value[0] : value;
+    }
+  }
+  return undefined;
+}
+
 interface RequestWithRawBody {
   rawBody?: Buffer;
   headers: Record<string, string | string[] | undefined>;
@@ -45,7 +58,7 @@ export class ClerkWebhookController {
       throw new BadRequestException('Clerk webhook is not configured');
     }
 
-    let payload: { id: string; type: string; data: Record<string, unknown> };
+    let payload: { id?: string; type?: string; data?: Record<string, unknown> };
     try {
       payload = await verifyClerkWebhook(rawBody, req.headers, secret);
     } catch (err) {
@@ -55,14 +68,25 @@ export class ClerkWebhookController {
       throw new UnauthorizedException('Webhook signature verification failed');
     }
 
-    if (!payload.id || !payload.type || !payload.data) {
+    // Idempotency: use payload.id (Svix) or svix-id header. Fallback for edge cases.
+    const eventId =
+      payload.id ??
+      getHeader(req.headers, 'svix-id') ??
+      `evt_${String((payload.data as Record<string, unknown>)?.id ?? 'unknown')}`;
+    const eventType = payload.type;
+    const eventData = payload.data ?? {};
+
+    if (!eventType) {
+      this.logger.warn(
+        `Invalid webhook payload: missing type. Keys: ${Object.keys(payload).join(', ')}`,
+      );
       throw new BadRequestException('Invalid webhook payload');
     }
 
     await this.clerkWebhookService.processEvent({
-      id: payload.id,
-      type: payload.type,
-      data: payload.data,
+      id: eventId,
+      type: eventType,
+      data: eventData,
     });
 
     return { received: true };
