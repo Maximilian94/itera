@@ -8,6 +8,7 @@ import {
 import type { Response } from 'express';
 import { Public } from '../common/decorators/public.decorator';
 import {
+  getEmailVerifiedHtml,
   getFirstTrainingCompletedHtml,
   getInactivityReminderHtml,
   getPaymentFailedHtml,
@@ -36,6 +37,10 @@ export class EmailPreviewController {
       daysInactive: 7,
       resumeUrl: 'https://app.maximizeenfermagem.com.br',
     },
+    'email-verified': {
+      firstName: 'Maria',
+      dashboardUrl: 'https://app.maximizeenfermagem.com.br',
+    },
   };
 
   private static readonly TEMPLATE_RENDERERS: Record<
@@ -48,6 +53,7 @@ export class EmailPreviewController {
     'subscription-canceled': getSubscriptionCanceledHtml,
     'first-training-completed': getFirstTrainingCompletedHtml,
     'inactivity-reminder': getInactivityReminderHtml,
+    'email-verified': getEmailVerifiedHtml,
   };
 
   @Get('preview/:template')

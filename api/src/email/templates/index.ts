@@ -40,3 +40,9 @@ export {
   getInactivityReminderHtml,
   type InactivityReminderTemplateParams,
 } from './inactivity-reminder.template';
+
+export {
+  getEmailVerifiedSubject,
+  getEmailVerifiedHtml,
+  type EmailVerifiedTemplateParams,
+} from './email-verified.template';

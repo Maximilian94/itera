@@ -9,6 +9,8 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { RESEND_CLIENT } from './providers/resend-client.provider';
 import {
+  getEmailVerifiedHtml,
+  getEmailVerifiedSubject,
   getFirstTrainingCompletedHtml,
   getFirstTrainingCompletedSubject,
   getInactivityReminderHtml,
@@ -142,6 +144,18 @@ export class EmailService {
       to,
       getFirstTrainingCompletedSubject(params),
       getFirstTrainingCompletedHtml(params),
+    );
+  }
+
+  /** Email verified confirmation (when user verifies primary email). */
+  async sendEmailVerifiedEmail(
+    to: string,
+    params: { firstName?: string; dashboardUrl: string },
+  ): Promise<{ id: string }> {
+    return this.sendEmail(
+      to,
+      getEmailVerifiedSubject(params),
+      getEmailVerifiedHtml(params),
     );
   }
 

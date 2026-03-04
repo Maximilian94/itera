@@ -588,6 +588,33 @@ model PaymentEvent {
   @@map("payment_events")
 }
 
+/// Webhook events for idempotency (Clerk, future: Stripe). Prevents duplicate processing on retries.
+model WebhookEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  source      String   // "clerk"
+  eventId     String   // external event ID (e.g. Clerk/Svix evt_xxx)
+  eventType   String
+  processedAt DateTime @default(now())
+  payloadHash String?  // optional hash for debugging
+  status      String   // "processed" | "ignored" | "failed"
+
+  @@unique([source, eventId])
+  @@index([source])
+  @@map("webhook_events")
+}
+
+/// Tracks which transactional emails we've sent per user (e.g. email_verified). Prevents duplicates.
+model UserEmailEvent {
+  id     String   @id @default(uuid()) @db.Uuid
+  userId String   // Clerk user ID
+  type   String   // "email_verified"
+  sentAt DateTime @default(now())
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("user_email_events")
+}
+
 /// Record of a user requesting a refund (e.g. 7-day right of withdrawal / CDC). Tied to a
 /// Purchase; once status is completed we do not allow another refund for the same purchase.
 /// Keeps an audit trail and supports “already requested refund” checks in the API.
