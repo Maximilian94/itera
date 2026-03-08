@@ -615,6 +615,25 @@ model UserEmailEvent {
   @@map("user_email_events")
 }
 
+/// Rastreia envios de email (fila BullMQ). Usado para auditoria e deduplicação.
+model EmailDispatchLog {
+  id              String    @id @default(uuid()) @db.Uuid
+  type            String    // welcome | subscription_activated | payment_failed | etc.
+  recipient       String
+  source          String    // clerk | stripe | system
+  externalEventId String?
+  jobId           String?
+  status          String    // queued | sent | failed | skipped
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  sentAt          DateTime?
+
+  @@index([jobId])
+  @@index([recipient, type])
+  @@index([status])
+  @@map("email_dispatch_logs")
+}
+
 /// Record of a user requesting a refund (e.g. 7-day right of withdrawal / CDC). Tied to a
 /// Purchase; once status is completed we do not allow another refund for the same purchase.
 /// Keeps an audit trail and supports “already requested refund” checks in the API.

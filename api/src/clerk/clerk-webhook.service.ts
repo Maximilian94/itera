@@ -4,7 +4,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { EmailService } from '../email/email.service';
+import { EmailProducerService } from '../email/email.producer';
 import { AuthService } from '../auth/auth.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { mapClerkUserPayload } from './clerk.mapper';
@@ -28,7 +28,7 @@ export class ClerkWebhookService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auth: AuthService,
-    private readonly email: EmailService,
+    private readonly emailProducer: EmailProducerService,
     private readonly config: ConfigService,
   ) {}
 
@@ -110,10 +110,22 @@ export class ClerkWebhookService {
     // Sync user in DB first
     await this.auth.syncUserFromClerk(mapped.clerkUserId, mapped.email);
 
-    // Send welcome email
-    await this.email.sendWelcomeEmail(mapped.email, {
-      firstName: mapped.firstName ?? undefined,
-    });
+    // Enqueue welcome email (async) - falha não derruba o webhook
+    try {
+      await this.emailProducer.enqueueWelcomeEmail(
+        mapped.email,
+        { firstName: mapped.firstName ?? undefined },
+        {
+          clerkUserId: mapped.clerkUserId,
+          source: 'clerk',
+          externalEventId: undefined,
+        },
+      );
+    } catch (err) {
+      this.logger.error(
+        `Falha ao enfileirar welcome email: clerkUserId=${mapped.clerkUserId}, error=${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
   }
 
   private async handleUserUpdated(data: Record<string, unknown>): Promise<void> {
@@ -143,17 +155,25 @@ export class ClerkWebhookService {
           this.config.get<string>('APP_DASHBOARD_URL') ??
           'https://app.maximizeenfermagem.com.br';
 
-        await this.email.sendEmailVerifiedEmail(mapped.email, {
-          firstName: mapped.firstName ?? undefined,
-          dashboardUrl,
-        });
-
-        await this.prisma.userEmailEvent.create({
-          data: {
-            userId: mapped.clerkUserId,
-            type: 'email_verified',
-          },
-        });
+        // Enqueue email verified (processor will create UserEmailEvent after send)
+        try {
+          await this.emailProducer.enqueueEmailVerifiedEmail(
+            mapped.email,
+            {
+              firstName: mapped.firstName ?? undefined,
+              dashboardUrl,
+            },
+            {
+              clerkUserId: mapped.clerkUserId,
+              source: 'clerk',
+              externalEventId: undefined,
+            },
+          );
+        } catch (err) {
+          this.logger.error(
+            `Falha ao enfileirar email verified: clerkUserId=${mapped.clerkUserId}, error=${err instanceof Error ? err.message : String(err)}`,
+          );
+        }
       }
     }
   }

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Stripe from 'stripe';
-import { EmailService } from '../email/email.service';
+import { EmailProducerService } from '../email/email.producer';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   extractPlanName,
@@ -29,7 +29,7 @@ export class StripeWebhookService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
-    private readonly email: EmailService,
+    private readonly emailProducer: EmailProducerService,
     private readonly stripeService: StripeService,
   ) {
     const secretKey = this.config.get<string>('STRIPE_SECRET_KEY');
@@ -148,20 +148,28 @@ export class StripeWebhookService {
       typeof session.subscription === 'string'
         ? session.subscription
         : session.subscription?.id;
+    if (!stripeSubscriptionId) return;
+
     let priceId: string | undefined;
-    if (stripeSubscriptionId) {
-      try {
-        const sub = await this.stripe.subscriptions.retrieve(
-          stripeSubscriptionId,
-        );
-        priceId = sub.items.data[0]?.price.id;
-      } catch {
-        // ignore
-      }
+    try {
+      const sub = await this.stripe.subscriptions.retrieve(
+        stripeSubscriptionId,
+      );
+      priceId = sub.items.data[0]?.price.id;
+    } catch {
+      // ignore
     }
 
     const planName = await extractPlanName(this.stripe, priceId);
-    await this.email.sendSubscriptionActivatedEmail(user.email, { planName });
+    await this.emailProducer.enqueueSubscriptionActivatedEmail(
+      user.email,
+      { planName },
+      {
+        subscriptionId: stripeSubscriptionId,
+        source: 'stripe',
+        externalEventId: event.id,
+      },
+    );
   }
 
   private async handleInvoicePaymentFailedEmail(
@@ -182,9 +190,15 @@ export class StripeWebhookService {
       billingPath,
     );
 
-    await this.email.sendPaymentFailedEmail(user.email, {
-      updateBillingUrl,
-    });
+    await this.emailProducer.enqueuePaymentFailedEmail(
+      user.email,
+      { updateBillingUrl },
+      {
+        invoiceId: invoice.id,
+        source: 'stripe',
+        externalEventId: event.id,
+      },
+    );
   }
 
   private async handleSubscriptionDeletedEmail(
@@ -198,7 +212,15 @@ export class StripeWebhookService {
     const priceId = sub.items.data[0]?.price.id;
     const planName = await extractPlanName(this.stripe, priceId);
 
-    await this.email.sendSubscriptionCanceledEmail(user.email, { planName });
+    await this.emailProducer.enqueueSubscriptionCanceledEmail(
+      user.email,
+      { planName },
+      {
+        subscriptionId: sub.id,
+        source: 'stripe',
+        externalEventId: event.id,
+      },
+    );
   }
 
   private getCustomerId(
