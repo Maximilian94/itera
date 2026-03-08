@@ -14,7 +14,7 @@ import {
   getPaymentFailedHtml,
   getSubscriptionActivatedHtml,
   getSubscriptionCanceledHtml,
-  getWelcomeHtml,
+  getWelcomeGreeting,
 } from './templates';
 
 /**
@@ -47,7 +47,25 @@ export class EmailPreviewController {
     string,
     (params: unknown) => string
   > = {
-    welcome: getWelcomeHtml,
+    welcome: (params) => {
+      const greeting = getWelcomeGreeting(params as { firstName?: string });
+      return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><title>Welcome (Resend template)</title></head>
+<body style="font-family:sans-serif;padding:24px;max-width:600px;">
+  <h2>Welcome Email — Resend Template</h2>
+  <p>Este template é renderizado pelo Resend (alias: <code>welcome</code>). O HTML não é mais gerado no backend.</p>
+  <h3>Variáveis enviadas:</h3>
+  <ul>
+    <li><strong>GREETING:</strong> ${greeting}</li>
+    <li><strong>AUTH_APP_URL:</strong> https://app.maximizeenfermagem.com.br</li>
+    <li><strong>AUTH_EXAMS_PAGE_URL:</strong> https://app.maximizeenfermagem.com.br/exams</li>
+    <li><strong>SUPPORT_EMAIL:</strong> contato@maximizeenfermagem.com.br</li>
+  </ul>
+</body>
+</html>`.trim();
+    },
     'subscription-activated': getSubscriptionActivatedHtml,
     'payment-failed': getPaymentFailedHtml,
     'subscription-canceled': getSubscriptionCanceledHtml,

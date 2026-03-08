@@ -6,8 +6,7 @@
  */
 
 export {
-  getWelcomeSubject,
-  getWelcomeHtml,
+  getWelcomeGreeting,
   type WelcomeTemplateParams,
 } from './welcome.template';
 
