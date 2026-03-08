@@ -86,24 +86,24 @@ export type EmailJobPayload =
   | InactivityReminderEmailJob
   | EmailVerifiedEmailJob;
 
-/** Gera jobId determinístico para deduplicação */
+/** Gera jobId determinístico para deduplicação. BullMQ não permite ':' no jobId. */
 export function getEmailJobId(payload: EmailJobPayload): string {
   switch (payload.type) {
     case 'welcome':
-      return `welcome:${payload.clerkUserId}`;
+      return `welcome_${payload.clerkUserId}`;
     case 'subscription_activated':
-      return `subscription_activated:${payload.subscriptionId}`;
+      return `subscription_activated_${payload.subscriptionId}`;
     case 'payment_failed':
-      return `payment_failed:${payload.invoiceId}`;
+      return `payment_failed_${payload.invoiceId}`;
     case 'subscription_canceled':
-      return `subscription_canceled:${payload.subscriptionId}`;
+      return `subscription_canceled_${payload.subscriptionId}`;
     case 'first_training_completed':
-      return `first_training_completed:${payload.trainingSessionId}`;
+      return `first_training_completed_${payload.trainingSessionId}`;
     case 'inactivity_reminder':
-      return `inactivity_reminder:${payload.userId}:${payload.params.daysInactive}`;
+      return `inactivity_reminder_${payload.userId}_${payload.params.daysInactive}`;
     case 'email_verified':
-      return `email_verified:${payload.clerkUserId}`;
+      return `email_verified_${payload.clerkUserId}`;
     default:
-      return `${(payload as EmailJobPayload).type}:${Date.now()}`;
+      return `${(payload as EmailJobPayload).type}_${Date.now()}`;
   }
 }
