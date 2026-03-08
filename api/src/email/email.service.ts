@@ -86,7 +86,7 @@ export class EmailService {
     return { id: data?.id ?? '' };
   }
 
-  /** Welcome email for new users. Uses Resend template (alias: welcome). */
+  /** Welcome email for new users. Uses published Resend template defaults. */
   async sendWelcomeEmail(
     to: string,
     params: { firstName?: string },
@@ -99,16 +99,10 @@ export class EmailService {
     }
 
     const greeting = getWelcomeGreeting(params);
-    const subject =
-      'Bem-vindo(a) ao Maximize Enfermagem! Bora fazer seu 1º treino? 💪';
-
-    this.logger.log(`Enviando welcome email para ${trimmedTo}: ${subject}`);
+    this.logger.log(`Enviando welcome email para ${trimmedTo}`);
 
     const { data, error } = await this.resend.emails.send({
-      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com>',
       to: trimmedTo,
-      subject,
-      replyTo: 'contato@maximizeenfermagem.com.br',
       template: {
         id: 'welcome',
         variables: {
