@@ -21,8 +21,7 @@ import {
   getSubscriptionActivatedSubject,
   getSubscriptionCanceledHtml,
   getSubscriptionCanceledSubject,
-  getWelcomeHtml,
-  getWelcomeSubject,
+  getWelcomeGreeting,
 } from './templates';
 
 /**
@@ -87,16 +86,55 @@ export class EmailService {
     return { id: data?.id ?? '' };
   }
 
-  /** Welcome email for new users. */
+  /** Welcome email for new users. Uses Resend template (alias: welcome). */
   async sendWelcomeEmail(
     to: string,
     params: { firstName?: string },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getWelcomeSubject(params),
-      getWelcomeHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const greeting = getWelcomeGreeting(params);
+    const subject =
+      'Bem-vindo(a) ao Maximize Enfermagem! Bora fazer seu 1º treino? 💪';
+
+    this.logger.log(`Enviando welcome email para ${trimmedTo}: ${subject}`);
+
+    // Resend template API - SDK types may not include template in older versions
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'welcome',
+        variables: {
+          GREETING: greeting,
+          AUTH_APP_URL: 'https://app.maximizeenfermagem.com.br',
+          AUTH_EXAMS_PAGE_URL: 'https://app.maximizeenfermagem.com.br/exams',
+          SUPPORT_EMAIL: 'contato@maximizeenfermagem.com.br',
+        },
+      },
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Resend template API supported at runtime; SDK types may lag
+    } as any);
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar welcome email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Welcome email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
     );
+    return { id: data?.id ?? '' };
   }
 
   /** Subscription activated confirmation. */
