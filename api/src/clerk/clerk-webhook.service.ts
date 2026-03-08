@@ -151,17 +151,12 @@ export class ClerkWebhookService {
       });
 
       if (!alreadySent) {
-        const dashboardUrl =
-          this.config.get<string>('APP_DASHBOARD_URL') ??
-          'https://app.maximizeenfermagem.com.br';
-
         // Enqueue email verified (processor will create UserEmailEvent after send)
         try {
           await this.emailProducer.enqueueEmailVerifiedEmail(
             mapped.email,
             {
               firstName: mapped.firstName ?? undefined,
-              dashboardUrl,
             },
             {
               clerkUserId: mapped.clerkUserId,

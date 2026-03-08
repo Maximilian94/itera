@@ -41,6 +41,7 @@ await this.emailService.sendPaymentFailedEmail(user.email, {
 // --- Example in TrainingService (first training completed) ---
 
 await this.emailService.sendFirstTrainingCompletedEmail(user.email, {
+  firstName: user.firstName,
   scorePercent: 75,
   totalQuestions: 20,
 });
