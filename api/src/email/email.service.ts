@@ -9,18 +9,14 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { RESEND_CLIENT } from './providers/resend-client.provider';
 import {
-  getEmailVerifiedHtml,
-  getEmailVerifiedSubject,
-  getFirstTrainingCompletedHtml,
-  getFirstTrainingCompletedSubject,
+  buildFirstTrainingCompletedEmailVariables,
+  getEmailVerifiedGreeting,
   getInactivityReminderHtml,
   getInactivityReminderSubject,
-  getPaymentFailedHtml,
-  getPaymentFailedSubject,
-  getSubscriptionActivatedHtml,
-  getSubscriptionActivatedSubject,
-  getSubscriptionCanceledHtml,
-  getSubscriptionCanceledSubject,
+  getPaymentFailedGreeting,
+  getSubscriptionActivatedGreeting,
+  getSubscriptionCanceledGreeting,
+  getSubscriptionCanceledPlanText,
   getWelcomeGreeting,
 } from './templates';
 
@@ -132,61 +128,242 @@ export class EmailService {
   /** Subscription activated confirmation. */
   async sendSubscriptionActivatedEmail(
     to: string,
-    params: { planName: string },
+    params: { planName: string; firstName?: string },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getSubscriptionActivatedSubject(params),
-      getSubscriptionActivatedHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const greeting = getSubscriptionActivatedGreeting(params);
+    const subject = `Pagamento confirmado ✅ Plano ${params.planName} ativo`;
+    this.logger.log(
+      `Enviando subscription-activated email para ${trimmedTo}: ${subject}`,
     );
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'subscription-activated',
+        variables: {
+          GREETING: greeting,
+          PLAN_NAME: params.planName,
+          AUTH_APP_URL: 'https://app.maximizeenfermagem.com.br',
+          SUPPORT_EMAIL: 'contato@maximizeenfermagem.com.br',
+        },
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar subscription-activated email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Subscription-activated email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
+    );
+    return { id: data?.id ?? '' };
   }
 
   /** Payment failure alert. */
   async sendPaymentFailedEmail(
     to: string,
-    params: { updateBillingUrl: string },
+    params: { updateBillingUrl: string; firstName?: string },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getPaymentFailedSubject(params),
-      getPaymentFailedHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const greeting = getPaymentFailedGreeting(params);
+    const subject = 'Ação necessária: atualizar forma de pagamento';
+    this.logger.log(`Enviando payment-failed email para ${trimmedTo}: ${subject}`);
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'payment-failed',
+        variables: {
+          GREETING: greeting,
+          UPDATE_BILLING_URL: params.updateBillingUrl,
+          SUPPORT_EMAIL: 'contato@maximizeenfermagem.com.br',
+        },
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar payment-failed email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Payment-failed email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
     );
+    return { id: data?.id ?? '' };
   }
 
   /** Subscription cancellation confirmation. */
   async sendSubscriptionCanceledEmail(
     to: string,
-    params: { planName?: string },
+    params: { planName?: string; firstName?: string },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getSubscriptionCanceledSubject(params),
-      getSubscriptionCanceledHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const greeting = getSubscriptionCanceledGreeting(params);
+    const planText = getSubscriptionCanceledPlanText(params);
+    const subject =
+      params.planName?.trim()
+        ? `Tudo certo ✅ sua assinatura (${params.planName.trim()}) foi cancelada`
+        : 'Tudo certo ✅ sua assinatura foi cancelada';
+    this.logger.log(
+      `Enviando subscription-canceled email para ${trimmedTo}: ${subject}`,
     );
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'subscription-canceled',
+        variables: {
+          GREETING: greeting,
+          PLAN_NAME: params.planName ?? 'Seu plano',
+          PLAN_TEXT: planText,
+          AUTH_APP_URL: 'https://app.maximizeenfermagem.com.br',
+          SUPPORT_EMAIL: 'contato@maximizeenfermagem.com.br',
+        },
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar subscription-canceled email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Subscription-canceled email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
+    );
+    return { id: data?.id ?? '' };
   }
 
   /** Congratulations for first training completed. */
   async sendFirstTrainingCompletedEmail(
     to: string,
-    params: { scorePercent: number; totalQuestions: number },
+    params: {
+      scorePercent: number;
+      totalQuestions: number;
+      firstName?: string | null;
+    },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getFirstTrainingCompletedSubject(params),
-      getFirstTrainingCompletedHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const subject = 'Parabéns! Você concluiu seu primeiro treino 🎯';
+    this.logger.log(
+      `Enviando first-training-completed email para ${trimmedTo}: ${subject}`,
     );
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'first-training-completed',
+        variables: buildFirstTrainingCompletedEmailVariables(params),
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar first-training-completed email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `First-training-completed email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
+    );
+    return { id: data?.id ?? '' };
   }
 
   /** Email verified confirmation (when user verifies primary email). */
   async sendEmailVerifiedEmail(
     to: string,
-    params: { firstName?: string; dashboardUrl: string },
+    params: { firstName?: string },
   ): Promise<{ id: string }> {
-    return this.sendEmail(
-      to,
-      getEmailVerifiedSubject(params),
-      getEmailVerifiedHtml(params),
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const greeting = getEmailVerifiedGreeting(params);
+    const subject = 'E-mail verificado com sucesso! ✅';
+    this.logger.log(`Enviando email-verified email para ${trimmedTo}: ${subject}`);
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'email-verified',
+        variables: {
+          GREETING: greeting,
+          AUTH_APP_URL: 'https://app.maximizeenfermagem.com.br',
+        },
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar email-verified email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Email-verified email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
     );
+    return { id: data?.id ?? '' };
   }
 
   /** Inactivity reminder (3 or 7 days). */

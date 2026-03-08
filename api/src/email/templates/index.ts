@@ -1,8 +1,5 @@
 /**
- * Barrel export for email templates.
- * Each template exports subject + html as functions that receive params.
- * Structure ready for future React Email migration (replace HTML functions
- * with React components).
+ * Barrel export for email template helpers.
  */
 
 export {
@@ -11,26 +8,23 @@ export {
 } from './welcome.template';
 
 export {
-  getSubscriptionActivatedSubject,
-  getSubscriptionActivatedHtml,
+  getSubscriptionActivatedGreeting,
   type SubscriptionActivatedTemplateParams,
 } from './subscription-activated.template';
 
 export {
-  getPaymentFailedSubject,
-  getPaymentFailedHtml,
+  getPaymentFailedGreeting,
   type PaymentFailedTemplateParams,
 } from './payment-failed.template';
 
 export {
-  getSubscriptionCanceledSubject,
-  getSubscriptionCanceledHtml,
+  getSubscriptionCanceledGreeting,
+  getSubscriptionCanceledPlanText,
   type SubscriptionCanceledTemplateParams,
 } from './subscription-canceled.template';
 
 export {
-  getFirstTrainingCompletedSubject,
-  getFirstTrainingCompletedHtml,
+  buildFirstTrainingCompletedEmailVariables,
   type FirstTrainingCompletedTemplateParams,
 } from './first-training-completed.template';
 
@@ -41,7 +35,6 @@ export {
 } from './inactivity-reminder.template';
 
 export {
-  getEmailVerifiedSubject,
-  getEmailVerifiedHtml,
+  getEmailVerifiedGreeting,
   type EmailVerifiedTemplateParams,
 } from './email-verified.template';

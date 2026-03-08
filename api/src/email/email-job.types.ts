@@ -34,7 +34,7 @@ export interface SubscriptionActivatedEmailJob extends EmailJobBase {
   to: string;
   /** Stripe subscription ID - usado para jobId determinístico */
   subscriptionId: string;
-  params: { planName: string };
+  params: { planName: string; firstName?: string };
 }
 
 export interface PaymentFailedEmailJob extends EmailJobBase {
@@ -42,7 +42,7 @@ export interface PaymentFailedEmailJob extends EmailJobBase {
   to: string;
   /** Stripe invoice ID - usado para jobId determinístico */
   invoiceId: string;
-  params: { updateBillingUrl: string };
+  params: { updateBillingUrl: string; firstName?: string };
 }
 
 export interface SubscriptionCanceledEmailJob extends EmailJobBase {
@@ -50,7 +50,7 @@ export interface SubscriptionCanceledEmailJob extends EmailJobBase {
   to: string;
   /** Stripe subscription ID - usado para jobId determinístico */
   subscriptionId: string;
-  params: { planName?: string };
+  params: { planName?: string; firstName?: string };
 }
 
 export interface FirstTrainingCompletedEmailJob extends EmailJobBase {
@@ -58,7 +58,11 @@ export interface FirstTrainingCompletedEmailJob extends EmailJobBase {
   to: string;
   /** Training session ID - usado para jobId determinístico */
   trainingSessionId: string;
-  params: { scorePercent: number; totalQuestions: number };
+  params: {
+    scorePercent: number;
+    totalQuestions: number;
+    firstName?: string | null;
+  };
 }
 
 export interface InactivityReminderEmailJob extends EmailJobBase {
@@ -74,7 +78,7 @@ export interface EmailVerifiedEmailJob extends EmailJobBase {
   to: string;
   /** Clerk user ID - usado para jobId determinístico e UserEmailEvent após envio */
   clerkUserId: string;
-  params: { firstName?: string; dashboardUrl: string };
+  params: { firstName?: string };
 }
 
 export type EmailJobPayload =

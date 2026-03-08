@@ -119,7 +119,7 @@ export class EmailProducerService {
 
   async enqueueSubscriptionActivatedEmail(
     to: string,
-    params: { planName: string },
+    params: { planName: string; firstName?: string },
     options: {
       subscriptionId: string;
       source?: EmailSource;
@@ -138,7 +138,7 @@ export class EmailProducerService {
 
   async enqueuePaymentFailedEmail(
     to: string,
-    params: { updateBillingUrl: string },
+    params: { updateBillingUrl: string; firstName?: string },
     options: {
       invoiceId: string;
       source?: EmailSource;
@@ -157,7 +157,7 @@ export class EmailProducerService {
 
   async enqueueSubscriptionCanceledEmail(
     to: string,
-    params: { planName?: string },
+    params: { planName?: string; firstName?: string },
     options: {
       subscriptionId: string;
       source?: EmailSource;
@@ -176,7 +176,11 @@ export class EmailProducerService {
 
   async enqueueFirstTrainingCompletedEmail(
     to: string,
-    params: { scorePercent: number; totalQuestions: number },
+    params: {
+      scorePercent: number;
+      totalQuestions: number;
+      firstName?: string | null;
+    },
     options: {
       trainingSessionId: string;
       source?: EmailSource;
@@ -214,7 +218,7 @@ export class EmailProducerService {
 
   async enqueueEmailVerifiedEmail(
     to: string,
-    params: { firstName?: string; dashboardUrl: string },
+    params: { firstName?: string },
     options: {
       clerkUserId: string;
       source?: EmailSource;
