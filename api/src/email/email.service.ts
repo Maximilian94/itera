@@ -104,7 +104,6 @@ export class EmailService {
 
     this.logger.log(`Enviando welcome email para ${trimmedTo}: ${subject}`);
 
-    // Resend template API - SDK types may not include template in older versions
     const { data, error } = await this.resend.emails.send({
       from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com>',
       to: trimmedTo,
@@ -119,8 +118,7 @@ export class EmailService {
           SUPPORT_EMAIL: 'contato@maximizeenfermagem.com.br',
         },
       },
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Resend template API supported at runtime; SDK types may lag
-    } as any);
+    });
 
     if (error) {
       this.logger.error(

@@ -48,7 +48,7 @@
     "passport-custom": "^1.1.1",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
-    "resend": "^4.8.0",
+    "resend": "^6.9.0",
     "rxjs": "^7.8.1",
     "stripe": "^17.5.0",
     "undici": "^7.0.0"
