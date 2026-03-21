@@ -27,6 +27,7 @@ api/secret/*
 !.vscode/tasks.json
 
 # JetBrains
-.idea/
+.idea/*
+!.idea/runConfigurations/
 
 

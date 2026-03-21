@@ -1,0 +1,42 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "api: dev",
+      "type": "shell",
+      "command": "npm run start:dev",
+      "options": {
+        "cwd": "${workspaceFolder}/api"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "dev",
+        "showReuseMessage": false
+      },
+      "isBackground": true
+    },
+    {
+      "label": "web: dev",
+      "type": "shell",
+      "command": "npm start",
+      "options": {
+        "cwd": "${workspaceFolder}/web"
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "group": "dev",
+        "showReuseMessage": false
+      },
+      "isBackground": true
+    },
+    {
+      "label": "dev",
+      "dependsOn": ["api: dev", "web: dev"],
+      "dependsOrder": "parallel",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    }
+  ]
+}
