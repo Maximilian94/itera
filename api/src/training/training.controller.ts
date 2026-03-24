@@ -23,11 +23,11 @@ export class TrainingController {
   }
 
   /**
-   * Creates a new training session. Requires active subscription (AccessGuard).
-   * The service also validates plan type (Estratégico/Elite) and monthly limits.
+   * Creates a new training session. Authorization is handled entirely in the
+   * service layer: new users get 1 free training (onboarding), after which an
+   * active subscription with the correct plan and available monthly quota is required.
    */
   @Post('exam-bases/:examBaseId')
-  @UseGuards(AccessGuard)
   create(
     @Param('examBaseId') examBaseId: string,
     @Req() req: { user: { userId: string } },
