@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Req } from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { OnboardingOrAccessGuard } from '../common/guards/onboarding-or-access.guard';
 import { TrainingService } from './training.service';
 import { CreateTrainingDto } from './dto/create-training.dto';
 import { UpdateStageDto } from './dto/update-stage.dto';
@@ -7,15 +8,15 @@ import { UpsertRetryAnswerDto } from './dto/upsert-retry-answer.dto';
 
 /**
  * Controller for intelligent training sessions.
- * All endpoints require authentication (JWT, applied globally).
- * Authorization (free onboarding training vs. active subscription, plan limits)
- * is enforced entirely in the service layer, so no AccessGuard is needed here.
+ * - list: open to all authenticated users.
+ * - create: no guard — service layer handles quota (1 free onboarding + subscription limits).
+ * - all other endpoints: OnboardingOrAccessGuard (active subscription OR onboarding user).
  */
 @Controller('training')
 export class TrainingController {
   constructor(private readonly service: TrainingService) {}
 
-  /** Lists the user's training sessions. */
+  /** Lists the user's training sessions. Open to all authenticated users. */
   @Get()
   list(@Req() req: { user: { userId: string } }) {
     return this.service.list(req.user.userId);
@@ -36,6 +37,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/study-items')
+  @UseGuards(OnboardingOrAccessGuard)
   listStudyItems(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -44,6 +46,7 @@ export class TrainingController {
   }
 
   @Post(':trainingId/study-items/:studyItemId/generate')
+  @UseGuards(OnboardingOrAccessGuard)
   generateStudyItemContent(
     @Param('trainingId') trainingId: string,
     @Param('studyItemId') studyItemId: string,
@@ -57,6 +60,7 @@ export class TrainingController {
   }
 
   @Patch(':trainingId/study-items/:studyItemId/complete')
+  @UseGuards(OnboardingOrAccessGuard)
   completeStudyItem(
     @Param('trainingId') trainingId: string,
     @Param('studyItemId') studyItemId: string,
@@ -72,6 +76,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId')
+  @UseGuards(OnboardingOrAccessGuard)
   getOne(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -80,6 +85,7 @@ export class TrainingController {
   }
 
   @Patch(':trainingId/stage')
+  @UseGuards(OnboardingOrAccessGuard)
   updateStage(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -89,6 +95,7 @@ export class TrainingController {
   }
 
   @Patch(':trainingId/study')
+  @UseGuards(OnboardingOrAccessGuard)
   updateStudy(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -98,6 +105,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/retry-questions')
+  @UseGuards(OnboardingOrAccessGuard)
   listRetryQuestions(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -106,6 +114,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/retry-questions/with-feedback-for-study')
+  @UseGuards(OnboardingOrAccessGuard)
   listRetryQuestionsWithFeedbackForStudy(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -117,6 +126,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/retry-questions/with-feedback')
+  @UseGuards(OnboardingOrAccessGuard)
   listRetryQuestionsWithFeedback(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -128,6 +138,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/retry-answers')
+  @UseGuards(OnboardingOrAccessGuard)
   getRetryAnswers(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -136,6 +147,7 @@ export class TrainingController {
   }
 
   @Patch(':trainingId/retry-answers')
+  @UseGuards(OnboardingOrAccessGuard)
   upsertRetryAnswer(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },
@@ -145,6 +157,7 @@ export class TrainingController {
   }
 
   @Get(':trainingId/final')
+  @UseGuards(OnboardingOrAccessGuard)
   getFinal(
     @Param('trainingId') trainingId: string,
     @Req() req: { user: { userId: string } },

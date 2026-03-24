@@ -1,15 +1,18 @@
 import { Body, Controller, Get, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { AccessGuard } from '../common/guards/access.guard';
+import { OnboardingOrAccessGuard } from '../common/guards/onboarding-or-access.guard';
 import { ExamBaseAttemptService } from './exam-base-attempt.service';
 import { CreateAttemptDto } from './dto/create-attempt.dto';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
 
 /**
- * Controller for exam base attempts. All endpoints require an active subscription
- * (any plan). The AccessGuard is applied at the controller level.
+ * Controller for exam base attempts.
+ * OnboardingOrAccessGuard is applied at the controller level: allows access
+ * for users with an active subscription OR onboarding users who already have
+ * their 1 free training session. Ownership is validated per-request in the
+ * service layer via userId.
  */
 @Controller('exam-bases/:examBaseId/attempts')
-@UseGuards(AccessGuard)
+@UseGuards(OnboardingOrAccessGuard)
 export class ExamBaseAttemptController {
   constructor(private readonly service: ExamBaseAttemptService) {}
 
@@ -92,5 +95,4 @@ export class ExamBaseAttemptController {
   ) {
     return this.service.finish(examBaseId, attemptId, req.user.userId);
   }
-
 }
