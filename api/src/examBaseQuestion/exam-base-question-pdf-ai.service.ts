@@ -207,27 +207,38 @@ export class ExamBaseQuestionPdfAiService {
   }
 
   /**
-   * Phase 2: parses questions structure (statement + alternatives) from a markdown chunk
-   * using Claude Sonnet. No answers, no explanations. Used by the per-chunk structure endpoint.
+   * Parses questions structure directly from a PDF using Claude Sonnet.
+   * No answers, no explanations — just statement, alternatives, hasImage, referenceText.
    */
-  async parseQuestionsStructureFromChunk(
-    markdownChunk: string,
+  async parseQuestionsStructureFromPdf(
+    pdfBuffer: Buffer,
   ): Promise<ParsedQuestionStructure[]> {
     const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (!anthropicKey) {
       throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
     }
 
-    const client = new Anthropic({ apiKey: anthropicKey, timeout: 120_000 });
+    const client = new Anthropic({ apiKey: anthropicKey, timeout: 180_000 });
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
+      max_tokens: 16384,
       system: buildStructureSystemPrompt(),
       messages: [
         {
           role: 'user',
-          content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`,
+          content: [
+            {
+              type: 'document',
+              source: {
+                type: 'base64',
+                media_type: 'application/pdf',
+                data: pdfBuffer.toString('base64'),
+              },
+              title: 'Prova',
+            },
+            { type: 'text', text: 'Extraia todas as questões desta prova e retorne o JSON array.' },
+          ],
         },
       ],
     });

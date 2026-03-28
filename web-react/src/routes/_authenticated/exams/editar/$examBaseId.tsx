@@ -14,25 +14,6 @@ import {
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 
-/** Mirrors the backend chunk-splitting logic. */
-function splitMarkdownIntoChunks(markdown: string, size = 10): string[] {
-  const boundaries: number[] = [0]
-  const regex = /(?:^|\n)\s*(?:\d+[.)]\s|Questão\s+\d+(?:\s|[-–:])|\d+\s*[-–]\s|#\s*\d+\.?\s)/gi
-  let m: RegExpExecArray | null
-  while ((m = regex.exec(markdown)) !== null) {
-    if (m.index !== boundaries[boundaries.length - 1]) boundaries.push(m.index)
-  }
-  boundaries.push(markdown.length)
-  if (boundaries.length - 2 <= 0) return [markdown]
-  const chunks: string[] = []
-  for (let i = 0; i < boundaries.length - 1; i += size) {
-    const start = boundaries[i]
-    const end = boundaries[Math.min(i + size, boundaries.length - 1)]
-    const chunk = markdown.slice(start, end).trim()
-    if (chunk) chunks.push(chunk)
-  }
-  return chunks
-}
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -114,16 +95,17 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
 // Step indicator
 // ─────────────────────────────────────────────────────────────────────────────
 
-function StepIndicator({ step }: { step: 1 | 2 }) {
-  const steps = ['Metadados', 'Questões']
+const WIZARD_STEPS = ['Metadados', 'Prova', 'Gabarito', 'Revisão']
+
+function StepIndicator({ step }: { step: number }) {
   return (
-    <div className="flex items-center gap-2 mb-6">
-      {steps.map((label, i) => {
+    <div className="flex items-center gap-1 mb-6 flex-wrap">
+      {WIZARD_STEPS.map((label, i) => {
         const idx = i + 1
         const active = step === idx
         const done = step > idx
         return (
-          <div key={label} className="flex items-center gap-2">
+          <div key={label} className="flex items-center gap-1">
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
                 ${active ? 'bg-violet-600 text-white' : done ? 'bg-violet-200 text-violet-700' : 'bg-slate-200 text-slate-500'}`}
@@ -135,8 +117,8 @@ function StepIndicator({ step }: { step: 1 | 2 }) {
             >
               {label}
             </span>
-            {i < steps.length - 1 && (
-              <div className="w-8 h-px bg-slate-300 mx-1" />
+            {i < WIZARD_STEPS.length - 1 && (
+              <div className="w-6 h-px bg-slate-300 mx-1" />
             )}
           </div>
         )
@@ -805,126 +787,384 @@ function QuestionCard({
 // Step 2 — Questions
 // ─────────────────────────────────────────────────────────────────────────────
 
-type Phase =
-  | { id: 'idle' }
-  | { id: 'extracting-markdown' }
-  | { id: 'parsing-structure'; current: number; total: number }
-  | { id: 'extracting-gabarito' }
-  | { id: 'generating-explanations'; current: number; total: number }
-  | { id: 'done' }
-  | { id: 'error'; message: string }
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared progress bar
+// ─────────────────────────────────────────────────────────────────────────────
 
-function phaseProgress(phase: Phase): number {
-  if (phase.id === 'idle') return 0
-  if (phase.id === 'extracting-markdown') return 5
-  if (phase.id === 'parsing-structure')
-    return 5 + Math.round((phase.current / phase.total) * 35) // 5→40%
-  if (phase.id === 'extracting-gabarito') return 45
-  if (phase.id === 'generating-explanations')
-    return 50 + Math.round((phase.current / phase.total) * 50) // 50→100%
-  if (phase.id === 'done') return 100
-  return 0
+function StepProgressBar({
+  label,
+  value,
+  color = 'primary',
+}: {
+  label: string
+  value: number
+  color?: 'primary' | 'success' | 'error'
+}) {
+  return (
+    <Box sx={{ mt: 2 }}>
+      <div className="flex items-center justify-between mb-1">
+        <Typography variant="caption" color={color === 'error' ? 'error.main' : 'text.secondary'}>
+          {label}
+        </Typography>
+        {color !== 'error' && (
+          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+            {value}%
+          </Typography>
+        )}
+      </div>
+      <LinearProgress
+        variant="determinate"
+        value={value}
+        color={color}
+        sx={{ height: 8, borderRadius: 4 }}
+      />
+    </Box>
+  )
 }
 
-function phaseLabel(phase: Phase): string {
-  if (phase.id === 'extracting-markdown') return 'Fase 1 — Extraindo texto da prova (Nanonets)...'
-  if (phase.id === 'parsing-structure')
-    return `Fase 2 — Extraindo questões — bloco ${phase.current} de ${phase.total} (Claude Sonnet)...`
-  if (phase.id === 'extracting-gabarito') return 'Fase 3 — Extraindo gabarito (Claude Haiku)...'
-  if (phase.id === 'generating-explanations')
-    return `Fase 5 — Gerando explicações — questão ${phase.current} de ${phase.total} (xAI Grok)...`
-  if (phase.id === 'done') return 'Concluído!'
-  if (phase.id === 'error') return `Erro: ${phase.message}`
-  return ''
-}
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2 — Prova PDF → Claude Sonnet extracts questions
+// ─────────────────────────────────────────────────────────────────────────────
 
-function QuestionsStep({
+function ExamPdfStep({
   examBaseId,
+  onNext,
   onBack,
 }: {
   examBaseId: string
+  onNext: (questions: ParsedQuestionStructure[]) => void
   onBack: () => void
 }) {
-  const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
+  const [file, setFile] = useState<File | null>(null)
+  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
+  const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const [examPdf, setExamPdf] = useState<File | null>(null)
-  const [examMarkdown, setExamMarkdown] = useState<string | null>(null)
-  const [gabaritoPdf, setGabaritoPdf] = useState<File | null>(null)
-  const [cargo, setCargo] = useState('Enfermeiro')
-  const [questions, setQuestions] = useState<ReviewQuestion[]>([])
-  const [phase, setPhase] = useState<Phase>({ id: 'idle' })
-  const examPdfRef = useRef<HTMLInputElement>(null)
-  const gabaritoPdfRef = useRef<HTMLInputElement>(null)
-
-  const isAnalyzing =
-    phase.id === 'extracting-markdown' ||
-    phase.id === 'parsing-structure' ||
-    phase.id === 'extracting-gabarito' ||
-    phase.id === 'generating-explanations'
-
-  async function handleExamPdfSelect(file: File) {
-    setExamPdf(file)
-    setExamMarkdown(null)
-    setPhase({ id: 'extracting-markdown' })
+  async function handleParse() {
+    if (!file) return
+    setStatus('parsing')
+    setErrorMsg(null)
     try {
-      const { content } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
-      setExamMarkdown(content)
-      setPhase({ id: 'idle' })
+      const { questions: qs } = await examBaseQuestionsService.parseQuestionsFromPdf(examBaseId, file)
+      setQuestions(qs)
+      setStatus('done')
     } catch (err) {
-      setPhase({ id: 'error', message: (err as Error).message ?? 'Erro ao extrair texto da prova' })
+      setStatus('error')
+      setErrorMsg((err as Error).message ?? 'Erro ao extrair questões da prova')
     }
   }
 
-  async function handleAnalyze() {
-    if (!examMarkdown || !gabaritoPdf) return
-    setQuestions([])
+  return (
+    <div className="flex flex-col gap-6">
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+        <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+          Prova (PDF)
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2.5}>
+          Envie o PDF da prova. Claude Sonnet lê o documento diretamente e extrai todas as questões com a formatação preservada (negrito, itálico, textos de referência, etc.).
+        </Typography>
 
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={status === 'parsing'}
+            onClick={() => fileRef.current?.click()}
+          >
+            {file ? file.name : 'Selecionar PDF'}
+          </Button>
+          {file && status !== 'parsing' && (
+            <button
+              type="button"
+              className="text-xs text-slate-500 hover:text-slate-700 underline"
+              onClick={() => {
+                setFile(null)
+                setQuestions([])
+                setStatus('idle')
+                if (fileRef.current) fileRef.current.value = ''
+              }}
+            >
+              Remover
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) { setFile(f); setQuestions([]); setStatus('idle') }
+          }}
+        />
+
+        {status === 'idle' && (
+          <Button
+            variant="contained"
+            startIcon={<AutoAwesomeIcon />}
+            disabled={!file}
+            onClick={handleParse}
+            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+          >
+            Extrair questões
+          </Button>
+        )}
+
+        {status === 'parsing' && (
+          <>
+            <StepProgressBar label="Extraindo questões (Claude Sonnet)..." value={50} />
+            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+              Extraindo...
+            </Button>
+          </>
+        )}
+
+        {status === 'done' && (
+          <StepProgressBar label={`${questions.length} questões extraídas!`} value={100} color="success" />
+        )}
+
+        {status === 'error' && (
+          <>
+            {errorMsg && <Alert severity="error" sx={{ mt: 1 }}>{errorMsg}</Alert>}
+            <Button variant="outlined" onClick={() => setStatus('idle')} sx={{ mt: 2 }}>
+              Tentar novamente
+            </Button>
+          </>
+        )}
+      </Box>
+
+      <div className="flex items-center gap-3">
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+          Voltar
+        </Button>
+        <Button
+          variant="contained"
+          disabled={status !== 'done' || questions.length === 0}
+          onClick={() => onNext(questions)}
+          sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+        >
+          Próximo: Gabarito
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 4 — Gabarito (Claude Haiku)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function GabaritoStep({
+  examBaseId,
+  onNext,
+  onBack,
+}: {
+  examBaseId: string
+  onNext: (answerKey: Record<string, string>) => void
+  onBack: () => void
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const [cargo, setCargo] = useState('Enfermeiro')
+  const [status, setStatus] = useState<'idle' | 'extracting' | 'done' | 'error'>('idle')
+  const [answerKey, setAnswerKey] = useState<Record<string, string>>({})
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  async function handleExtract() {
+    if (!file) return
+    setStatus('extracting')
+    setErrorMsg(null)
     try {
-      // Phase 2: parse question structure via Claude Sonnet (no answers, no explanations)
-      const chunks = splitMarkdownIntoChunks(examMarkdown, 10)
-      setPhase({ id: 'parsing-structure', current: 0, total: chunks.length })
-
-      const structuredQuestions: ParsedQuestionStructure[] = []
-      for (let i = 0; i < chunks.length; i++) {
-        setPhase({ id: 'parsing-structure', current: i + 1, total: chunks.length })
-        const { questions: chunkQs } = await examBaseQuestionsService.parseQuestionsStructure(
-          examBaseId,
-          chunks[i],
-        )
-        structuredQuestions.push(...chunkQs)
-      }
-
-      // Phase 3: extract answer key via Claude Haiku
-      setPhase({ id: 'extracting-gabarito' })
-      const { answerKey } = await examBaseQuestionsService.extractGabaritoAnswerKey(
+      const { answerKey: key } = await examBaseQuestionsService.extractGabaritoAnswerKey(
         examBaseId,
-        gabaritoPdf,
+        file,
         cargo.trim() || undefined,
       )
+      setAnswerKey(key)
+      setStatus('done')
+    } catch (err) {
+      setStatus('error')
+      setErrorMsg((err as Error).message ?? 'Erro ao extrair gabarito')
+    }
+  }
 
-      // Phase 4: match answers (frontend only — instant)
-      const matched: ReviewQuestion[] = structuredQuestions.map((q) => ({
-        ...q,
-        correctAlternative: answerKey[String(q.number)] ?? null,
-        answerDoubt: false,
-        doubtReason: null,
-        explanations: [],
-        unblocked: false,
-      }))
+  const answerCount = Object.keys(answerKey).length
 
-      // Phase 5: generate explanations per question via xAI Grok
-      setPhase({ id: 'generating-explanations', current: 0, total: matched.length })
-      const withExplanations: ReviewQuestion[] = []
+  return (
+    <div className="flex flex-col gap-6">
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+        <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+          Gabarito (Claude Haiku)
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2.5}>
+          Envie o PDF do gabarito. Claude Haiku extrai o mapa de respostas corretas por número de questão.
+        </Typography>
+
+        <div className="flex items-center gap-2 mb-3">
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={status === 'extracting'}
+            onClick={() => fileRef.current?.click()}
+          >
+            {file ? file.name : 'Selecionar PDF do gabarito'}
+          </Button>
+          {file && status !== 'extracting' && (
+            <button
+              type="button"
+              className="text-xs text-slate-500 hover:text-slate-700 underline"
+              onClick={() => {
+                setFile(null)
+                setStatus('idle')
+                setAnswerKey({})
+                if (fileRef.current) fileRef.current.value = ''
+              }}
+            >
+              Remover
+            </button>
+          )}
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".pdf"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0]
+            if (f) { setFile(f); setStatus('idle'); setAnswerKey({}) }
+          }}
+        />
+
+        <Box sx={{ maxWidth: 320, mb: 2 }}>
+          <TextField
+            label="Cargo no gabarito"
+            value={cargo}
+            onChange={(e) => setCargo(e.target.value)}
+            size="small"
+            fullWidth
+            disabled={status === 'extracting'}
+            helperText="Nome do cargo para filtrar a seção correta"
+          />
+        </Box>
+
+        {status === 'idle' && (
+          <Button
+            variant="contained"
+            startIcon={<AutoAwesomeIcon />}
+            disabled={!file}
+            onClick={handleExtract}
+            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+          >
+            Extrair gabarito
+          </Button>
+        )}
+
+        {status === 'extracting' && (
+          <>
+            <StepProgressBar label="Extraindo gabarito (Claude Haiku)..." value={50} />
+            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+              Extraindo...
+            </Button>
+          </>
+        )}
+
+        {status === 'done' && (
+          <>
+            <StepProgressBar label={`${answerCount} respostas extraídas!`} value={100} color="success" />
+            <Box sx={{ mt: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider', maxHeight: 120, overflow: 'auto' }}>
+              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+                Gabarito extraído:
+              </Typography>
+              <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+                {Object.entries(answerKey).map(([k, v]) => `${k}: ${v}`).join('  ')}
+              </Typography>
+            </Box>
+          </>
+        )}
+
+        {status === 'error' && (
+          <>
+            {errorMsg && <Alert severity="error" sx={{ mt: 1 }}>{errorMsg}</Alert>}
+            <Button variant="outlined" onClick={() => setStatus('idle')} sx={{ mt: 2 }}>
+              Tentar novamente
+            </Button>
+          </>
+        )}
+      </Box>
+
+      <div className="flex items-center gap-3">
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+          Voltar
+        </Button>
+        <Button
+          variant="contained"
+          disabled={status !== 'done' || answerCount === 0}
+          onClick={() => onNext(answerKey)}
+          sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+        >
+          Próximo: Revisão
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 5 — Review (match + explanations + save)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewStep({
+  examBaseId,
+  structuredQuestions,
+  answerKey,
+  onBack,
+}: {
+  examBaseId: string
+  structuredQuestions: ParsedQuestionStructure[]
+  answerKey: Record<string, string>
+  onBack: () => void
+}) {
+  const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
+  const [questions, setQuestions] = useState<ReviewQuestion[]>([])
+  const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
+  const [status, setStatus] = useState<'generating' | 'done' | 'error'>('generating')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
+  const startedRef = useRef(false)
+
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+
+    // Phase 4: match answers (instant)
+    const matched: ReviewQuestion[] = structuredQuestions.map((q) => ({
+      ...q,
+      correctAlternative: answerKey[String(q.number)] ?? null,
+      answerDoubt: false,
+      doubtReason: null,
+      explanations: [],
+      unblocked: false,
+    }))
+
+    // Phase 5: generate explanations per question
+    void generateAllExplanations(matched)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  async function generateAllExplanations(matched: ReviewQuestion[]) {
+    setGenProgress({ current: 0, total: matched.length })
+    const result: ReviewQuestion[] = []
+    try {
       for (let i = 0; i < matched.length; i++) {
         const q = matched[i]
-        setPhase({ id: 'generating-explanations', current: i + 1, total: matched.length })
+        setGenProgress({ current: i + 1, total: matched.length })
         if (!q.correctAlternative) {
-          // No answer in gabarito — skip explanation generation
-          withExplanations.push(q)
+          result.push(q)
+          setQuestions([...result])
           continue
         }
         try {
-          const result = await examBaseQuestionsService.generateExplanationsInline(examBaseId, {
+          const resp = await examBaseQuestionsService.generateExplanationsInline(examBaseId, {
             subject: q.subject || undefined,
             statement: q.statement,
             referenceText: q.referenceText,
@@ -932,24 +1172,23 @@ function QuestionsStep({
             correctAlternative: q.correctAlternative,
             alternatives: q.alternatives,
           })
-          withExplanations.push({
+          result.push({
             ...q,
-            topic: result.topic || q.topic,
-            subtopics: result.subtopics.length ? result.subtopics : q.subtopics,
-            explanations: result.explanations,
-            answerDoubt: !result.agreesWithCorrectAnswer,
-            doubtReason: result.disagreementWarning ?? null,
+            topic: resp.topic || q.topic,
+            subtopics: resp.subtopics.length ? resp.subtopics : q.subtopics,
+            explanations: resp.explanations,
+            answerDoubt: !resp.agreesWithCorrectAnswer,
+            doubtReason: resp.disagreementWarning ?? null,
           })
         } catch {
-          // If explanation generation fails for one question, continue with the rest
-          withExplanations.push(q)
+          result.push(q)
         }
+        setQuestions([...result])
       }
-
-      setQuestions(withExplanations)
-      setPhase({ id: 'done' })
+      setStatus('done')
     } catch (err) {
-      setPhase({ id: 'error', message: (err as Error).message ?? 'Erro ao analisar PDFs' })
+      setStatus('error')
+      setErrorMsg((err as Error).message ?? 'Erro ao gerar explicações')
     }
   }
 
@@ -971,196 +1210,46 @@ function QuestionsStep({
     await saveMutation.mutateAsync(payload)
   }
 
-  const blockedCount = questions.filter(
-    (q) => q.hasImage && !q.unblocked && !q.statementImageUrl,
-  ).length
+  const blockedCount = questions.filter((q) => q.hasImage && !q.unblocked && !q.statementImageUrl).length
   const doubtCount = questions.filter((q) => q.answerDoubt).length
-  const progress = phaseProgress(phase)
-  const showProgress = isAnalyzing || phase.id === 'done' || phase.id === 'error'
+  const progressValue = genProgress.total > 0
+    ? Math.round((genProgress.current / genProgress.total) * 100)
+    : 0
+  const isGenerating = status === 'generating'
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Upload panel */}
+      {/* Generation progress */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
-          Analisar PDFs com IA
+          Gerando explicações (xAI Grok)
         </Typography>
-        <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie a prova e o gabarito. O processo extrai as questões em 5 fases: texto (Nanonets) → estrutura das questões (Claude Sonnet) → gabarito (Claude Haiku) → associação de respostas → explicações (xAI Grok).
-        </Typography>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Exam PDF */}
-          <div>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-              Prova (PDF)
-            </Typography>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={isAnalyzing}
-                startIcon={phase.id === 'extracting-markdown' ? <CircularProgress size={14} /> : undefined}
-                onClick={() => examPdfRef.current?.click()}
-              >
-                {phase.id === 'extracting-markdown'
-                  ? 'Extraindo...'
-                  : examPdf
-                    ? examPdf.name
-                    : 'Selecionar PDF'}
-              </Button>
-              {examPdf && phase.id !== 'extracting-markdown' && !isAnalyzing && (
-                <button
-                  type="button"
-                  className="text-xs text-slate-500 hover:text-slate-700 underline"
-                  onClick={() => {
-                    setExamPdf(null)
-                    setExamMarkdown(null)
-                    setPhase({ id: 'idle' })
-                    if (examPdfRef.current) examPdfRef.current.value = ''
-                  }}
-                >
-                  Remover
-                </button>
-              )}
-            </div>
-            {examMarkdown && phase.id !== 'extracting-markdown' && (
-              <Typography variant="caption" color="success.main" display="block" mt={0.5}>
-                Texto extraído ({examMarkdown.length.toLocaleString()} chars)
-              </Typography>
-            )}
-            <input
-              ref={examPdfRef}
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) handleExamPdfSelect(f)
-              }}
-            />
-          </div>
-
-          {/* Gabarito PDF */}
-          <div>
-            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-              Gabarito (PDF)
-            </Typography>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={isAnalyzing}
-                onClick={() => gabaritoPdfRef.current?.click()}
-              >
-                {gabaritoPdf ? gabaritoPdf.name : 'Selecionar PDF'}
-              </Button>
-              {gabaritoPdf && !isAnalyzing && (
-                <button
-                  type="button"
-                  className="text-xs text-slate-500 hover:text-slate-700 underline"
-                  onClick={() => {
-                    setGabaritoPdf(null)
-                    if (gabaritoPdfRef.current) gabaritoPdfRef.current.value = ''
-                  }}
-                >
-                  Remover
-                </button>
-              )}
-            </div>
-            <input
-              ref={gabaritoPdfRef}
-              type="file"
-              accept=".pdf"
-              className="hidden"
-              onChange={(e) => setGabaritoPdf(e.target.files?.[0] ?? null)}
-            />
-          </div>
-        </div>
-
-        {/* Cargo field */}
-        <Box sx={{ mt: 2.5, maxWidth: 320 }}>
-          <TextField
-            label="Cargo no gabarito"
-            value={cargo}
-            onChange={(e) => setCargo(e.target.value)}
-            size="small"
-            fullWidth
-            disabled={isAnalyzing}
-            helperText="Nome do cargo no gabarito para filtrar a seção correta"
+        {isGenerating && (
+          <StepProgressBar
+            label={`Questão ${genProgress.current} de ${genProgress.total}...`}
+            value={progressValue}
           />
-        </Box>
-
-        {/* Progress bar */}
-        {showProgress && (
-          <Box sx={{ mt: 3 }}>
-            <div className="flex items-center justify-between mb-1">
-              <Typography variant="caption" color={phase.id === 'error' ? 'error.main' : 'text.secondary'}>
-                {phaseLabel(phase)}
-              </Typography>
-              {phase.id !== 'error' && (
-                <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                  {progress}%
-                </Typography>
-              )}
-            </div>
-            <LinearProgress
-              variant="determinate"
-              value={progress}
-              color={phase.id === 'error' ? 'error' : phase.id === 'done' ? 'success' : 'primary'}
-              sx={{ height: 8, borderRadius: 4 }}
-            />
-          </Box>
         )}
-
-        {/* Analyze button */}
-        <div className="flex items-center gap-3 mt-4">
-          <Button
-            variant="contained"
-            startIcon={
-              isAnalyzing ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : (
-                <AutoAwesomeIcon />
-              )
-            }
-            disabled={!examMarkdown || !gabaritoPdf || isAnalyzing}
-            onClick={handleAnalyze}
-            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
-          >
-            {isAnalyzing ? 'Analisando...' : 'Analisar com IA'}
-          </Button>
-          {phase.id === 'error' && (
-            <Typography variant="caption" color="error.main">
-              {phase.message}
-            </Typography>
-          )}
-        </div>
+        {status === 'done' && (
+          <StepProgressBar label={`Explicações geradas para ${questions.length} questões!`} value={100} color="success" />
+        )}
+        {status === 'error' && errorMsg && (
+          <Alert severity="error" sx={{ mt: 1 }}>{errorMsg}</Alert>
+        )}
       </Box>
 
-      {/* Results */}
+      {/* Questions list */}
       {questions.length > 0 && (
         <>
           <div className="flex items-center gap-3 flex-wrap">
             <Typography variant="subtitle1" fontWeight={600}>
-              {questions.length} questões extraídas
+              {questions.length}{isGenerating ? ` de ${genProgress.total}` : ''} questões
             </Typography>
             {blockedCount > 0 && (
-              <Chip
-                icon={<ImageIcon fontSize="small" />}
-                label={`${blockedCount} aguardando imagem`}
-                size="small"
-                color="warning"
-              />
+              <Chip icon={<ImageIcon fontSize="small" />} label={`${blockedCount} aguardando imagem`} size="small" color="warning" />
             )}
             {doubtCount > 0 && (
-              <Chip
-                icon={<WarningAmberIcon fontSize="small" />}
-                label={`${doubtCount} gabarito duvidoso`}
-                size="small"
-                color="warning"
-                variant="outlined"
-              />
+              <Chip icon={<WarningAmberIcon fontSize="small" />} label={`${doubtCount} gabarito duvidoso`} size="small" color="warning" variant="outlined" />
             )}
           </div>
 
@@ -1172,15 +1261,11 @@ function QuestionsStep({
                 index={i}
                 examBaseId={examBaseId}
                 onUnblock={(idx) =>
-                  setQuestions((prev) =>
-                    prev.map((item, j) => (j === idx ? { ...item, unblocked: true } : item))
-                  )
+                  setQuestions((prev) => prev.map((item, j) => (j === idx ? { ...item, unblocked: true } : item)))
                 }
                 onImageUploaded={(idx, url) =>
                   setQuestions((prev) =>
-                    prev.map((item, j) =>
-                      j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item
-                    )
+                    prev.map((item, j) => (j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item))
                   )
                 }
               />
@@ -1188,9 +1273,7 @@ function QuestionsStep({
           </Stack>
 
           {saveMutation.isError && (
-            <Alert severity="error">
-              {(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}
-            </Alert>
+            <Alert severity="error">{(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}</Alert>
           )}
           {saveMutation.isSuccess && (
             <Alert severity="success">{questions.length} questões salvas com sucesso!</Alert>
@@ -1200,7 +1283,7 @@ function QuestionsStep({
             <Button
               variant="contained"
               onClick={handleSave}
-              disabled={saveMutation.isPending || saveMutation.isSuccess}
+              disabled={isGenerating || saveMutation.isPending || saveMutation.isSuccess}
               startIcon={saveMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
               sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
             >
@@ -1213,8 +1296,8 @@ function QuestionsStep({
       <Divider />
 
       <div>
-        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
-          Voltar para metadados
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isGenerating}>
+          Voltar para gabarito
         </Button>
       </div>
     </div>
@@ -1228,7 +1311,9 @@ function QuestionsStep({
 function ExamEditPage() {
   const { examBaseId } = Route.useParams()
   const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2>(1)
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const [structuredQuestions, setStructuredQuestions] = useState<ParsedQuestionStructure[]>([])
+  const [answerKey, setAnswerKey] = useState<Record<string, string>>({})
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -1247,10 +1332,30 @@ function ExamEditPage() {
 
       <StepIndicator step={step} />
 
-      {step === 1 ? (
+      {step === 1 && (
         <MetadataStep examBaseId={examBaseId} onNext={() => setStep(2)} />
-      ) : (
-        <QuestionsStep examBaseId={examBaseId} onBack={() => setStep(1)} />
+      )}
+      {step === 2 && (
+        <ExamPdfStep
+          examBaseId={examBaseId}
+          onNext={(qs) => { setStructuredQuestions(qs); setStep(3) }}
+          onBack={() => setStep(1)}
+        />
+      )}
+      {step === 3 && (
+        <GabaritoStep
+          examBaseId={examBaseId}
+          onNext={(key) => { setAnswerKey(key); setStep(4) }}
+          onBack={() => setStep(2)}
+        />
+      )}
+      {step === 4 && (
+        <ReviewStep
+          examBaseId={examBaseId}
+          structuredQuestions={structuredQuestions}
+          answerKey={answerKey}
+          onBack={() => setStep(3)}
+        />
       )}
     </div>
   )

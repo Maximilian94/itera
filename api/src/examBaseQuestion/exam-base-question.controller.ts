@@ -88,22 +88,23 @@ export class ExamBaseQuestionController {
   }
 
   /**
-   * Phase 2: Parses question structure (statement + alternatives, no answers/explanations)
-   * from a markdown chunk using Claude Sonnet. Returns { questions: ParsedQuestionStructure[] }.
+   * Parses question structure (statement + alternatives, no answers/explanations) directly
+   * from an exam PDF using Claude Sonnet. Returns { questions: ParsedQuestionStructure[] }.
    * Admin only.
    */
-  @Post('parse-questions-structure')
+  @Post('parse-questions-from-pdf')
   @Roles('ADMIN')
-  async parseQuestionsStructure(
+  @UseInterceptors(FileInterceptor('file'))
+  async parseQuestionsFromPdf(
     @Param('examBaseId') _examBaseId: string,
-    @Body() body: { markdownChunk: string },
+    @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
   ) {
-    if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
-    const questions = await this.pdfAi.parseQuestionsStructureFromChunk(body.markdownChunk);
+    if (!file) throw new BadRequestException('file is required');
+    const questions = await this.pdfAi.parseQuestionsStructureFromPdf(file.buffer);
     return { questions };
   }
 
-  /**
+/**
    * Phase 5: Generates explanations inline (without a DB question) using xAI Grok.
    * Returns GenerateExplanationsResponse. Admin only.
    */
