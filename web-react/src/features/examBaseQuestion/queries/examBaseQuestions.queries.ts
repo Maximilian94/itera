@@ -145,10 +145,10 @@ export function useGenerateExplanationsMutation(
 
 export type { ParsedQuestionItem, ParsedQuestionFromPdf, GenerateExplanationsResponse }
 
-export function useParseQuestionsFromPdfsMutation(examBaseId: string) {
+export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: string) {
   return useMutation({
-    mutationFn: ({ examPdf, gabaritoPdf }: { examPdf: File; gabaritoPdf: File }) =>
-      examBaseQuestionsService.parseFromPdfs(examBaseId, examPdf, gabaritoPdf),
+    mutationFn: ({ markdown, gabaritoPdf }: { markdown: string; gabaritoPdf: File }) =>
+      examBaseQuestionsService.parseFromMarkdownAndGabarito(examBaseId, markdown, gabaritoPdf),
   })
 }
 

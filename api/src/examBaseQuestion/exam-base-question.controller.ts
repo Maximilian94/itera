@@ -9,10 +9,9 @@ import {
   Post,
   Query,
   UploadedFile,
-  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express/multer';
+import { FileInterceptor } from '@nestjs/platform-express/multer';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CopyQuestionDto } from './dto/copy-question.dto';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
@@ -46,31 +45,23 @@ export class ExamBaseQuestionController {
   ) {}
 
   /**
-   * Parses exam questions from two PDFs (prova + gabarito) using Claude.
+   * Parses nursing questions from pre-extracted markdown + gabarito PDF.
+   * Step 1 (Nanonets → markdown) is done client-side via extract-from-pdf.
+   * Step 2 (Claude Haiku → answer key) + Step 3 (GPT-4o chunks) are done here.
    * Returns structured questions for review — does NOT save to DB. Admin only.
    */
-  @Post('parse-from-pdfs')
+  @Post('parse-from-markdown-and-gabarito')
   @Roles('ADMIN')
-  @UseInterceptors(
-    FileFieldsInterceptor([
-      { name: 'examPdf', maxCount: 1 },
-      { name: 'gabaritoPdf', maxCount: 1 },
-    ]),
-  )
-  async parseFromPdfs(
+  @UseInterceptors(FileInterceptor('gabaritoPdf'))
+  async parseFromMarkdownAndGabarito(
     @Param('examBaseId') _examBaseId: string,
-    @UploadedFiles()
-    files: {
-      examPdf?: { buffer: Buffer; mimetype: string }[];
-      gabaritoPdf?: { buffer: Buffer; mimetype: string }[];
-    },
+    @Body('markdown') markdown: string,
+    @UploadedFile() gabaritoPdf: { buffer: Buffer; mimetype: string } | undefined,
   ) {
-    const examPdf = files?.examPdf?.[0];
-    const gabaritoPdf = files?.gabaritoPdf?.[0];
-    if (!examPdf) throw new BadRequestException('examPdf is required');
+    if (!markdown?.trim()) throw new BadRequestException('markdown is required');
     if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
-    const questions = await this.pdfAi.parseQuestionsFromPdfs(
-      examPdf.buffer,
+    const questions = await this.pdfAi.parseQuestionsFromMarkdownAndGabarito(
+      markdown,
       gabaritoPdf.buffer,
     );
     return { questions };

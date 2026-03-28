@@ -221,16 +221,16 @@ export const examBaseQuestionsService = {
     )
   },
 
-  parseFromPdfs(
+  parseFromMarkdownAndGabarito(
     examBaseId: string,
-    examPdf: File,
+    markdown: string,
     gabaritoPdf: File,
   ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
     const formData = new FormData()
-    formData.append('examPdf', examPdf)
+    formData.append('markdown', markdown)
     formData.append('gabaritoPdf', gabaritoPdf)
     return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
-      `${basePath(examBaseId)}/parse-from-pdfs`,
+      `${basePath(examBaseId)}/parse-from-markdown-and-gabarito`,
       { method: 'POST', body: formData },
     )
   },

@@ -9,7 +9,7 @@ import {
 } from '@/features/examBase/queries/examBase.queries'
 import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
 import {
-  useParseQuestionsFromPdfsMutation,
+  useParseQuestionsFromMarkdownAndGabaritoMutation,
   useCreateBatchQuestionsMutation,
   type ParsedQuestionFromPdf,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
@@ -785,21 +785,37 @@ function QuestionsStep({
   examBaseId: string
   onBack: () => void
 }) {
-  const parseMutation = useParseQuestionsFromPdfsMutation(examBaseId)
+  const parseMutation = useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId)
   const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
 
   const [examPdf, setExamPdf] = useState<File | null>(null)
+  const [examMarkdown, setExamMarkdown] = useState<string | null>(null)
+  const [markdownLoading, setMarkdownLoading] = useState(false)
+  const [markdownError, setMarkdownError] = useState<string | null>(null)
   const [gabaritoPdf, setGabaritoPdf] = useState<File | null>(null)
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
   const examPdfRef = useRef<HTMLInputElement>(null)
   const gabaritoPdfRef = useRef<HTMLInputElement>(null)
 
+  async function handleExamPdfSelect(file: File) {
+    setExamPdf(file)
+    setExamMarkdown(null)
+    setMarkdownError(null)
+    setMarkdownLoading(true)
+    try {
+      const { content } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
+      setExamMarkdown(content)
+    } catch (err) {
+      setMarkdownError((err as Error).message ?? 'Erro ao extrair texto da prova')
+    } finally {
+      setMarkdownLoading(false)
+    }
+  }
+
   async function handleParse() {
-    if (!examPdf || !gabaritoPdf) return
-    const result = await parseMutation.mutateAsync({ examPdf, gabaritoPdf })
-    setQuestions(
-      result.questions.map((q) => ({ ...q, unblocked: false })),
-    )
+    if (!examMarkdown || !gabaritoPdf) return
+    const result = await parseMutation.mutateAsync({ markdown: examMarkdown, gabaritoPdf })
+    setQuestions(result.questions.map((q) => ({ ...q, unblocked: false })))
   }
 
   async function handleSave() {
@@ -843,7 +859,7 @@ function QuestionsStep({
           Analisar PDFs com IA
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie a prova e o gabarito. O Claude extrairá as questões de enfermagem com respostas e explicações.
+          Envie a prova (Nanonets extrai o texto automaticamente) e o gabarito (Claude extrai as respostas). O GPT-4o gera as questões com explicações em blocos de 10.
         </Typography>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -855,16 +871,20 @@ function QuestionsStep({
               <Button
                 variant="outlined"
                 size="small"
+                disabled={markdownLoading}
+                startIcon={markdownLoading ? <CircularProgress size={14} /> : undefined}
                 onClick={() => examPdfRef.current?.click()}
               >
-                {examPdf ? examPdf.name : 'Selecionar PDF'}
+                {markdownLoading ? 'Extraindo...' : examPdf ? examPdf.name : 'Selecionar PDF'}
               </Button>
-              {examPdf && (
+              {examPdf && !markdownLoading && (
                 <button
                   type="button"
                   className="text-xs text-slate-500 hover:text-slate-700 underline"
                   onClick={() => {
                     setExamPdf(null)
+                    setExamMarkdown(null)
+                    setMarkdownError(null)
                     if (examPdfRef.current) examPdfRef.current.value = ''
                   }}
                 >
@@ -872,12 +892,25 @@ function QuestionsStep({
                 </button>
               )}
             </div>
+            {examMarkdown && (
+              <Typography variant="caption" color="success.main" display="block" mt={0.5}>
+                Texto extraído ({examMarkdown.length.toLocaleString()} caracteres)
+              </Typography>
+            )}
+            {markdownError && (
+              <Typography variant="caption" color="error.main" display="block" mt={0.5}>
+                {markdownError}
+              </Typography>
+            )}
             <input
               ref={examPdfRef}
               type="file"
               accept=".pdf"
               className="hidden"
-              onChange={(e) => setExamPdf(e.target.files?.[0] ?? null)}
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) handleExamPdfSelect(f)
+              }}
             />
           </div>
 
@@ -926,7 +959,7 @@ function QuestionsStep({
                 <AutoAwesomeIcon />
               )
             }
-            disabled={!examPdf || !gabaritoPdf || parseMutation.isPending}
+            disabled={!examMarkdown || !gabaritoPdf || parseMutation.isPending || markdownLoading}
             onClick={handleParse}
             sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
           >
@@ -934,7 +967,7 @@ function QuestionsStep({
           </Button>
           {parseMutation.isPending && (
             <Typography variant="caption" color="text.secondary">
-              Isso pode levar alguns minutos para PDFs grandes.
+              Extraindo gabarito + parsing em blocos...
             </Typography>
           )}
         </div>
