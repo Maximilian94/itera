@@ -67,6 +67,40 @@ export class ExamBaseQuestionController {
     return { questions };
   }
 
+  /**
+   * Extracts answer key from gabarito PDF using Claude Haiku.
+   * Returns { answerKey: { "1": "A", "2": "C", ... } }. Admin only.
+   */
+  @Post('extract-gabarito-answer-key')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('gabaritoPdf'))
+  async extractGabaritoAnswerKey(
+    @Param('examBaseId') _examBaseId: string,
+    @UploadedFile() gabaritoPdf: { buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
+    const answerKey = await this.pdfAi.extractGabaritoAnswerKey(gabaritoPdf.buffer);
+    return { answerKey };
+  }
+
+  /**
+   * Parses a single markdown chunk using the provided answer key via GPT-4o.
+   * Returns { questions: ParsedQuestionFromPdf[] }. Admin only.
+   */
+  @Post('parse-markdown-chunk')
+  @Roles('ADMIN')
+  async parseMarkdownChunk(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdownChunk: string; answerKey: Record<string, string> },
+  ) {
+    if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
+    const questions = await this.pdfAi.parseMarkdownChunk(
+      body.markdownChunk,
+      body.answerKey ?? {},
+    );
+    return { questions };
+  }
+
   /** Saves an array of questions in batch. Admin only. */
   @Post('batch')
   @Roles('ADMIN')

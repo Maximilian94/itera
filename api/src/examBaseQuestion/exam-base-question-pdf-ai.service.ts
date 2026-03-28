@@ -139,28 +139,41 @@ export class ExamBaseQuestionPdfAiService {
     markdown: string,
     answerKey: Record<string, string>,
   ): Promise<ParsedQuestionFromPdf[]> {
+    const chunks = this.splitIntoChunks(markdown, 10);
+    const systemPrompt = buildQuestionSystemPrompt(answerKey);
+    const all: ParsedQuestionFromPdf[] = [];
+    for (const chunk of chunks) {
+      const questions = await this.parseOneChunk(systemPrompt, chunk);
+      all.push(...questions);
+    }
+    return all;
+  }
+
+  /** Splits markdown into chunks of `size` questions. Exposed for frontend-driven chunking. */
+  splitMarkdownIntoChunks(markdown: string, size = 10): string[] {
+    return this.splitIntoChunks(markdown, size);
+  }
+
+  /** Parses a single markdown chunk with the provided answer key. Used by the per-chunk endpoint. */
+  async parseMarkdownChunk(
+    markdownChunk: string,
+    answerKey: Record<string, string>,
+  ): Promise<ParsedQuestionFromPdf[]> {
     const openaiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!openaiKey) {
       throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
     }
-
-    const chunks = this.splitIntoChunks(markdown, 10);
-    const systemPrompt = buildQuestionSystemPrompt(answerKey);
-    const all: ParsedQuestionFromPdf[] = [];
-
-    for (const chunk of chunks) {
-      const questions = await this.parseChunk(openaiKey, systemPrompt, chunk);
-      all.push(...questions);
-    }
-
-    return all;
+    return this.parseOneChunk(buildQuestionSystemPrompt(answerKey), markdownChunk);
   }
 
-  private async parseChunk(
-    apiKey: string,
+  private async parseOneChunk(
     systemPrompt: string,
     markdown: string,
   ): Promise<ParsedQuestionFromPdf[]> {
+    const openaiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!openaiKey) {
+      throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
+    }
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
@@ -170,7 +183,7 @@ export class ExamBaseQuestionPdfAiService {
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
         model: 'gpt-4o',

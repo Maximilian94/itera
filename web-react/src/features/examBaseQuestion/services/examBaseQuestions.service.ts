@@ -235,6 +235,29 @@ export const examBaseQuestionsService = {
     )
   },
 
+  extractGabaritoAnswerKey(
+    examBaseId: string,
+    gabaritoPdf: File,
+  ): Promise<{ answerKey: Record<string, string> }> {
+    const formData = new FormData()
+    formData.append('gabaritoPdf', gabaritoPdf)
+    return apiFetch<{ answerKey: Record<string, string> }>(
+      `${basePath(examBaseId)}/extract-gabarito-answer-key`,
+      { method: 'POST', body: formData },
+    )
+  },
+
+  parseMarkdownChunk(
+    examBaseId: string,
+    markdownChunk: string,
+    answerKey: Record<string, string>,
+  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
+    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+      `${basePath(examBaseId)}/parse-markdown-chunk`,
+      { method: 'POST', body: JSON.stringify({ markdownChunk, answerKey }) },
+    )
+  },
+
   createBatch(
     examBaseId: string,
     questions: CreateExamBaseQuestionInput[],

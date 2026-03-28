@@ -9,11 +9,30 @@ import {
 } from '@/features/examBase/queries/examBase.queries'
 import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
 import {
-  useParseQuestionsFromMarkdownAndGabaritoMutation,
   useCreateBatchQuestionsMutation,
   type ParsedQuestionFromPdf,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
+
+/** Mirrors the backend chunk-splitting logic. */
+function splitMarkdownIntoChunks(markdown: string, size = 10): string[] {
+  const boundaries: number[] = [0]
+  const regex = /(?:^|\n)\s*(?:\d+[.)]\s|Questão\s+\d+(?:\s|[-–:])|\d+\s*[-–]\s|#\s*\d+\.?\s)/gi
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(markdown)) !== null) {
+    if (m.index !== boundaries[boundaries.length - 1]) boundaries.push(m.index)
+  }
+  boundaries.push(markdown.length)
+  if (boundaries.length - 2 <= 0) return [markdown]
+  const chunks: string[] = []
+  for (let i = 0; i < boundaries.length - 1; i += size) {
+    const start = boundaries[i]
+    const end = boundaries[Math.min(i + size, boundaries.length - 1)]
+    const chunk = markdown.slice(start, end).trim()
+    if (chunk) chunks.push(chunk)
+  }
+  return chunks
+}
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
@@ -28,6 +47,7 @@ import {
   Chip,
   CircularProgress,
   Divider,
+  LinearProgress,
   FormControl,
   IconButton,
   InputLabel,
@@ -778,6 +798,34 @@ function QuestionCard({
 // Step 2 — Questions
 // ─────────────────────────────────────────────────────────────────────────────
 
+type Phase =
+  | { id: 'idle' }
+  | { id: 'extracting-markdown' }
+  | { id: 'extracting-gabarito' }
+  | { id: 'parsing-chunks'; current: number; total: number }
+  | { id: 'done' }
+  | { id: 'error'; message: string }
+
+function phaseProgress(phase: Phase): number {
+  if (phase.id === 'idle') return 0
+  if (phase.id === 'extracting-markdown') return 10
+  if (phase.id === 'extracting-gabarito') return 30
+  if (phase.id === 'parsing-chunks')
+    return 30 + Math.round((phase.current / phase.total) * 65)
+  if (phase.id === 'done') return 100
+  return 0
+}
+
+function phaseLabel(phase: Phase): string {
+  if (phase.id === 'extracting-markdown') return 'Extraindo texto da prova (Nanonets)...'
+  if (phase.id === 'extracting-gabarito') return 'Extraindo gabarito (Claude Haiku)...'
+  if (phase.id === 'parsing-chunks')
+    return `Gerando questões — bloco ${phase.current} de ${phase.total} (GPT-4o)...`
+  if (phase.id === 'done') return 'Concluído!'
+  if (phase.id === 'error') return `Erro: ${phase.message}`
+  return ''
+}
+
 function QuestionsStep({
   examBaseId,
   onBack,
@@ -785,37 +833,66 @@ function QuestionsStep({
   examBaseId: string
   onBack: () => void
 }) {
-  const parseMutation = useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId)
   const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
 
   const [examPdf, setExamPdf] = useState<File | null>(null)
   const [examMarkdown, setExamMarkdown] = useState<string | null>(null)
-  const [markdownLoading, setMarkdownLoading] = useState(false)
-  const [markdownError, setMarkdownError] = useState<string | null>(null)
   const [gabaritoPdf, setGabaritoPdf] = useState<File | null>(null)
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
+  const [phase, setPhase] = useState<Phase>({ id: 'idle' })
   const examPdfRef = useRef<HTMLInputElement>(null)
   const gabaritoPdfRef = useRef<HTMLInputElement>(null)
+
+  const isAnalyzing =
+    phase.id === 'extracting-markdown' ||
+    phase.id === 'extracting-gabarito' ||
+    phase.id === 'parsing-chunks'
 
   async function handleExamPdfSelect(file: File) {
     setExamPdf(file)
     setExamMarkdown(null)
-    setMarkdownError(null)
-    setMarkdownLoading(true)
+    setPhase({ id: 'extracting-markdown' })
     try {
       const { content } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
       setExamMarkdown(content)
+      setPhase({ id: 'idle' })
     } catch (err) {
-      setMarkdownError((err as Error).message ?? 'Erro ao extrair texto da prova')
-    } finally {
-      setMarkdownLoading(false)
+      setPhase({ id: 'error', message: (err as Error).message ?? 'Erro ao extrair texto da prova' })
     }
   }
 
-  async function handleParse() {
+  async function handleAnalyze() {
     if (!examMarkdown || !gabaritoPdf) return
-    const result = await parseMutation.mutateAsync({ markdown: examMarkdown, gabaritoPdf })
-    setQuestions(result.questions.map((q) => ({ ...q, unblocked: false })))
+    setQuestions([])
+
+    try {
+      // Phase 2: extract answer key via Claude Haiku
+      setPhase({ id: 'extracting-gabarito' })
+      const { answerKey } = await examBaseQuestionsService.extractGabaritoAnswerKey(
+        examBaseId,
+        gabaritoPdf,
+      )
+
+      // Phase 3: parse chunks via GPT-4o
+      const chunks = splitMarkdownIntoChunks(examMarkdown, 10)
+      setPhase({ id: 'parsing-chunks', current: 0, total: chunks.length })
+
+      const allQuestions: ReviewQuestion[] = []
+      for (let i = 0; i < chunks.length; i++) {
+        setPhase({ id: 'parsing-chunks', current: i + 1, total: chunks.length })
+        const { questions: chunkQs } = await examBaseQuestionsService.parseMarkdownChunk(
+          examBaseId,
+          chunks[i],
+          answerKey,
+        )
+        allQuestions.push(...chunkQs.map((q) => ({ ...q, unblocked: false })))
+      }
+
+      setQuestions(allQuestions)
+      setPhase({ id: 'done' })
+    } catch (err) {
+      setPhase({ id: 'error', message: (err as Error).message ?? 'Erro ao analisar PDFs' })
+    }
   }
 
   async function handleSave() {
@@ -834,35 +911,28 @@ function QuestionsStep({
       })),
     }))
     await saveMutation.mutateAsync(payload)
-    setQuestions([])
-    setExamPdf(null)
-    setGabaritoPdf(null)
   }
 
   const blockedCount = questions.filter(
     (q) => q.hasImage && !q.unblocked && !q.statementImageUrl,
   ).length
   const doubtCount = questions.filter((q) => q.answerDoubt).length
+  const progress = phaseProgress(phase)
+  const showProgress = isAnalyzing || phase.id === 'done' || phase.id === 'error'
 
   return (
     <div className="flex flex-col gap-6">
       {/* Upload panel */}
-      <Box
-        sx={{
-          border: '1px solid',
-          borderColor: 'divider',
-          borderRadius: 2,
-          p: 3,
-        }}
-      >
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
           Analisar PDFs com IA
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie a prova (Nanonets extrai o texto automaticamente) e o gabarito (Claude extrai as respostas). O GPT-4o gera as questões com explicações em blocos de 10.
+          Envie a prova e o gabarito. O processo extrai o texto (Nanonets), o gabarito (Claude Haiku) e gera as questões em blocos (GPT-4o).
         </Typography>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Exam PDF */}
           <div>
             <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
               Prova (PDF)
@@ -871,20 +941,24 @@ function QuestionsStep({
               <Button
                 variant="outlined"
                 size="small"
-                disabled={markdownLoading}
-                startIcon={markdownLoading ? <CircularProgress size={14} /> : undefined}
+                disabled={phase.id === 'extracting-markdown' || isAnalyzing}
+                startIcon={phase.id === 'extracting-markdown' ? <CircularProgress size={14} /> : undefined}
                 onClick={() => examPdfRef.current?.click()}
               >
-                {markdownLoading ? 'Extraindo...' : examPdf ? examPdf.name : 'Selecionar PDF'}
+                {phase.id === 'extracting-markdown'
+                  ? 'Extraindo...'
+                  : examPdf
+                    ? examPdf.name
+                    : 'Selecionar PDF'}
               </Button>
-              {examPdf && !markdownLoading && (
+              {examPdf && phase.id !== 'extracting-markdown' && !isAnalyzing && (
                 <button
                   type="button"
                   className="text-xs text-slate-500 hover:text-slate-700 underline"
                   onClick={() => {
                     setExamPdf(null)
                     setExamMarkdown(null)
-                    setMarkdownError(null)
+                    setPhase({ id: 'idle' })
                     if (examPdfRef.current) examPdfRef.current.value = ''
                   }}
                 >
@@ -892,14 +966,9 @@ function QuestionsStep({
                 </button>
               )}
             </div>
-            {examMarkdown && (
+            {examMarkdown && phase.id !== 'extracting-markdown' && (
               <Typography variant="caption" color="success.main" display="block" mt={0.5}>
-                Texto extraído ({examMarkdown.length.toLocaleString()} caracteres)
-              </Typography>
-            )}
-            {markdownError && (
-              <Typography variant="caption" color="error.main" display="block" mt={0.5}>
-                {markdownError}
+                Texto extraído ({examMarkdown.length.toLocaleString()} chars)
               </Typography>
             )}
             <input
@@ -914,6 +983,7 @@ function QuestionsStep({
             />
           </div>
 
+          {/* Gabarito PDF */}
           <div>
             <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
               Gabarito (PDF)
@@ -922,11 +992,12 @@ function QuestionsStep({
               <Button
                 variant="outlined"
                 size="small"
+                disabled={isAnalyzing}
                 onClick={() => gabaritoPdfRef.current?.click()}
               >
                 {gabaritoPdf ? gabaritoPdf.name : 'Selecionar PDF'}
               </Button>
-              {gabaritoPdf && (
+              {gabaritoPdf && !isAnalyzing && (
                 <button
                   type="button"
                   className="text-xs text-slate-500 hover:text-slate-700 underline"
@@ -949,34 +1020,51 @@ function QuestionsStep({
           </div>
         </div>
 
+        {/* Progress bar */}
+        {showProgress && (
+          <Box sx={{ mt: 3 }}>
+            <div className="flex items-center justify-between mb-1">
+              <Typography variant="caption" color={phase.id === 'error' ? 'error.main' : 'text.secondary'}>
+                {phaseLabel(phase)}
+              </Typography>
+              {phase.id !== 'error' && (
+                <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                  {progress}%
+                </Typography>
+              )}
+            </div>
+            <LinearProgress
+              variant="determinate"
+              value={progress}
+              color={phase.id === 'error' ? 'error' : phase.id === 'done' ? 'success' : 'primary'}
+              sx={{ height: 8, borderRadius: 4 }}
+            />
+          </Box>
+        )}
+
+        {/* Analyze button */}
         <div className="flex items-center gap-3 mt-4">
           <Button
             variant="contained"
             startIcon={
-              parseMutation.isPending ? (
+              isAnalyzing ? (
                 <CircularProgress size={16} color="inherit" />
               ) : (
                 <AutoAwesomeIcon />
               )
             }
-            disabled={!examMarkdown || !gabaritoPdf || parseMutation.isPending || markdownLoading}
-            onClick={handleParse}
+            disabled={!examMarkdown || !gabaritoPdf || isAnalyzing}
+            onClick={handleAnalyze}
             sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
           >
-            {parseMutation.isPending ? 'Analisando...' : 'Analisar com IA'}
+            {isAnalyzing ? 'Analisando...' : 'Analisar com IA'}
           </Button>
-          {parseMutation.isPending && (
-            <Typography variant="caption" color="text.secondary">
-              Extraindo gabarito + parsing em blocos...
+          {phase.id === 'error' && (
+            <Typography variant="caption" color="error.main">
+              {phase.message}
             </Typography>
           )}
         </div>
-
-        {parseMutation.isError && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {(parseMutation.error as Error)?.message ?? 'Erro ao analisar PDFs'}
-          </Alert>
-        )}
       </Box>
 
       {/* Results */}
@@ -1014,16 +1102,14 @@ function QuestionsStep({
                 examBaseId={examBaseId}
                 onUnblock={(idx) =>
                   setQuestions((prev) =>
-                    prev.map((item, j) =>
-                      j === idx ? { ...item, unblocked: true } : item,
-                    ),
+                    prev.map((item, j) => (j === idx ? { ...item, unblocked: true } : item))
                   )
                 }
                 onImageUploaded={(idx, url) =>
                   setQuestions((prev) =>
                     prev.map((item, j) =>
-                      j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item,
-                    ),
+                      j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item
+                    )
                   )
                 }
               />
@@ -1035,14 +1121,11 @@ function QuestionsStep({
               {(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}
             </Alert>
           )}
-
           {saveMutation.isSuccess && (
-            <Alert severity="success">
-              {questions.length} questões salvas com sucesso!
-            </Alert>
+            <Alert severity="success">{questions.length} questões salvas com sucesso!</Alert>
           )}
 
-          <div className="flex items-center gap-3">
+          <div>
             <Button
               variant="contained"
               onClick={handleSave}
@@ -1050,9 +1133,7 @@ function QuestionsStep({
               startIcon={saveMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
               sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
             >
-              {saveMutation.isPending
-                ? 'Salvando...'
-                : `Salvar ${questions.length} questões`}
+              {saveMutation.isPending ? 'Salvando...' : `Salvar ${questions.length} questões`}
             </Button>
           </div>
         </>
