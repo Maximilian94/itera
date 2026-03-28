@@ -207,37 +207,49 @@ export class ExamBaseQuestionPdfAiService {
   }
 
   /**
-   * Parses questions structure from a markdown chunk using Claude Sonnet.
+   * Parses questions structure from a markdown chunk using GPT-4o.
    * No answers, no explanations. Used by the per-chunk endpoint.
    */
   async parseQuestionsStructureFromChunk(
     markdownChunk: string,
   ): Promise<ParsedQuestionStructure[]> {
-    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
-    if (!anthropicKey) {
-      throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
+    const openaiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!openaiKey) {
+      throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
     }
 
-    const client = new Anthropic({ apiKey: anthropicKey, timeout: 120_000 });
+    const { fetch: undiciFetch, Agent } = await import('undici');
+    const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 120_000, bodyTimeout: 120_000 });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 8192,
-      system: buildStructureSystemPrompt(),
-      messages: [
-        {
-          role: 'user',
-          content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`,
-        },
-      ],
+    const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      dispatcher: agent,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 8192,
+        temperature: 0,
+        messages: [
+          { role: 'system', content: buildStructureSystemPrompt() },
+          { role: 'user', content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}` },
+        ],
+      }),
     });
 
-    const block = response.content[0];
-    if (!block || block.type !== 'text') {
-      throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
+    if (!res.ok) {
+      const body = await res.text();
+      throw new BadRequestException(`OpenAI API error (${res.status}): ${body.slice(0, 300)}`);
     }
 
-    return this.parseStructureJson(block.text);
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) return [];
+
+    return this.parseStructureJson(content);
   }
 
   /**

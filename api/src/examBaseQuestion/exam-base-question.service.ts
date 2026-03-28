@@ -514,7 +514,7 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
 
   /**
    * Generates explanations for a question inline (without needing a DB question).
-   * Accepts all question data directly. Uses xAI Grok.
+   * Accepts all question data directly. Uses OpenAI o3-mini.
    */
   async generateExplanationsInline(input: {
     subject?: string;
@@ -525,10 +525,10 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
     alternatives: { key: string; text: string }[];
     examName?: string;
   }): Promise<GenerateExplanationsResponse> {
-    const apiKey = this.config.get<string>('XAI_API_KEY');
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
       throw new BadRequestException(
-        'XAI_API_KEY is not configured. Set it in .env to use AI explanations.',
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI explanations.',
       );
     }
 
@@ -579,7 +579,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
         }
       : { role: 'user', content: userPromptText };
 
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -587,8 +587,8 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 8192,
+        model: 'o3-mini',
+        max_completion_tokens: 16384,
         messages: [
           { role: 'system', content: systemPrompt },
           userContent,
@@ -598,7 +598,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
 
     if (!res.ok) {
       const errBody = await res.text();
-      throw new BadRequestException(`xAI API error (${res.status}): ${errBody.slice(0, 500)}`);
+      throw new BadRequestException(`OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`);
     }
 
     const data = (await res.json()) as {
@@ -667,10 +667,10 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
       );
     }
 
-    const apiKey = this.config.get<string>('XAI_API_KEY');
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
       throw new BadRequestException(
-        'XAI_API_KEY is not configured. Set it in .env to use AI explanations.',
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI explanations.',
       );
     }
 
@@ -741,7 +741,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         }
       : { role: 'user', content: userPromptText };
 
-    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -749,8 +749,8 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 8192,
+        model: 'o3-mini',
+        max_completion_tokens: 16384,
         messages: [
           { role: 'system', content: systemPrompt },
           userContent,
@@ -761,7 +761,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     if (!res.ok) {
       const errBody = await res.text();
       throw new BadRequestException(
-        `xAI API error (${res.status}): ${errBody.slice(0, 500)}`,
+        `OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`,
       );
     }
 

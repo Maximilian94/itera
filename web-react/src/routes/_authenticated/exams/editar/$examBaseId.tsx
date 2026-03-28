@@ -843,7 +843,7 @@ function StepProgressBar({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 2 — Prova PDF → Claude Sonnet extracts questions
+// Step 2 — Prova PDF → GPT-4o extracts questions
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ExamPdfStep({
@@ -877,7 +877,7 @@ function ExamPdfStep({
       setChunkProgress({ current: 0, total: chunks.length })
       setStatus('parsing-chunks')
 
-      // Phase 3: Claude Sonnet processes each chunk (no timeout risk per call)
+      // Phase 3: GPT-4o processes each chunk (no timeout risk per call)
       const all: ParsedQuestionStructure[] = []
       for (let i = 0; i < chunks.length; i++) {
         setChunkProgress({ current: i + 1, total: chunks.length })
@@ -905,7 +905,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e processado em blocos de 10 questões pelo Claude Sonnet.
+          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e processado em blocos de 10 questões pelo GPT-4o.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
@@ -948,7 +948,7 @@ function ExamPdfStep({
 
         {status === 'parsing-chunks' && (
           <StepProgressBar
-            label={`Extraindo questões — bloco ${chunkProgress.current} de ${chunkProgress.total} (Claude Sonnet)...`}
+            label={`Extraindo questões — bloco ${chunkProgress.current} de ${chunkProgress.total} (GPT-4o)...`}
             value={10 + progressValue * 0.9}
           />
         )}
@@ -1260,7 +1260,7 @@ function ReviewStep({
       {/* Generation progress */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
-          Gerando explicações (xAI Grok)
+          Gerando explicações (o3-mini)
         </Typography>
         {isGenerating && (
           <StepProgressBar
