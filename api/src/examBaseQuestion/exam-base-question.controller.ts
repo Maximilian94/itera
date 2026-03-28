@@ -77,9 +77,13 @@ export class ExamBaseQuestionController {
   async extractGabaritoAnswerKey(
     @Param('examBaseId') _examBaseId: string,
     @UploadedFile() gabaritoPdf: { buffer: Buffer; mimetype: string } | undefined,
+    @Body('cargo') cargo?: string,
   ) {
     if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
-    const answerKey = await this.pdfAi.extractGabaritoAnswerKey(gabaritoPdf.buffer);
+    const answerKey = await this.pdfAi.extractGabaritoAnswerKey(
+      gabaritoPdf.buffer,
+      cargo?.trim() || undefined,
+    );
     return { answerKey };
   }
 

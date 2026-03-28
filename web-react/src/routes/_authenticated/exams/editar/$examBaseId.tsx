@@ -838,6 +838,7 @@ function QuestionsStep({
   const [examPdf, setExamPdf] = useState<File | null>(null)
   const [examMarkdown, setExamMarkdown] = useState<string | null>(null)
   const [gabaritoPdf, setGabaritoPdf] = useState<File | null>(null)
+  const [cargo, setCargo] = useState('Enfermeiro')
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
   const [phase, setPhase] = useState<Phase>({ id: 'idle' })
   const examPdfRef = useRef<HTMLInputElement>(null)
@@ -871,6 +872,7 @@ function QuestionsStep({
       const { answerKey } = await examBaseQuestionsService.extractGabaritoAnswerKey(
         examBaseId,
         gabaritoPdf,
+        cargo.trim() || undefined,
       )
 
       // Phase 3: parse chunks via GPT-4o
@@ -1019,6 +1021,19 @@ function QuestionsStep({
             />
           </div>
         </div>
+
+        {/* Cargo field */}
+        <Box sx={{ mt: 2.5, maxWidth: 320 }}>
+          <TextField
+            label="Cargo no gabarito"
+            value={cargo}
+            onChange={(e) => setCargo(e.target.value)}
+            size="small"
+            fullWidth
+            disabled={isAnalyzing}
+            helperText="Nome do cargo no gabarito para filtrar a seção correta"
+          />
+        </Box>
 
         {/* Progress bar */}
         {showProgress && (

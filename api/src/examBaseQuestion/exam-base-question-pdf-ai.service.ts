@@ -9,32 +9,50 @@ import {
 
 // ─── Gabarito extraction (Claude Haiku — fast & cheap) ───────────────────────
 
-const GABARITO_SYSTEM_PROMPT = `
+function buildGabaritoSystemPrompt(cargo?: string): string {
+  const cargoHint = cargo
+    ? `O gabarito pode conter seções para diferentes cargos ou provas. Extraia SOMENTE as respostas da seção correspondente ao cargo "${cargo}". Se não encontrar essa seção, extraia a seção principal ou todas as respostas disponíveis.`
+    : `O gabarito pode conter seções para diferentes cargos ou provas. Extraia as respostas da seção principal de Enfermeiro/Enfermagem. Se não houver seção específica, extraia todas as respostas.`;
+  return `
 Você é um assistente especializado em extrair gabaritos de concursos públicos brasileiros.
-Dado um PDF de gabarito, extraia TODAS as respostas no formato JSON:
+${cargoHint}
+Retorne SOMENTE um objeto JSON com os pares número-letra, sem texto adicional:
 { "1": "A", "2": "C", "3": "B", ... }
-Inclua apenas os pares número-letra. Retorne SOMENTE o JSON, sem texto adicional.
 `.trim();
+}
 
 // ─── Question parsing (OpenAI GPT-4o — per chunk) ────────────────────────────
 
 function buildQuestionSystemPrompt(answerKey: Record<string, string>): string {
   return `
-Você é um especialista em questões de concursos públicos brasileiros de enfermagem.
+Você é um especialista em elaboração e resolução de questões de concursos públicos brasileiros.
 
 Você receberá um trecho de markdown de uma prova e o gabarito completo.
-Extraia APENAS as questões de ENFERMAGEM do trecho e retorne um array JSON.
+Extraia TODAS as questões do trecho (independente da área) e retorne um array JSON.
 
-Gabarito completo: ${JSON.stringify(answerKey)}
+Gabarito: ${JSON.stringify(answerKey)}
 
-Para cada questão:
-- Identifique o número da questão no texto e busque a resposta no gabarito acima
-- Preserve formatação markdown: **negrito**, *itálico*, \\n para quebras de linha
-- hasImage: true se o enunciado/alternativa referenciar figura, imagem ou gráfico não textual
-- Gere explicações didáticas e completas para CADA alternativa
-- answerDoubt: true se você discordar da resposta do gabarito; preencha doubtReason
+INSTRUÇÕES OBRIGATÓRIAS:
 
-Nas explicações, NUNCA mencione a letra da alternativa. Use "Esta alternativa", "A alternativa correta", etc.
+1. EXTRAÇÃO
+   - Extraia TODAS as questões presentes no trecho, sem exceção
+   - Identifique o número da questão e busque a resposta no gabarito
+   - Preserve formatação markdown: **negrito**, *itálico*, \\n para quebras de linha
+   - hasImage: true APENAS se o enunciado/alternativa referenciar explicitamente uma figura, imagem, gráfico ou tabela não representável como texto
+
+2. VALIDAÇÃO DO GABARITO
+   - Analise cuidadosamente qual alternativa você considera correta com base no conteúdo
+   - Se sua conclusão divergir do gabarito: answerDoubt: true + doubtReason explicando objetivamente qual seria a resposta correta e por quê
+   - Se concordar: answerDoubt: false, doubtReason: null
+
+3. EXPLICAÇÕES — QUALIDADE MÁXIMA OBRIGATÓRIA
+   Cada explicação deve ser uma análise profunda e didática. Siga estas regras sem exceção:
+   - Mínimo de 3 parágrafos por alternativa
+   - Para alternativas INCORRETAS: explique detalhadamente por que está errada, qual conceito ela viola ou distorce, e qual seria o cenário em que poderia confundir o candidato
+   - Para a alternativa CORRETA: explique o fundamento teórico completo, cite princípios, protocolos ou evidências que a sustentam (ex: diretrizes do COFEN, protocolos do MS, fisiopatologia, farmacologia, etc.)
+   - Use linguagem técnica apropriada à área da questão
+   - NUNCA use frases genéricas como "Esta alternativa está incorreta porque não é a melhor opção"
+   - NUNCA mencione a letra da alternativa nas explicações
 
 Retorne SOMENTE o array JSON, sem markdown nem texto adicional.
 Formato de cada elemento: ${JSON.stringify(PARSED_QUESTION_FROM_PDF_EXAMPLE)}
@@ -57,7 +75,10 @@ export class ExamBaseQuestionPdfAiService {
 
   // ─── Step 1: extract answer key via Claude Haiku ────────────────────────────
 
-  async extractGabaritoAnswerKey(gabaritoPdf: Buffer): Promise<Record<string, string>> {
+  async extractGabaritoAnswerKey(
+    gabaritoPdf: Buffer,
+    cargo?: string,
+  ): Promise<Record<string, string>> {
     const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
     if (!anthropicKey) {
       throw new BadRequestException(
@@ -70,7 +91,7 @@ export class ExamBaseQuestionPdfAiService {
     const response = await client.messages.create({
       model: 'claude-haiku-4-5-20251001',
       max_tokens: 2048,
-      system: GABARITO_SYSTEM_PROMPT,
+      system: buildGabaritoSystemPrompt(cargo),
       messages: [
         {
           role: 'user',
@@ -187,7 +208,7 @@ export class ExamBaseQuestionPdfAiService {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        max_tokens: 16384,
+        max_tokens: 32768,
         temperature: 0,
         messages: [
           { role: 'system', content: systemPrompt },

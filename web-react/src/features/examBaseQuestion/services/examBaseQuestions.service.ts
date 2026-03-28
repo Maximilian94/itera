@@ -238,9 +238,11 @@ export const examBaseQuestionsService = {
   extractGabaritoAnswerKey(
     examBaseId: string,
     gabaritoPdf: File,
+    cargo?: string,
   ): Promise<{ answerKey: Record<string, string> }> {
     const formData = new FormData()
     formData.append('gabaritoPdf', gabaritoPdf)
+    if (cargo) formData.append('cargo', cargo)
     return apiFetch<{ answerKey: Record<string, string> }>(
       `${basePath(examBaseId)}/extract-gabarito-answer-key`,
       { method: 'POST', body: formData },
