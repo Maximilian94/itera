@@ -175,7 +175,7 @@ model ExamBoard {
   name       String
   alias      String?
   websiteUrl String?
-  logoUrl    String
+  logoUrl    String?
 
   exams      Exam[]
   examBases  ExamBase[]

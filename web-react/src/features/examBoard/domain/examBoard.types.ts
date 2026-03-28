@@ -3,5 +3,5 @@ export type ExamBoard = {
   name: string
   alias?: string | null
   websiteUrl?: string | null
-  logoUrl: string
+  logoUrl?: string | null
 }

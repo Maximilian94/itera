@@ -7,16 +7,24 @@ import {
   Post,
   Query,
   Req,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
+import { ExtractMetadataDto } from './dto/extract-metadata.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
 import { UpdateExamBaseDto } from './dto/update-exam-base.dto';
+import { ExamBaseAiService } from './exam-base-ai.service';
 import { ExamBaseService } from './exam-base.service';
 
 @Controller('exam-bases')
 export class ExamBaseController {
-  constructor(private readonly examBases: ExamBaseService) {}
+  constructor(
+    private readonly examBases: ExamBaseService,
+    private readonly examBaseAi: ExamBaseAiService,
+  ) {}
 
   @Get()
   list(
@@ -35,6 +43,32 @@ export class ExamBaseController {
     @Req() req: { user?: { userId: string } },
   ) {
     return this.examBases.getOne(id, req.user?.userId);
+  }
+
+  /** Creates an empty draft exam base and returns its id. Admin only. */
+  @Post('draft')
+  @Roles('ADMIN')
+  createDraft() {
+    return this.examBases.createDraft();
+  }
+
+  /**
+   * Extracts exam metadata from a URL or PDF using AI. Admin only.
+   * Accepts multipart/form-data with optional fields: url (string) and pdfFile (file).
+   */
+  @Post('extract-metadata')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('pdfFile'))
+  extractMetadata(
+    @Body() dto: ExtractMetadataDto,
+    @UploadedFile()
+    pdfFile?: { buffer: Buffer; mimetype: string; originalname?: string },
+  ) {
+    return this.examBaseAi.extractMetadata({
+      url: dto.url,
+      role: dto.role,
+      pdfFile,
+    });
   }
 
   /** Creates a new exam base. Admin only. */

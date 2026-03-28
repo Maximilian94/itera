@@ -32,7 +32,7 @@ type ExamBoard = {
   name: string
   alias?: string | null
   websiteUrl?: string | null
-  logoUrl: string
+  logoUrl?: string | null
 }
 
 export const Route = createFileRoute('/_authenticated/exam-boards')({
@@ -104,7 +104,7 @@ function RouteComponent() {
     setEditName(row.name)
     setEditAlias(row.alias ?? '')
     setEditWebsiteUrl(row.websiteUrl ?? '')
-    setEditLogoUrl(row.logoUrl)
+    setEditLogoUrl(row.logoUrl ?? '')
   }
 
   function cancelEdit() {

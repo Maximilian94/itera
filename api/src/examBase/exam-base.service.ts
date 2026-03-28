@@ -376,6 +376,18 @@ export class ExamBaseService {
     return result;
   }
 
+  createDraft() {
+    return this.prisma.examBase.create({
+      data: {
+        name: '',
+        role: '',
+        governmentScope: GovernmentScope.FEDERAL,
+        examDate: new Date(),
+      },
+      select: { id: true },
+    });
+  }
+
   create(input: {
     name: string;
     examBoardId?: string;

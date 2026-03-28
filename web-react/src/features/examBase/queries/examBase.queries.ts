@@ -1,5 +1,4 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { examBaseService } from '../services/examBase.service'
 
 export const examBaseKeys = {
@@ -31,6 +30,30 @@ export function useSetPublishedMutation(examBaseId: string) {
       examBaseService.setPublished(examBaseId, published),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examBaseKeys.examBases })
+    },
+  })
+}
+
+export function useCreateDraftExamBaseMutation() {
+  return useMutation({
+    mutationFn: () => examBaseService.createDraft(),
+  })
+}
+
+export function useExtractExamMetadataMutation() {
+  return useMutation({
+    mutationFn: (input: { url?: string; role?: string; pdfFile?: File }) =>
+      examBaseService.extractMetadata(input),
+  })
+}
+
+export function useUpdateExamBaseMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: Parameters<typeof examBaseService.update>[1]) =>
+      examBaseService.update(examBaseId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
     },
   })
 }

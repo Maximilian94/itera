@@ -2,6 +2,7 @@ import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
+import { useCreateDraftExamBaseMutation } from '@/features/examBase/queries/examBase.queries'
 import { examBaseService } from '@/features/examBase/services/examBase.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
@@ -86,7 +87,7 @@ function BoardPill({
   isActive,
   onClick,
 }: {
-  board: { id: string; name: string; alias?: string | null; logoUrl: string }
+  board: { id: string; name: string; alias?: string | null; logoUrl?: string | null }
   count: number
   isActive: boolean
   onClick: () => void
@@ -102,11 +103,13 @@ function BoardPill({
             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
-        <img
-          src={board.logoUrl}
-          alt={board.alias ?? board.name}
-          className="w-7 h-7 object-contain rounded"
-        />
+        {board.logoUrl && (
+          <img
+            src={board.logoUrl}
+            alt={board.alias ?? board.name}
+            className="w-7 h-7 object-contain rounded"
+          />
+        )}
         <div className="min-w-0">
           <p
             className={`text-xs font-semibold truncate ${
@@ -500,6 +503,12 @@ function ExamsPage() {
   const navigate = useNavigate()
   const { board: boardFromUrl } = Route.useSearch()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const createDraftMutation = useCreateDraftExamBaseMutation()
+
+  async function handleCreateExam() {
+    const { id } = await createDraftMutation.mutateAsync()
+    navigate({ to: '/exams/editar/$examBaseId', params: { examBaseId: id }, search: { board: undefined } })
+  }
   const [search, setSearch] = useState('')
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(
     boardFromUrl ?? null,
@@ -867,7 +876,8 @@ function ExamsPage() {
           {isAdmin && (
             <button
               type="button"
-              onClick={() => setCreateDialogOpen(true)}
+              onClick={handleCreateExam}
+              disabled={createDraftMutation.isPending}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 transition-colors cursor-pointer"
             >
               <PlusIcon className="w-4 h-4" />

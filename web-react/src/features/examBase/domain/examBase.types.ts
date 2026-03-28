@@ -14,7 +14,7 @@ export type ExamBase = {
   editalUrl: string | null
   adminNotes?: string | null
   examBoardId: string | null
-  examBoard: { id: string; name: string; alias?: string | null; logoUrl: string; websiteUrl?: string | null } | null
+  examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
 }
@@ -30,6 +30,21 @@ export type CreateExamBaseInput = {
   institution?: string
   examBoardId?: string
   minPassingGradeNonQuota?: string | null
+}
+
+export type ExtractedExamMetadata = {
+  name?: string
+  role?: string
+  governmentScope?: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  examDate?: string
+  institution?: string
+  state?: string | null
+  city?: string | null
+  salaryBase?: string | null
+  minPassingGradeNonQuota?: string | null
+  examBoardName?: string | null
+  examBoardAlias?: string | null
+  editalUrl?: string | null
 }
 
 export type UpdateExamBaseInput = {
