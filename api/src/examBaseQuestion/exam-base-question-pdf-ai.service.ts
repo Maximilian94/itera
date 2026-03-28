@@ -207,6 +207,40 @@ export class ExamBaseQuestionPdfAiService {
   }
 
   /**
+   * Parses questions structure from a markdown chunk using Claude Sonnet.
+   * No answers, no explanations. Used by the per-chunk endpoint.
+   */
+  async parseQuestionsStructureFromChunk(
+    markdownChunk: string,
+  ): Promise<ParsedQuestionStructure[]> {
+    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    if (!anthropicKey) {
+      throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
+    }
+
+    const client = new Anthropic({ apiKey: anthropicKey, timeout: 120_000 });
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      system: buildStructureSystemPrompt(),
+      messages: [
+        {
+          role: 'user',
+          content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`,
+        },
+      ],
+    });
+
+    const block = response.content[0];
+    if (!block || block.type !== 'text') {
+      throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
+    }
+
+    return this.parseStructureJson(block.text);
+  }
+
+  /**
    * Parses questions structure directly from a PDF using Claude Sonnet.
    * No answers, no explanations — just statement, alternatives, hasImage, referenceText.
    */
@@ -248,34 +282,7 @@ export class ExamBaseQuestionPdfAiService {
       throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
     }
 
-    let jsonStr = block.text
-      .trim()
-      .replace(/^```(?:json)?\s*/i, '')
-      .replace(/\s*```\s*$/m, '')
-      .trim();
-
-    const firstBracket = jsonStr.indexOf('[');
-    const lastBracket = jsonStr.lastIndexOf(']');
-    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
-      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
-    }
-    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(jsonStr);
-    } catch {
-      try {
-        parsed = JSON.parse(jsonrepair(jsonStr));
-      } catch (err) {
-        throw new BadRequestException(
-          `Claude retornou JSON inválido: ${(err as Error).message?.slice(0, 200)}`,
-        );
-      }
-    }
-
-    if (!Array.isArray(parsed)) return [];
-    return parsed.map((item: unknown) => this.normalizeQuestionStructure(item));
+    return this.parseStructureJson(block.text);
   }
 
   /** Parses a single markdown chunk with the provided answer key. Used by the per-chunk endpoint. */
@@ -361,6 +368,34 @@ export class ExamBaseQuestionPdfAiService {
   }
 
   // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  private parseStructureJson(rawText: string): ParsedQuestionStructure[] {
+    let jsonStr = rawText
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
+    }
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (err) {
+        throw new BadRequestException(
+          `Claude retornou JSON inválido: ${(err as Error).message?.slice(0, 200)}`,
+        );
+      }
+    }
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item: unknown) => this.normalizeQuestionStructure(item));
+  }
 
   /**
    * Splits markdown at question boundaries into chunks of at most `size` questions.

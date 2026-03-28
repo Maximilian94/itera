@@ -271,15 +271,13 @@ export const examBaseQuestionsService = {
     )
   },
 
-  parseQuestionsFromPdf(
+parseQuestionsStructureFromChunk(
     examBaseId: string,
-    file: File,
+    markdownChunk: string,
   ): Promise<{ questions: ParsedQuestionStructure[] }> {
-    const formData = new FormData()
-    formData.append('file', file)
     return apiFetch<{ questions: ParsedQuestionStructure[] }>(
-      `${basePath(examBaseId)}/parse-questions-from-pdf`,
-      { method: 'POST', body: formData },
+      `${basePath(examBaseId)}/parse-questions-structure`,
+      { method: 'POST', body: JSON.stringify({ markdownChunk }) },
     )
   },
 

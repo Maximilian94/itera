@@ -97,6 +97,26 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
 
 const WIZARD_STEPS = ['Metadados', 'Prova', 'Gabarito', 'Revisão']
 
+/** Splits markdown at question boundaries into chunks of at most `size` questions. */
+function splitMarkdownIntoChunks(markdown: string, size = 10): string[] {
+  const boundaries: number[] = [0]
+  const regex = /(?:^|\n)\s*(?:\d+[.)]\s|Questão\s+\d+(?:\s|[-–:])|\d+\s*[-–]\s|#\s*\d+\.?\s)/gi
+  let m: RegExpExecArray | null
+  while ((m = regex.exec(markdown)) !== null) {
+    if (m.index !== boundaries[boundaries.length - 1]) boundaries.push(m.index)
+  }
+  boundaries.push(markdown.length)
+  if (boundaries.length - 2 <= 0) return [markdown]
+  const chunks: string[] = []
+  for (let i = 0; i < boundaries.length - 1; i += size) {
+    const start = boundaries[i]
+    const end = boundaries[Math.min(i + size, boundaries.length - 1)]
+    const chunk = markdown.slice(start, end).trim()
+    if (chunk) chunks.push(chunk)
+  }
+  return chunks
+}
+
 function StepIndicator({ step }: { step: number }) {
   return (
     <div className="flex items-center gap-1 mb-6 flex-wrap">
@@ -836,24 +856,47 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
+  const [chunkProgress, setChunkProgress] = useState({ current: 0, total: 0 })
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleParse() {
     if (!file) return
-    setStatus('parsing')
+    setStatus('extracting-markdown')
     setErrorMsg(null)
+    setQuestions([])
+
     try {
-      const { questions: qs } = await examBaseQuestionsService.parseQuestionsFromPdf(examBaseId, file)
-      setQuestions(qs)
+      // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
+      const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
+
+      // Phase 2: split markdown into chunks of 10 questions
+      const chunks = splitMarkdownIntoChunks(markdown, 10)
+      setChunkProgress({ current: 0, total: chunks.length })
+      setStatus('parsing-chunks')
+
+      // Phase 3: Claude Sonnet processes each chunk (no timeout risk per call)
+      const all: ParsedQuestionStructure[] = []
+      for (let i = 0; i < chunks.length; i++) {
+        setChunkProgress({ current: i + 1, total: chunks.length })
+        const { questions: qs } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(examBaseId, chunks[i])
+        all.push(...qs)
+      }
+
+      setQuestions(all)
       setStatus('done')
     } catch (err) {
       setStatus('error')
       setErrorMsg((err as Error).message ?? 'Erro ao extrair questões da prova')
     }
   }
+
+  const progressValue = chunkProgress.total > 0
+    ? Math.round((chunkProgress.current / chunkProgress.total) * 100)
+    : 0
+  const isParsing = status === 'extracting-markdown' || status === 'parsing-chunks'
 
   return (
     <div className="flex flex-col gap-6">
@@ -862,28 +905,23 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. Claude Sonnet lê o documento diretamente e extrai todas as questões com a formatação preservada (negrito, itálico, textos de referência, etc.).
+          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e processado em blocos de 10 questões pelo Claude Sonnet.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
           <Button
             variant="outlined"
             size="small"
-            disabled={status === 'parsing'}
+            disabled={isParsing}
             onClick={() => fileRef.current?.click()}
           >
             {file ? file.name : 'Selecionar PDF'}
           </Button>
-          {file && status !== 'parsing' && (
+          {file && !isParsing && (
             <button
               type="button"
               className="text-xs text-slate-500 hover:text-slate-700 underline"
-              onClick={() => {
-                setFile(null)
-                setQuestions([])
-                setStatus('idle')
-                if (fileRef.current) fileRef.current.value = ''
-              }}
+              onClick={() => { setFile(null); setQuestions([]); setStatus('idle'); if (fileRef.current) fileRef.current.value = '' }}
             >
               Remover
             </button>
@@ -894,31 +932,31 @@ function ExamPdfStep({
           type="file"
           accept=".pdf"
           className="hidden"
-          onChange={(e) => {
-            const f = e.target.files?.[0]
-            if (f) { setFile(f); setQuestions([]); setStatus('idle') }
-          }}
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setQuestions([]); setStatus('idle') } }}
         />
 
         {status === 'idle' && (
-          <Button
-            variant="contained"
-            startIcon={<AutoAwesomeIcon />}
-            disabled={!file}
-            onClick={handleParse}
-            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
-          >
+          <Button variant="contained" startIcon={<AutoAwesomeIcon />} disabled={!file} onClick={handleParse}
+            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}>
             Extrair questões
           </Button>
         )}
 
-        {status === 'parsing' && (
-          <>
-            <StepProgressBar label="Extraindo questões (Claude Sonnet)..." value={50} />
-            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
-              Extraindo...
-            </Button>
-          </>
+        {status === 'extracting-markdown' && (
+          <StepProgressBar label="Extraindo texto da prova (Nanonets)..." value={10} />
+        )}
+
+        {status === 'parsing-chunks' && (
+          <StepProgressBar
+            label={`Extraindo questões — bloco ${chunkProgress.current} de ${chunkProgress.total} (Claude Sonnet)...`}
+            value={10 + progressValue * 0.9}
+          />
+        )}
+
+        {isParsing && (
+          <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+            Extraindo...
+          </Button>
         )}
 
         {status === 'done' && (
@@ -936,7 +974,7 @@ function ExamPdfStep({
       </Box>
 
       <div className="flex items-center gap-3">
-        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isParsing}>
           Voltar
         </Button>
         <Button
