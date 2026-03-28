@@ -16,6 +16,17 @@ export type ParsedQuestionItem = {
   alternatives: { key: string; text: string }[]
 }
 
+export type ParsedQuestionStructure = {
+  number: number
+  subject: string
+  topic: string
+  subtopics: string[]
+  statement: string
+  referenceText: string | null
+  hasImage: boolean
+  alternatives: { key: string; text: string }[]
+}
+
 export type ParsedQuestionFromPdf = {
   number: number
   subject: string
@@ -257,6 +268,34 @@ export const examBaseQuestionsService = {
     return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
       `${basePath(examBaseId)}/parse-markdown-chunk`,
       { method: 'POST', body: JSON.stringify({ markdownChunk, answerKey }) },
+    )
+  },
+
+  parseQuestionsStructure(
+    examBaseId: string,
+    markdownChunk: string,
+  ): Promise<{ questions: ParsedQuestionStructure[] }> {
+    return apiFetch<{ questions: ParsedQuestionStructure[] }>(
+      `${basePath(examBaseId)}/parse-questions-structure`,
+      { method: 'POST', body: JSON.stringify({ markdownChunk }) },
+    )
+  },
+
+  generateExplanationsInline(
+    examBaseId: string,
+    input: {
+      subject?: string
+      statement: string
+      referenceText?: string | null
+      statementImageUrl?: string | null
+      correctAlternative: string
+      alternatives: { key: string; text: string }[]
+      examName?: string
+    },
+  ): Promise<GenerateExplanationsResponse> {
+    return apiFetch<GenerateExplanationsResponse>(
+      `${basePath(examBaseId)}/generate-explanations-inline`,
+      { method: 'POST', body: JSON.stringify(input) },
     )
   },
 

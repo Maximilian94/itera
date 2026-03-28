@@ -512,6 +512,127 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
     );
   }
 
+  /**
+   * Generates explanations for a question inline (without needing a DB question).
+   * Accepts all question data directly. Uses xAI Grok.
+   */
+  async generateExplanationsInline(input: {
+    subject?: string;
+    statement: string;
+    referenceText?: string | null;
+    statementImageUrl?: string | null;
+    correctAlternative: string;
+    alternatives: { key: string; text: string }[];
+    examName?: string;
+  }): Promise<GenerateExplanationsResponse> {
+    const apiKey = this.config.get<string>('XAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'XAI_API_KEY is not configured. Set it in .env to use AI explanations.',
+      );
+    }
+
+    const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateExplanationsResponse {\n  topic: string;\n  subtopics: string[];\n  explanations: Array<{ key: string; explanation: string }>;\n  agreesWithCorrectAnswer: boolean;\n  disagreementWarning?: string;\n}\nExemplo: ${JSON.stringify(GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE)}`;
+
+    const systemPrompt = `Você é um especialista em elaboração de questões de concurso. Sua tarefa é gerar explicações de alto nível e bem completas para cada alternativa de uma questão de múltipla escolha.
+
+${responseTypeDescription}
+
+VALIDAÇÃO DA RESPOSTA CORRETA: Antes de gerar as explicações, analise a questão e determine qual alternativa VOCÊ considera correta com base no enunciado e no conteúdo. Se a alternativa que você considera correta for DIFERENTE da indicada na questão, defina agreesWithCorrectAnswer como false e preencha disagreementWarning com uma explicação objetiva. Se concordar, defina agreesWithCorrectAnswer como true e omita disagreementWarning.
+
+Regras para topic e subtopics:
+- Use SEMPRE o nome técnico da matéria/assunto, não uma descrição em linguagem comum.
+
+Regras para o JSON:
+- Escape aspas duplas dentro de strings com \\".
+- Use \\n para quebras de linha dentro de strings.
+- Inclua uma explicação para cada alternativa.
+- As explicações devem ser didáticas, completas e de alto nível.
+- IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa. Use apenas "A alternativa correta", "Esta alternativa está incorreta", etc.`;
+
+    const subjectInfo = input.subject ? `**Matéria:** ${input.subject}\n\n` : '';
+    const referenceSection = input.referenceText?.trim()
+      ? `**Texto de referência:**\n${input.referenceText}\n\n`
+      : '';
+    const alternativesText = input.alternatives.map((a) => `${a.key}) ${a.text}`).join('\n\n');
+    const examLabel = input.examName ?? 'Não informada';
+
+    const userPromptText = `Gere as explicações para a questão abaixo.
+
+**Prova:** ${examLabel}
+${subjectInfo}${referenceSection}**Enunciado:** ${input.statement}
+
+**Alternativas:**
+${alternativesText}
+
+**A alternativa correta é: ${input.correctAlternative}.**
+
+Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
+
+    const userContent: { role: 'user'; content: string | object[] } = input.statementImageUrl?.trim()
+      ? {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: input.statementImageUrl, detail: 'high' } },
+            { type: 'text', text: userPromptText },
+          ],
+        }
+      : { role: 'user', content: userPromptText };
+
+    const res = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'grok-4-1-fast-reasoning',
+        max_tokens: 8192,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          userContent,
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(`xAI API error (${res.status}): ${errBody.slice(0, 500)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) throw new BadRequestException('AI returned empty response.');
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(`AI returned invalid JSON. (${msg})`);
+      }
+    }
+
+    return normalizeGenerateExplanationsResponse(parsed);
+  }
+
   async generateExplanations(
     examBaseId: string,
     questionId: string,

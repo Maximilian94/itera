@@ -10,7 +10,7 @@ import {
 import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
-  type ParsedQuestionFromPdf,
+  type ParsedQuestionStructure,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 
@@ -529,7 +529,11 @@ function MetadataStep({
 // Question card (review UI)
 // ─────────────────────────────────────────────────────────────────────────────
 
-type ReviewQuestion = ParsedQuestionFromPdf & {
+type ReviewQuestion = ParsedQuestionStructure & {
+  correctAlternative: string | null
+  answerDoubt: boolean
+  doubtReason: string | null
+  explanations: { key: string; explanation: string }[]
   unblocked: boolean
   statementImageUrl?: string
 }
@@ -759,21 +763,24 @@ function QuestionCard({
                   </Typography>
                   <Box sx={{ flex: 1 }}>
                     <Markdown variant="body2">{alt.text}</Markdown>
-                    {showExplanations && alt.explanation && (
-                      <Box
-                        sx={{
-                          mt: 1,
-                          pt: 1,
-                          borderTop: '1px dashed',
-                          borderColor: 'divider',
-                        }}
-                      >
-                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                          Explicação:
-                        </Typography>
-                        <Markdown variant="caption">{alt.explanation}</Markdown>
-                      </Box>
-                    )}
+                    {showExplanations && (() => {
+                      const exp = q.explanations.find((e) => e.key === alt.key)?.explanation
+                      return exp ? (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            pt: 1,
+                            borderTop: '1px dashed',
+                            borderColor: 'divider',
+                          }}
+                        >
+                          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                            Explicação:
+                          </Typography>
+                          <Markdown variant="caption">{exp}</Markdown>
+                        </Box>
+                      ) : null
+                    })()}
                   </Box>
                 </div>
               </Box>
@@ -801,26 +808,31 @@ function QuestionCard({
 type Phase =
   | { id: 'idle' }
   | { id: 'extracting-markdown' }
+  | { id: 'parsing-structure'; current: number; total: number }
   | { id: 'extracting-gabarito' }
-  | { id: 'parsing-chunks'; current: number; total: number }
+  | { id: 'generating-explanations'; current: number; total: number }
   | { id: 'done' }
   | { id: 'error'; message: string }
 
 function phaseProgress(phase: Phase): number {
   if (phase.id === 'idle') return 0
-  if (phase.id === 'extracting-markdown') return 10
-  if (phase.id === 'extracting-gabarito') return 30
-  if (phase.id === 'parsing-chunks')
-    return 30 + Math.round((phase.current / phase.total) * 65)
+  if (phase.id === 'extracting-markdown') return 5
+  if (phase.id === 'parsing-structure')
+    return 5 + Math.round((phase.current / phase.total) * 35) // 5→40%
+  if (phase.id === 'extracting-gabarito') return 45
+  if (phase.id === 'generating-explanations')
+    return 50 + Math.round((phase.current / phase.total) * 50) // 50→100%
   if (phase.id === 'done') return 100
   return 0
 }
 
 function phaseLabel(phase: Phase): string {
-  if (phase.id === 'extracting-markdown') return 'Extraindo texto da prova (Nanonets)...'
-  if (phase.id === 'extracting-gabarito') return 'Extraindo gabarito (Claude Haiku)...'
-  if (phase.id === 'parsing-chunks')
-    return `Gerando questões — bloco ${phase.current} de ${phase.total} (GPT-4o)...`
+  if (phase.id === 'extracting-markdown') return 'Fase 1 — Extraindo texto da prova (Nanonets)...'
+  if (phase.id === 'parsing-structure')
+    return `Fase 2 — Extraindo questões — bloco ${phase.current} de ${phase.total} (Claude Sonnet)...`
+  if (phase.id === 'extracting-gabarito') return 'Fase 3 — Extraindo gabarito (Claude Haiku)...'
+  if (phase.id === 'generating-explanations')
+    return `Fase 5 — Gerando explicações — questão ${phase.current} de ${phase.total} (xAI Grok)...`
   if (phase.id === 'done') return 'Concluído!'
   if (phase.id === 'error') return `Erro: ${phase.message}`
   return ''
@@ -846,8 +858,9 @@ function QuestionsStep({
 
   const isAnalyzing =
     phase.id === 'extracting-markdown' ||
+    phase.id === 'parsing-structure' ||
     phase.id === 'extracting-gabarito' ||
-    phase.id === 'parsing-chunks'
+    phase.id === 'generating-explanations'
 
   async function handleExamPdfSelect(file: File) {
     setExamPdf(file)
@@ -867,7 +880,21 @@ function QuestionsStep({
     setQuestions([])
 
     try {
-      // Phase 2: extract answer key via Claude Haiku
+      // Phase 2: parse question structure via Claude Sonnet (no answers, no explanations)
+      const chunks = splitMarkdownIntoChunks(examMarkdown, 10)
+      setPhase({ id: 'parsing-structure', current: 0, total: chunks.length })
+
+      const structuredQuestions: ParsedQuestionStructure[] = []
+      for (let i = 0; i < chunks.length; i++) {
+        setPhase({ id: 'parsing-structure', current: i + 1, total: chunks.length })
+        const { questions: chunkQs } = await examBaseQuestionsService.parseQuestionsStructure(
+          examBaseId,
+          chunks[i],
+        )
+        structuredQuestions.push(...chunkQs)
+      }
+
+      // Phase 3: extract answer key via Claude Haiku
       setPhase({ id: 'extracting-gabarito' })
       const { answerKey } = await examBaseQuestionsService.extractGabaritoAnswerKey(
         examBaseId,
@@ -875,22 +902,51 @@ function QuestionsStep({
         cargo.trim() || undefined,
       )
 
-      // Phase 3: parse chunks via GPT-4o
-      const chunks = splitMarkdownIntoChunks(examMarkdown, 10)
-      setPhase({ id: 'parsing-chunks', current: 0, total: chunks.length })
+      // Phase 4: match answers (frontend only — instant)
+      const matched: ReviewQuestion[] = structuredQuestions.map((q) => ({
+        ...q,
+        correctAlternative: answerKey[String(q.number)] ?? null,
+        answerDoubt: false,
+        doubtReason: null,
+        explanations: [],
+        unblocked: false,
+      }))
 
-      const allQuestions: ReviewQuestion[] = []
-      for (let i = 0; i < chunks.length; i++) {
-        setPhase({ id: 'parsing-chunks', current: i + 1, total: chunks.length })
-        const { questions: chunkQs } = await examBaseQuestionsService.parseMarkdownChunk(
-          examBaseId,
-          chunks[i],
-          answerKey,
-        )
-        allQuestions.push(...chunkQs.map((q) => ({ ...q, unblocked: false })))
+      // Phase 5: generate explanations per question via xAI Grok
+      setPhase({ id: 'generating-explanations', current: 0, total: matched.length })
+      const withExplanations: ReviewQuestion[] = []
+      for (let i = 0; i < matched.length; i++) {
+        const q = matched[i]
+        setPhase({ id: 'generating-explanations', current: i + 1, total: matched.length })
+        if (!q.correctAlternative) {
+          // No answer in gabarito — skip explanation generation
+          withExplanations.push(q)
+          continue
+        }
+        try {
+          const result = await examBaseQuestionsService.generateExplanationsInline(examBaseId, {
+            subject: q.subject || undefined,
+            statement: q.statement,
+            referenceText: q.referenceText,
+            statementImageUrl: q.statementImageUrl,
+            correctAlternative: q.correctAlternative,
+            alternatives: q.alternatives,
+          })
+          withExplanations.push({
+            ...q,
+            topic: result.topic || q.topic,
+            subtopics: result.subtopics.length ? result.subtopics : q.subtopics,
+            explanations: result.explanations,
+            answerDoubt: !result.agreesWithCorrectAnswer,
+            doubtReason: result.disagreementWarning ?? null,
+          })
+        } catch {
+          // If explanation generation fails for one question, continue with the rest
+          withExplanations.push(q)
+        }
       }
 
-      setQuestions(allQuestions)
+      setQuestions(withExplanations)
       setPhase({ id: 'done' })
     } catch (err) {
       setPhase({ id: 'error', message: (err as Error).message ?? 'Erro ao analisar PDFs' })
@@ -909,7 +965,7 @@ function QuestionsStep({
       alternatives: q.alternatives.map((a) => ({
         key: a.key,
         text: a.text,
-        explanation: a.explanation,
+        explanation: q.explanations.find((e) => e.key === a.key)?.explanation ?? '',
       })),
     }))
     await saveMutation.mutateAsync(payload)
@@ -930,7 +986,7 @@ function QuestionsStep({
           Analisar PDFs com IA
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie a prova e o gabarito. O processo extrai o texto (Nanonets), o gabarito (Claude Haiku) e gera as questões em blocos (GPT-4o).
+          Envie a prova e o gabarito. O processo extrai as questões em 5 fases: texto (Nanonets) → estrutura das questões (Claude Sonnet) → gabarito (Claude Haiku) → associação de respostas → explicações (xAI Grok).
         </Typography>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -943,7 +999,7 @@ function QuestionsStep({
               <Button
                 variant="outlined"
                 size="small"
-                disabled={phase.id === 'extracting-markdown' || isAnalyzing}
+                disabled={isAnalyzing}
                 startIcon={phase.id === 'extracting-markdown' ? <CircularProgress size={14} /> : undefined}
                 onClick={() => examPdfRef.current?.click()}
               >

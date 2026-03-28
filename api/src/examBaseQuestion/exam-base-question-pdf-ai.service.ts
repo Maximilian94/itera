@@ -5,6 +5,8 @@ import { jsonrepair } from 'jsonrepair';
 import {
   ParsedQuestionFromPdf,
   PARSED_QUESTION_FROM_PDF_EXAMPLE,
+  ParsedQuestionStructure,
+  PARSED_QUESTION_STRUCTURE_EXAMPLE,
 } from './dto/parsed-question-from-pdf.types';
 
 // ─── Gabarito extraction (Claude Haiku — fast & cheap) ───────────────────────
@@ -18,6 +20,35 @@ Você é um assistente especializado em extrair gabaritos de concursos públicos
 ${cargoHint}
 Retorne SOMENTE um objeto JSON com os pares número-letra, sem texto adicional:
 { "1": "A", "2": "C", "3": "B", ... }
+`.trim();
+}
+
+// ─── Question structure parsing (Claude Sonnet — per chunk, no answers/explanations) ──
+
+function buildStructureSystemPrompt(): string {
+  return `
+Você é um especialista em concursos públicos brasileiros.
+
+Você receberá um trecho de markdown de uma prova.
+Extraia TODAS as questões do trecho e retorne um array JSON.
+
+INSTRUÇÕES OBRIGATÓRIAS:
+
+1. EXTRAÇÃO
+   - Extraia TODAS as questões presentes no trecho, sem exceção
+   - Identifique o número da questão pelo seu número na prova
+   - Preserve formatação markdown: **negrito**, *itálico*, \\n para quebras de linha
+   - hasImage: true APENAS se o enunciado ou alguma alternativa referenciar explicitamente uma figura, imagem, gráfico ou tabela não representável como texto
+   - referenceText: texto de contexto que precede um grupo de questões e é compartilhado por elas (ex: textos para interpretação, situações-problema, etc.); null se não houver
+   - NÃO inclua respostas corretas nem explicações — apenas a estrutura da questão
+
+2. IDENTIFICAÇÃO DO ASSUNTO
+   - subject: matéria/área (ex: "Saúde do Adulto", "Farmacologia", "Legislação de Enfermagem")
+   - topic: tópico específico dentro da matéria
+   - subtopics: array com subtópicos relevantes
+
+Retorne SOMENTE o array JSON, sem markdown nem texto adicional.
+Formato de cada elemento: ${JSON.stringify(PARSED_QUESTION_STRUCTURE_EXAMPLE)}
 `.trim();
 }
 
@@ -175,6 +206,67 @@ export class ExamBaseQuestionPdfAiService {
     return this.splitIntoChunks(markdown, size);
   }
 
+  /**
+   * Phase 2: parses questions structure (statement + alternatives) from a markdown chunk
+   * using Claude Sonnet. No answers, no explanations. Used by the per-chunk structure endpoint.
+   */
+  async parseQuestionsStructureFromChunk(
+    markdownChunk: string,
+  ): Promise<ParsedQuestionStructure[]> {
+    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
+    if (!anthropicKey) {
+      throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
+    }
+
+    const client = new Anthropic({ apiKey: anthropicKey, timeout: 120_000 });
+
+    const response = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 8192,
+      system: buildStructureSystemPrompt(),
+      messages: [
+        {
+          role: 'user',
+          content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`,
+        },
+      ],
+    });
+
+    const block = response.content[0];
+    if (!block || block.type !== 'text') {
+      throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
+    }
+
+    let jsonStr = block.text
+      .trim()
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+
+    const firstBracket = jsonStr.indexOf('[');
+    const lastBracket = jsonStr.lastIndexOf(']');
+    if (firstBracket !== -1 && lastBracket !== -1 && lastBracket > firstBracket) {
+      jsonStr = jsonStr.slice(firstBracket, lastBracket + 1);
+    }
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (err) {
+        throw new BadRequestException(
+          `Claude retornou JSON inválido: ${(err as Error).message?.slice(0, 200)}`,
+        );
+      }
+    }
+
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((item: unknown) => this.normalizeQuestionStructure(item));
+  }
+
   /** Parses a single markdown chunk with the provided answer key. Used by the per-chunk endpoint. */
   async parseMarkdownChunk(
     markdownChunk: string,
@@ -208,7 +300,7 @@ export class ExamBaseQuestionPdfAiService {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        max_tokens: 32768,
+        max_tokens: 16384,
         temperature: 0,
         messages: [
           { role: 'system', content: systemPrompt },
@@ -281,6 +373,33 @@ export class ExamBaseQuestionPdfAiService {
       if (chunk) chunks.push(chunk);
     }
     return chunks;
+  }
+
+  private normalizeQuestionStructure(item: unknown): ParsedQuestionStructure {
+    if (!item || typeof item !== 'object') {
+      return {
+        number: 0, subject: '', topic: '', subtopics: [], statement: '',
+        referenceText: null, hasImage: false, alternatives: [],
+      };
+    }
+    const o = item as Record<string, unknown>;
+    return {
+      number: typeof o.number === 'number' ? o.number : 0,
+      subject: String(o.subject ?? ''),
+      topic: String(o.topic ?? ''),
+      subtopics: Array.isArray(o.subtopics) ? (o.subtopics as unknown[]).map(String) : [],
+      statement: String(o.statement ?? ''),
+      referenceText: o.referenceText != null ? String(o.referenceText) : null,
+      hasImage: o.hasImage === true,
+      alternatives: Array.isArray(o.alternatives)
+        ? (o.alternatives as unknown[])
+            .filter((a): a is Record<string, unknown> => a != null && typeof a === 'object')
+            .map((a) => ({
+              key: String(a.key ?? ''),
+              text: String(a.text ?? ''),
+            }))
+        : [],
+    };
   }
 
   private normalizeQuestion(item: unknown): ParsedQuestionFromPdf {

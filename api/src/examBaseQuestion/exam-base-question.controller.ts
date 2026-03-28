@@ -88,6 +88,45 @@ export class ExamBaseQuestionController {
   }
 
   /**
+   * Phase 2: Parses question structure (statement + alternatives, no answers/explanations)
+   * from a markdown chunk using Claude Sonnet. Returns { questions: ParsedQuestionStructure[] }.
+   * Admin only.
+   */
+  @Post('parse-questions-structure')
+  @Roles('ADMIN')
+  async parseQuestionsStructure(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdownChunk: string },
+  ) {
+    if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
+    const questions = await this.pdfAi.parseQuestionsStructureFromChunk(body.markdownChunk);
+    return { questions };
+  }
+
+  /**
+   * Phase 5: Generates explanations inline (without a DB question) using xAI Grok.
+   * Returns GenerateExplanationsResponse. Admin only.
+   */
+  @Post('generate-explanations-inline')
+  @Roles('ADMIN')
+  async generateExplanationsInline(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: {
+      subject?: string;
+      statement: string;
+      referenceText?: string | null;
+      statementImageUrl?: string | null;
+      correctAlternative: string;
+      alternatives: { key: string; text: string }[];
+      examName?: string;
+    },
+  ) {
+    if (!body.statement?.trim()) throw new BadRequestException('statement is required');
+    if (!body.correctAlternative?.trim()) throw new BadRequestException('correctAlternative is required');
+    return this.service.generateExplanationsInline(body);
+  }
+
+  /**
    * Parses a single markdown chunk using the provided answer key via GPT-4o.
    * Returns { questions: ParsedQuestionFromPdf[] }. Admin only.
    */

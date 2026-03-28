@@ -11,6 +11,7 @@ import {
 import type {
   ParsedQuestionItem,
   ParsedQuestionFromPdf,
+  ParsedQuestionStructure,
   GenerateExplanationsResponse,
 } from '../services/examBaseQuestions.service'
 import type {
@@ -143,7 +144,7 @@ export function useGenerateExplanationsMutation(
   })
 }
 
-export type { ParsedQuestionItem, ParsedQuestionFromPdf, GenerateExplanationsResponse }
+export type { ParsedQuestionItem, ParsedQuestionFromPdf, ParsedQuestionStructure, GenerateExplanationsResponse }
 
 export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: string) {
   return useMutation({

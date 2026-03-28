@@ -1,3 +1,28 @@
+export interface ParsedQuestionStructure {
+  number: number;
+  subject: string;
+  topic: string;
+  subtopics: string[];
+  statement: string;
+  referenceText: string | null;
+  hasImage: boolean;
+  alternatives: { key: string; text: string }[];
+}
+
+export const PARSED_QUESTION_STRUCTURE_EXAMPLE: ParsedQuestionStructure = {
+  number: 1,
+  subject: 'Saúde do Adulto',
+  topic: 'Hipertensão Arterial',
+  subtopics: ['Tratamento não farmacológico'],
+  statement: 'Sobre o tratamento da hipertensão arterial, assinale a alternativa **correta**:',
+  referenceText: null,
+  hasImage: false,
+  alternatives: [
+    { key: 'A', text: 'Reduzir o consumo de sódio para menos de 2g/dia.' },
+    { key: 'B', text: 'Aumentar o consumo de gorduras saturadas.' },
+  ],
+};
+
 export interface ParsedQuestionFromPdfAlternative {
   key: string;
   text: string;
