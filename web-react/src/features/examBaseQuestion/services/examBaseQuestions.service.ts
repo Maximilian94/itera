@@ -16,6 +16,20 @@ export type ParsedQuestionItem = {
   alternatives: { key: string; text: string }[]
 }
 
+export type ParsedQuestionFromPdf = {
+  number: number
+  subject: string
+  topic: string
+  subtopics: string[]
+  statement: string
+  referenceText: string | null
+  hasImage: boolean
+  alternatives: { key: string; text: string; explanation: string }[]
+  correctAlternative: string | null
+  answerDoubt: boolean
+  doubtReason: string | null
+}
+
 export type GenerateExplanationsResponse = {
   topic: string
   subtopics: string[]
@@ -205,6 +219,30 @@ export const examBaseQuestionsService = {
       `${basePath(examBaseId)}/${questionId}/generate-explanations`,
       { method: 'POST' },
     )
+  },
+
+  parseFromPdfs(
+    examBaseId: string,
+    examPdf: File,
+    gabaritoPdf: File,
+  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
+    const formData = new FormData()
+    formData.append('examPdf', examPdf)
+    formData.append('gabaritoPdf', gabaritoPdf)
+    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+      `${basePath(examBaseId)}/parse-from-pdfs`,
+      { method: 'POST', body: formData },
+    )
+  },
+
+  createBatch(
+    examBaseId: string,
+    questions: CreateExamBaseQuestionInput[],
+  ): Promise<ExamBaseQuestion[]> {
+    return apiFetch<ExamBaseQuestion[]>(`${basePath(examBaseId)}/batch`, {
+      method: 'POST',
+      body: JSON.stringify({ questions }),
+    })
   },
 }
 

@@ -8,13 +8,24 @@ import {
   useUpdateExamBaseMutation,
 } from '@/features/examBase/queries/examBase.queries'
 import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
+import {
+  useParseQuestionsFromPdfsMutation,
+  useCreateBatchQuestionsMutation,
+  type ParsedQuestionFromPdf,
+} from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 import { StateCitySelect } from '@/components/StateCitySelect'
+import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import WarningAmberIcon from '@mui/icons-material/WarningAmber'
+import ImageIcon from '@mui/icons-material/Image'
+import LockOpenIcon from '@mui/icons-material/LockOpen'
 import {
   Alert,
   Box,
   Button,
+  Chip,
   CircularProgress,
   Divider,
   FormControl,
@@ -494,21 +505,533 @@ function MetadataStep({
 // Step 2 — Questions (placeholder)
 // ─────────────────────────────────────────────────────────────────────────────
 
-function QuestionsStep({ onBack }: { onBack: () => void }) {
+// ─────────────────────────────────────────────────────────────────────────────
+// Question card (review UI)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type ReviewQuestion = ParsedQuestionFromPdf & {
+  unblocked: boolean
+  statementImageUrl?: string
+}
+
+function QuestionCard({
+  q,
+  index,
+  examBaseId,
+  onUnblock,
+  onImageUploaded,
+}: {
+  q: ReviewQuestion
+  index: number
+  examBaseId: string
+  onUnblock: (index: number) => void
+  onImageUploaded: (index: number, url: string) => void
+}) {
+  const [showExplanations, setShowExplanations] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  const isBlocked = q.hasImage && !q.unblocked && !q.statementImageUrl
+
+  async function handleImageUpload(file: File) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
+      onImageUploaded(index, url)
+    } catch (err) {
+      setUploadError((err as Error).message ?? 'Erro ao subir imagem')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   return (
-    <div className="flex flex-col items-center justify-center py-16 gap-4">
-      <div className="w-16 h-16 rounded-full bg-violet-100 flex items-center justify-center">
-        <AutoAwesomeIcon className="text-violet-500" style={{ fontSize: 32 }} />
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: isBlocked ? 'warning.light' : 'divider',
+        borderRadius: 2,
+        overflow: 'hidden',
+        position: 'relative',
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          bgcolor: isBlocked ? 'warning.50' : 'grey.50',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
+          Questão {q.number}
+        </Typography>
+        {q.subject && <Chip label={q.subject} size="small" variant="outlined" />}
+        {q.topic && (
+          <Typography variant="caption" color="text.secondary">
+            {q.topic}
+          </Typography>
+        )}
+        <Box sx={{ flex: 1 }} />
+        {q.correctAlternative && (
+          <Chip
+            label={`Gabarito: ${q.correctAlternative}`}
+            size="small"
+            color="success"
+            variant="filled"
+          />
+        )}
+        {q.answerDoubt && (
+          <Chip
+            icon={<WarningAmberIcon fontSize="small" />}
+            label="Gabarito duvidoso"
+            size="small"
+            color="warning"
+            variant="filled"
+          />
+        )}
+        {isBlocked && (
+          <Chip
+            icon={<ImageIcon fontSize="small" />}
+            label="Imagem necessária"
+            size="small"
+            color="warning"
+            variant="outlined"
+          />
+        )}
+      </Box>
+
+      {/* Body */}
+      <Box sx={{ px: 2, py: 2, position: 'relative' }}>
+        {/* Blocked overlay */}
+        {isBlocked && (
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
+              bgcolor: 'rgba(255,255,255,0.85)',
+              zIndex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 1.5,
+              p: 2,
+            }}
+          >
+            <ImageIcon sx={{ fontSize: 36, color: 'warning.main' }} />
+            <Typography variant="body2" color="text.secondary" textAlign="center">
+              Esta questão referencia uma imagem/figura. Faça upload ou desbloqueie manualmente.
+            </Typography>
+            <div className="flex gap-2 flex-wrap justify-center">
+              <Button
+                size="small"
+                variant="contained"
+                startIcon={uploading ? <CircularProgress size={14} color="inherit" /> : <ImageIcon />}
+                disabled={uploading}
+                onClick={() => imageInputRef.current?.click()}
+                sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+              >
+                Upload imagem
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                startIcon={<LockOpenIcon />}
+                onClick={() => onUnblock(index)}
+              >
+                Desbloquear
+              </Button>
+            </div>
+            {uploadError && (
+              <Alert severity="error" sx={{ py: 0, mt: 0.5 }}>
+                {uploadError}
+              </Alert>
+            )}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) handleImageUpload(file)
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Gabarito doubt warning */}
+        {q.answerDoubt && q.doubtReason && (
+          <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>
+            <Typography variant="body2" fontWeight={600}>
+              Atenção: gabarito possivelmente incorreto
+            </Typography>
+            <Typography variant="body2">{q.doubtReason}</Typography>
+          </Alert>
+        )}
+
+        {/* Uploaded image */}
+        {q.statementImageUrl && (
+          <Box sx={{ mb: 2 }}>
+            <img
+              src={q.statementImageUrl}
+              alt="Imagem do enunciado"
+              style={{ maxWidth: '100%', borderRadius: 4 }}
+            />
+          </Box>
+        )}
+
+        {/* Reference text */}
+        {q.referenceText && (
+          <Box
+            sx={{
+              bgcolor: 'grey.50',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 1.5,
+              mb: 2,
+            }}
+          >
+            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+              Texto de referência
+            </Typography>
+            <Markdown variant="body2">{q.referenceText}</Markdown>
+          </Box>
+        )}
+
+        {/* Statement */}
+        <Box sx={{ mb: 2 }}>
+          <Markdown variant="body2">{q.statement}</Markdown>
+        </Box>
+
+        {/* Alternatives */}
+        <Stack spacing={1} sx={{ mb: 1.5 }}>
+          {q.alternatives.map((alt) => {
+            const isCorrect = alt.key === q.correctAlternative
+            return (
+              <Box
+                key={alt.key}
+                sx={{
+                  border: '1px solid',
+                  borderColor: isCorrect ? 'success.light' : 'divider',
+                  borderRadius: 1,
+                  p: 1.5,
+                  bgcolor: isCorrect ? 'success.50' : 'transparent',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    sx={{ minWidth: 20, color: isCorrect ? 'success.main' : 'text.primary' }}
+                  >
+                    {alt.key})
+                  </Typography>
+                  <Box sx={{ flex: 1 }}>
+                    <Markdown variant="body2">{alt.text}</Markdown>
+                    {showExplanations && alt.explanation && (
+                      <Box
+                        sx={{
+                          mt: 1,
+                          pt: 1,
+                          borderTop: '1px dashed',
+                          borderColor: 'divider',
+                        }}
+                      >
+                        <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                          Explicação:
+                        </Typography>
+                        <Markdown variant="caption">{alt.explanation}</Markdown>
+                      </Box>
+                    )}
+                  </Box>
+                </div>
+              </Box>
+            )
+          })}
+        </Stack>
+
+        <Button
+          size="small"
+          variant="text"
+          sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
+          onClick={() => setShowExplanations((v) => !v)}
+        >
+          {showExplanations ? 'Ocultar explicações' : 'Ver explicações'}
+        </Button>
+      </Box>
+    </Box>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 2 — Questions
+// ─────────────────────────────────────────────────────────────────────────────
+
+function QuestionsStep({
+  examBaseId,
+  onBack,
+}: {
+  examBaseId: string
+  onBack: () => void
+}) {
+  const parseMutation = useParseQuestionsFromPdfsMutation(examBaseId)
+  const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
+
+  const [examPdf, setExamPdf] = useState<File | null>(null)
+  const [gabaritoPdf, setGabaritoPdf] = useState<File | null>(null)
+  const [questions, setQuestions] = useState<ReviewQuestion[]>([])
+  const examPdfRef = useRef<HTMLInputElement>(null)
+  const gabaritoPdfRef = useRef<HTMLInputElement>(null)
+
+  async function handleParse() {
+    if (!examPdf || !gabaritoPdf) return
+    const result = await parseMutation.mutateAsync({ examPdf, gabaritoPdf })
+    setQuestions(
+      result.questions.map((q) => ({ ...q, unblocked: false })),
+    )
+  }
+
+  async function handleSave() {
+    const payload = questions.map((q) => ({
+      subject: q.subject,
+      topic: q.topic,
+      subtopics: q.subtopics,
+      statement: q.statement,
+      referenceText: q.referenceText ?? undefined,
+      statementImageUrl: q.statementImageUrl ?? undefined,
+      correctAlternative: q.correctAlternative ?? undefined,
+      alternatives: q.alternatives.map((a) => ({
+        key: a.key,
+        text: a.text,
+        explanation: a.explanation,
+      })),
+    }))
+    await saveMutation.mutateAsync(payload)
+    setQuestions([])
+    setExamPdf(null)
+    setGabaritoPdf(null)
+  }
+
+  const blockedCount = questions.filter(
+    (q) => q.hasImage && !q.unblocked && !q.statementImageUrl,
+  ).length
+  const doubtCount = questions.filter((q) => q.answerDoubt).length
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Upload panel */}
+      <Box
+        sx={{
+          border: '1px solid',
+          borderColor: 'divider',
+          borderRadius: 2,
+          p: 3,
+        }}
+      >
+        <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+          Analisar PDFs com IA
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2.5}>
+          Envie a prova e o gabarito. O Claude extrairá as questões de enfermagem com respostas e explicações.
+        </Typography>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+              Prova (PDF)
+            </Typography>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => examPdfRef.current?.click()}
+              >
+                {examPdf ? examPdf.name : 'Selecionar PDF'}
+              </Button>
+              {examPdf && (
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-slate-700 underline"
+                  onClick={() => {
+                    setExamPdf(null)
+                    if (examPdfRef.current) examPdfRef.current.value = ''
+                  }}
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            <input
+              ref={examPdfRef}
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={(e) => setExamPdf(e.target.files?.[0] ?? null)}
+            />
+          </div>
+
+          <div>
+            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+              Gabarito (PDF)
+            </Typography>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => gabaritoPdfRef.current?.click()}
+              >
+                {gabaritoPdf ? gabaritoPdf.name : 'Selecionar PDF'}
+              </Button>
+              {gabaritoPdf && (
+                <button
+                  type="button"
+                  className="text-xs text-slate-500 hover:text-slate-700 underline"
+                  onClick={() => {
+                    setGabaritoPdf(null)
+                    if (gabaritoPdfRef.current) gabaritoPdfRef.current.value = ''
+                  }}
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+            <input
+              ref={gabaritoPdfRef}
+              type="file"
+              accept=".pdf"
+              className="hidden"
+              onChange={(e) => setGabaritoPdf(e.target.files?.[0] ?? null)}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 mt-4">
+          <Button
+            variant="contained"
+            startIcon={
+              parseMutation.isPending ? (
+                <CircularProgress size={16} color="inherit" />
+              ) : (
+                <AutoAwesomeIcon />
+              )
+            }
+            disabled={!examPdf || !gabaritoPdf || parseMutation.isPending}
+            onClick={handleParse}
+            sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+          >
+            {parseMutation.isPending ? 'Analisando...' : 'Analisar com IA'}
+          </Button>
+          {parseMutation.isPending && (
+            <Typography variant="caption" color="text.secondary">
+              Isso pode levar alguns minutos para PDFs grandes.
+            </Typography>
+          )}
+        </div>
+
+        {parseMutation.isError && (
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {(parseMutation.error as Error)?.message ?? 'Erro ao analisar PDFs'}
+          </Alert>
+        )}
+      </Box>
+
+      {/* Results */}
+      {questions.length > 0 && (
+        <>
+          <div className="flex items-center gap-3 flex-wrap">
+            <Typography variant="subtitle1" fontWeight={600}>
+              {questions.length} questões extraídas
+            </Typography>
+            {blockedCount > 0 && (
+              <Chip
+                icon={<ImageIcon fontSize="small" />}
+                label={`${blockedCount} aguardando imagem`}
+                size="small"
+                color="warning"
+              />
+            )}
+            {doubtCount > 0 && (
+              <Chip
+                icon={<WarningAmberIcon fontSize="small" />}
+                label={`${doubtCount} gabarito duvidoso`}
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+          </div>
+
+          <Stack spacing={2}>
+            {questions.map((q, i) => (
+              <QuestionCard
+                key={i}
+                q={q}
+                index={i}
+                examBaseId={examBaseId}
+                onUnblock={(idx) =>
+                  setQuestions((prev) =>
+                    prev.map((item, j) =>
+                      j === idx ? { ...item, unblocked: true } : item,
+                    ),
+                  )
+                }
+                onImageUploaded={(idx, url) =>
+                  setQuestions((prev) =>
+                    prev.map((item, j) =>
+                      j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item,
+                    ),
+                  )
+                }
+              />
+            ))}
+          </Stack>
+
+          {saveMutation.isError && (
+            <Alert severity="error">
+              {(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}
+            </Alert>
+          )}
+
+          {saveMutation.isSuccess && (
+            <Alert severity="success">
+              {questions.length} questões salvas com sucesso!
+            </Alert>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button
+              variant="contained"
+              onClick={handleSave}
+              disabled={saveMutation.isPending || saveMutation.isSuccess}
+              startIcon={saveMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
+              sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+            >
+              {saveMutation.isPending
+                ? 'Salvando...'
+                : `Salvar ${questions.length} questões`}
+            </Button>
+          </div>
+        </>
+      )}
+
+      <Divider />
+
+      <div>
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+          Voltar para metadados
+        </Button>
       </div>
-      <Typography variant="h6" fontWeight={600} color="text.primary">
-        Questões
-      </Typography>
-      <Typography variant="body2" color="text.secondary" className="text-center max-w-sm">
-        A funcionalidade de adição de questões estará disponível em breve.
-      </Typography>
-      <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
-        Voltar para metadados
-      </Button>
     </div>
   )
 }
@@ -542,7 +1065,7 @@ function ExamEditPage() {
       {step === 1 ? (
         <MetadataStep examBaseId={examBaseId} onNext={() => setStep(2)} />
       ) : (
-        <QuestionsStep onBack={() => setStep(1)} />
+        <QuestionsStep examBaseId={examBaseId} onBack={() => setStep(1)} />
       )}
     </div>
   )

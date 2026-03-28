@@ -9,9 +9,10 @@ import {
   Post,
   Query,
   UploadedFile,
+  UploadedFiles,
   UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express/multer';
+import { FileInterceptor, FileFieldsInterceptor } from '@nestjs/platform-express/multer';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CopyQuestionDto } from './dto/copy-question.dto';
 import { CreateAlternativeDto } from './dto/create-alternative.dto';
@@ -21,6 +22,7 @@ import { ReorderQuestionsDto } from './dto/reorder-questions.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { ExamBaseQuestionService } from './exam-base-question.service';
+import { ExamBaseQuestionPdfAiService } from './exam-base-question-pdf-ai.service';
 import { StorageService } from '../storage/storage.service';
 
 const STATEMENT_IMAGE_MIMES = [
@@ -39,8 +41,50 @@ const STATEMENT_IMAGE_MAX_SIZE = 5 * 1024 * 1024; // 5MB
 export class ExamBaseQuestionController {
   constructor(
     private readonly service: ExamBaseQuestionService,
+    private readonly pdfAi: ExamBaseQuestionPdfAiService,
     private readonly storage: StorageService,
   ) {}
+
+  /**
+   * Parses exam questions from two PDFs (prova + gabarito) using Claude.
+   * Returns structured questions for review — does NOT save to DB. Admin only.
+   */
+  @Post('parse-from-pdfs')
+  @Roles('ADMIN')
+  @UseInterceptors(
+    FileFieldsInterceptor([
+      { name: 'examPdf', maxCount: 1 },
+      { name: 'gabaritoPdf', maxCount: 1 },
+    ]),
+  )
+  async parseFromPdfs(
+    @Param('examBaseId') _examBaseId: string,
+    @UploadedFiles()
+    files: {
+      examPdf?: { buffer: Buffer; mimetype: string }[];
+      gabaritoPdf?: { buffer: Buffer; mimetype: string }[];
+    },
+  ) {
+    const examPdf = files?.examPdf?.[0];
+    const gabaritoPdf = files?.gabaritoPdf?.[0];
+    if (!examPdf) throw new BadRequestException('examPdf is required');
+    if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
+    const questions = await this.pdfAi.parseQuestionsFromPdfs(
+      examPdf.buffer,
+      gabaritoPdf.buffer,
+    );
+    return { questions };
+  }
+
+  /** Saves an array of questions in batch. Admin only. */
+  @Post('batch')
+  @Roles('ADMIN')
+  createBatch(
+    @Param('examBaseId') examBaseId: string,
+    @Body() body: { questions: CreateExamBaseQuestionDto[] },
+  ) {
+    return this.service.createBatch(examBaseId, body.questions ?? []);
+  }
 
   @Get()
   list(@Param('examBaseId') examBaseId: string) {

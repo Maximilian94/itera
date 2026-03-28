@@ -1054,4 +1054,61 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       where: { id: alternativeId },
     });
   }
+
+  /** Saves an array of questions in a single transaction, appending after existing ones. */
+  async createBatch(
+    examBaseId: string,
+    questions: CreateExamBaseQuestionDto[],
+  ) {
+    if (questions.length === 0) return [];
+
+    return this.prisma.$transaction(async (tx) => {
+      const maxPosition = await tx.examBaseQuestion.aggregate({
+        where: { examBaseId },
+        _max: { position: true },
+      });
+      let nextPosition = (maxPosition._max.position ?? -1) + 1;
+
+      const created: Awaited<ReturnType<typeof tx.examBaseQuestion.findUniqueOrThrow>>[] = [];
+
+      for (const dto of questions) {
+        const correctAlternative = dto.correctAlternative?.trim() || null;
+        const question = await tx.examBaseQuestion.create({
+          data: {
+            examBaseId,
+            subject: dto.subject,
+            topic: dto.topic,
+            subtopics: dto.subtopics ?? [],
+            statement: dto.statement,
+            statementImageUrl: dto.statementImageUrl?.trim() || null,
+            referenceText: dto.referenceText?.trim() || null,
+            skills: dto.skills ?? [],
+            correctAlternative,
+            position: nextPosition++,
+          },
+          select: { id: true },
+        });
+
+        if (dto.alternatives && dto.alternatives.length > 0) {
+          await tx.examBaseQuestionAlternative.createMany({
+            data: dto.alternatives.map((a) => ({
+              examBaseQuestionId: question.id,
+              key: a.key.trim(),
+              text: a.text,
+              explanation: a.explanation,
+            })),
+          });
+        }
+
+        created.push(
+          await tx.examBaseQuestion.findUniqueOrThrow({
+            where: { id: question.id },
+            select: questionSelect,
+          }),
+        );
+      }
+
+      return created;
+    });
+  }
 }
