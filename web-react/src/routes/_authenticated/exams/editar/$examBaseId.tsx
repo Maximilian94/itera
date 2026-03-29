@@ -839,7 +839,6 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [totalQuestions, setTotalQuestions] = useState<number | ''>('')
   const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -855,12 +854,11 @@ function ExamPdfStep({
       // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
       const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
 
-      // Phase 2: send full markdown to Grok in a single request
+      // Phase 2: backend splits markdown into chunks and calls GPT-4o per chunk
       setStatus('parsing-chunks')
       const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
         examBaseId,
         markdown,
-        totalQuestions !== '' ? totalQuestions : undefined,
       )
 
       setQuestions(all)
@@ -880,7 +878,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e enviado ao Grok para extração de todas as questões.
+          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e enviado ao GPT-4o para extração de todas as questões.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
@@ -910,21 +908,6 @@ function ExamPdfStep({
           onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setQuestions([]); setStatus('idle') } }}
         />
 
-        <div className="flex items-center gap-2 mb-3">
-          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
-            Nº de questões (opcional):
-          </Typography>
-          <input
-            type="number"
-            min={1}
-            value={totalQuestions}
-            disabled={isParsing}
-            onChange={(e) => setTotalQuestions(e.target.value === '' ? '' : Number(e.target.value))}
-            className="border border-gray-300 rounded px-2 py-1 text-sm w-20 disabled:opacity-50"
-            placeholder="Ex: 50"
-          />
-        </div>
-
         {status === 'idle' && (
           <Button variant="contained" startIcon={<AutoAwesomeIcon />} disabled={!file} onClick={handleParse}
             sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}>
@@ -937,7 +920,7 @@ function ExamPdfStep({
         )}
 
         {status === 'parsing-chunks' && (
-          <StepProgressBar label="Extraindo questões (Grok)..." value={-1} />
+          <StepProgressBar label="Extraindo questões (GPT-4o)..." value={-1} />
         )}
 
         {isParsing && (

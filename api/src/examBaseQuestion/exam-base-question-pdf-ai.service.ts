@@ -214,57 +214,95 @@ export class ExamBaseQuestionPdfAiService {
    */
   async parseQuestionsStructureFromChunk(
     markdown: string,
-    totalQuestions?: number,
   ): Promise<ParsedQuestionStructure[]> {
-    const xaiKey = this.config.get<string>('XAI_API_KEY');
-    if (!xaiKey) {
-      throw new BadRequestException('XAI_API_KEY não configurada. Configure-a no .env.');
+    const openaiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!openaiKey) {
+      throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
     }
 
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
-    const totalHint = totalQuestions != null
-      ? `A prova tem exatamente ${totalQuestions} questões. Extraia TODAS as ${totalQuestions} questões, sem exceção.\n\n`
-      : '';
+    const chunks = this.splitIntoChunks(markdown, 5);
+    const all: ParsedQuestionStructure[] = [];
 
-    const res = await undiciFetch('https://api.x.ai/v1/chat/completions', {
-      method: 'POST',
-      dispatcher: agent,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        Authorization: `Bearer ${xaiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'grok-4-1-fast-reasoning',
-        max_tokens: 32768,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: buildStructureSystemPrompt() },
-          { role: 'user', content: `${totalHint}Extraia TODAS as questões e retorne em questions:\n\n${markdown}` },
-        ],
-      }),
-    });
+    for (const chunk of chunks) {
+      const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        dispatcher: agent,
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          Authorization: `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o',
+          max_tokens: 8192,
+          temperature: 0,
+          response_format: {
+            type: 'json_schema',
+            json_schema: {
+              name: 'exam_questions',
+              strict: true,
+              schema: {
+                type: 'object',
+                properties: {
+                  questions: {
+                    type: 'array',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        number: { type: 'integer' },
+                        subject: { type: 'string' },
+                        topic: { type: 'string' },
+                        subtopics: { type: 'array', items: { type: 'string' } },
+                        statement: { type: 'string' },
+                        referenceText: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                        hasImage: { type: 'boolean' },
+                        alternatives: {
+                          type: 'array',
+                          items: {
+                            type: 'object',
+                            properties: {
+                              key: { type: 'string' },
+                              text: { type: 'string' },
+                            },
+                            required: ['key', 'text'],
+                            additionalProperties: false,
+                          },
+                        },
+                      },
+                      required: ['number', 'subject', 'topic', 'subtopics', 'statement', 'referenceText', 'hasImage', 'alternatives'],
+                      additionalProperties: false,
+                    },
+                  },
+                },
+                required: ['questions'],
+                additionalProperties: false,
+              },
+            },
+          },
+          messages: [
+            { role: 'system', content: buildStructureSystemPrompt() },
+            { role: 'user', content: `Extraia todas as questões e retorne em questions:\n\n${chunk}` },
+          ],
+        }),
+      });
 
-    if (!res.ok) {
-      const body = await res.text();
-      throw new BadRequestException(`Grok API error (${res.status}): ${body.slice(0, 300)}`);
+      if (!res.ok) {
+        const body = await res.text();
+        throw new BadRequestException(`OpenAI API error (${res.status}): ${body.slice(0, 300)}`);
+      }
+
+      const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+      const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+      if (!content) continue;
+
+      const parsed = JSON.parse(content) as { questions: unknown[] };
+      all.push(...(parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item)));
     }
 
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const raw = data.choices?.[0]?.message?.content?.trim() ?? '';
-    if (!raw) return [];
-
-    // Strip <think>...</think> reasoning blocks returned by reasoning models (e.g. grok-4-1-fast-reasoning)
-    let jsonStr = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
-    // Extract between first { and last } to handle any surrounding text
-    const first = jsonStr.indexOf('{');
-    const last = jsonStr.lastIndexOf('}');
-    if (first !== -1 && last > first) jsonStr = jsonStr.slice(first, last + 1);
-
-    const parsed = JSON.parse(jsonrepair(jsonStr)) as { questions: unknown[] };
-    return (parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item));
+    return all;
   }
 
   /**
