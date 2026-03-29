@@ -223,7 +223,7 @@ export class ExamBaseQuestionPdfAiService {
     }
 
     const { fetch: undiciFetch, Agent } = await import('undici');
-    const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 120_000, bodyTimeout: 120_000 });
+    const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
     const userMessage =
       rangeFrom != null && rangeTo != null
