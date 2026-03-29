@@ -143,7 +143,7 @@ function RouteComponent() {
                         <Grid size={1}>
                             <div className='w-full h-12 flex items-center justify-start'>
                                 <img
-                                    src={examBase.examBoard?.logoUrl}
+                                    src={examBase.examBoard?.logoUrl ?? undefined}
                                     alt={examBase.examBoard?.name}
                                     className="h-full w-full object-contain object-left"
                                 />

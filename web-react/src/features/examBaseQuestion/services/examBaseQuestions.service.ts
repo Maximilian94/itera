@@ -16,6 +16,31 @@ export type ParsedQuestionItem = {
   alternatives: { key: string; text: string }[]
 }
 
+export type ParsedQuestionStructure = {
+  number: number
+  subject: string
+  topic: string
+  subtopics: string[]
+  statement: string
+  referenceText: string | null
+  hasImage: boolean
+  alternatives: { key: string; text: string }[]
+}
+
+export type ParsedQuestionFromPdf = {
+  number: number
+  subject: string
+  topic: string
+  subtopics: string[]
+  statement: string
+  referenceText: string | null
+  hasImage: boolean
+  alternatives: { key: string; text: string; explanation: string }[]
+  correctAlternative: string | null
+  answerDoubt: boolean
+  doubtReason: string | null
+}
+
 export type GenerateExplanationsResponse = {
   topic: string
   subtopics: string[]
@@ -205,6 +230,85 @@ export const examBaseQuestionsService = {
       `${basePath(examBaseId)}/${questionId}/generate-explanations`,
       { method: 'POST' },
     )
+  },
+
+  parseFromMarkdownAndGabarito(
+    examBaseId: string,
+    markdown: string,
+    gabaritoPdf: File,
+  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
+    const formData = new FormData()
+    formData.append('markdown', markdown)
+    formData.append('gabaritoPdf', gabaritoPdf)
+    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+      `${basePath(examBaseId)}/parse-from-markdown-and-gabarito`,
+      { method: 'POST', body: formData },
+    )
+  },
+
+  extractGabaritoAnswerKey(
+    examBaseId: string,
+    gabaritoPdf: File,
+    cargo?: string,
+  ): Promise<{ answerKey: Record<string, string> }> {
+    const formData = new FormData()
+    formData.append('gabaritoPdf', gabaritoPdf)
+    if (cargo) formData.append('cargo', cargo)
+    return apiFetch<{ answerKey: Record<string, string> }>(
+      `${basePath(examBaseId)}/extract-gabarito-answer-key`,
+      { method: 'POST', body: formData },
+    )
+  },
+
+  parseMarkdownChunk(
+    examBaseId: string,
+    markdownChunk: string,
+    answerKey: Record<string, string>,
+  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
+    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+      `${basePath(examBaseId)}/parse-markdown-chunk`,
+      { method: 'POST', body: JSON.stringify({ markdownChunk, answerKey }) },
+    )
+  },
+
+parseQuestionsStructureFromChunk(
+    examBaseId: string,
+    markdownChunk: string,
+    rangeFrom?: number,
+    rangeTo?: number,
+  ): Promise<{ questions: ParsedQuestionStructure[] }> {
+    return apiFetch<{ questions: ParsedQuestionStructure[] }>(
+      `${basePath(examBaseId)}/parse-questions-structure`,
+      { method: 'POST', body: JSON.stringify({ markdownChunk, rangeFrom, rangeTo }) },
+    )
+  },
+
+  generateExplanationsInline(
+    examBaseId: string,
+    input: {
+      subject?: string
+      statement: string
+      referenceText?: string | null
+      statementImageUrl?: string | null
+      correctAlternative: string
+      alternatives: { key: string; text: string }[]
+      examName?: string
+    },
+  ): Promise<GenerateExplanationsResponse> {
+    return apiFetch<GenerateExplanationsResponse>(
+      `${basePath(examBaseId)}/generate-explanations-inline`,
+      { method: 'POST', body: JSON.stringify(input) },
+    )
+  },
+
+  createBatch(
+    examBaseId: string,
+    questions: CreateExamBaseQuestionInput[],
+  ): Promise<ExamBaseQuestion[]> {
+    return apiFetch<ExamBaseQuestion[]>(`${basePath(examBaseId)}/batch`, {
+      method: 'POST',
+      body: JSON.stringify({ questions }),
+    })
   },
 }
 

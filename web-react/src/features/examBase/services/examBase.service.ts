@@ -1,6 +1,7 @@
 import type {
   CreateExamBaseInput,
   ExamBase,
+  ExtractedExamMetadata,
   UpdateExamBaseInput,
 } from '../domain/examBase.types'
 import { apiFetch } from '@/lib/api'
@@ -49,6 +50,21 @@ class ExamBaseService {
       `${this.urlPath}/${id}/generate-slug`,
       { method: 'POST' },
     )
+  }
+
+  async createDraft(): Promise<{ id: string }> {
+    return await apiFetch<{ id: string }>(`${this.urlPath}/draft`, { method: 'POST' })
+  }
+
+  async extractMetadata(input: { url?: string; role?: string; pdfFile?: File }): Promise<ExtractedExamMetadata> {
+    const formData = new FormData()
+    if (input.url) formData.append('url', input.url)
+    if (input.role) formData.append('role', input.role)
+    if (input.pdfFile) formData.append('pdfFile', input.pdfFile)
+    return await apiFetch<ExtractedExamMetadata>(`${this.urlPath}/extract-metadata`, {
+      method: 'POST',
+      body: formData,
+    })
   }
 }
 

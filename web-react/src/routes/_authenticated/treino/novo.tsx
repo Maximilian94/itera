@@ -205,7 +205,7 @@ function BoardPill({
   isActive,
   onClick,
 }: {
-  board: { id: string; name: string; alias?: string | null; logoUrl: string }
+  board: { id: string; name: string; alias?: string | null; logoUrl?: string | null }
   count: number
   isActive: boolean
   onClick: () => void
@@ -221,11 +221,13 @@ function BoardPill({
             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
         }`}
       >
-        <img
-          src={board.logoUrl}
-          alt={board.alias ?? board.name}
-          className="w-7 h-7 object-contain rounded"
-        />
+        {board.logoUrl && (
+          <img
+            src={board.logoUrl}
+            alt={board.alias ?? board.name}
+            className="w-7 h-7 object-contain rounded"
+          />
+        )}
         <div className="min-w-0">
           <p
             className={`text-xs font-semibold truncate ${

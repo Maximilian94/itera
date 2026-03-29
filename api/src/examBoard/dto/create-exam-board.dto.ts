@@ -12,6 +12,7 @@ export class CreateExamBoardDto {
   @IsUrl()
   websiteUrl?: string;
 
+  @IsOptional()
   @IsString()
-  logoUrl: string;
+  logoUrl?: string;
 }

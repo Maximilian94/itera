@@ -10,6 +10,8 @@ import {
 } from '../services/examBaseQuestions.service'
 import type {
   ParsedQuestionItem,
+  ParsedQuestionFromPdf,
+  ParsedQuestionStructure,
   GenerateExplanationsResponse,
 } from '../services/examBaseQuestions.service'
 import type {
@@ -142,7 +144,25 @@ export function useGenerateExplanationsMutation(
   })
 }
 
-export type { ParsedQuestionItem, GenerateExplanationsResponse }
+export type { ParsedQuestionItem, ParsedQuestionFromPdf, ParsedQuestionStructure, GenerateExplanationsResponse }
+
+export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: string) {
+  return useMutation({
+    mutationFn: ({ markdown, gabaritoPdf }: { markdown: string; gabaritoPdf: File }) =>
+      examBaseQuestionsService.parseFromMarkdownAndGabarito(examBaseId, markdown, gabaritoPdf),
+  })
+}
+
+export function useCreateBatchQuestionsMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (questions: CreateExamBaseQuestionInput[]) =>
+      examBaseQuestionsService.createBatch(examBaseId, questions),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
 
 export function useUpdateExamBaseQuestionMutation(
   examBaseId: string,

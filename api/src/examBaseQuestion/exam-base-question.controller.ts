@@ -21,6 +21,7 @@ import { ReorderQuestionsDto } from './dto/reorder-questions.dto';
 import { UpdateAlternativeDto } from './dto/update-alternative.dto';
 import { UpdateExamBaseQuestionDto } from './dto/update-exam-base-question.dto';
 import { ExamBaseQuestionService } from './exam-base-question.service';
+import { ExamBaseQuestionPdfAiService } from './exam-base-question-pdf-ai.service';
 import { StorageService } from '../storage/storage.service';
 
 const STATEMENT_IMAGE_MIMES = [
@@ -39,8 +40,122 @@ const STATEMENT_IMAGE_MAX_SIZE = 5 * 1024 * 1024; // 5MB
 export class ExamBaseQuestionController {
   constructor(
     private readonly service: ExamBaseQuestionService,
+    private readonly pdfAi: ExamBaseQuestionPdfAiService,
     private readonly storage: StorageService,
   ) {}
+
+  /**
+   * Parses nursing questions from pre-extracted markdown + gabarito PDF.
+   * Step 1 (Nanonets → markdown) is done client-side via extract-from-pdf.
+   * Step 2 (Claude Haiku → answer key) + Step 3 (GPT-4o chunks) are done here.
+   * Returns structured questions for review — does NOT save to DB. Admin only.
+   */
+  @Post('parse-from-markdown-and-gabarito')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('gabaritoPdf'))
+  async parseFromMarkdownAndGabarito(
+    @Param('examBaseId') _examBaseId: string,
+    @Body('markdown') markdown: string,
+    @UploadedFile() gabaritoPdf: { buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!markdown?.trim()) throw new BadRequestException('markdown is required');
+    if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
+    const questions = await this.pdfAi.parseQuestionsFromMarkdownAndGabarito(
+      markdown,
+      gabaritoPdf.buffer,
+    );
+    return { questions };
+  }
+
+  /**
+   * Extracts answer key from gabarito PDF using Claude Haiku.
+   * Returns { answerKey: { "1": "A", "2": "C", ... } }. Admin only.
+   */
+  @Post('extract-gabarito-answer-key')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('gabaritoPdf'))
+  async extractGabaritoAnswerKey(
+    @Param('examBaseId') _examBaseId: string,
+    @UploadedFile() gabaritoPdf: { buffer: Buffer; mimetype: string } | undefined,
+    @Body('cargo') cargo?: string,
+  ) {
+    if (!gabaritoPdf) throw new BadRequestException('gabaritoPdf is required');
+    const answerKey = await this.pdfAi.extractGabaritoAnswerKey(
+      gabaritoPdf.buffer,
+      cargo?.trim() || undefined,
+    );
+    return { answerKey };
+  }
+
+/**
+   * Parses question structure from a markdown chunk via Claude Sonnet.
+   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   */
+  @Post('parse-questions-structure')
+  @Roles('ADMIN')
+  async parseQuestionsStructure(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdownChunk: string; rangeFrom?: number; rangeTo?: number },
+  ) {
+    if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
+    const questions = await this.pdfAi.parseQuestionsStructureFromChunk(
+      body.markdownChunk,
+      body.rangeFrom,
+      body.rangeTo,
+    );
+    return { questions };
+  }
+
+  /**
+   * Phase 5: Generates explanations inline (without a DB question) using xAI Grok.
+   * Returns GenerateExplanationsResponse. Admin only.
+   */
+  @Post('generate-explanations-inline')
+  @Roles('ADMIN')
+  async generateExplanationsInline(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: {
+      subject?: string;
+      statement: string;
+      referenceText?: string | null;
+      statementImageUrl?: string | null;
+      correctAlternative: string;
+      alternatives: { key: string; text: string }[];
+      examName?: string;
+    },
+  ) {
+    if (!body.statement?.trim()) throw new BadRequestException('statement is required');
+    if (!body.correctAlternative?.trim()) throw new BadRequestException('correctAlternative is required');
+    return this.service.generateExplanationsInline(body);
+  }
+
+  /**
+   * Parses a single markdown chunk using the provided answer key via GPT-4o.
+   * Returns { questions: ParsedQuestionFromPdf[] }. Admin only.
+   */
+  @Post('parse-markdown-chunk')
+  @Roles('ADMIN')
+  async parseMarkdownChunk(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdownChunk: string; answerKey: Record<string, string> },
+  ) {
+    if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
+    const questions = await this.pdfAi.parseMarkdownChunk(
+      body.markdownChunk,
+      body.answerKey ?? {},
+    );
+    return { questions };
+  }
+
+  /** Saves an array of questions in batch. Admin only. */
+  @Post('batch')
+  @Roles('ADMIN')
+  createBatch(
+    @Param('examBaseId') examBaseId: string,
+    @Body() body: { questions: CreateExamBaseQuestionDto[] },
+  ) {
+    return this.service.createBatch(examBaseId, body.questions ?? []);
+  }
 
   @Get()
   list(@Param('examBaseId') examBaseId: string) {

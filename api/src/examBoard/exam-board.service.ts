@@ -21,7 +21,7 @@ export class ExamBoardService {
     return examBoard;
   }
 
-  create(input: { name: string; logoUrl: string; alias?: string; websiteUrl?: string }) {
+  create(input: { name: string; logoUrl?: string; alias?: string; websiteUrl?: string }) {
     return this.prisma.examBoard.create({
       data: {
         name: input.name,
