@@ -854,12 +854,23 @@ function ExamPdfStep({
       // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
       const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
 
-      // Phase 2: send full markdown to GPT-4o in a single call
+      // Phase 2: send full markdown to GPT-4o in chunks of 10 questions until empty
       setStatus('parsing-chunks')
-      const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
-        examBaseId,
-        markdown,
-      )
+      const all: ParsedQuestionStructure[] = []
+      const CHUNK_SIZE = 10
+      let from = 1
+      while (true) {
+        const to = from + CHUNK_SIZE - 1
+        const { questions: chunk } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
+          examBaseId,
+          markdown,
+          from,
+          to,
+        )
+        if (chunk.length === 0) break
+        all.push(...chunk)
+        from = to + 1
+      }
 
       setQuestions(all)
       setStatus('done')
