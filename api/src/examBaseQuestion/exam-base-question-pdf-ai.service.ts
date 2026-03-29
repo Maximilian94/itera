@@ -43,9 +43,9 @@ INSTRUÇÕES OBRIGATÓRIAS:
    - NÃO inclua respostas corretas nem explicações — apenas a estrutura da questão
 
 2. IDENTIFICAÇÃO DO ASSUNTO
-   - subject: matéria/área (ex: "Saúde do Adulto", "Farmacologia", "Legislação de Enfermagem")
-   - topic: tópico específico dentro da matéria
-   - subtopics: array com subtópicos relevantes
+   - subject: matéria/área da questão. REGRA PRINCIPAL: se a prova já organiza as questões em seções com nome explícito (ex: cabeçalhos como "POLÍTICA DE SAÚDE", "ATENÇÃO PRIMÁRIA À SAÚDE", "FARMACOLOGIA"), use EXATAMENTE esse nome como subject para todas as questões dessa seção — sem alterar a grafia, sem resumir, sem substituir por sinônimo. Só defina o subject por conta própria se não houver nenhuma categorização explícita na prova. Questões da mesma seção devem sempre ter o mesmo subject.
+   - topic: conceito central testado pela questão, usando nomenclatura técnica oficial (ex: "Hipertensão Arterial Sistêmica", "Lei Orgânica da Saúde — Lei 8.080/90", "Sistematização da Assistência de Enfermagem (SAE)"). Deve ser específico o suficiente para funcionar como um título de capítulo em material de estudo — nem tão amplo quanto a matéria, nem tão granular quanto um subtópico.
+   - subtopics: array com 1 a 3 itens representando os aspectos EXATOS testados nessa questão específica (ex: ["Critérios diagnósticos", "Metas pressóricas"], ["Princípio da universalidade"]). Use terminologia técnica reconhecida. Não repita o topic nem o subject. Não inclua aspectos genéricos que se aplicariam a qualquer questão da matéria.
 
 Retorne SOMENTE o array JSON, sem markdown nem texto adicional.
 Formato de cada elemento: ${JSON.stringify(PARSED_QUESTION_STRUCTURE_EXAMPLE)}
