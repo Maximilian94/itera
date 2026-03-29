@@ -103,6 +103,26 @@ export class ExamBaseQuestionController {
   }
 
   /**
+   * Parses question structure directly from a PDF using Claude Sonnet 4.6.
+   * Sends the PDF natively — no Nanonets/markdown step needed.
+   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   */
+  @Post('parse-from-pdf')
+  @Roles('ADMIN')
+  @UseInterceptors(FileInterceptor('file'))
+  async parseFromPdf(
+    @Param('examBaseId') _examBaseId: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
+  ) {
+    if (!file) throw new BadRequestException('file is required');
+    if (file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Only PDF files are accepted');
+    }
+    const questions = await this.pdfAi.parseQuestionsStructureFromPdf(file.buffer);
+    return { questions };
+  }
+
+  /**
    * Phase 5: Generates explanations inline (without a DB question) using xAI Grok.
    * Returns GenerateExplanationsResponse. Admin only.
    */

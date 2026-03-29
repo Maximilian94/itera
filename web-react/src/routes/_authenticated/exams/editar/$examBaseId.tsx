@@ -868,28 +868,19 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleParse() {
     if (!file) return
-    setStatus('extracting-markdown')
+    setStatus('parsing')
     setErrorMsg(null)
     setQuestions([])
 
     try {
-      // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
-      const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
-
-      // Phase 2: backend splits markdown into chunks and calls GPT-4o per chunk
-      setStatus('parsing-chunks')
-      const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
-        examBaseId,
-        markdown,
-      )
-
+      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromPdf(examBaseId, file)
       setQuestions(all)
       setStatus('done')
     } catch (err) {
@@ -898,7 +889,8 @@ function ExamPdfStep({
     }
   }
 
-  const isParsing = status === 'extracting-markdown' || status === 'parsing-chunks'
+  const isParsing = status === 'parsing'
+  const blockedCount = questions.filter((q) => q.hasImage).length
 
   return (
     <div className="flex flex-col gap-6">
@@ -907,7 +899,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e enviado ao GPT-4o para extração de todas as questões.
+          Envie o PDF da prova. Claude Sonnet 4.6 extrairá todas as questões diretamente do PDF.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
@@ -944,22 +936,24 @@ function ExamPdfStep({
           </Button>
         )}
 
-        {status === 'extracting-markdown' && (
-          <StepProgressBar label="Extraindo texto da prova (Nanonets)..." value={10} />
-        )}
-
-        {status === 'parsing-chunks' && (
-          <StepProgressBar label="Extraindo questões (GPT-4o)..." value={-1} />
-        )}
-
         {isParsing && (
-          <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
-            Extraindo...
-          </Button>
+          <>
+            <StepProgressBar label="Extraindo questões (Claude Sonnet 4.6)..." value={-1} />
+            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+              Extraindo...
+            </Button>
+          </>
         )}
 
         {status === 'done' && (
-          <StepProgressBar label={`${questions.length} questões extraídas!`} value={100} color="success" />
+          <>
+            <StepProgressBar label={`${questions.length} questões extraídas!`} value={100} color="success" />
+            {blockedCount > 0 && (
+              <Alert severity="warning" sx={{ mt: 2, py: 0.5 }}>
+                {blockedCount} questão(ões) referenciam imagens. Será necessário fazer upload antes de salvar.
+              </Alert>
+            )}
+          </>
         )}
 
         {status === 'error' && (
@@ -971,6 +965,45 @@ function ExamPdfStep({
           </>
         )}
       </Box>
+
+      {/* Preview das questões extraídas */}
+      {questions.length > 0 && (
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} mb={2}>
+            Questões extraídas ({questions.length})
+          </Typography>
+          <Stack spacing={1.5} sx={{ maxHeight: 400, overflow: 'auto' }}>
+            {questions.map((q) => (
+              <Box
+                key={q.number}
+                sx={{
+                  border: '1px solid',
+                  borderColor: q.hasImage ? 'warning.light' : 'divider',
+                  borderRadius: 1,
+                  p: 1.5,
+                  bgcolor: q.hasImage ? 'warning.50' : 'transparent',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Typography variant="body2" fontWeight={700}>
+                    {q.number}.
+                  </Typography>
+                  {q.subject && <Chip label={q.subject} size="small" variant="outlined" />}
+                  {q.hasImage && (
+                    <Chip icon={<ImageIcon fontSize="small" />} label="Imagem" size="small" color="warning" variant="outlined" />
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                    {q.alternatives.length} alternativas
+                  </Typography>
+                </div>
+                <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {q.statement.slice(0, 150)}{q.statement.length > 150 ? '...' : ''}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       <div className="flex items-center gap-3">
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isParsing}>

@@ -312,6 +312,18 @@ parseQuestionsStructureFromChunk(
     )
   },
 
+  parseQuestionsFromPdf(
+    examBaseId: string,
+    file: File,
+  ): Promise<{ questions: ParsedQuestionStructure[] }> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return apiFetch<{ questions: ParsedQuestionStructure[] }>(
+      `${basePath(examBaseId)}/parse-from-pdf`,
+      { method: 'POST', body: formData },
+    )
+  },
+
   generateExplanationsInline(
     examBaseId: string,
     input: {
