@@ -136,8 +136,18 @@ export function useGenerateMetadataMutation(
   questionId: string,
 ) {
   return useMutation({
+    mutationFn: ({ subject }: { subject?: string } = {}) =>
+      examBaseQuestionsService.generateMetadata(examBaseId, questionId, subject),
+  })
+}
+
+export function useGenerateSubjectMutation(
+  examBaseId: string,
+  questionId: string,
+) {
+  return useMutation({
     mutationFn: () =>
-      examBaseQuestionsService.generateMetadata(examBaseId, questionId),
+      examBaseQuestionsService.generateSubject(examBaseId, questionId),
   })
 }
 

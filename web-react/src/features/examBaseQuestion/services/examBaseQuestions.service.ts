@@ -231,9 +231,24 @@ export const examBaseQuestionsService = {
   generateMetadata(
     examBaseId: string,
     questionId: string,
+    subject?: string,
   ): Promise<GenerateMetadataResponse> {
     return apiFetch<GenerateMetadataResponse>(
       `${basePath(examBaseId)}/${questionId}/generate-metadata`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: subject ?? null }),
+      },
+    )
+  },
+
+  generateSubject(
+    examBaseId: string,
+    questionId: string,
+  ): Promise<{ subject: string }> {
+    return apiFetch<{ subject: string }>(
+      `${basePath(examBaseId)}/${questionId}/generate-subject`,
       { method: 'POST' },
     )
   },

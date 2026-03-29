@@ -640,6 +640,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
   async generateMetadata(
     examBaseId: string,
     questionId: string,
+    subjectOverride?: string,
   ): Promise<GenerateMetadataResponse> {
     await assertQuestionBelongsToExamBase(this.prisma, examBaseId, questionId);
 
@@ -690,7 +691,8 @@ Regras para o JSON:
     const examLabel = [question.examBase.name, question.examBase.institution]
       .filter(Boolean)
       .join(' — ');
-    const subjectInfo = question.subject ? `**Matéria:** ${question.subject}\n\n` : '';
+    const effectiveSubject = subjectOverride?.trim() || question.subject;
+    const subjectInfo = effectiveSubject ? `**Matéria:** ${effectiveSubject}\n\n` : '';
     const referenceSection = question.referenceText?.trim()
       ? `**Texto de referência:**\n${question.referenceText}\n\n`
       : '';
@@ -775,6 +777,127 @@ Retorne o objeto JSON no formato GenerateMetadataResponse (topic, subtopics, ski
       subtopics: Array.isArray(p.subtopics) ? (p.subtopics as string[]).filter((s) => typeof s === 'string') : [],
       skills: Array.isArray(p.skills) ? (p.skills as string[]).filter((s) => typeof s === 'string') : [],
     };
+  }
+
+  async generateSubject(
+    examBaseId: string,
+    questionId: string,
+  ): Promise<{ subject: string }> {
+    await assertQuestionBelongsToExamBase(this.prisma, examBaseId, questionId);
+
+    const question = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: {
+        statement: true,
+        statementImageUrl: true,
+        referenceText: true,
+        alternatives: {
+          orderBy: { key: 'asc' },
+          select: { key: true, text: true },
+        },
+        examBase: { select: { name: true, institution: true } },
+      },
+    });
+    if (!question) throw new NotFoundException('question not found');
+
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI metadata generation.',
+      );
+    }
+
+    const systemPrompt = `Você é um especialista em concursos públicos brasileiros para enfermagem. Sua tarefa é identificar a matéria de uma questão de múltipla escolha.
+
+Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no formato: {"subject": "Nome da Matéria"}
+
+Regras para subject:
+- Use o nome da matéria no nível de edital de concurso público — ou seja, a disciplina principal, não a subárea ou especialidade. Exemplos corretos: "Enfermagem", "Farmacologia", "Anatomia e Fisiologia", "Português", "Raciocínio Lógico", "Ética e Legislação de Enfermagem", "Saúde Coletiva".
+- NUNCA use subáreas como "Enfermagem em Saúde Coletiva", "Enfermagem em UTI", "Enfermagem Cirúrgica" — nesses casos use simplesmente "Enfermagem".
+- A exceção são matérias que já aparecem como disciplinas independentes em editais, como "Farmacologia", "Anatomia e Fisiologia", "Semiologia e Semiotécnica", "Ética e Legislação de Enfermagem".`;
+
+    const examLabel = [question.examBase.name, question.examBase.institution]
+      .filter(Boolean)
+      .join(' — ');
+    const referenceSection = question.referenceText?.trim()
+      ? `**Texto de referência:**\n${question.referenceText}\n\n`
+      : '';
+    const alternativesText = question.alternatives
+      .map((a) => `${a.key}) ${a.text}`)
+      .join('\n\n');
+
+    const userPromptText = `Identifique a matéria da questão abaixo.
+
+**Prova:** ${examLabel || 'Não informada'}
+${referenceSection}**Enunciado:** ${question.statement}
+
+**Alternativas:**
+${alternativesText}
+
+Retorne o JSON: {"subject": "Nome da Matéria"}`;
+
+    const userContent: { role: 'user'; content: string | object[] } = question.statementImageUrl?.trim()
+      ? {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: question.statementImageUrl, detail: 'high' } },
+            { type: 'text', text: userPromptText },
+          ],
+        }
+      : { role: 'user', content: userPromptText };
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        max_tokens: 256,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          userContent,
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(`OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) throw new BadRequestException('AI returned empty response.');
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(`AI returned invalid JSON. (${msg})`);
+      }
+    }
+
+    const p = parsed as Record<string, unknown>;
+    return { subject: typeof p.subject === 'string' ? p.subject : '' };
   }
 
   async generateExplanations(

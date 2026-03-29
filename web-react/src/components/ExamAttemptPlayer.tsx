@@ -6,6 +6,8 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
+  InputAdornment,
   Snackbar,
   TextField,
   Tooltip,
@@ -58,6 +60,7 @@ import {
   useDeleteAlternativeMutation,
   useGenerateExplanationsMutation,
   useGenerateMetadataMutation,
+  useGenerateSubjectMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
@@ -279,6 +282,7 @@ export function ExamAttemptPlayer({
   const deleteAlternativeMutation = useDeleteAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const deleteQuestionMutation = useDeleteExamBaseQuestionMutation(examBaseId ?? '')
   const generateMetadataMutation = useGenerateMetadataMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const generateSubjectMutation = useGenerateSubjectMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Check if inline editing is enabled (only in management mode; admin edits via management page only)
@@ -471,7 +475,7 @@ export function ExamAttemptPlayer({
     if (!currentQuestion || !examBaseId) return
     setGenerateMetadataError(null)
     try {
-      const result = await generateMetadataMutation.mutateAsync()
+      const result = await generateMetadataMutation.mutateAsync({ subject: subject || undefined })
       setTopic(result.topic)
       setSubtopicsStr(arrayToStringList(result.subtopics))
       setSkillsStr(arrayToStringList(result.skills))
@@ -480,7 +484,20 @@ export function ExamAttemptPlayer({
     } catch (err) {
       setGenerateMetadataError(getApiMessage(err))
     }
-  }, [currentQuestion, examBaseId, generateMetadataMutation])
+  }, [currentQuestion, examBaseId, subject, generateMetadataMutation])
+
+  const handleGenerateSubject = useCallback(async () => {
+    if (!currentQuestion || !examBaseId) return
+    try {
+      const result = await generateSubjectMutation.mutateAsync()
+      setSubject(result.subject)
+      setSnackbarMessage('Matéria preenchida em rascunho — revise e salve.')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [currentQuestion, examBaseId, generateSubjectMutation])
 
   const handleGenerateExplanations = useCallback(async () => {
     if (!currentQuestion || !examBaseId) return
@@ -1064,6 +1081,25 @@ export function ExamAttemptPlayer({
                                 value={subject}
                                 onChange={(e) => setSubject(e.target.value)}
                                 sx={isSubjectChanged ? changedFieldSx : undefined}
+                                slotProps={{
+                                  input: {
+                                    endAdornment: (
+                                      <InputAdornment position="end">
+                                        <Tooltip title="Descobrir matéria por IA">
+                                          <span>
+                                            <IconButton
+                                              size="small"
+                                              onClick={handleGenerateSubject}
+                                              disabled={generateSubjectMutation.isPending}
+                                            >
+                                              <AutoAwesomeIcon fontSize="small" />
+                                            </IconButton>
+                                          </span>
+                                        </Tooltip>
+                                      </InputAdornment>
+                                    ),
+                                  },
+                                }}
                               />
                               <TextField
                                 label="Tópico"

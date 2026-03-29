@@ -280,8 +280,19 @@ export class ExamBaseQuestionController {
   generateMetadata(
     @Param('examBaseId') examBaseId: string,
     @Param('questionId') questionId: string,
+    @Body() body: { subject?: string } = {},
   ) {
-    return this.service.generateMetadata(examBaseId, questionId);
+    return this.service.generateMetadata(examBaseId, questionId, body.subject);
+  }
+
+  /** Gera sugestão de matéria da questão via IA. Apenas ADMIN. */
+  @Post(':questionId/generate-subject')
+  @Roles('ADMIN')
+  generateSubject(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+  ) {
+    return this.service.generateSubject(examBaseId, questionId);
   }
 
   /** Gera explicações para alternativas via IA. Apenas ADMIN. */
