@@ -7,6 +7,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
   app.use(
     json({
+      limit: '10mb',
       verify: (req: any, _res, buf) => {
         req.rawBody = buf;
       },

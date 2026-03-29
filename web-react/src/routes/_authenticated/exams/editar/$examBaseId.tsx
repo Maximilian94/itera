@@ -97,25 +97,6 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
 
 const WIZARD_STEPS = ['Metadados', 'Prova', 'Gabarito', 'Revisão']
 
-/** Splits markdown at question boundaries into chunks of at most `size` questions. */
-function splitMarkdownIntoChunks(markdown: string, size = 10): string[] {
-  const boundaries: number[] = [0]
-  const regex = /(?:^|\n)\s*(?:\d+[.)]\s|Questão\s+\d+(?:\s|[-–:])|\d+\s*[-–]\s|#\s*\d+\.?\s)/gi
-  let m: RegExpExecArray | null
-  while ((m = regex.exec(markdown)) !== null) {
-    if (m.index !== boundaries[boundaries.length - 1]) boundaries.push(m.index)
-  }
-  boundaries.push(markdown.length)
-  if (boundaries.length - 2 <= 0) return [markdown]
-  const chunks: string[] = []
-  for (let i = 0; i < boundaries.length - 1; i += size) {
-    const start = boundaries[i]
-    const end = boundaries[Math.min(i + size, boundaries.length - 1)]
-    const chunk = markdown.slice(start, end).trim()
-    if (chunk) chunks.push(chunk)
-  }
-  return chunks
-}
 
 function StepIndicator({ step }: { step: number }) {
   return (
@@ -817,24 +798,26 @@ function StepProgressBar({
   color = 'primary',
 }: {
   label: string
+  /** Pass -1 to show an indeterminate bar (no % label). */
   value: number
   color?: 'primary' | 'success' | 'error'
 }) {
+  const indeterminate = value < 0
   return (
     <Box sx={{ mt: 2 }}>
       <div className="flex items-center justify-between mb-1">
         <Typography variant="caption" color={color === 'error' ? 'error.main' : 'text.secondary'}>
           {label}
         </Typography>
-        {color !== 'error' && (
+        {color !== 'error' && !indeterminate && (
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             {value}%
           </Typography>
         )}
       </div>
       <LinearProgress
-        variant="determinate"
-        value={value}
+        variant={indeterminate ? 'indeterminate' : 'determinate'}
+        value={indeterminate ? undefined : value}
         color={color}
         sx={{ height: 8, borderRadius: 4 }}
       />
@@ -857,7 +840,6 @@ function ExamPdfStep({
 }) {
   const [file, setFile] = useState<File | null>(null)
   const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
-  const [chunkProgress, setChunkProgress] = useState({ current: 0, total: 0 })
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -872,18 +854,12 @@ function ExamPdfStep({
       // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
       const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
 
-      // Phase 2: split markdown into chunks of 10 questions
-      const chunks = splitMarkdownIntoChunks(markdown, 10)
-      setChunkProgress({ current: 0, total: chunks.length })
+      // Phase 2: send full markdown to GPT-4o in a single call
       setStatus('parsing-chunks')
-
-      // Phase 3: GPT-4o processes each chunk (no timeout risk per call)
-      const all: ParsedQuestionStructure[] = []
-      for (let i = 0; i < chunks.length; i++) {
-        setChunkProgress({ current: i + 1, total: chunks.length })
-        const { questions: qs } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(examBaseId, chunks[i])
-        all.push(...qs)
-      }
+      const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
+        examBaseId,
+        markdown,
+      )
 
       setQuestions(all)
       setStatus('done')
@@ -893,9 +869,6 @@ function ExamPdfStep({
     }
   }
 
-  const progressValue = chunkProgress.total > 0
-    ? Math.round((chunkProgress.current / chunkProgress.total) * 100)
-    : 0
   const isParsing = status === 'extracting-markdown' || status === 'parsing-chunks'
 
   return (
@@ -905,7 +878,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e processado em blocos de 10 questões pelo GPT-4o.
+          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e enviado ao GPT-4o para extração de todas as questões.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
@@ -947,10 +920,7 @@ function ExamPdfStep({
         )}
 
         {status === 'parsing-chunks' && (
-          <StepProgressBar
-            label={`Extraindo questões — bloco ${chunkProgress.current} de ${chunkProgress.total} (GPT-4o)...`}
-            value={10 + progressValue * 0.9}
-          />
+          <StepProgressBar label="Extraindo questões (GPT-4o)..." value={-1} />
         )}
 
         {isParsing && (

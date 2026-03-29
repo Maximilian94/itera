@@ -209,9 +209,13 @@ export class ExamBaseQuestionPdfAiService {
   /**
    * Parses questions structure from a markdown chunk using GPT-4o.
    * No answers, no explanations. Used by the per-chunk endpoint.
+   * When rangeFrom/rangeTo are provided, instructs GPT-4o to extract only that range
+   * from the full markdown — avoiding the need for regex-based splitting.
    */
   async parseQuestionsStructureFromChunk(
     markdownChunk: string,
+    rangeFrom?: number,
+    rangeTo?: number,
   ): Promise<ParsedQuestionStructure[]> {
     const openaiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!openaiKey) {
@@ -220,6 +224,11 @@ export class ExamBaseQuestionPdfAiService {
 
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 120_000, bodyTimeout: 120_000 });
+
+    const userMessage =
+      rangeFrom != null && rangeTo != null
+        ? `Extraia SOMENTE as questões de número ${rangeFrom} até ${rangeTo} (inclusive) do markdown abaixo e retorne o JSON array. Se não houver questões nesse intervalo, retorne um array vazio [].\n\n${markdownChunk}`
+        : `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`;
 
     const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -231,11 +240,11 @@ export class ExamBaseQuestionPdfAiService {
       },
       body: JSON.stringify({
         model: 'gpt-4o',
-        max_tokens: 8192,
+        max_tokens: 16384,
         temperature: 0,
         messages: [
           { role: 'system', content: buildStructureSystemPrompt() },
-          { role: 'user', content: `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}` },
+          { role: 'user', content: userMessage },
         ],
       }),
     });
