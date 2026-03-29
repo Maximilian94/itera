@@ -274,13 +274,10 @@ export const examBaseQuestionsService = {
 parseQuestionsStructureFromChunk(
     examBaseId: string,
     markdownChunk: string,
-    rangeFrom?: number,
-    rangeTo?: number,
-    totalQuestions?: number,
   ): Promise<{ questions: ParsedQuestionStructure[] }> {
     return apiFetch<{ questions: ParsedQuestionStructure[] }>(
       `${basePath(examBaseId)}/parse-questions-structure`,
-      { method: 'POST', body: JSON.stringify({ markdownChunk, rangeFrom, rangeTo, totalQuestions }) },
+      { method: 'POST', body: JSON.stringify({ markdownChunk }) },
     )
   },
 

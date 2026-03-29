@@ -213,97 +213,46 @@ export class ExamBaseQuestionPdfAiService {
    * from the full markdown — avoiding the need for regex-based splitting.
    */
   async parseQuestionsStructureFromChunk(
-    markdownChunk: string,
-    rangeFrom?: number,
-    rangeTo?: number,
-    totalQuestions?: number,
+    markdown: string,
   ): Promise<ParsedQuestionStructure[]> {
-    const openaiKey = this.config.get<string>('OPENAI_API_KEY');
-    if (!openaiKey) {
-      throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
+    const xaiKey = this.config.get<string>('XAI_API_KEY');
+    if (!xaiKey) {
+      throw new BadRequestException('XAI_API_KEY não configurada. Configure-a no .env.');
     }
 
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
-    const totalHint = totalQuestions != null ? `A prova tem ${totalQuestions} questões no total. ` : '';
-    const userMessage =
-      rangeFrom != null && rangeTo != null
-        ? `${totalHint}Extraia SOMENTE as questões de número ${rangeFrom} até ${rangeTo} (inclusive). Os números das questões podem aparecer em formatos variados: "42.", "**42.**", "**42.", "Questão 42" — todos representam a questão de número 42. Se não houver questões nesse intervalo, retorne questions como array vazio.\n\n${markdownChunk}`
-        : `Extraia todas as questões e retorne em questions:\n\n${markdownChunk}`;
-
-    const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
+    const res = await undiciFetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       dispatcher: agent,
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        Authorization: `Bearer ${openaiKey}`,
+        Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 16384,
+        model: 'grok-4-1-fast-non-reasoning',
+        max_tokens: 32768,
         temperature: 0,
-        response_format: {
-          type: 'json_schema',
-          json_schema: {
-            name: 'exam_questions',
-            strict: true,
-            schema: {
-              type: 'object',
-              properties: {
-                questions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      number: { type: 'integer' },
-                      subject: { type: 'string' },
-                      topic: { type: 'string' },
-                      subtopics: { type: 'array', items: { type: 'string' } },
-                      statement: { type: 'string' },
-                      referenceText: { anyOf: [{ type: 'string' }, { type: 'null' }] },
-                      hasImage: { type: 'boolean' },
-                      alternatives: {
-                        type: 'array',
-                        items: {
-                          type: 'object',
-                          properties: {
-                            key: { type: 'string' },
-                            text: { type: 'string' },
-                          },
-                          required: ['key', 'text'],
-                          additionalProperties: false,
-                        },
-                      },
-                    },
-                    required: ['number', 'subject', 'topic', 'subtopics', 'statement', 'referenceText', 'hasImage', 'alternatives'],
-                    additionalProperties: false,
-                  },
-                },
-              },
-              required: ['questions'],
-              additionalProperties: false,
-            },
-          },
-        },
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildStructureSystemPrompt() },
-          { role: 'user', content: userMessage },
+          { role: 'user', content: `Extraia TODAS as questões e retorne em questions:\n\n${markdown}` },
         ],
       }),
     });
 
     if (!res.ok) {
       const body = await res.text();
-      throw new BadRequestException(`OpenAI API error (${res.status}): ${body.slice(0, 300)}`);
+      throw new BadRequestException(`Grok API error (${res.status}): ${body.slice(0, 300)}`);
     }
 
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
-    if (!content) return [];
+    const raw = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!raw) return [];
 
-    const parsed = JSON.parse(content) as { questions: unknown[] };
+    const parsed = JSON.parse(jsonrepair(raw)) as { questions: unknown[] };
     return (parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item));
   }
 
