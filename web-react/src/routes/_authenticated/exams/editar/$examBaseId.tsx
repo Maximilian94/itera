@@ -855,11 +855,11 @@ function ExamPdfStep({
       // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
       const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
 
-      // Phase 2: send full markdown to GPT-4o in chunks of 10 questions until empty (or total reached)
+      // Phase 2: send full markdown to GPT-4o in chunks of 5 questions until empty (or total reached)
       setStatus('parsing-chunks')
       const total = totalQuestions !== '' ? totalQuestions : Infinity
       const all: ParsedQuestionStructure[] = []
-      const CHUNK_SIZE = 10
+      const CHUNK_SIZE = 5
       let from = 1
       while (from <= total) {
         const to = Math.min(from + CHUNK_SIZE - 1, total === Infinity ? from + CHUNK_SIZE - 1 : total)
