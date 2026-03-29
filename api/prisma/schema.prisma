@@ -36,6 +36,16 @@ enum GovernmentScope {
   FEDERAL
 }
 
+/// Processing phase for the exam creation wizard.
+enum ProcessingPhase {
+  EDITAL
+  PROVA
+  GABARITO
+  REVISAO
+  EXPLICACOES
+  CONCLUIDO
+}
+
 model User {
   id               String    @id @default(uuid()) @db.Uuid
   email            String    @unique
@@ -201,6 +211,8 @@ model ExamBase {
   editalUrl               String?
   /// Notas internas visíveis apenas para administradores (ex: motivo de não ter adicionado o PDF ainda)
   adminNotes              String?
+  /// Current phase in the exam creation wizard
+  processingPhase         ProcessingPhase @default(EDITAL)
 
   examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)

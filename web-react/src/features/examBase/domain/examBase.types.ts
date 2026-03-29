@@ -1,3 +1,5 @@
+export type ProcessingPhase = 'EDITAL' | 'PROVA' | 'GABARITO' | 'REVISAO' | 'EXPLICACOES' | 'CONCLUIDO'
+
 export type ExamBase = {
   id: string
   name: string
@@ -13,6 +15,7 @@ export type ExamBase = {
   published?: boolean
   editalUrl: string | null
   adminNotes?: string | null
+  processingPhase?: ProcessingPhase
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   _count?: { questions: number }
@@ -61,5 +64,6 @@ export type UpdateExamBaseInput = {
   institution?: string | null
   examBoardId?: string | null
   minPassingGradeNonQuota?: string | null
+  processingPhase?: ProcessingPhase
 }
 

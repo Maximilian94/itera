@@ -7,7 +7,7 @@ import {
   useExtractExamMetadataMutation,
   useUpdateExamBaseMutation,
 } from '@/features/examBase/queries/examBase.queries'
-import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
+import type { ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
   type ParsedQuestionStructure,
@@ -95,26 +95,48 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
 // Step indicator
 // ─────────────────────────────────────────────────────────────────────────────
 
-const WIZARD_STEPS = ['Metadados', 'Prova', 'Gabarito', 'Revisão']
+const WIZARD_STEPS = ['Edital', 'Prova', 'Gabarito', 'Revisão', 'Explicações']
+
+const PHASE_TO_STEP: Record<ProcessingPhase, number> = {
+  EDITAL: 1,
+  PROVA: 2,
+  GABARITO: 3,
+  REVISAO: 4,
+  EXPLICACOES: 5,
+  CONCLUIDO: 5,
+}
+
+const STEP_TO_PHASE: Record<number, ProcessingPhase> = {
+  1: 'EDITAL',
+  2: 'PROVA',
+  3: 'GABARITO',
+  4: 'REVISAO',
+  5: 'EXPLICACOES',
+}
 
 
-function StepIndicator({ step }: { step: number }) {
+function StepIndicator({ step, onStepClick }: { step: number; onStepClick?: (step: number) => void }) {
   return (
     <div className="flex items-center gap-1 mb-6 flex-wrap">
       {WIZARD_STEPS.map((label, i) => {
         const idx = i + 1
         const active = step === idx
         const done = step > idx
+        const clickable = done && onStepClick
         return (
           <div key={label} className="flex items-center gap-1">
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
-                ${active ? 'bg-violet-600 text-white' : done ? 'bg-violet-200 text-violet-700' : 'bg-slate-200 text-slate-500'}`}
+                ${active ? 'bg-violet-600 text-white' : done ? 'bg-violet-200 text-violet-700' : 'bg-slate-200 text-slate-500'}
+                ${clickable ? 'cursor-pointer hover:bg-violet-300' : ''}`}
+              onClick={() => clickable && onStepClick(idx)}
             >
               {idx}
             </div>
             <span
-              className={`text-sm font-medium ${active ? 'text-violet-700' : 'text-slate-500'}`}
+              className={`text-sm font-medium ${active ? 'text-violet-700' : 'text-slate-500'}
+                ${clickable ? 'cursor-pointer hover:text-violet-700' : ''}`}
+              onClick={() => clickable && onStepClick(idx)}
             >
               {label}
             </span>
@@ -300,6 +322,7 @@ function MetadataStep({
     onNext()
   }
 
+  const canAdvance = form.name.trim() !== '' && form.role.trim() !== '' && form.examDate.trim() !== ''
   const canExtract = pdfFile != null && !extractMutation.isPending
 
   return (
@@ -488,15 +511,21 @@ function MetadataStep({
           </Alert>
         )}
 
+        {!canAdvance && (
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            Preencha os campos obrigatórios (*) para avançar.
+          </Alert>
+        )}
+
         <div className="flex justify-end pt-2">
           <Button
             variant="contained"
             onClick={handleNext}
-            disabled={updateMutation.isPending}
+            disabled={!canAdvance || updateMutation.isPending}
             startIcon={updateMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
             sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
           >
-            Próximo: Questões
+            Próximo: Prova
           </Button>
         </div>
       </Stack>
@@ -1325,9 +1354,30 @@ function ReviewStep({
 function ExamEditPage() {
   const { examBaseId } = Route.useParams()
   const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const { data: examBase } = useExamBaseQuery(examBaseId)
+  const updateMutation = useUpdateExamBaseMutation(examBaseId)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [initialPhaseApplied, setInitialPhaseApplied] = useState(false)
   const [structuredQuestions, setStructuredQuestions] = useState<ParsedQuestionStructure[]>([])
   const [answerKey, setAnswerKey] = useState<Record<string, string>>({})
+
+  // Restore step from persisted processingPhase on load
+  useEffect(() => {
+    if (!examBase || initialPhaseApplied) return
+    const phase = examBase.processingPhase
+    if (phase) {
+      setStep(PHASE_TO_STEP[phase] as 1 | 2 | 3 | 4 | 5)
+    }
+    setInitialPhaseApplied(true)
+  }, [examBase, initialPhaseApplied])
+
+  function handleStepChange(newStep: 1 | 2 | 3 | 4 | 5) {
+    setStep(newStep)
+    const phase = STEP_TO_PHASE[newStep]
+    if (phase) {
+      updateMutation.mutate({ processingPhase: phase })
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -1342,25 +1392,41 @@ function ExamEditPage() {
         <Typography variant="h5" fontWeight={700}>
           Criar exame
         </Typography>
+        {examBase?.processingPhase && examBase.processingPhase !== 'CONCLUIDO' && (
+          <Chip
+            label={`Fase: ${examBase.processingPhase}`}
+            size="small"
+            variant="outlined"
+            sx={{ ml: 'auto', textTransform: 'capitalize' }}
+          />
+        )}
+        {examBase?.processingPhase === 'CONCLUIDO' && (
+          <Chip
+            label="Concluído"
+            size="small"
+            color="success"
+            sx={{ ml: 'auto' }}
+          />
+        )}
       </div>
 
-      <StepIndicator step={step} />
+      <StepIndicator step={step} onStepClick={(s) => handleStepChange(s as 1 | 2 | 3 | 4 | 5)} />
 
       {step === 1 && (
-        <MetadataStep examBaseId={examBaseId} onNext={() => setStep(2)} />
+        <MetadataStep examBaseId={examBaseId} onNext={() => handleStepChange(2)} />
       )}
       {step === 2 && (
         <ExamPdfStep
           examBaseId={examBaseId}
-          onNext={(qs) => { setStructuredQuestions(qs); setStep(3) }}
-          onBack={() => setStep(1)}
+          onNext={(qs) => { setStructuredQuestions(qs); handleStepChange(3) }}
+          onBack={() => handleStepChange(1)}
         />
       )}
       {step === 3 && (
         <GabaritoStep
           examBaseId={examBaseId}
-          onNext={(key) => { setAnswerKey(key); setStep(4) }}
-          onBack={() => setStep(2)}
+          onNext={(key) => { setAnswerKey(key); handleStepChange(4) }}
+          onBack={() => handleStepChange(2)}
         />
       )}
       {step === 4 && (
@@ -1368,7 +1434,7 @@ function ExamEditPage() {
           examBaseId={examBaseId}
           structuredQuestions={structuredQuestions}
           answerKey={answerKey}
-          onBack={() => setStep(3)}
+          onBack={() => handleStepChange(3)}
         />
       )}
     </div>
