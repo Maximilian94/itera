@@ -1134,6 +1134,8 @@ function ReviewStep({
   answerKey: Record<string, string>
   onBack: () => void
 }) {
+  const navigate = useNavigate()
+  const { data: examBase } = useExamBaseQuery(examBaseId)
   const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
   const [questions, setQuestions] = useState<ReviewQuestion[]>([])
   const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
@@ -1216,6 +1218,10 @@ function ReviewStep({
       })),
     }))
     await saveMutation.mutateAsync(payload)
+    const examBoardId = examBase?.examBoardId
+    if (examBoardId) {
+      navigate({ to: '/exams/$examBoard/$examId', params: { examBoard: examBoardId, examId: examBaseId } })
+    }
   }
 
   const blockedCount = questions.filter((q) => q.hasImage && !q.unblocked && !q.statementImageUrl).length
