@@ -839,6 +839,7 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [totalQuestions, setTotalQuestions] = useState<number | ''>('')
   const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -854,18 +855,20 @@ function ExamPdfStep({
       // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
       const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
 
-      // Phase 2: send full markdown to GPT-4o in chunks of 10 questions until empty
+      // Phase 2: send full markdown to GPT-4o in chunks of 10 questions until empty (or total reached)
       setStatus('parsing-chunks')
+      const total = totalQuestions !== '' ? totalQuestions : Infinity
       const all: ParsedQuestionStructure[] = []
       const CHUNK_SIZE = 10
       let from = 1
-      while (true) {
-        const to = from + CHUNK_SIZE - 1
+      while (from <= total) {
+        const to = Math.min(from + CHUNK_SIZE - 1, total === Infinity ? from + CHUNK_SIZE - 1 : total)
         const { questions: chunk } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
           examBaseId,
           markdown,
           from,
           to,
+          totalQuestions !== '' ? totalQuestions : undefined,
         )
         if (chunk.length === 0) break
         all.push(...chunk)
@@ -918,6 +921,21 @@ function ExamPdfStep({
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setQuestions([]); setStatus('idle') } }}
         />
+
+        <div className="flex items-center gap-2 mb-3">
+          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+            Nº de questões (opcional):
+          </Typography>
+          <input
+            type="number"
+            min={1}
+            value={totalQuestions}
+            disabled={isParsing}
+            onChange={(e) => setTotalQuestions(e.target.value === '' ? '' : Number(e.target.value))}
+            className="border border-gray-300 rounded px-2 py-1 text-sm w-20 disabled:opacity-50"
+            placeholder="Ex: 50"
+          />
+        </div>
 
         {status === 'idle' && (
           <Button variant="contained" startIcon={<AutoAwesomeIcon />} disabled={!file} onClick={handleParse}

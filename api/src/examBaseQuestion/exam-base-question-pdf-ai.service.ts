@@ -216,6 +216,7 @@ export class ExamBaseQuestionPdfAiService {
     markdownChunk: string,
     rangeFrom?: number,
     rangeTo?: number,
+    totalQuestions?: number,
   ): Promise<ParsedQuestionStructure[]> {
     const openaiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!openaiKey) {
@@ -225,10 +226,11 @@ export class ExamBaseQuestionPdfAiService {
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
+    const totalHint = totalQuestions != null ? `A prova tem ${totalQuestions} questões no total. ` : '';
     const userMessage =
       rangeFrom != null && rangeTo != null
-        ? `Extraia SOMENTE as questões de número ${rangeFrom} até ${rangeTo} (inclusive) do markdown abaixo e retorne o JSON array. Se não houver questões nesse intervalo, retorne um array vazio [].\n\n${markdownChunk}`
-        : `Extraia as questões deste trecho e retorne o JSON array:\n\n${markdownChunk}`;
+        ? `${totalHint}Extraia SOMENTE as questões de número ${rangeFrom} até ${rangeTo} (inclusive). Os números das questões podem aparecer em formatos variados: "42.", "**42.**", "**42.", "Questão 42" — todos representam a questão de número 42. Se não houver questões nesse intervalo, retorne questions como array vazio.\n\n${markdownChunk}`
+        : `Extraia todas as questões e retorne em questions:\n\n${markdownChunk}`;
 
     const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -242,6 +244,49 @@ export class ExamBaseQuestionPdfAiService {
         model: 'gpt-4o',
         max_tokens: 16384,
         temperature: 0,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'exam_questions',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: {
+                questions: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      number: { type: 'integer' },
+                      subject: { type: 'string' },
+                      topic: { type: 'string' },
+                      subtopics: { type: 'array', items: { type: 'string' } },
+                      statement: { type: 'string' },
+                      referenceText: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                      hasImage: { type: 'boolean' },
+                      alternatives: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            key: { type: 'string' },
+                            text: { type: 'string' },
+                          },
+                          required: ['key', 'text'],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ['number', 'subject', 'topic', 'subtopics', 'statement', 'referenceText', 'hasImage', 'alternatives'],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ['questions'],
+              additionalProperties: false,
+            },
+          },
+        },
         messages: [
           { role: 'system', content: buildStructureSystemPrompt() },
           { role: 'user', content: userMessage },
@@ -258,7 +303,8 @@ export class ExamBaseQuestionPdfAiService {
     const content = data.choices?.[0]?.message?.content?.trim() ?? '';
     if (!content) return [];
 
-    return this.parseStructureJson(content);
+    const parsed = JSON.parse(content) as { questions: unknown[] };
+    return (parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item));
   }
 
   /**
