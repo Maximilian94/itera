@@ -18,6 +18,8 @@ import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ImageIcon from '@mui/icons-material/Image'
 import LockOpenIcon from '@mui/icons-material/LockOpen'
@@ -1028,10 +1030,12 @@ function ExamPdfStep({
 
 function GabaritoStep({
   examBaseId,
+  structuredQuestions,
   onNext,
   onBack,
 }: {
   examBaseId: string
+  structuredQuestions: ParsedQuestionStructure[]
   onNext: (answerKey: Record<string, string>) => void
   onBack: () => void
 }) {
@@ -1060,10 +1064,21 @@ function GabaritoStep({
     }
   }
 
-  const answerCount = Object.keys(answerKey).length
+  function handleAnswerChange(questionNumber: string, value: string) {
+    setAnswerKey((prev) => ({ ...prev, [questionNumber]: value.toUpperCase() }))
+  }
+
+  // Validation: compare gabarito vs extracted questions
+  const questionNumbers = structuredQuestions.map((q) => String(q.number))
+  const gabaritoNumbers = Object.keys(answerKey)
+  const matched = questionNumbers.filter((n) => gabaritoNumbers.includes(n))
+  const missingInGabarito = questionNumbers.filter((n) => !gabaritoNumbers.includes(n))
+  const extraInGabarito = gabaritoNumbers.filter((n) => !questionNumbers.includes(n))
+  const answerCount = gabaritoNumbers.length
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Upload section */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
           Gabarito (Claude Haiku)
@@ -1133,7 +1148,7 @@ function GabaritoStep({
 
         {status === 'extracting' && (
           <>
-            <StepProgressBar label="Extraindo gabarito (Claude Haiku)..." value={50} />
+            <StepProgressBar label="Extraindo gabarito (Claude Haiku)..." value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
             </Button>
@@ -1141,17 +1156,7 @@ function GabaritoStep({
         )}
 
         {status === 'done' && (
-          <>
-            <StepProgressBar label={`${answerCount} respostas extraídas!`} value={100} color="success" />
-            <Box sx={{ mt: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider', maxHeight: 120, overflow: 'auto' }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                Gabarito extraído:
-              </Typography>
-              <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                {Object.entries(answerKey).map(([k, v]) => `${k}: ${v}`).join('  ')}
-              </Typography>
-            </Box>
-          </>
+          <StepProgressBar label={`${answerCount} respostas extraídas!`} value={100} color="success" />
         )}
 
         {status === 'error' && (
@@ -1164,13 +1169,98 @@ function GabaritoStep({
         )}
       </Box>
 
+      {/* Validation & editable answer key table */}
+      {status === 'done' && (
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} mb={1.5}>
+            Validação do gabarito
+          </Typography>
+
+          {/* Validation summary */}
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Chip
+              icon={<CheckCircleIcon fontSize="small" />}
+              label={`${matched.length} questões com gabarito`}
+              size="small"
+              color="success"
+              variant="outlined"
+            />
+            {missingInGabarito.length > 0 && (
+              <Chip
+                icon={<ErrorOutlineIcon fontSize="small" />}
+                label={`${missingInGabarito.length} sem gabarito`}
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            )}
+            {extraInGabarito.length > 0 && (
+              <Chip
+                icon={<WarningAmberIcon fontSize="small" />}
+                label={`${extraInGabarito.length} extras no gabarito`}
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+          </div>
+
+          {missingInGabarito.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>
+              Questões sem gabarito: {missingInGabarito.join(', ')}. Você pode preencher manualmente abaixo.
+            </Alert>
+          )}
+
+          {extraInGabarito.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2, py: 0.5 }}>
+              O gabarito contém questões que não estão na prova: {extraInGabarito.join(', ')}. Serão ignoradas.
+            </Alert>
+          )}
+
+          {/* Editable answer key grid */}
+          <Box sx={{ maxHeight: 350, overflow: 'auto' }}>
+            <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))' }}>
+              {questionNumbers.map((num) => {
+                const answer = answerKey[num] ?? ''
+                const isMissing = !answer
+                return (
+                  <div
+                    key={num}
+                    className="flex items-center gap-1 px-2 py-1 rounded"
+                    style={{
+                      border: `1px solid ${isMissing ? '#ef5350' : '#e0e0e0'}`,
+                      backgroundColor: isMissing ? '#fff3f3' : 'transparent',
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={700} sx={{ minWidth: 28 }}>
+                      {num}.
+                    </Typography>
+                    <TextField
+                      value={answer}
+                      onChange={(e) => handleAnswerChange(num, e.target.value.slice(0, 1))}
+                      size="small"
+                      variant="standard"
+                      inputProps={{
+                        maxLength: 1,
+                        style: { textAlign: 'center', fontWeight: 700, fontSize: '0.875rem', width: 24, padding: '2px 0' },
+                      }}
+                      sx={{ '& .MuiInput-underline:before': { borderBottom: 'none' } }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </Box>
+        </Box>
+      )}
+
       <div className="flex items-center gap-3">
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
           Voltar
         </Button>
         <Button
           variant="contained"
-          disabled={status !== 'done' || answerCount === 0}
+          disabled={status !== 'done' || matched.length === 0}
           onClick={() => onNext(answerKey)}
           sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
         >
@@ -1458,6 +1548,7 @@ function ExamEditPage() {
       {step === 3 && (
         <GabaritoStep
           examBaseId={examBaseId}
+          structuredQuestions={structuredQuestions}
           onNext={(key) => { setAnswerKey(key); handleStepChange(4) }}
           onBack={() => handleStepChange(2)}
         />
