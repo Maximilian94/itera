@@ -839,6 +839,7 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [totalQuestions, setTotalQuestions] = useState<number | ''>('')
   const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -859,6 +860,7 @@ function ExamPdfStep({
       const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
         examBaseId,
         markdown,
+        totalQuestions !== '' ? totalQuestions : undefined,
       )
 
       setQuestions(all)
@@ -907,6 +909,21 @@ function ExamPdfStep({
           className="hidden"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) { setFile(f); setQuestions([]); setStatus('idle') } }}
         />
+
+        <div className="flex items-center gap-2 mb-3">
+          <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+            Nº de questões (opcional):
+          </Typography>
+          <input
+            type="number"
+            min={1}
+            value={totalQuestions}
+            disabled={isParsing}
+            onChange={(e) => setTotalQuestions(e.target.value === '' ? '' : Number(e.target.value))}
+            className="border border-gray-300 rounded px-2 py-1 text-sm w-20 disabled:opacity-50"
+            placeholder="Ex: 50"
+          />
+        </div>
 
         {status === 'idle' && (
           <Button variant="contained" startIcon={<AutoAwesomeIcon />} disabled={!file} onClick={handleParse}

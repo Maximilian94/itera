@@ -214,6 +214,7 @@ export class ExamBaseQuestionPdfAiService {
    */
   async parseQuestionsStructureFromChunk(
     markdown: string,
+    totalQuestions?: number,
   ): Promise<ParsedQuestionStructure[]> {
     const xaiKey = this.config.get<string>('XAI_API_KEY');
     if (!xaiKey) {
@@ -222,6 +223,10 @@ export class ExamBaseQuestionPdfAiService {
 
     const { fetch: undiciFetch, Agent } = await import('undici');
     const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
+
+    const totalHint = totalQuestions != null
+      ? `A prova tem exatamente ${totalQuestions} questões. Extraia TODAS as ${totalQuestions} questões, sem exceção.\n\n`
+      : '';
 
     const res = await undiciFetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
@@ -232,13 +237,12 @@ export class ExamBaseQuestionPdfAiService {
         Authorization: `Bearer ${xaiKey}`,
       },
       body: JSON.stringify({
-        model: 'grok-4-1-fast-non-reasoning',
+        model: 'grok-4-1-fast-reasoning',
         max_tokens: 32768,
-        temperature: 0,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: buildStructureSystemPrompt() },
-          { role: 'user', content: `Extraia TODAS as questões e retorne em questions:\n\n${markdown}` },
+          { role: 'user', content: `${totalHint}Extraia TODAS as questões e retorne em questions:\n\n${markdown}` },
         ],
       }),
     });

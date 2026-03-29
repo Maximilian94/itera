@@ -95,10 +95,10 @@ export class ExamBaseQuestionController {
   @Roles('ADMIN')
   async parseQuestionsStructure(
     @Param('examBaseId') _examBaseId: string,
-    @Body() body: { markdownChunk: string },
+    @Body() body: { markdownChunk: string; totalQuestions?: number },
   ) {
     if (!body.markdownChunk?.trim()) throw new BadRequestException('markdownChunk is required');
-    const questions = await this.pdfAi.parseQuestionsStructureFromChunk(body.markdownChunk);
+    const questions = await this.pdfAi.parseQuestionsStructureFromChunk(body.markdownChunk, body.totalQuestions);
     return { questions };
   }
 
