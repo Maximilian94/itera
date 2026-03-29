@@ -13,6 +13,7 @@ import type {
   ParsedQuestionFromPdf,
   ParsedQuestionStructure,
   GenerateExplanationsResponse,
+  GenerateMetadataResponse,
 } from '../services/examBaseQuestions.service'
 import type {
   CreateAlternativeInput,
@@ -130,6 +131,16 @@ export function useExtractFromPdfMutation(examBaseId: string) {
   })
 }
 
+export function useGenerateMetadataMutation(
+  examBaseId: string,
+  questionId: string,
+) {
+  return useMutation({
+    mutationFn: () =>
+      examBaseQuestionsService.generateMetadata(examBaseId, questionId),
+  })
+}
+
 export function useGenerateExplanationsMutation(
   examBaseId: string,
   questionId: string,
@@ -144,7 +155,7 @@ export function useGenerateExplanationsMutation(
   })
 }
 
-export type { ParsedQuestionItem, ParsedQuestionFromPdf, ParsedQuestionStructure, GenerateExplanationsResponse }
+export type { ParsedQuestionItem, ParsedQuestionFromPdf, ParsedQuestionStructure, GenerateExplanationsResponse, GenerateMetadataResponse }
 
 export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: string) {
   return useMutation({

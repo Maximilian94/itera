@@ -274,6 +274,16 @@ export class ExamBaseQuestionController {
     return this.service.getOne(examBaseId, questionId);
   }
 
+  /** Gera metadados (topic, subtopics, skills) da questão via IA. Apenas ADMIN. */
+  @Post(':questionId/generate-metadata')
+  @Roles('ADMIN')
+  generateMetadata(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+  ) {
+    return this.service.generateMetadata(examBaseId, questionId);
+  }
+
   /** Gera explicações para alternativas via IA. Apenas ADMIN. */
   @Post(':questionId/generate-explanations')
   @Roles('ADMIN')

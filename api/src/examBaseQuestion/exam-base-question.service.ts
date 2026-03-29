@@ -14,6 +14,10 @@ import {
   GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE,
 } from './dto/generate-explanations-response.types';
 import {
+  GenerateMetadataResponse,
+  GENERATE_METADATA_RESPONSE_EXAMPLE,
+} from './dto/generate-metadata-response.types';
+import {
   ParsedQuestionAlternative,
   ParsedQuestionItem,
   PARSED_QUESTION_EXAMPLE,
@@ -631,6 +635,146 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
     }
 
     return normalizeGenerateExplanationsResponse(parsed);
+  }
+
+  async generateMetadata(
+    examBaseId: string,
+    questionId: string,
+  ): Promise<GenerateMetadataResponse> {
+    await assertQuestionBelongsToExamBase(this.prisma, examBaseId, questionId);
+
+    const question = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: {
+        subject: true,
+        statement: true,
+        statementImageUrl: true,
+        referenceText: true,
+        alternatives: {
+          orderBy: { key: 'asc' },
+          select: { key: true, text: true },
+        },
+        examBase: { select: { name: true, institution: true } },
+      },
+    });
+    if (!question) throw new NotFoundException('question not found');
+
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI metadata generation.',
+      );
+    }
+
+    const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateMetadataResponse {\n  topic: string;\n  subtopics: string[];\n  skills: string[];\n}\nExemplo: ${JSON.stringify(GENERATE_METADATA_RESPONSE_EXAMPLE)}`;
+
+    const systemPrompt = `Você é um especialista em elaboração de questões de concurso para enfermagem e saúde. Sua tarefa é classificar uma questão de múltipla escolha com metadados acadêmicos precisos.
+
+${responseTypeDescription}
+
+Regras para topic:
+- Use SEMPRE o nome técnico da matéria/assunto, não uma descrição em linguagem comum. Exemplos: em vez de "Pronúncia correta das palavras" use "Prosódia"; em vez de "Escrita correta" use "Ortografia"; em vez de "Concordância entre sujeito e verbo" use "Concordância verbal". O nome técnico é usado para recomendações de estudo, então deve ser o termo pelo qual o conteúdo é conhecido em programas de ensino e materiais didáticos.
+
+Regras para subtopics:
+- Liste os subtópicos específicos abordados pela questão dentro do topic principal.
+- Use nomes técnicos precisos, como aparecem em programas de ensino e materiais didáticos.
+
+Regras para skills:
+- Liste as habilidades/competências que a questão avalia (ex.: "Identificar sinais de choque hipovolêmico", "Calcular gotejamento de soro").
+- Use verbos no infinitivo e seja específico ao conteúdo da questão.
+
+Regras para o JSON:
+- Escape aspas duplas dentro de strings com \\".
+- Use \\n para quebras de linha dentro de strings.`;
+
+    const examLabel = [question.examBase.name, question.examBase.institution]
+      .filter(Boolean)
+      .join(' — ');
+    const subjectInfo = question.subject ? `**Matéria:** ${question.subject}\n\n` : '';
+    const referenceSection = question.referenceText?.trim()
+      ? `**Texto de referência:**\n${question.referenceText}\n\n`
+      : '';
+    const alternativesText = question.alternatives
+      .map((a) => `${a.key}) ${a.text}`)
+      .join('\n\n');
+
+    const userPromptText = `Classifique a questão abaixo com metadados acadêmicos (topic, subtopics, skills).
+
+**Prova:** ${examLabel || 'Não informada'}
+${subjectInfo}${referenceSection}**Enunciado:** ${question.statement}
+
+**Alternativas:**
+${alternativesText}
+
+Retorne o objeto JSON no formato GenerateMetadataResponse (topic, subtopics, skills).`;
+
+    const userContent: { role: 'user'; content: string | object[] } = question.statementImageUrl?.trim()
+      ? {
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: question.statementImageUrl, detail: 'high' } },
+            { type: 'text', text: userPromptText },
+          ],
+        }
+      : { role: 'user', content: userPromptText };
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'o3-mini',
+        max_completion_tokens: 2048,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          userContent,
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(`OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`);
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) throw new BadRequestException('AI returned empty response.');
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+    jsonStr = jsonStr.replace(/,(\s*[}\]])/g, '$1');
+
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (parseErr) {
+        const msg = parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(`AI returned invalid JSON. (${msg})`);
+      }
+    }
+
+    const p = parsed as Record<string, unknown>;
+    return {
+      topic: typeof p.topic === 'string' ? p.topic : '',
+      subtopics: Array.isArray(p.subtopics) ? (p.subtopics as string[]).filter((s) => typeof s === 'string') : [],
+      skills: Array.isArray(p.skills) ? (p.skills as string[]).filter((s) => typeof s === 'string') : [],
+    };
   }
 
   async generateExplanations(

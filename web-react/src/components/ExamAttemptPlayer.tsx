@@ -57,6 +57,7 @@ import {
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
   useGenerateExplanationsMutation,
+  useGenerateMetadataMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
@@ -233,6 +234,7 @@ export function ExamAttemptPlayer({
   const [topic, setTopic] = useState('')
   const [subtopicsStr, setSubtopicsStr] = useState('')
   const [skillsStr, setSkillsStr] = useState('')
+  const [generateMetadataError, setGenerateMetadataError] = useState<string | null>(null)
   const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
   const [disagreementWarning, setDisagreementWarning] = useState<string | null>(null)
   const [deleteQuestionDialogOpen, setDeleteQuestionDialogOpen] = useState(false)
@@ -276,6 +278,7 @@ export function ExamAttemptPlayer({
   const updateAlternativeMutation = useUpdateAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const deleteAlternativeMutation = useDeleteAlternativeMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const deleteQuestionMutation = useDeleteExamBaseQuestionMutation(examBaseId ?? '')
+  const generateMetadataMutation = useGenerateMetadataMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Check if inline editing is enabled (only in management mode; admin edits via management page only)
@@ -464,14 +467,27 @@ export function ExamAttemptPlayer({
     }
   }, [currentQuestion, subject, topic, subtopicsStr, skillsStr, updateQuestionMutation])
 
+  const handleGenerateMetadata = useCallback(async () => {
+    if (!currentQuestion || !examBaseId) return
+    setGenerateMetadataError(null)
+    try {
+      const result = await generateMetadataMutation.mutateAsync()
+      setTopic(result.topic)
+      setSubtopicsStr(arrayToStringList(result.subtopics))
+      setSkillsStr(arrayToStringList(result.skills))
+      setSnackbarMessage('Metadados preenchidos em rascunho — revise e salve.')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setGenerateMetadataError(getApiMessage(err))
+    }
+  }, [currentQuestion, examBaseId, generateMetadataMutation])
+
   const handleGenerateExplanations = useCallback(async () => {
     if (!currentQuestion || !examBaseId) return
     setGenerateExplainError(null)
     setDisagreementWarning(null)
     try {
       const result = await generateExplanationsMutation.mutateAsync()
-      setTopic(result.topic)
-      setSubtopicsStr(arrayToStringList(result.subtopics))
       const alternatives = [...currentQuestion.alternatives].sort((a, b) => a.key.localeCompare(b.key))
       const newEditById: Record<string, { text: string; explanation: string }> = {}
       for (const e of result.explanations) {
@@ -485,7 +501,7 @@ export function ExamAttemptPlayer({
         }
       }
       setEditAlternativeById(newEditById)
-      setSnackbarMessage('Explicações salvas. Metadados (tópico, subtópicos) preenchidos em rascunho — revise e salve.')
+      setSnackbarMessage('Explicações geradas e salvas.')
       setSnackbarOpen(true)
       if (result.agreesWithCorrectAnswer === false) {
         setDisagreementWarning(
@@ -651,6 +667,7 @@ export function ExamAttemptPlayer({
     setEditingStatement(false)
     setEditingReferenceText(false)
     setEditAlternativeById({})
+    setGenerateMetadataError(null)
     setGenerateExplainError(null)
     setDisagreementWarning(null)
     setEditStatementImageUrl(currentQuestion?.statementImageUrl ?? '')
@@ -972,27 +989,48 @@ export function ExamAttemptPlayer({
                     const changedFieldSx = { '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'warning.main', borderWidth: 2 } } }
                     return (
                     <div className="flex flex-col gap-6">
-                      {/* Gerar explicações por IA */}
+                      {/* Ações de IA */}
                       {canInlineEdit && (
                         <div className="flex flex-col gap-2">
-                          <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<AutoAwesomeIcon />}
-                            onClick={handleGenerateExplanations}
-                            disabled={
-                              generateExplanationsMutation.isPending ||
-                              currentQuestion.alternatives.length === 0 ||
-                              !currentQuestion.correctAlternative
-                            }
-                            title={
-                              !currentQuestion.correctAlternative
-                                ? 'Marque a resposta correta para gerar explicações'
-                                : undefined
-                            }
-                          >
-                            {generateExplanationsMutation.isPending ? 'Gerando…' : 'Gerar explicações e metadados por IA'}
-                          </Button>
+                          <div className="flex flex-row gap-2 flex-wrap">
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<AutoAwesomeIcon />}
+                              onClick={handleGenerateMetadata}
+                              disabled={
+                                generateMetadataMutation.isPending ||
+                                generateExplanationsMutation.isPending ||
+                                currentQuestion.alternatives.length === 0
+                              }
+                            >
+                              {generateMetadataMutation.isPending ? 'Gerando…' : 'Gerar metadados por IA'}
+                            </Button>
+                            <Button
+                              variant="outlined"
+                              size="small"
+                              startIcon={<AutoAwesomeIcon />}
+                              onClick={handleGenerateExplanations}
+                              disabled={
+                                generateExplanationsMutation.isPending ||
+                                generateMetadataMutation.isPending ||
+                                currentQuestion.alternatives.length === 0 ||
+                                !currentQuestion.correctAlternative
+                              }
+                              title={
+                                !currentQuestion.correctAlternative
+                                  ? 'Marque a resposta correta para gerar explicações'
+                                  : undefined
+                              }
+                            >
+                              {generateExplanationsMutation.isPending ? 'Gerando…' : 'Gerar explicações por IA'}
+                            </Button>
+                          </div>
+                          {generateMetadataError && (
+                            <Alert severity="error" onClose={() => setGenerateMetadataError(null)} sx={{ py: 0 }}>
+                              {generateMetadataError}
+                            </Alert>
+                          )}
                           {generateExplainError && (
                             <Alert severity="error" onClose={() => setGenerateExplainError(null)} sx={{ py: 0 }}>
                               {generateExplainError}

@@ -49,6 +49,12 @@ export type GenerateExplanationsResponse = {
   disagreementWarning?: string
 }
 
+export type GenerateMetadataResponse = {
+  topic: string
+  subtopics: string[]
+  skills: string[]
+}
+
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/questions`
 
 export type ExamBaseQuestionWithSource = ExamBaseQuestion & {
@@ -219,6 +225,16 @@ export const examBaseQuestionsService = {
     return apiFetch<void>(
       `${basePath(examBaseId)}/${questionId}/alternatives/${alternativeId}`,
       { method: 'DELETE' },
+    )
+  },
+
+  generateMetadata(
+    examBaseId: string,
+    questionId: string,
+  ): Promise<GenerateMetadataResponse> {
+    return apiFetch<GenerateMetadataResponse>(
+      `${basePath(examBaseId)}/${questionId}/generate-metadata`,
+      { method: 'POST' },
     )
   },
 
