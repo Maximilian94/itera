@@ -256,7 +256,14 @@ export class ExamBaseQuestionPdfAiService {
     const raw = data.choices?.[0]?.message?.content?.trim() ?? '';
     if (!raw) return [];
 
-    const parsed = JSON.parse(jsonrepair(raw)) as { questions: unknown[] };
+    // Strip <think>...</think> reasoning blocks returned by reasoning models (e.g. grok-4-1-fast-reasoning)
+    let jsonStr = raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+    // Extract between first { and last } to handle any surrounding text
+    const first = jsonStr.indexOf('{');
+    const last = jsonStr.lastIndexOf('}');
+    if (first !== -1 && last > first) jsonStr = jsonStr.slice(first, last + 1);
+
+    const parsed = JSON.parse(jsonrepair(jsonStr)) as { questions: unknown[] };
     return (parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item));
   }
 
