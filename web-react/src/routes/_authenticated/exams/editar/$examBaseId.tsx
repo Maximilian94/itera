@@ -7,7 +7,7 @@ import {
   useExtractExamMetadataMutation,
   useUpdateExamBaseMutation,
 } from '@/features/examBase/queries/examBase.queries'
-import type { ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
+import type { ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
   type ParsedQuestionStructure,
@@ -18,21 +18,31 @@ import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
+import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ImageIcon from '@mui/icons-material/Image'
 import LockOpenIcon from '@mui/icons-material/LockOpen'
+import SaveIcon from '@mui/icons-material/Save'
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
+  FormControlLabel,
   LinearProgress,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Stack,
   TextField,
@@ -95,26 +105,48 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
 // Step indicator
 // ─────────────────────────────────────────────────────────────────────────────
 
-const WIZARD_STEPS = ['Metadados', 'Prova', 'Gabarito', 'Revisão']
+const WIZARD_STEPS = ['Edital', 'Prova', 'Gabarito', 'Revisão', 'Explicações']
+
+const PHASE_TO_STEP: Record<ProcessingPhase, number> = {
+  EDITAL: 1,
+  PROVA: 2,
+  GABARITO: 3,
+  REVISAO: 4,
+  EXPLICACOES: 5,
+  CONCLUIDO: 5,
+}
+
+const STEP_TO_PHASE: Record<number, ProcessingPhase> = {
+  1: 'EDITAL',
+  2: 'PROVA',
+  3: 'GABARITO',
+  4: 'REVISAO',
+  5: 'EXPLICACOES',
+}
 
 
-function StepIndicator({ step }: { step: number }) {
+function StepIndicator({ step, onStepClick }: { step: number; onStepClick?: (step: number) => void }) {
   return (
     <div className="flex items-center gap-1 mb-6 flex-wrap">
       {WIZARD_STEPS.map((label, i) => {
         const idx = i + 1
         const active = step === idx
         const done = step > idx
+        const clickable = done && onStepClick
         return (
           <div key={label} className="flex items-center gap-1">
             <div
               className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold
-                ${active ? 'bg-violet-600 text-white' : done ? 'bg-violet-200 text-violet-700' : 'bg-slate-200 text-slate-500'}`}
+                ${active ? 'bg-violet-600 text-white' : done ? 'bg-violet-200 text-violet-700' : 'bg-slate-200 text-slate-500'}
+                ${clickable ? 'cursor-pointer hover:bg-violet-300' : ''}`}
+              onClick={() => clickable && onStepClick(idx)}
             >
               {idx}
             </div>
             <span
-              className={`text-sm font-medium ${active ? 'text-violet-700' : 'text-slate-500'}`}
+              className={`text-sm font-medium ${active ? 'text-violet-700' : 'text-slate-500'}
+                ${clickable ? 'cursor-pointer hover:text-violet-700' : ''}`}
+              onClick={() => clickable && onStepClick(idx)}
             >
               {label}
             </span>
@@ -300,6 +332,7 @@ function MetadataStep({
     onNext()
   }
 
+  const canAdvance = form.name.trim() !== '' && form.role.trim() !== '' && form.examDate.trim() !== ''
   const canExtract = pdfFile != null && !extractMutation.isPending
 
   return (
@@ -488,15 +521,21 @@ function MetadataStep({
           </Alert>
         )}
 
+        {!canAdvance && (
+          <Alert severity="info" sx={{ py: 0.5 }}>
+            Preencha os campos obrigatórios (*) para avançar.
+          </Alert>
+        )}
+
         <div className="flex justify-end pt-2">
           <Button
             variant="contained"
             onClick={handleNext}
-            disabled={updateMutation.isPending}
+            disabled={!canAdvance || updateMutation.isPending}
             startIcon={updateMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
             sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
           >
-            Próximo: Questões
+            Próximo: Prova
           </Button>
         </div>
       </Stack>
@@ -509,7 +548,7 @@ function MetadataStep({
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Question card (review UI)
+// Shared types
 // ─────────────────────────────────────────────────────────────────────────────
 
 type ReviewQuestion = ParsedQuestionStructure & {
@@ -519,269 +558,6 @@ type ReviewQuestion = ParsedQuestionStructure & {
   explanations: { key: string; explanation: string }[]
   unblocked: boolean
   statementImageUrl?: string
-}
-
-function QuestionCard({
-  q,
-  index,
-  examBaseId,
-  onUnblock,
-  onImageUploaded,
-}: {
-  q: ReviewQuestion
-  index: number
-  examBaseId: string
-  onUnblock: (index: number) => void
-  onImageUploaded: (index: number, url: string) => void
-}) {
-  const [showExplanations, setShowExplanations] = useState(false)
-  const [uploading, setUploading] = useState(false)
-  const [uploadError, setUploadError] = useState<string | null>(null)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-
-  const isBlocked = q.hasImage && !q.unblocked && !q.statementImageUrl
-
-  async function handleImageUpload(file: File) {
-    setUploading(true)
-    setUploadError(null)
-    try {
-      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
-      onImageUploaded(index, url)
-    } catch (err) {
-      setUploadError((err as Error).message ?? 'Erro ao subir imagem')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  return (
-    <Box
-      sx={{
-        border: '1px solid',
-        borderColor: isBlocked ? 'warning.light' : 'divider',
-        borderRadius: 2,
-        overflow: 'hidden',
-        position: 'relative',
-      }}
-    >
-      {/* Header */}
-      <Box
-        sx={{
-          px: 2,
-          py: 1.5,
-          bgcolor: isBlocked ? 'warning.50' : 'grey.50',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 1,
-          flexWrap: 'wrap',
-        }}
-      >
-        <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
-          Questão {q.number}
-        </Typography>
-        {q.subject && <Chip label={q.subject} size="small" variant="outlined" />}
-        {q.topic && (
-          <Typography variant="caption" color="text.secondary">
-            {q.topic}
-          </Typography>
-        )}
-        <Box sx={{ flex: 1 }} />
-        {q.correctAlternative && (
-          <Chip
-            label={`Gabarito: ${q.correctAlternative}`}
-            size="small"
-            color="success"
-            variant="filled"
-          />
-        )}
-        {q.answerDoubt && (
-          <Chip
-            icon={<WarningAmberIcon fontSize="small" />}
-            label="Gabarito duvidoso"
-            size="small"
-            color="warning"
-            variant="filled"
-          />
-        )}
-        {isBlocked && (
-          <Chip
-            icon={<ImageIcon fontSize="small" />}
-            label="Imagem necessária"
-            size="small"
-            color="warning"
-            variant="outlined"
-          />
-        )}
-      </Box>
-
-      {/* Body */}
-      <Box sx={{ px: 2, py: 2, position: 'relative' }}>
-        {/* Blocked overlay */}
-        {isBlocked && (
-          <Box
-            sx={{
-              position: 'absolute',
-              inset: 0,
-              bgcolor: 'rgba(255,255,255,0.85)',
-              zIndex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 1.5,
-              p: 2,
-            }}
-          >
-            <ImageIcon sx={{ fontSize: 36, color: 'warning.main' }} />
-            <Typography variant="body2" color="text.secondary" textAlign="center">
-              Esta questão referencia uma imagem/figura. Faça upload ou desbloqueie manualmente.
-            </Typography>
-            <div className="flex gap-2 flex-wrap justify-center">
-              <Button
-                size="small"
-                variant="contained"
-                startIcon={uploading ? <CircularProgress size={14} color="inherit" /> : <ImageIcon />}
-                disabled={uploading}
-                onClick={() => imageInputRef.current?.click()}
-                sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
-              >
-                Upload imagem
-              </Button>
-              <Button
-                size="small"
-                variant="outlined"
-                startIcon={<LockOpenIcon />}
-                onClick={() => onUnblock(index)}
-              >
-                Desbloquear
-              </Button>
-            </div>
-            {uploadError && (
-              <Alert severity="error" sx={{ py: 0, mt: 0.5 }}>
-                {uploadError}
-              </Alert>
-            )}
-            <input
-              ref={imageInputRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0]
-                if (file) handleImageUpload(file)
-              }}
-            />
-          </Box>
-        )}
-
-        {/* Gabarito doubt warning */}
-        {q.answerDoubt && q.doubtReason && (
-          <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>
-            <Typography variant="body2" fontWeight={600}>
-              Atenção: gabarito possivelmente incorreto
-            </Typography>
-            <Typography variant="body2">{q.doubtReason}</Typography>
-          </Alert>
-        )}
-
-        {/* Uploaded image */}
-        {q.statementImageUrl && (
-          <Box sx={{ mb: 2 }}>
-            <img
-              src={q.statementImageUrl}
-              alt="Imagem do enunciado"
-              style={{ maxWidth: '100%', borderRadius: 4 }}
-            />
-          </Box>
-        )}
-
-        {/* Reference text */}
-        {q.referenceText && (
-          <Box
-            sx={{
-              bgcolor: 'grey.50',
-              border: '1px solid',
-              borderColor: 'divider',
-              borderRadius: 1,
-              p: 1.5,
-              mb: 2,
-            }}
-          >
-            <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-              Texto de referência
-            </Typography>
-            <Markdown variant="body2">{q.referenceText}</Markdown>
-          </Box>
-        )}
-
-        {/* Statement */}
-        <Box sx={{ mb: 2 }}>
-          <Markdown variant="body2">{q.statement}</Markdown>
-        </Box>
-
-        {/* Alternatives */}
-        <Stack spacing={1} sx={{ mb: 1.5 }}>
-          {q.alternatives.map((alt) => {
-            const isCorrect = alt.key === q.correctAlternative
-            return (
-              <Box
-                key={alt.key}
-                sx={{
-                  border: '1px solid',
-                  borderColor: isCorrect ? 'success.light' : 'divider',
-                  borderRadius: 1,
-                  p: 1.5,
-                  bgcolor: isCorrect ? 'success.50' : 'transparent',
-                }}
-              >
-                <div className="flex items-start gap-2">
-                  <Typography
-                    variant="body2"
-                    fontWeight={700}
-                    sx={{ minWidth: 20, color: isCorrect ? 'success.main' : 'text.primary' }}
-                  >
-                    {alt.key})
-                  </Typography>
-                  <Box sx={{ flex: 1 }}>
-                    <Markdown variant="body2">{alt.text}</Markdown>
-                    {showExplanations && (() => {
-                      const exp = q.explanations.find((e) => e.key === alt.key)?.explanation
-                      return exp ? (
-                        <Box
-                          sx={{
-                            mt: 1,
-                            pt: 1,
-                            borderTop: '1px dashed',
-                            borderColor: 'divider',
-                          }}
-                        >
-                          <Typography variant="caption" color="text.secondary" fontWeight={600}>
-                            Explicação:
-                          </Typography>
-                          <Markdown variant="caption">{exp}</Markdown>
-                        </Box>
-                      ) : null
-                    })()}
-                  </Box>
-                </div>
-              </Box>
-            )
-          })}
-        </Stack>
-
-        <Button
-          size="small"
-          variant="text"
-          sx={{ color: 'text.secondary', fontSize: '0.75rem' }}
-          onClick={() => setShowExplanations((v) => !v)}
-        >
-          {showExplanations ? 'Ocultar explicações' : 'Ver explicações'}
-        </Button>
-      </Box>
-    </Box>
-  )
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -839,28 +615,19 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [status, setStatus] = useState<'idle' | 'extracting-markdown' | 'parsing-chunks' | 'done' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleParse() {
     if (!file) return
-    setStatus('extracting-markdown')
+    setStatus('parsing')
     setErrorMsg(null)
     setQuestions([])
 
     try {
-      // Phase 1: Nanonets → markdown (preserves bold, italic, images, etc.)
-      const { content: markdown } = await examBaseQuestionsService.extractFromPdf(examBaseId, file)
-
-      // Phase 2: backend splits markdown into chunks and calls GPT-4o per chunk
-      setStatus('parsing-chunks')
-      const { questions: all } = await examBaseQuestionsService.parseQuestionsStructureFromChunk(
-        examBaseId,
-        markdown,
-      )
-
+      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromPdf(examBaseId, file)
       setQuestions(all)
       setStatus('done')
     } catch (err) {
@@ -869,7 +636,8 @@ function ExamPdfStep({
     }
   }
 
-  const isParsing = status === 'extracting-markdown' || status === 'parsing-chunks'
+  const isParsing = status === 'parsing'
+  const blockedCount = questions.filter((q) => q.hasImage).length
 
   return (
     <div className="flex flex-col gap-6">
@@ -878,7 +646,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. O texto é extraído via Nanonets (preserva negrito, itálico, imagens, etc.) e enviado ao GPT-4o para extração de todas as questões.
+          Envie o PDF da prova. Claude Sonnet 4.6 extrairá todas as questões diretamente do PDF.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">
@@ -915,22 +683,24 @@ function ExamPdfStep({
           </Button>
         )}
 
-        {status === 'extracting-markdown' && (
-          <StepProgressBar label="Extraindo texto da prova (Nanonets)..." value={10} />
-        )}
-
-        {status === 'parsing-chunks' && (
-          <StepProgressBar label="Extraindo questões (GPT-4o)..." value={-1} />
-        )}
-
         {isParsing && (
-          <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
-            Extraindo...
-          </Button>
+          <>
+            <StepProgressBar label="Extraindo questões (Claude Sonnet 4.6)..." value={-1} />
+            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+              Extraindo...
+            </Button>
+          </>
         )}
 
         {status === 'done' && (
-          <StepProgressBar label={`${questions.length} questões extraídas!`} value={100} color="success" />
+          <>
+            <StepProgressBar label={`${questions.length} questões extraídas!`} value={100} color="success" />
+            {blockedCount > 0 && (
+              <Alert severity="warning" sx={{ mt: 2, py: 0.5 }}>
+                {blockedCount} questão(ões) referenciam imagens. Será necessário fazer upload antes de salvar.
+              </Alert>
+            )}
+          </>
         )}
 
         {status === 'error' && (
@@ -942,6 +712,45 @@ function ExamPdfStep({
           </>
         )}
       </Box>
+
+      {/* Preview das questões extraídas */}
+      {questions.length > 0 && (
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} mb={2}>
+            Questões extraídas ({questions.length})
+          </Typography>
+          <Stack spacing={1.5} sx={{ maxHeight: 400, overflow: 'auto' }}>
+            {questions.map((q) => (
+              <Box
+                key={q.number}
+                sx={{
+                  border: '1px solid',
+                  borderColor: q.hasImage ? 'warning.light' : 'divider',
+                  borderRadius: 1,
+                  p: 1.5,
+                  bgcolor: q.hasImage ? 'warning.50' : 'transparent',
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Typography variant="body2" fontWeight={700}>
+                    {q.number}.
+                  </Typography>
+                  {q.subject && <Chip label={q.subject} size="small" variant="outlined" />}
+                  {q.hasImage && (
+                    <Chip icon={<ImageIcon fontSize="small" />} label="Imagem" size="small" color="warning" variant="outlined" />
+                  )}
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
+                    {q.alternatives.length} alternativas
+                  </Typography>
+                </div>
+                <Typography variant="body2" color="text.secondary" sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {q.statement.slice(0, 150)}{q.statement.length > 150 ? '...' : ''}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      )}
 
       <div className="flex items-center gap-3">
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isParsing}>
@@ -966,10 +775,12 @@ function ExamPdfStep({
 
 function GabaritoStep({
   examBaseId,
+  structuredQuestions,
   onNext,
   onBack,
 }: {
   examBaseId: string
+  structuredQuestions: ParsedQuestionStructure[]
   onNext: (answerKey: Record<string, string>) => void
   onBack: () => void
 }) {
@@ -998,10 +809,21 @@ function GabaritoStep({
     }
   }
 
-  const answerCount = Object.keys(answerKey).length
+  function handleAnswerChange(questionNumber: string, value: string) {
+    setAnswerKey((prev) => ({ ...prev, [questionNumber]: value.toUpperCase() }))
+  }
+
+  // Validation: compare gabarito vs extracted questions
+  const questionNumbers = structuredQuestions.map((q) => String(q.number))
+  const gabaritoNumbers = Object.keys(answerKey)
+  const matched = questionNumbers.filter((n) => gabaritoNumbers.includes(n))
+  const missingInGabarito = questionNumbers.filter((n) => !gabaritoNumbers.includes(n))
+  const extraInGabarito = gabaritoNumbers.filter((n) => !questionNumbers.includes(n))
+  const answerCount = gabaritoNumbers.length
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Upload section */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
           Gabarito (Claude Haiku)
@@ -1071,7 +893,7 @@ function GabaritoStep({
 
         {status === 'extracting' && (
           <>
-            <StepProgressBar label="Extraindo gabarito (Claude Haiku)..." value={50} />
+            <StepProgressBar label="Extraindo gabarito (Claude Haiku)..." value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
             </Button>
@@ -1079,17 +901,7 @@ function GabaritoStep({
         )}
 
         {status === 'done' && (
-          <>
-            <StepProgressBar label={`${answerCount} respostas extraídas!`} value={100} color="success" />
-            <Box sx={{ mt: 2, p: 1.5, bgcolor: 'grey.50', borderRadius: 1, border: '1px solid', borderColor: 'divider', maxHeight: 120, overflow: 'auto' }}>
-              <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
-                Gabarito extraído:
-              </Typography>
-              <Typography variant="caption" sx={{ fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                {Object.entries(answerKey).map(([k, v]) => `${k}: ${v}`).join('  ')}
-              </Typography>
-            </Box>
-          </>
+          <StepProgressBar label={`${answerCount} respostas extraídas!`} value={100} color="success" />
         )}
 
         {status === 'error' && (
@@ -1102,13 +914,98 @@ function GabaritoStep({
         )}
       </Box>
 
+      {/* Validation & editable answer key table */}
+      {status === 'done' && (
+        <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+          <Typography variant="subtitle1" fontWeight={600} mb={1.5}>
+            Validação do gabarito
+          </Typography>
+
+          {/* Validation summary */}
+          <div className="flex items-center gap-3 flex-wrap mb-3">
+            <Chip
+              icon={<CheckCircleIcon fontSize="small" />}
+              label={`${matched.length} questões com gabarito`}
+              size="small"
+              color="success"
+              variant="outlined"
+            />
+            {missingInGabarito.length > 0 && (
+              <Chip
+                icon={<ErrorOutlineIcon fontSize="small" />}
+                label={`${missingInGabarito.length} sem gabarito`}
+                size="small"
+                color="error"
+                variant="outlined"
+              />
+            )}
+            {extraInGabarito.length > 0 && (
+              <Chip
+                icon={<WarningAmberIcon fontSize="small" />}
+                label={`${extraInGabarito.length} extras no gabarito`}
+                size="small"
+                color="warning"
+                variant="outlined"
+              />
+            )}
+          </div>
+
+          {missingInGabarito.length > 0 && (
+            <Alert severity="warning" sx={{ mb: 2, py: 0.5 }}>
+              Questões sem gabarito: {missingInGabarito.join(', ')}. Você pode preencher manualmente abaixo.
+            </Alert>
+          )}
+
+          {extraInGabarito.length > 0 && (
+            <Alert severity="info" sx={{ mb: 2, py: 0.5 }}>
+              O gabarito contém questões que não estão na prova: {extraInGabarito.join(', ')}. Serão ignoradas.
+            </Alert>
+          )}
+
+          {/* Editable answer key grid */}
+          <Box sx={{ maxHeight: 350, overflow: 'auto' }}>
+            <div className="grid gap-1" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))' }}>
+              {questionNumbers.map((num) => {
+                const answer = answerKey[num] ?? ''
+                const isMissing = !answer
+                return (
+                  <div
+                    key={num}
+                    className="flex items-center gap-1 px-2 py-1 rounded"
+                    style={{
+                      border: `1px solid ${isMissing ? '#ef5350' : '#e0e0e0'}`,
+                      backgroundColor: isMissing ? '#fff3f3' : 'transparent',
+                    }}
+                  >
+                    <Typography variant="body2" fontWeight={700} sx={{ minWidth: 28 }}>
+                      {num}.
+                    </Typography>
+                    <TextField
+                      value={answer}
+                      onChange={(e) => handleAnswerChange(num, e.target.value.slice(0, 1))}
+                      size="small"
+                      variant="standard"
+                      inputProps={{
+                        maxLength: 1,
+                        style: { textAlign: 'center', fontWeight: 700, fontSize: '0.875rem', width: 24, padding: '2px 0' },
+                      }}
+                      sx={{ '& .MuiInput-underline:before': { borderBottom: 'none' } }}
+                    />
+                  </div>
+                )
+              })}
+            </div>
+          </Box>
+        </Box>
+      )}
+
       <div className="flex items-center gap-3">
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
           Voltar
         </Button>
         <Button
           variant="contained"
-          disabled={status !== 'done' || answerCount === 0}
+          disabled={status !== 'done' || matched.length === 0}
           onClick={() => onNext(answerKey)}
           sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
         >
@@ -1120,35 +1017,24 @@ function GabaritoStep({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 5 — Review (match + explanations + save)
+// Step 4 — Revisão (Human QC)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ReviewStep({
   examBaseId,
   structuredQuestions,
   answerKey,
+  onNext,
   onBack,
 }: {
   examBaseId: string
   structuredQuestions: ParsedQuestionStructure[]
   answerKey: Record<string, string>
+  onNext: (reviewed: ReviewQuestion[]) => void
   onBack: () => void
 }) {
-  const navigate = useNavigate()
-  const { data: examBase } = useExamBaseQuery(examBaseId)
-  const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
-  const [questions, setQuestions] = useState<ReviewQuestion[]>([])
-  const [genProgress, setGenProgress] = useState({ current: 0, total: 0 })
-  const [status, setStatus] = useState<'generating' | 'done' | 'error'>('generating')
-  const [errorMsg, setErrorMsg] = useState<string | null>(null)
-  const startedRef = useRef(false)
-
-  useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
-
-    // Phase 4: match answers (instant)
-    const matched: ReviewQuestion[] = structuredQuestions.map((q) => ({
+  const [questions, setQuestions] = useState<ReviewQuestion[]>(() =>
+    structuredQuestions.map((q) => ({
       ...q,
       correctAlternative: answerKey[String(q.number)] ?? null,
       answerDoubt: false,
@@ -1156,50 +1042,541 @@ function ReviewStep({
       explanations: [],
       unblocked: false,
     }))
+  )
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
 
-    // Phase 5: generate explanations per question
-    void generateAllExplanations(matched)
+  const withAnswer = questions.filter((q) => q.correctAlternative)
+  const withoutAnswer = questions.filter((q) => !q.correctAlternative)
+  const needsImage = questions.filter((q) => q.hasImage && !q.statementImageUrl && !q.unblocked)
+
+  function updateQuestion(index: number, patch: Partial<ReviewQuestion>) {
+    setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
+  }
+
+  function deleteQuestion(index: number) {
+    setQuestions((prev) => prev.filter((_, i) => i !== index))
+    if (expandedIndex === index) setExpandedIndex(null)
+    else if (expandedIndex !== null && expandedIndex > index) setExpandedIndex(expandedIndex - 1)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Summary */}
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+        <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+          Revisão de qualidade
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Revise as questões extraídas antes de gerar as explicações. Você pode editar enunciados, alternativas, gabaritos e remover questões com problemas.
+        </Typography>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Chip
+            icon={<CheckCircleIcon fontSize="small" />}
+            label={`${withAnswer.length} com gabarito`}
+            size="small"
+            color="success"
+            variant="outlined"
+          />
+          {withoutAnswer.length > 0 && (
+            <Chip
+              icon={<ErrorOutlineIcon fontSize="small" />}
+              label={`${withoutAnswer.length} sem gabarito`}
+              size="small"
+              color="error"
+              variant="outlined"
+            />
+          )}
+          {needsImage.length > 0 && (
+            <Chip
+              icon={<ImageIcon fontSize="small" />}
+              label={`${needsImage.length} aguardando imagem`}
+              size="small"
+              color="warning"
+              variant="outlined"
+            />
+          )}
+          <Chip label={`${questions.length} total`} size="small" variant="outlined" />
+        </div>
+      </Box>
+
+      {/* Question list */}
+      <Stack spacing={1}>
+        {questions.map((q, i) => {
+          const isExpanded = expandedIndex === i
+          const isBlocked = q.hasImage && !q.unblocked && !q.statementImageUrl
+          return (
+            <ReviewQuestionCard
+              key={`${q.number}-${i}`}
+              q={q}
+              examBaseId={examBaseId}
+              expanded={isExpanded}
+              isBlocked={isBlocked}
+              onToggle={() => setExpandedIndex(isExpanded ? null : i)}
+              onChange={(patch) => updateQuestion(i, patch)}
+              onDelete={() => deleteQuestion(i)}
+              onImageUploaded={(url) => updateQuestion(i, { statementImageUrl: url, unblocked: true })}
+              onUnblock={() => updateQuestion(i, { unblocked: true })}
+            />
+          )
+        })}
+      </Stack>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+          Voltar para gabarito
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onNext(questions)}
+          disabled={questions.length === 0}
+          sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+        >
+          Próximo: Gerar explicações ({questions.length} questões)
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ReviewQuestionCard — editable question card for Phase 4
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewQuestionCard({
+  q,
+  examBaseId,
+  expanded,
+  isBlocked,
+  onToggle,
+  onChange,
+  onDelete,
+  onImageUploaded,
+  onUnblock,
+}: {
+  q: ReviewQuestion
+  examBaseId: string
+  expanded: boolean
+  isBlocked: boolean
+  onToggle: () => void
+  onChange: (patch: Partial<ReviewQuestion>) => void
+  onDelete: () => void
+  onImageUploaded: (url: string) => void
+  onUnblock: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Local editable state — only used when editing
+  const [editState, setEditState] = useState({
+    statement: q.statement,
+    referenceText: q.referenceText ?? '',
+    subject: q.subject,
+    topic: q.topic,
+    correctAlternative: q.correctAlternative ?? '',
+    alternatives: q.alternatives.map((a) => ({ ...a })),
+  })
+
+  function startEditing() {
+    setEditState({
+      statement: q.statement,
+      referenceText: q.referenceText ?? '',
+      subject: q.subject,
+      topic: q.topic,
+      correctAlternative: q.correctAlternative ?? '',
+      alternatives: q.alternatives.map((a) => ({ ...a })),
+    })
+    setEditing(true)
+  }
+
+  function saveEdits() {
+    onChange({
+      statement: editState.statement,
+      referenceText: editState.referenceText || null,
+      subject: editState.subject,
+      topic: editState.topic,
+      correctAlternative: editState.correctAlternative || null,
+      alternatives: editState.alternatives,
+    })
+    setEditing(false)
+  }
+
+  function cancelEditing() {
+    setEditing(false)
+  }
+
+  async function handleImageUpload(file: File) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
+      onImageUploaded(url)
+    } catch (err) {
+      setUploadError((err as Error).message ?? 'Erro ao subir imagem')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: isBlocked ? 'warning.light' : !q.correctAlternative ? 'error.light' : 'divider',
+        borderRadius: 2,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Collapsed header — always visible */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          bgcolor: isBlocked ? 'warning.50' : !q.correctAlternative ? '#fff3f3' : 'grey.50',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          cursor: 'pointer',
+          '&:hover': { bgcolor: isBlocked ? 'warning.100' : 'grey.100' },
+        }}
+        onClick={onToggle}
+      >
+        <ExpandMoreIcon
+          fontSize="small"
+          sx={{
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: 'text.secondary',
+          }}
+        />
+        <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
+          Q{q.number}
+        </Typography>
+        {q.subject && <Chip label={q.subject} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />}
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+          {q.statement.slice(0, 80)}{q.statement.length > 80 ? '…' : ''}
+        </Typography>
+        {q.correctAlternative && (
+          <Chip label={q.correctAlternative} size="small" color="success" sx={{ fontWeight: 700, minWidth: 28 }} />
+        )}
+        {!q.correctAlternative && (
+          <Chip label="?" size="small" color="error" sx={{ fontWeight: 700, minWidth: 28 }} />
+        )}
+        {isBlocked && <ImageIcon fontSize="small" color="warning" />}
+      </Box>
+
+      {/* Expanded body */}
+      <Collapse in={expanded}>
+        <Box sx={{ px: 2, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          {/* Image upload for blocked questions */}
+          {isBlocked && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" fontWeight={600} mb={1}>
+                Esta questão referencia uma imagem/figura.
+              </Typography>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={uploading ? <CircularProgress size={14} color="inherit" /> : <ImageIcon />}
+                  disabled={uploading}
+                  onClick={() => imageInputRef.current?.click()}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  Upload imagem
+                </Button>
+                <Button size="small" variant="outlined" startIcon={<LockOpenIcon />} onClick={onUnblock}>
+                  Desbloquear
+                </Button>
+              </div>
+              {uploadError && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{uploadError}</Alert>}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleImageUpload(file)
+                }}
+              />
+            </Alert>
+          )}
+
+          {/* Uploaded image preview */}
+          {q.statementImageUrl && (
+            <Box sx={{ mb: 2 }}>
+              <img src={q.statementImageUrl} alt="Imagem do enunciado" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4 }} />
+            </Box>
+          )}
+
+          {editing ? (
+            /* ─── Edit mode ─── */
+            <Stack spacing={2}>
+              <div className="flex gap-2">
+                <TextField
+                  label="Disciplina"
+                  value={editState.subject}
+                  onChange={(e) => setEditState((s) => ({ ...s, subject: e.target.value }))}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Tópico"
+                  value={editState.topic}
+                  onChange={(e) => setEditState((s) => ({ ...s, topic: e.target.value }))}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+              </div>
+
+              {editState.referenceText !== undefined && (
+                <TextField
+                  label="Texto de referência"
+                  value={editState.referenceText}
+                  onChange={(e) => setEditState((s) => ({ ...s, referenceText: e.target.value }))}
+                  size="small"
+                  multiline
+                  minRows={2}
+                  maxRows={6}
+                  fullWidth
+                />
+              )}
+
+              <TextField
+                label="Enunciado"
+                value={editState.statement}
+                onChange={(e) => setEditState((s) => ({ ...s, statement: e.target.value }))}
+                size="small"
+                multiline
+                minRows={2}
+                maxRows={8}
+                fullWidth
+              />
+
+              <Typography variant="body2" fontWeight={600}>Alternativas</Typography>
+              <RadioGroup
+                value={editState.correctAlternative}
+                onChange={(e) => setEditState((s) => ({ ...s, correctAlternative: e.target.value }))}
+              >
+                {editState.alternatives.map((alt, altIdx) => (
+                  <div key={alt.key} className="flex items-start gap-2 mb-1">
+                    <FormControlLabel
+                      value={alt.key}
+                      control={<Radio size="small" />}
+                      label=""
+                      sx={{ mr: 0, ml: 0 }}
+                    />
+                    <Typography variant="body2" fontWeight={700} sx={{ mt: 1, minWidth: 20 }}>
+                      {alt.key})
+                    </Typography>
+                    <TextField
+                      value={alt.text}
+                      onChange={(e) => {
+                        const updated = [...editState.alternatives]
+                        updated[altIdx] = { ...updated[altIdx], text: e.target.value }
+                        setEditState((s) => ({ ...s, alternatives: updated }))
+                      }}
+                      size="small"
+                      fullWidth
+                      multiline
+                      maxRows={3}
+                    />
+                  </div>
+                ))}
+              </RadioGroup>
+
+              <div className="flex gap-2">
+                <Button size="small" variant="contained" startIcon={<SaveIcon />} onClick={saveEdits}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  Salvar alterações
+                </Button>
+                <Button size="small" variant="outlined" onClick={cancelEditing}>
+                  Cancelar
+                </Button>
+              </div>
+            </Stack>
+          ) : (
+            /* ─── View mode ─── */
+            <>
+              {q.referenceText && (
+                <Box sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5, mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+                    Texto de referência
+                  </Typography>
+                  <Markdown variant="body2">{q.referenceText}</Markdown>
+                </Box>
+              )}
+
+              <Box sx={{ mb: 2 }}>
+                <Markdown variant="body2">{q.statement}</Markdown>
+              </Box>
+
+              <Stack spacing={0.5} sx={{ mb: 2 }}>
+                {q.alternatives.map((alt) => {
+                  const isCorrect = alt.key === q.correctAlternative
+                  return (
+                    <Box
+                      key={alt.key}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: isCorrect ? 'success.light' : 'divider',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                        bgcolor: isCorrect ? 'success.50' : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Typography variant="body2" fontWeight={700} sx={{ minWidth: 20, color: isCorrect ? 'success.main' : 'text.primary' }}>
+                          {alt.key})
+                        </Typography>
+                        <Markdown variant="body2">{alt.text}</Markdown>
+                      </div>
+                    </Box>
+                  )
+                })}
+              </Stack>
+
+              {q.topic && (
+                <Typography variant="caption" color="text.secondary">
+                  Tópico: {q.topic}
+                </Typography>
+              )}
+            </>
+          )}
+
+          {/* Action buttons */}
+          {!editing && (
+            <div className="flex gap-2 mt-3 pt-2 border-t border-slate-200">
+              <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={startEditing}>
+                Editar
+              </Button>
+              <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={onDelete}>
+                Remover
+              </Button>
+            </div>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 5 — Explicações (AI explanation generation + save)
+// ─────────────────────────────────────────────────────────────────────────────
+
+type QuestionGenStatus = 'pending' | 'generating' | 'done' | 'skipped' | 'error'
+
+type ExplanationQuestion = ReviewQuestion & {
+  genStatus: QuestionGenStatus
+  genError?: string
+}
+
+function ExplanationsStep({
+  examBaseId,
+  reviewedQuestions,
+  onBack,
+}: {
+  examBaseId: string
+  reviewedQuestions: ReviewQuestion[]
+  onBack: () => void
+}) {
+  const navigate = useNavigate()
+  const { data: examBase } = useExamBaseQuery(examBaseId)
+  const saveMutation = useCreateBatchQuestionsMutation(examBaseId)
+  const updatePhaseMutation = useUpdateExamBaseMutation(examBaseId)
+  const [questions, setQuestions] = useState<ExplanationQuestion[]>(() =>
+    reviewedQuestions.map((q) => ({
+      ...q,
+      genStatus: q.correctAlternative ? 'pending' : 'skipped',
+    }))
+  )
+  const [globalStatus, setGlobalStatus] = useState<'idle' | 'generating' | 'done'>('idle')
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+  const abortRef = useRef(false)
+  const startedRef = useRef(false)
+
+  useEffect(() => {
+    if (startedRef.current) return
+    startedRef.current = true
+    void generateAll()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function generateAllExplanations(matched: ReviewQuestion[]) {
-    setGenProgress({ current: 0, total: matched.length })
-    const result: ReviewQuestion[] = []
+  function updateQ(index: number, patch: Partial<ExplanationQuestion>) {
+    setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
+  }
+
+  async function generateOne(q: ExplanationQuestion, index: number): Promise<ExplanationQuestion> {
+    if (!q.correctAlternative) return { ...q, genStatus: 'skipped' }
+    updateQ(index, { genStatus: 'generating' })
     try {
-      for (let i = 0; i < matched.length; i++) {
-        const q = matched[i]
-        setGenProgress({ current: i + 1, total: matched.length })
-        if (!q.correctAlternative) {
-          result.push(q)
-          setQuestions([...result])
-          continue
-        }
-        try {
-          const resp = await examBaseQuestionsService.generateExplanationsInline(examBaseId, {
-            subject: q.subject || undefined,
-            statement: q.statement,
-            referenceText: q.referenceText,
-            statementImageUrl: q.statementImageUrl,
-            correctAlternative: q.correctAlternative,
-            alternatives: q.alternatives,
-          })
-          result.push({
-            ...q,
-            topic: resp.topic || q.topic,
-            subtopics: resp.subtopics.length ? resp.subtopics : q.subtopics,
-            explanations: resp.explanations,
-            answerDoubt: !resp.agreesWithCorrectAnswer,
-            doubtReason: resp.disagreementWarning ?? null,
-          })
-        } catch {
-          result.push(q)
-        }
-        setQuestions([...result])
+      const resp = await examBaseQuestionsService.generateExplanationsInline(examBaseId, {
+        subject: q.subject || undefined,
+        statement: q.statement,
+        referenceText: q.referenceText,
+        statementImageUrl: q.statementImageUrl,
+        correctAlternative: q.correctAlternative,
+        alternatives: q.alternatives,
+      })
+      const updated: ExplanationQuestion = {
+        ...q,
+        topic: resp.topic || q.topic,
+        subtopics: resp.subtopics.length ? resp.subtopics : q.subtopics,
+        explanations: resp.explanations,
+        answerDoubt: !resp.agreesWithCorrectAnswer,
+        doubtReason: resp.disagreementWarning ?? null,
+        genStatus: 'done',
       }
-      setStatus('done')
+      updateQ(index, updated)
+      return updated
     } catch (err) {
-      setStatus('error')
-      setErrorMsg((err as Error).message ?? 'Erro ao gerar explicações')
+      const errMsg = (err as Error).message ?? 'Erro desconhecido'
+      updateQ(index, { genStatus: 'error', genError: errMsg })
+      return { ...q, genStatus: 'error', genError: errMsg }
     }
+  }
+
+  async function generateAll() {
+    abortRef.current = false
+    setGlobalStatus('generating')
+    for (let i = 0; i < questions.length; i++) {
+      if (abortRef.current) break
+      const q = questions[i]
+      if (q.genStatus === 'done' || q.genStatus === 'skipped') continue
+      // Re-read latest state for this question
+      const latest = await new Promise<ExplanationQuestion>((resolve) => {
+        setQuestions((prev) => { resolve(prev[i]); return prev })
+      })
+      if (latest.genStatus === 'done' || latest.genStatus === 'skipped') continue
+      await generateOne(latest, i)
+    }
+    setGlobalStatus('done')
+  }
+
+  async function retryFailed() {
+    abortRef.current = false
+    setGlobalStatus('generating')
+    for (let i = 0; i < questions.length; i++) {
+      if (abortRef.current) break
+      const latest = await new Promise<ExplanationQuestion>((resolve) => {
+        setQuestions((prev) => { resolve(prev[i]); return prev })
+      })
+      if (latest.genStatus !== 'error') continue
+      await generateOne(latest, i)
+    }
+    setGlobalStatus('done')
+  }
+
+  async function retrySingle(index: number) {
+    const latest = await new Promise<ExplanationQuestion>((resolve) => {
+      setQuestions((prev) => { resolve(prev[index]); return prev })
+    })
+    await generateOne(latest, index)
   }
 
   async function handleSave() {
@@ -1218,103 +1595,381 @@ function ReviewStep({
       })),
     }))
     await saveMutation.mutateAsync(payload)
+    updatePhaseMutation.mutate({ processingPhase: 'CONCLUIDO' })
     const examBoardId = examBase?.examBoardId
     if (examBoardId) {
       navigate({ to: '/exams/$examBoard/$examId', params: { examBoard: examBoardId, examId: examBaseId } })
     }
   }
 
-  const blockedCount = questions.filter((q) => q.hasImage && !q.unblocked && !q.statementImageUrl).length
+  const doneCount = questions.filter((q) => q.genStatus === 'done').length
+  const errorCount = questions.filter((q) => q.genStatus === 'error').length
+  const skippedCount = questions.filter((q) => q.genStatus === 'skipped').length
   const doubtCount = questions.filter((q) => q.answerDoubt).length
-  const progressValue = genProgress.total > 0
-    ? Math.round((genProgress.current / genProgress.total) * 100)
+  const pendingOrGenerating = questions.filter((q) => q.genStatus === 'pending' || q.genStatus === 'generating').length
+  const isGenerating = globalStatus === 'generating'
+  const progressValue = questions.length > 0
+    ? Math.round(((doneCount + errorCount + skippedCount) / questions.length) * 100)
     : 0
-  const isGenerating = status === 'generating'
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Generation progress */}
+      {/* Progress panel */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
-          Gerando explicações (o3-mini)
+          Gerando explicações (Claude Sonnet)
         </Typography>
         {isGenerating && (
           <StepProgressBar
-            label={`Questão ${genProgress.current} de ${genProgress.total}...`}
+            label={`${doneCount + errorCount} de ${questions.length - skippedCount} questões processadas...`}
             value={progressValue}
           />
         )}
-        {status === 'done' && (
-          <StepProgressBar label={`Explicações geradas para ${questions.length} questões!`} value={100} color="success" />
+        {globalStatus === 'done' && errorCount === 0 && (
+          <StepProgressBar label={`Explicações geradas para ${doneCount} questões!`} value={100} color="success" />
         )}
-        {status === 'error' && errorMsg && (
-          <Alert severity="error" sx={{ mt: 1 }}>{errorMsg}</Alert>
+        {globalStatus === 'done' && errorCount > 0 && (
+          <StepProgressBar
+            label={`${doneCount} geradas, ${errorCount} com erro`}
+            value={100}
+            color="error"
+          />
+        )}
+
+        {/* Summary chips */}
+        <div className="flex items-center gap-2 flex-wrap mt-3">
+          <Chip
+            icon={<CheckCircleIcon fontSize="small" />}
+            label={`${doneCount} geradas`}
+            size="small"
+            color="success"
+            variant="outlined"
+          />
+          {errorCount > 0 && (
+            <Chip
+              icon={<ErrorOutlineIcon fontSize="small" />}
+              label={`${errorCount} com erro`}
+              size="small"
+              color="error"
+              variant="outlined"
+            />
+          )}
+          {skippedCount > 0 && (
+            <Chip label={`${skippedCount} sem gabarito`} size="small" variant="outlined" />
+          )}
+          {doubtCount > 0 && (
+            <Chip
+              icon={<WarningAmberIcon fontSize="small" />}
+              label={`${doubtCount} gabarito duvidoso`}
+              size="small"
+              color="warning"
+              variant="outlined"
+            />
+          )}
+        </div>
+
+        {/* Retry all errors */}
+        {globalStatus === 'done' && errorCount > 0 && (
+          <Button
+            size="small"
+            variant="outlined"
+            color="error"
+            onClick={retryFailed}
+            sx={{ mt: 2 }}
+            startIcon={<AutoAwesomeIcon />}
+          >
+            Tentar novamente ({errorCount} com erro)
+          </Button>
         )}
       </Box>
 
-      {/* Questions list */}
-      {questions.length > 0 && (
-        <>
-          <div className="flex items-center gap-3 flex-wrap">
-            <Typography variant="subtitle1" fontWeight={600}>
-              {questions.length}{isGenerating ? ` de ${genProgress.total}` : ''} questões
-            </Typography>
-            {blockedCount > 0 && (
-              <Chip icon={<ImageIcon fontSize="small" />} label={`${blockedCount} aguardando imagem`} size="small" color="warning" />
-            )}
-            {doubtCount > 0 && (
-              <Chip icon={<WarningAmberIcon fontSize="small" />} label={`${doubtCount} gabarito duvidoso`} size="small" color="warning" variant="outlined" />
-            )}
-          </div>
+      {/* Question list */}
+      <Stack spacing={1}>
+        {questions.map((q, i) => (
+          <ExplanationQuestionCard
+            key={`${q.number}-${i}`}
+            q={q}
+            expanded={expandedIndex === i}
+            onToggle={() => setExpandedIndex(expandedIndex === i ? null : i)}
+            onRetry={() => retrySingle(i)}
+            onUpdateExplanation={(altKey, text) => {
+              const newExplanations = q.explanations.map((e) =>
+                e.key === altKey ? { ...e, explanation: text } : e
+              )
+              updateQ(i, { explanations: newExplanations })
+            }}
+            onResolveDoubt={(newCorrect) => {
+              updateQ(i, {
+                correctAlternative: newCorrect,
+                answerDoubt: false,
+                doubtReason: null,
+              })
+            }}
+          />
+        ))}
+      </Stack>
 
-          <Stack spacing={2}>
-            {questions.map((q, i) => (
-              <QuestionCard
-                key={i}
-                q={q}
-                index={i}
-                examBaseId={examBaseId}
-                onUnblock={(idx) =>
-                  setQuestions((prev) => prev.map((item, j) => (j === idx ? { ...item, unblocked: true } : item)))
-                }
-                onImageUploaded={(idx, url) =>
-                  setQuestions((prev) =>
-                    prev.map((item, j) => (j === idx ? { ...item, statementImageUrl: url, unblocked: true } : item))
-                  )
-                }
-              />
-            ))}
-          </Stack>
-
-          {saveMutation.isError && (
-            <Alert severity="error">{(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}</Alert>
-          )}
-          {saveMutation.isSuccess && (
-            <Alert severity="success">{questions.length} questões salvas com sucesso!</Alert>
-          )}
-
-          <div>
-            <Button
-              variant="contained"
-              onClick={handleSave}
-              disabled={isGenerating || saveMutation.isPending || saveMutation.isSuccess}
-              startIcon={saveMutation.isPending ? <CircularProgress size={16} color="inherit" /> : undefined}
-              sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
-            >
-              {saveMutation.isPending ? 'Salvando...' : `Salvar ${questions.length} questões`}
-            </Button>
-          </div>
-        </>
+      {/* Save / navigate */}
+      {saveMutation.isError && (
+        <Alert severity="error">{(saveMutation.error as Error)?.message ?? 'Erro ao salvar questões'}</Alert>
+      )}
+      {saveMutation.isSuccess && (
+        <Alert severity="success">{questions.length} questões salvas com sucesso!</Alert>
       )}
 
-      <Divider />
-
-      <div>
+      <div className="flex items-center gap-3">
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isGenerating}>
-          Voltar para gabarito
+          Voltar para revisão
+        </Button>
+        <Button
+          variant="contained"
+          onClick={handleSave}
+          disabled={isGenerating || pendingOrGenerating > 0 || saveMutation.isPending || saveMutation.isSuccess}
+          startIcon={saveMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+          sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+        >
+          {saveMutation.isPending ? 'Salvando...' : `Salvar ${questions.length} questões`}
         </Button>
       </div>
     </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ExplanationQuestionCard — shows question with generated explanations
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ExplanationQuestionCard({
+  q,
+  expanded,
+  onToggle,
+  onRetry,
+  onUpdateExplanation,
+  onResolveDoubt,
+}: {
+  q: ExplanationQuestion
+  expanded: boolean
+  onToggle: () => void
+  onRetry: () => void
+  onUpdateExplanation: (altKey: string, text: string) => void
+  onResolveDoubt: (newCorrectAlternative: string) => void
+}) {
+  const [editingAltKey, setEditingAltKey] = useState<string | null>(null)
+  const [editText, setEditText] = useState('')
+
+  const statusColor =
+    q.genStatus === 'done' ? 'success' :
+    q.genStatus === 'error' ? 'error' :
+    q.genStatus === 'generating' ? 'info' :
+    q.genStatus === 'skipped' ? 'default' : 'default'
+
+  const statusLabel =
+    q.genStatus === 'done' ? 'OK' :
+    q.genStatus === 'error' ? 'Erro' :
+    q.genStatus === 'generating' ? '...' :
+    q.genStatus === 'skipped' ? 'Pulada' : 'Pendente'
+
+  return (
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: q.answerDoubt ? 'warning.main' : q.genStatus === 'error' ? 'error.light' : 'divider',
+        borderRadius: 2,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Header */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          bgcolor: q.answerDoubt ? 'warning.50' : q.genStatus === 'error' ? '#fff3f3' : 'grey.50',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          cursor: 'pointer',
+          '&:hover': { bgcolor: 'grey.100' },
+        }}
+        onClick={onToggle}
+      >
+        <ExpandMoreIcon
+          fontSize="small"
+          sx={{
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: 'text.secondary',
+          }}
+        />
+        <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
+          Q{q.number}
+        </Typography>
+        {q.subject && <Chip label={q.subject} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />}
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+          {q.statement.slice(0, 80)}{q.statement.length > 80 ? '…' : ''}
+        </Typography>
+        {q.genStatus === 'generating' && <CircularProgress size={16} />}
+        <Chip
+          label={statusLabel}
+          size="small"
+          color={statusColor as 'success' | 'error' | 'info' | 'default'}
+          sx={{ fontWeight: 700, minWidth: 40 }}
+        />
+        {q.correctAlternative && (
+          <Chip label={q.correctAlternative} size="small" color="success" sx={{ fontWeight: 700, minWidth: 28 }} />
+        )}
+        {q.answerDoubt && <WarningAmberIcon fontSize="small" color="warning" />}
+      </Box>
+
+      {/* Expanded body */}
+      <Collapse in={expanded}>
+        <Box sx={{ px: 2, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          {/* Error state */}
+          {q.genStatus === 'error' && (
+            <Alert severity="error" sx={{ mb: 2 }} action={
+              <Button size="small" color="inherit" onClick={onRetry} startIcon={<AutoAwesomeIcon />}>
+                Tentar novamente
+              </Button>
+            }>
+              {q.genError ?? 'Erro ao gerar explicações'}
+            </Alert>
+          )}
+
+          {/* Answer doubt warning */}
+          {q.answerDoubt && q.doubtReason && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" fontWeight={600} mb={0.5}>
+                A IA discorda do gabarito
+              </Typography>
+              <Typography variant="body2" mb={1.5}>{q.doubtReason}</Typography>
+              <Typography variant="caption" fontWeight={600} display="block" mb={0.5}>
+                Alterar gabarito para:
+              </Typography>
+              <div className="flex gap-1 flex-wrap">
+                {q.alternatives.map((alt) => (
+                  <Button
+                    key={alt.key}
+                    size="small"
+                    variant={alt.key === q.correctAlternative ? 'contained' : 'outlined'}
+                    onClick={() => onResolveDoubt(alt.key)}
+                    sx={{
+                      minWidth: 36,
+                      ...(alt.key === q.correctAlternative
+                        ? { bgcolor: 'success.main', '&:hover': { bgcolor: 'success.dark' } }
+                        : {}),
+                    }}
+                  >
+                    {alt.key}
+                  </Button>
+                ))}
+              </div>
+            </Alert>
+          )}
+
+          {/* Statement preview */}
+          <Box sx={{ mb: 2 }}>
+            <Markdown variant="body2">{q.statement}</Markdown>
+          </Box>
+
+          {/* Alternatives with explanations */}
+          <Stack spacing={1}>
+            {q.alternatives.map((alt) => {
+              const isCorrect = alt.key === q.correctAlternative
+              const explanation = q.explanations.find((e) => e.key === alt.key)?.explanation
+              const isEditing = editingAltKey === alt.key
+
+              return (
+                <Box
+                  key={alt.key}
+                  sx={{
+                    border: '1px solid',
+                    borderColor: isCorrect ? 'success.light' : 'divider',
+                    borderRadius: 1,
+                    overflow: 'hidden',
+                  }}
+                >
+                  {/* Alternative text */}
+                  <Box sx={{ px: 1.5, py: 1, bgcolor: isCorrect ? 'success.50' : 'transparent' }}>
+                    <div className="flex items-start gap-2">
+                      <Typography
+                        variant="body2"
+                        fontWeight={700}
+                        sx={{ minWidth: 20, color: isCorrect ? 'success.main' : 'text.primary' }}
+                      >
+                        {alt.key})
+                      </Typography>
+                      <Markdown variant="body2">{alt.text}</Markdown>
+                    </div>
+                  </Box>
+
+                  {/* Explanation */}
+                  {explanation && (
+                    <Box sx={{ px: 1.5, py: 1, bgcolor: 'grey.50', borderTop: '1px dashed', borderColor: 'divider' }}>
+                      {isEditing ? (
+                        <Stack spacing={1}>
+                          <TextField
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            size="small"
+                            multiline
+                            minRows={2}
+                            maxRows={8}
+                            fullWidth
+                          />
+                          <div className="flex gap-1">
+                            <Button
+                              size="small"
+                              variant="contained"
+                              onClick={() => { onUpdateExplanation(alt.key, editText); setEditingAltKey(null) }}
+                              sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                            >
+                              Salvar
+                            </Button>
+                            <Button size="small" onClick={() => setEditingAltKey(null)}>
+                              Cancelar
+                            </Button>
+                          </div>
+                        </Stack>
+                      ) : (
+                        <div className="flex items-start gap-2">
+                          <Box sx={{ flex: 1 }}>
+                            <Markdown variant="caption">{explanation}</Markdown>
+                          </Box>
+                          <Tooltip title="Editar explicação">
+                            <IconButton
+                              size="small"
+                              onClick={() => { setEditingAltKey(alt.key); setEditText(explanation) }}
+                              sx={{ ml: 0.5, mt: -0.5 }}
+                            >
+                              <EditIcon sx={{ fontSize: 14 }} />
+                            </IconButton>
+                          </Tooltip>
+                        </div>
+                      )}
+                    </Box>
+                  )}
+                </Box>
+              )
+            })}
+          </Stack>
+
+          {/* Topic / subtopics */}
+          {q.genStatus === 'done' && (
+            <div className="flex items-center gap-2 flex-wrap mt-2">
+              {q.topic && (
+                <Typography variant="caption" color="text.secondary">
+                  Tópico: {q.topic}
+                </Typography>
+              )}
+              {q.subtopics.length > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                  · {q.subtopics.join(', ')}
+                </Typography>
+              )}
+            </div>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
   )
 }
 
@@ -1325,9 +1980,31 @@ function ReviewStep({
 function ExamEditPage() {
   const { examBaseId } = Route.useParams()
   const navigate = useNavigate()
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1)
+  const { data: examBase } = useExamBaseQuery(examBaseId)
+  const updateMutation = useUpdateExamBaseMutation(examBaseId)
+  const [step, setStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [initialPhaseApplied, setInitialPhaseApplied] = useState(false)
   const [structuredQuestions, setStructuredQuestions] = useState<ParsedQuestionStructure[]>([])
   const [answerKey, setAnswerKey] = useState<Record<string, string>>({})
+  const [reviewedQuestions, setReviewedQuestions] = useState<ReviewQuestion[]>([])
+
+  // Restore step from persisted processingPhase on load
+  useEffect(() => {
+    if (!examBase || initialPhaseApplied) return
+    const phase = examBase.processingPhase
+    if (phase) {
+      setStep(PHASE_TO_STEP[phase] as 1 | 2 | 3 | 4 | 5)
+    }
+    setInitialPhaseApplied(true)
+  }, [examBase, initialPhaseApplied])
+
+  function handleStepChange(newStep: 1 | 2 | 3 | 4 | 5) {
+    setStep(newStep)
+    const phase = STEP_TO_PHASE[newStep]
+    if (phase) {
+      updateMutation.mutate({ processingPhase: phase })
+    }
+  }
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
@@ -1342,25 +2019,42 @@ function ExamEditPage() {
         <Typography variant="h5" fontWeight={700}>
           Criar exame
         </Typography>
+        {examBase?.processingPhase && examBase.processingPhase !== 'CONCLUIDO' && (
+          <Chip
+            label={`Fase: ${examBase.processingPhase}`}
+            size="small"
+            variant="outlined"
+            sx={{ ml: 'auto', textTransform: 'capitalize' }}
+          />
+        )}
+        {examBase?.processingPhase === 'CONCLUIDO' && (
+          <Chip
+            label="Concluído"
+            size="small"
+            color="success"
+            sx={{ ml: 'auto' }}
+          />
+        )}
       </div>
 
-      <StepIndicator step={step} />
+      <StepIndicator step={step} onStepClick={(s) => handleStepChange(s as 1 | 2 | 3 | 4 | 5)} />
 
       {step === 1 && (
-        <MetadataStep examBaseId={examBaseId} onNext={() => setStep(2)} />
+        <MetadataStep examBaseId={examBaseId} onNext={() => handleStepChange(2)} />
       )}
       {step === 2 && (
         <ExamPdfStep
           examBaseId={examBaseId}
-          onNext={(qs) => { setStructuredQuestions(qs); setStep(3) }}
-          onBack={() => setStep(1)}
+          onNext={(qs) => { setStructuredQuestions(qs); handleStepChange(3) }}
+          onBack={() => handleStepChange(1)}
         />
       )}
       {step === 3 && (
         <GabaritoStep
           examBaseId={examBaseId}
-          onNext={(key) => { setAnswerKey(key); setStep(4) }}
-          onBack={() => setStep(2)}
+          structuredQuestions={structuredQuestions}
+          onNext={(key) => { setAnswerKey(key); handleStepChange(4) }}
+          onBack={() => handleStepChange(2)}
         />
       )}
       {step === 4 && (
@@ -1368,7 +2062,15 @@ function ExamEditPage() {
           examBaseId={examBaseId}
           structuredQuestions={structuredQuestions}
           answerKey={answerKey}
-          onBack={() => setStep(3)}
+          onNext={(reviewed) => { setReviewedQuestions(reviewed); handleStepChange(5) }}
+          onBack={() => handleStepChange(3)}
+        />
+      )}
+      {step === 5 && (
+        <ExplanationsStep
+          examBaseId={examBaseId}
+          reviewedQuestions={reviewedQuestions}
+          onBack={() => handleStepChange(4)}
         />
       )}
     </div>

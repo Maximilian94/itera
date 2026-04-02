@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GovernmentScope, UserRole } from '@prisma/client';
+import { GovernmentScope, ProcessingPhase, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
@@ -119,6 +119,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         published: true,
         editalUrl: true,
+        processingPhase: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -278,6 +279,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         published: true,
         editalUrl: true,
+        processingPhase: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -436,6 +438,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         editalUrl: true,
         adminNotes: true,
+        processingPhase: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
@@ -458,6 +461,7 @@ export class ExamBaseService {
       slug?: string | null;
       editalUrl?: string | null;
       adminNotes?: string | null;
+      processingPhase?: ProcessingPhase;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -497,6 +501,7 @@ export class ExamBaseService {
         slug: input.slug === undefined ? undefined : input.slug,
         editalUrl: input.editalUrl === undefined ? undefined : normalizeOptionalText(input.editalUrl),
         adminNotes: input.adminNotes === undefined ? undefined : normalizeOptionalText(input.adminNotes),
+        processingPhase: input.processingPhase,
       },
       select: {
         id: true,
@@ -512,6 +517,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         editalUrl: true,
         adminNotes: true,
+        processingPhase: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },

@@ -1,4 +1,4 @@
-import { GovernmentScope } from '@prisma/client';
+import { GovernmentScope, ProcessingPhase } from '@prisma/client';
 import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
 
 export class UpdateExamBaseDto {
@@ -53,5 +53,9 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsString()
   adminNotes?: string | null;
+
+  @IsOptional()
+  @IsEnum(ProcessingPhase)
+  processingPhase?: ProcessingPhase;
 }
 

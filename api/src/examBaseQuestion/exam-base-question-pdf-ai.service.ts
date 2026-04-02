@@ -317,11 +317,11 @@ export class ExamBaseQuestionPdfAiService {
       throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
     }
 
-    const client = new Anthropic({ apiKey: anthropicKey, timeout: 180_000 });
+    const client = new Anthropic({ apiKey: anthropicKey, timeout: 600_000 });
 
     const response = await client.messages.create({
       model: 'claude-sonnet-4-6',
-      max_tokens: 16384,
+      max_tokens: 64000,
       system: buildStructureSystemPrompt(),
       messages: [
         {
@@ -342,12 +342,14 @@ export class ExamBaseQuestionPdfAiService {
       ],
     });
 
-    const block = response.content[0];
-    if (!block || block.type !== 'text') {
+    // Handle potential multi-block responses for large PDFs
+    const textBlocks = response.content.filter((b) => b.type === 'text');
+    if (textBlocks.length === 0) {
       throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
     }
+    const fullText = textBlocks.map((b) => b.text).join('');
 
-    return this.parseStructureJson(block.text);
+    return this.parseStructureJson(fullText);
   }
 
   /** Parses a single markdown chunk with the provided answer key. Used by the per-chunk endpoint. */
