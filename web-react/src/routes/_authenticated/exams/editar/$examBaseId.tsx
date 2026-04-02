@@ -19,22 +19,30 @@ import { Markdown } from '@/components/Markdown'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
+import EditIcon from '@mui/icons-material/Edit'
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
 import WarningAmberIcon from '@mui/icons-material/WarningAmber'
 import ImageIcon from '@mui/icons-material/Image'
 import LockOpenIcon from '@mui/icons-material/LockOpen'
+import SaveIcon from '@mui/icons-material/Save'
 import {
   Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
+  Collapse,
   Divider,
+  FormControlLabel,
   LinearProgress,
   FormControl,
   IconButton,
   InputLabel,
   MenuItem,
+  Radio,
+  RadioGroup,
   Select,
   Stack,
   TextField,
@@ -1272,18 +1280,466 @@ function GabaritoStep({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Step 5 — Review (match + explanations + save)
+// Step 4 — Revisão (Human QC)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function ReviewStep({
   examBaseId,
   structuredQuestions,
   answerKey,
+  onNext,
   onBack,
 }: {
   examBaseId: string
   structuredQuestions: ParsedQuestionStructure[]
   answerKey: Record<string, string>
+  onNext: (reviewed: ReviewQuestion[]) => void
+  onBack: () => void
+}) {
+  const [questions, setQuestions] = useState<ReviewQuestion[]>(() =>
+    structuredQuestions.map((q) => ({
+      ...q,
+      correctAlternative: answerKey[String(q.number)] ?? null,
+      answerDoubt: false,
+      doubtReason: null,
+      explanations: [],
+      unblocked: false,
+    }))
+  )
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(null)
+
+  const withAnswer = questions.filter((q) => q.correctAlternative)
+  const withoutAnswer = questions.filter((q) => !q.correctAlternative)
+  const needsImage = questions.filter((q) => q.hasImage && !q.statementImageUrl && !q.unblocked)
+
+  function updateQuestion(index: number, patch: Partial<ReviewQuestion>) {
+    setQuestions((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)))
+  }
+
+  function deleteQuestion(index: number) {
+    setQuestions((prev) => prev.filter((_, i) => i !== index))
+    if (expandedIndex === index) setExpandedIndex(null)
+    else if (expandedIndex !== null && expandedIndex > index) setExpandedIndex(expandedIndex - 1)
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Summary */}
+      <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+        <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+          Revisão de qualidade
+        </Typography>
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Revise as questões extraídas antes de gerar as explicações. Você pode editar enunciados, alternativas, gabaritos e remover questões com problemas.
+        </Typography>
+        <div className="flex items-center gap-3 flex-wrap">
+          <Chip
+            icon={<CheckCircleIcon fontSize="small" />}
+            label={`${withAnswer.length} com gabarito`}
+            size="small"
+            color="success"
+            variant="outlined"
+          />
+          {withoutAnswer.length > 0 && (
+            <Chip
+              icon={<ErrorOutlineIcon fontSize="small" />}
+              label={`${withoutAnswer.length} sem gabarito`}
+              size="small"
+              color="error"
+              variant="outlined"
+            />
+          )}
+          {needsImage.length > 0 && (
+            <Chip
+              icon={<ImageIcon fontSize="small" />}
+              label={`${needsImage.length} aguardando imagem`}
+              size="small"
+              color="warning"
+              variant="outlined"
+            />
+          )}
+          <Chip label={`${questions.length} total`} size="small" variant="outlined" />
+        </div>
+      </Box>
+
+      {/* Question list */}
+      <Stack spacing={1}>
+        {questions.map((q, i) => {
+          const isExpanded = expandedIndex === i
+          const isBlocked = q.hasImage && !q.unblocked && !q.statementImageUrl
+          return (
+            <ReviewQuestionCard
+              key={`${q.number}-${i}`}
+              q={q}
+              examBaseId={examBaseId}
+              expanded={isExpanded}
+              isBlocked={isBlocked}
+              onToggle={() => setExpandedIndex(isExpanded ? null : i)}
+              onChange={(patch) => updateQuestion(i, patch)}
+              onDelete={() => deleteQuestion(i)}
+              onImageUploaded={(url) => updateQuestion(i, { statementImageUrl: url, unblocked: true })}
+              onUnblock={() => updateQuestion(i, { unblocked: true })}
+            />
+          )
+        })}
+      </Stack>
+
+      {/* Actions */}
+      <div className="flex items-center gap-3">
+        <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />}>
+          Voltar para gabarito
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onNext(questions)}
+          disabled={questions.length === 0}
+          sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+        >
+          Próximo: Gerar explicações ({questions.length} questões)
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ReviewQuestionCard — editable question card for Phase 4
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ReviewQuestionCard({
+  q,
+  examBaseId,
+  expanded,
+  isBlocked,
+  onToggle,
+  onChange,
+  onDelete,
+  onImageUploaded,
+  onUnblock,
+}: {
+  q: ReviewQuestion
+  examBaseId: string
+  expanded: boolean
+  isBlocked: boolean
+  onToggle: () => void
+  onChange: (patch: Partial<ReviewQuestion>) => void
+  onDelete: () => void
+  onImageUploaded: (url: string) => void
+  onUnblock: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Local editable state — only used when editing
+  const [editState, setEditState] = useState({
+    statement: q.statement,
+    referenceText: q.referenceText ?? '',
+    subject: q.subject,
+    topic: q.topic,
+    correctAlternative: q.correctAlternative ?? '',
+    alternatives: q.alternatives.map((a) => ({ ...a })),
+  })
+
+  function startEditing() {
+    setEditState({
+      statement: q.statement,
+      referenceText: q.referenceText ?? '',
+      subject: q.subject,
+      topic: q.topic,
+      correctAlternative: q.correctAlternative ?? '',
+      alternatives: q.alternatives.map((a) => ({ ...a })),
+    })
+    setEditing(true)
+  }
+
+  function saveEdits() {
+    onChange({
+      statement: editState.statement,
+      referenceText: editState.referenceText || null,
+      subject: editState.subject,
+      topic: editState.topic,
+      correctAlternative: editState.correctAlternative || null,
+      alternatives: editState.alternatives,
+    })
+    setEditing(false)
+  }
+
+  function cancelEditing() {
+    setEditing(false)
+  }
+
+  async function handleImageUpload(file: File) {
+    setUploading(true)
+    setUploadError(null)
+    try {
+      const { url } = await examBaseQuestionsService.uploadStatementImage(examBaseId, file)
+      onImageUploaded(url)
+    } catch (err) {
+      setUploadError((err as Error).message ?? 'Erro ao subir imagem')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <Box
+      sx={{
+        border: '1px solid',
+        borderColor: isBlocked ? 'warning.light' : !q.correctAlternative ? 'error.light' : 'divider',
+        borderRadius: 2,
+        overflow: 'hidden',
+      }}
+    >
+      {/* Collapsed header — always visible */}
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          bgcolor: isBlocked ? 'warning.50' : !q.correctAlternative ? '#fff3f3' : 'grey.50',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          cursor: 'pointer',
+          '&:hover': { bgcolor: isBlocked ? 'warning.100' : 'grey.100' },
+        }}
+        onClick={onToggle}
+      >
+        <ExpandMoreIcon
+          fontSize="small"
+          sx={{
+            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+            transition: 'transform 0.2s',
+            color: 'text.secondary',
+          }}
+        />
+        <Typography variant="body2" fontWeight={700} sx={{ mr: 0.5 }}>
+          Q{q.number}
+        </Typography>
+        {q.subject && <Chip label={q.subject} size="small" variant="outlined" sx={{ height: 22, fontSize: '0.7rem' }} />}
+        <Typography variant="caption" color="text.secondary" noWrap sx={{ flex: 1, minWidth: 0 }}>
+          {q.statement.slice(0, 80)}{q.statement.length > 80 ? '…' : ''}
+        </Typography>
+        {q.correctAlternative && (
+          <Chip label={q.correctAlternative} size="small" color="success" sx={{ fontWeight: 700, minWidth: 28 }} />
+        )}
+        {!q.correctAlternative && (
+          <Chip label="?" size="small" color="error" sx={{ fontWeight: 700, minWidth: 28 }} />
+        )}
+        {isBlocked && <ImageIcon fontSize="small" color="warning" />}
+      </Box>
+
+      {/* Expanded body */}
+      <Collapse in={expanded}>
+        <Box sx={{ px: 2, py: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+          {/* Image upload for blocked questions */}
+          {isBlocked && (
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              <Typography variant="body2" fontWeight={600} mb={1}>
+                Esta questão referencia uma imagem/figura.
+              </Typography>
+              <div className="flex gap-2 flex-wrap">
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={uploading ? <CircularProgress size={14} color="inherit" /> : <ImageIcon />}
+                  disabled={uploading}
+                  onClick={() => imageInputRef.current?.click()}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  Upload imagem
+                </Button>
+                <Button size="small" variant="outlined" startIcon={<LockOpenIcon />} onClick={onUnblock}>
+                  Desbloquear
+                </Button>
+              </div>
+              {uploadError && <Alert severity="error" sx={{ mt: 1, py: 0 }}>{uploadError}</Alert>}
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0]
+                  if (file) handleImageUpload(file)
+                }}
+              />
+            </Alert>
+          )}
+
+          {/* Uploaded image preview */}
+          {q.statementImageUrl && (
+            <Box sx={{ mb: 2 }}>
+              <img src={q.statementImageUrl} alt="Imagem do enunciado" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 4 }} />
+            </Box>
+          )}
+
+          {editing ? (
+            /* ─── Edit mode ─── */
+            <Stack spacing={2}>
+              <div className="flex gap-2">
+                <TextField
+                  label="Disciplina"
+                  value={editState.subject}
+                  onChange={(e) => setEditState((s) => ({ ...s, subject: e.target.value }))}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+                <TextField
+                  label="Tópico"
+                  value={editState.topic}
+                  onChange={(e) => setEditState((s) => ({ ...s, topic: e.target.value }))}
+                  size="small"
+                  sx={{ flex: 1 }}
+                />
+              </div>
+
+              {editState.referenceText !== undefined && (
+                <TextField
+                  label="Texto de referência"
+                  value={editState.referenceText}
+                  onChange={(e) => setEditState((s) => ({ ...s, referenceText: e.target.value }))}
+                  size="small"
+                  multiline
+                  minRows={2}
+                  maxRows={6}
+                  fullWidth
+                />
+              )}
+
+              <TextField
+                label="Enunciado"
+                value={editState.statement}
+                onChange={(e) => setEditState((s) => ({ ...s, statement: e.target.value }))}
+                size="small"
+                multiline
+                minRows={2}
+                maxRows={8}
+                fullWidth
+              />
+
+              <Typography variant="body2" fontWeight={600}>Alternativas</Typography>
+              <RadioGroup
+                value={editState.correctAlternative}
+                onChange={(e) => setEditState((s) => ({ ...s, correctAlternative: e.target.value }))}
+              >
+                {editState.alternatives.map((alt, altIdx) => (
+                  <div key={alt.key} className="flex items-start gap-2 mb-1">
+                    <FormControlLabel
+                      value={alt.key}
+                      control={<Radio size="small" />}
+                      label=""
+                      sx={{ mr: 0, ml: 0 }}
+                    />
+                    <Typography variant="body2" fontWeight={700} sx={{ mt: 1, minWidth: 20 }}>
+                      {alt.key})
+                    </Typography>
+                    <TextField
+                      value={alt.text}
+                      onChange={(e) => {
+                        const updated = [...editState.alternatives]
+                        updated[altIdx] = { ...updated[altIdx], text: e.target.value }
+                        setEditState((s) => ({ ...s, alternatives: updated }))
+                      }}
+                      size="small"
+                      fullWidth
+                      multiline
+                      maxRows={3}
+                    />
+                  </div>
+                ))}
+              </RadioGroup>
+
+              <div className="flex gap-2">
+                <Button size="small" variant="contained" startIcon={<SaveIcon />} onClick={saveEdits}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  Salvar alterações
+                </Button>
+                <Button size="small" variant="outlined" onClick={cancelEditing}>
+                  Cancelar
+                </Button>
+              </div>
+            </Stack>
+          ) : (
+            /* ─── View mode ─── */
+            <>
+              {q.referenceText && (
+                <Box sx={{ bgcolor: 'grey.50', border: '1px solid', borderColor: 'divider', borderRadius: 1, p: 1.5, mb: 2 }}>
+                  <Typography variant="caption" color="text.secondary" fontWeight={600} display="block" mb={0.5}>
+                    Texto de referência
+                  </Typography>
+                  <Markdown variant="body2">{q.referenceText}</Markdown>
+                </Box>
+              )}
+
+              <Box sx={{ mb: 2 }}>
+                <Markdown variant="body2">{q.statement}</Markdown>
+              </Box>
+
+              <Stack spacing={0.5} sx={{ mb: 2 }}>
+                {q.alternatives.map((alt) => {
+                  const isCorrect = alt.key === q.correctAlternative
+                  return (
+                    <Box
+                      key={alt.key}
+                      sx={{
+                        border: '1px solid',
+                        borderColor: isCorrect ? 'success.light' : 'divider',
+                        borderRadius: 1,
+                        px: 1.5,
+                        py: 1,
+                        bgcolor: isCorrect ? 'success.50' : 'transparent',
+                      }}
+                    >
+                      <div className="flex items-start gap-2">
+                        <Typography variant="body2" fontWeight={700} sx={{ minWidth: 20, color: isCorrect ? 'success.main' : 'text.primary' }}>
+                          {alt.key})
+                        </Typography>
+                        <Markdown variant="body2">{alt.text}</Markdown>
+                      </div>
+                    </Box>
+                  )
+                })}
+              </Stack>
+
+              {q.topic && (
+                <Typography variant="caption" color="text.secondary">
+                  Tópico: {q.topic}
+                </Typography>
+              )}
+            </>
+          )}
+
+          {/* Action buttons */}
+          {!editing && (
+            <div className="flex gap-2 mt-3 pt-2 border-t border-slate-200">
+              <Button size="small" variant="outlined" startIcon={<EditIcon />} onClick={startEditing}>
+                Editar
+              </Button>
+              <Button size="small" variant="outlined" color="error" startIcon={<DeleteOutlineIcon />} onClick={onDelete}>
+                Remover
+              </Button>
+            </div>
+          )}
+        </Box>
+      </Collapse>
+    </Box>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Step 5 — Explicações (AI explanation generation + save)
+// ─────────────────────────────────────────────────────────────────────────────
+
+function ExplanationsStep({
+  examBaseId,
+  reviewedQuestions,
+  onBack,
+}: {
+  examBaseId: string
+  reviewedQuestions: ReviewQuestion[]
   onBack: () => void
 }) {
   const navigate = useNavigate()
@@ -1298,19 +1754,7 @@ function ReviewStep({
   useEffect(() => {
     if (startedRef.current) return
     startedRef.current = true
-
-    // Phase 4: match answers (instant)
-    const matched: ReviewQuestion[] = structuredQuestions.map((q) => ({
-      ...q,
-      correctAlternative: answerKey[String(q.number)] ?? null,
-      answerDoubt: false,
-      doubtReason: null,
-      explanations: [],
-      unblocked: false,
-    }))
-
-    // Phase 5: generate explanations per question
-    void generateAllExplanations(matched)
+    void generateAllExplanations(reviewedQuestions)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function generateAllExplanations(matched: ReviewQuestion[]) {
@@ -1388,7 +1832,7 @@ function ReviewStep({
       {/* Generation progress */}
       <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
         <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
-          Gerando explicações (o3-mini)
+          Gerando explicações (Claude Sonnet)
         </Typography>
         {isGenerating && (
           <StepProgressBar
@@ -1463,7 +1907,7 @@ function ReviewStep({
 
       <div>
         <Button variant="outlined" onClick={onBack} startIcon={<ArrowBackIcon />} disabled={isGenerating}>
-          Voltar para gabarito
+          Voltar para revisão
         </Button>
       </div>
     </div>
@@ -1483,6 +1927,7 @@ function ExamEditPage() {
   const [initialPhaseApplied, setInitialPhaseApplied] = useState(false)
   const [structuredQuestions, setStructuredQuestions] = useState<ParsedQuestionStructure[]>([])
   const [answerKey, setAnswerKey] = useState<Record<string, string>>({})
+  const [reviewedQuestions, setReviewedQuestions] = useState<ReviewQuestion[]>([])
 
   // Restore step from persisted processingPhase on load
   useEffect(() => {
@@ -1558,7 +2003,15 @@ function ExamEditPage() {
           examBaseId={examBaseId}
           structuredQuestions={structuredQuestions}
           answerKey={answerKey}
+          onNext={(reviewed) => { setReviewedQuestions(reviewed); handleStepChange(5) }}
           onBack={() => handleStepChange(3)}
+        />
+      )}
+      {step === 5 && (
+        <ExplanationsStep
+          examBaseId={examBaseId}
+          reviewedQuestions={reviewedQuestions}
+          onBack={() => handleStepChange(4)}
         />
       )}
     </div>
