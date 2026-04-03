@@ -103,22 +103,58 @@ export class ExamBaseQuestionController {
   }
 
   /**
-   * Parses question structure directly from a PDF using Claude Sonnet 4.6.
-   * Sends the PDF natively — no Nanonets/markdown step needed.
-   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   * Step 1: Extracts markdown + images from a PDF via Mistral OCR.
+   * Images are uploaded to GCS and their refs replaced with public URLs.
+   * Returns { markdown: string }. Admin only.
    */
-  @Post('parse-from-pdf')
+  @Post('ocr-from-pdf')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file'))
-  async parseFromPdf(
-    @Param('examBaseId') _examBaseId: string,
+  async ocrFromPdf(
+    @Param('examBaseId') examBaseId: string,
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
   ) {
     if (!file) throw new BadRequestException('file is required');
     if (file.mimetype !== 'application/pdf') {
       throw new BadRequestException('Only PDF files are accepted');
     }
-    const questions = await this.pdfAi.parseQuestionsStructureFromPdf(file.buffer);
+
+    const { markdown, images } = await this.pdfAi.extractMarkdownWithMistralOcr(file.buffer);
+
+    // Upload images to GCS and replace refs in markdown
+    let enrichedMarkdown = markdown;
+    for (const [id, base64Data] of images) {
+      try {
+        const match = base64Data.match(/^data:(image\/\w+);base64,(.+)$/s);
+        if (!match) continue;
+        const [, mimetype, raw] = match;
+        const buffer = Buffer.from(raw, 'base64');
+        const url = await this.storage.uploadStatementImage(examBaseId, buffer, mimetype);
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        enrichedMarkdown = enrichedMarkdown.replace(
+          new RegExp(`!\\[([^\\]]*)\\]\\(${escaped}\\)`, 'g'),
+          `![image](${url})`,
+        );
+      } catch {
+        // Skip images that fail to upload
+      }
+    }
+
+    return { markdown: enrichedMarkdown };
+  }
+
+  /**
+   * Step 2: Parses question structure from markdown via GPT-4.1-mini.
+   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   */
+  @Post('parse-from-pdf')
+  @Roles('ADMIN')
+  async parseFromPdf(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdown: string },
+  ) {
+    if (!body.markdown?.trim()) throw new BadRequestException('markdown is required');
+    const questions = await this.pdfAi.parseFullMarkdownStructure(body.markdown);
     return { questions };
   }
 

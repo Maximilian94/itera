@@ -306,50 +306,160 @@ export class ExamBaseQuestionPdfAiService {
   }
 
   /**
-   * Parses questions structure directly from a PDF using Claude Sonnet.
-   * No answers, no explanations — just statement, alternatives, hasImage, referenceText.
+   * Parses questions structure from a PDF using Mistral OCR → GPT-4.1-mini.
+   * Convenience method without image handling — use extractMarkdownWithMistralOcr
+   * + parseFullMarkdownStructure separately when image uploads are needed.
    */
   async parseQuestionsStructureFromPdf(
     pdfBuffer: Buffer,
   ): Promise<ParsedQuestionStructure[]> {
-    const anthropicKey = this.config.get<string>('ANTHROPIC_API_KEY');
-    if (!anthropicKey) {
-      throw new BadRequestException('ANTHROPIC_API_KEY não configurada. Configure-a no .env.');
+    const { markdown } = await this.extractMarkdownWithMistralOcr(pdfBuffer);
+    return this.parseFullMarkdownStructure(markdown);
+  }
+
+  /**
+   * Extracts markdown + images from a PDF using Mistral OCR.
+   */
+  async extractMarkdownWithMistralOcr(
+    pdfBuffer: Buffer,
+  ): Promise<{ markdown: string; images: Map<string, string> }> {
+    const mistralKey = this.config.get<string>('MISTRAL_API_KEY');
+    if (!mistralKey) {
+      throw new BadRequestException('MISTRAL_API_KEY não configurada. Configure-a no .env.');
     }
 
-    const client = new Anthropic({ apiKey: anthropicKey, timeout: 600_000 });
+    const { fetch: undiciFetch, Agent } = await import('undici');
+    const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 300_000, bodyTimeout: 300_000 });
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 64000,
-      system: buildStructureSystemPrompt(),
-      messages: [
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'document',
-              source: {
-                type: 'base64',
-                media_type: 'application/pdf',
-                data: pdfBuffer.toString('base64'),
-              },
-              title: 'Prova',
-            },
-            { type: 'text', text: 'Extraia todas as questões desta prova e retorne o JSON array.' },
-          ],
+    const res = await undiciFetch('https://api.mistral.ai/v1/ocr', {
+      method: 'POST',
+      dispatcher: agent,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${mistralKey}`,
+      },
+      body: JSON.stringify({
+        model: 'mistral-ocr-latest',
+        document: {
+          type: 'document_url',
+          document_url: `data:application/pdf;base64,${pdfBuffer.toString('base64')}`,
         },
-      ],
+        include_image_base64: true,
+      }),
     });
 
-    // Handle potential multi-block responses for large PDFs
-    const textBlocks = response.content.filter((b) => b.type === 'text');
-    if (textBlocks.length === 0) {
-      throw new BadRequestException('Claude retornou resposta inesperada ao extrair estrutura.');
+    if (!res.ok) {
+      const body = await res.text();
+      throw new BadRequestException(`Mistral OCR error (${res.status}): ${body.slice(0, 300)}`);
     }
-    const fullText = textBlocks.map((b) => b.text).join('');
 
-    return this.parseStructureJson(fullText);
+    const data = (await res.json()) as {
+      pages?: { markdown: string; images?: { id: string; image_base64: string }[] }[];
+    };
+    if (!data.pages?.length) {
+      throw new BadRequestException('Mistral OCR não retornou conteúdo.');
+    }
+
+    const markdown = data.pages.map((p) => p.markdown).join('\n\n');
+    const images = new Map<string, string>();
+    for (const page of data.pages) {
+      if (page.images) {
+        for (const img of page.images) {
+          images.set(img.id, img.image_base64);
+        }
+      }
+    }
+
+    return { markdown, images };
+  }
+
+  /**
+   * Parses the full markdown into question structures using GPT-4.1-mini (single call).
+   */
+  async parseFullMarkdownStructure(
+    markdown: string,
+  ): Promise<ParsedQuestionStructure[]> {
+    const openaiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!openaiKey) {
+      throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
+    }
+
+    const { fetch: undiciFetch, Agent } = await import('undici');
+    const agent = new Agent({ connectTimeout: 30_000, headersTimeout: 600_000, bodyTimeout: 600_000 });
+
+    const res = await undiciFetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      dispatcher: agent,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${openaiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-mini',
+        max_tokens: 16384,
+        temperature: 0,
+        response_format: {
+          type: 'json_schema',
+          json_schema: {
+            name: 'exam_questions',
+            strict: true,
+            schema: {
+              type: 'object',
+              properties: {
+                questions: {
+                  type: 'array',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      number: { type: 'integer' },
+                      subject: { type: 'string' },
+                      topic: { type: 'string' },
+                      subtopics: { type: 'array', items: { type: 'string' } },
+                      statement: { type: 'string' },
+                      referenceText: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+                      hasImage: { type: 'boolean' },
+                      alternatives: {
+                        type: 'array',
+                        items: {
+                          type: 'object',
+                          properties: {
+                            key: { type: 'string' },
+                            text: { type: 'string' },
+                          },
+                          required: ['key', 'text'],
+                          additionalProperties: false,
+                        },
+                      },
+                    },
+                    required: ['number', 'subject', 'topic', 'subtopics', 'statement', 'referenceText', 'hasImage', 'alternatives'],
+                    additionalProperties: false,
+                  },
+                },
+              },
+              required: ['questions'],
+              additionalProperties: false,
+            },
+          },
+        },
+        messages: [
+          { role: 'system', content: buildStructureSystemPrompt() },
+          { role: 'user', content: `Extraia todas as questões e retorne em questions:\n\n${markdown}` },
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      throw new BadRequestException(`OpenAI API error (${res.status}): ${body.slice(0, 300)}`);
+    }
+
+    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content) return [];
+
+    const parsed = JSON.parse(content) as { questions: unknown[] };
+    return (parsed.questions ?? []).map((item) => this.normalizeQuestionStructure(item));
   }
 
   /** Parses a single markdown chunk with the provided answer key. Used by the per-chunk endpoint. */
