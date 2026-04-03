@@ -685,7 +685,7 @@ function ExamPdfStep({
 
         {isParsing && (
           <>
-            <StepProgressBar label="Extraindo questões (Claude Sonnet 4.6)..." value={-1} />
+            <StepProgressBar label="Extraindo questões (Mistral OCR + GPT-4.1-mini)..." value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
             </Button>
