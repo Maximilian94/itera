@@ -615,19 +615,21 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [status, setStatus] = useState<'idle' | 'parsing' | 'done' | 'error'>('idle')
+  const [status, setStatus] = useState<'idle' | 'ocr' | 'structuring' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   async function handleParse() {
     if (!file) return
-    setStatus('parsing')
+    setStatus('ocr')
     setErrorMsg(null)
     setQuestions([])
 
     try {
-      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromPdf(examBaseId, file)
+      const { markdown } = await examBaseQuestionsService.ocrFromPdf(examBaseId, file)
+      setStatus('structuring')
+      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromMarkdownStructure(examBaseId, markdown)
       setQuestions(all)
       setStatus('done')
     } catch (err) {
@@ -636,7 +638,7 @@ function ExamPdfStep({
     }
   }
 
-  const isParsing = status === 'parsing'
+  const isParsing = status === 'ocr' || status === 'structuring'
   const blockedCount = questions.filter((q) => q.hasImage).length
 
   return (
@@ -683,11 +685,20 @@ function ExamPdfStep({
           </Button>
         )}
 
-        {isParsing && (
+        {status === 'ocr' && (
           <>
-            <StepProgressBar label="Extraindo questões (Mistral OCR + GPT-4.1-mini)..." value={-1} />
+            <StepProgressBar label="Etapa 1/2 — Extraindo texto do PDF (Mistral OCR)..." value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
+            </Button>
+          </>
+        )}
+
+        {status === 'structuring' && (
+          <>
+            <StepProgressBar label="Etapa 2/2 — Estruturando questões (GPT-4.1-mini)..." value={-1} />
+            <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
+              Estruturando...
             </Button>
           </>
         )}

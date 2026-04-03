@@ -312,15 +312,25 @@ parseQuestionsStructureFromChunk(
     )
   },
 
-  parseQuestionsFromPdf(
+  ocrFromPdf(
     examBaseId: string,
     file: File,
-  ): Promise<{ questions: ParsedQuestionStructure[] }> {
+  ): Promise<{ markdown: string }> {
     const formData = new FormData()
     formData.append('file', file)
+    return apiFetch<{ markdown: string }>(
+      `${basePath(examBaseId)}/ocr-from-pdf`,
+      { method: 'POST', body: formData },
+    )
+  },
+
+  parseQuestionsFromMarkdownStructure(
+    examBaseId: string,
+    markdown: string,
+  ): Promise<{ questions: ParsedQuestionStructure[] }> {
     return apiFetch<{ questions: ParsedQuestionStructure[] }>(
       `${basePath(examBaseId)}/parse-from-pdf`,
-      { method: 'POST', body: formData },
+      { method: 'POST', body: JSON.stringify({ markdown }) },
     )
   },
 

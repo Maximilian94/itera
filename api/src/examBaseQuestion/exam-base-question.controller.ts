@@ -103,16 +103,14 @@ export class ExamBaseQuestionController {
   }
 
   /**
-   * Parses question structure from a PDF using Mistral OCR → GPT-4.1-mini.
-   * Step 1: Mistral OCR extracts markdown + images from the PDF.
-   * Step 2: Images are uploaded to GCS and markdown refs are replaced with URLs.
-   * Step 3: GPT-4.1-mini structures the questions from the enriched markdown.
-   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   * Step 1: Extracts markdown + images from a PDF via Mistral OCR.
+   * Images are uploaded to GCS and their refs replaced with public URLs.
+   * Returns { markdown: string }. Admin only.
    */
-  @Post('parse-from-pdf')
+  @Post('ocr-from-pdf')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file'))
-  async parseFromPdf(
+  async ocrFromPdf(
     @Param('examBaseId') examBaseId: string,
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
   ) {
@@ -121,10 +119,9 @@ export class ExamBaseQuestionController {
       throw new BadRequestException('Only PDF files are accepted');
     }
 
-    // Step 1: Mistral OCR → markdown + images
     const { markdown, images } = await this.pdfAi.extractMarkdownWithMistralOcr(file.buffer);
 
-    // Step 2: Upload images to GCS and replace refs in markdown
+    // Upload images to GCS and replace refs in markdown
     let enrichedMarkdown = markdown;
     for (const [id, base64Data] of images) {
       try {
@@ -143,9 +140,21 @@ export class ExamBaseQuestionController {
       }
     }
 
-    // Step 3: GPT-4.1-mini structures the questions
-    const questions = await this.pdfAi.parseFullMarkdownStructure(enrichedMarkdown);
+    return { markdown: enrichedMarkdown };
+  }
 
+  /**
+   * Step 2: Parses question structure from markdown via GPT-4.1-mini.
+   * Returns { questions: ParsedQuestionStructure[] }. Admin only.
+   */
+  @Post('parse-from-pdf')
+  @Roles('ADMIN')
+  async parseFromPdf(
+    @Param('examBaseId') _examBaseId: string,
+    @Body() body: { markdown: string },
+  ) {
+    if (!body.markdown?.trim()) throw new BadRequestException('markdown is required');
+    const questions = await this.pdfAi.parseFullMarkdownStructure(body.markdown);
     return { questions };
   }
 
