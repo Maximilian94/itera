@@ -2,7 +2,7 @@ import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
-import { useCreateDraftExamBaseMutation } from '@/features/examBase/queries/examBase.queries'
+import { useCreateDraftExamBaseMutation, useDeleteExamBaseMutation } from '@/features/examBase/queries/examBase.queries'
 import { examBaseService } from '@/features/examBase/services/examBase.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
@@ -28,6 +28,7 @@ import {
   ArrowTrendingDownIcon,
   MinusIcon,
   EyeSlashIcon,
+  TrashIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { CalendarDaysIcon } from '@heroicons/react/24/solid'
@@ -135,10 +136,12 @@ function ExamCard({
   exam,
   isAdmin,
   animDelay = 0,
+  onDelete,
 }: {
   exam: ExamBase
   isAdmin?: boolean
   animDelay?: number
+  onDelete?: (exam: ExamBase) => void
 }) {
   const questionCount = exam._count?.questions ?? 0
   const hasAttempts = (exam.userStats?.attemptCount ?? 0) > 0
@@ -173,7 +176,23 @@ function ExamCard({
                 <p className="text-xs text-slate-500 truncate">{exam.role}</p>
               </div>
             </div>
-            <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-1" />
+            <div className="flex items-center gap-1 shrink-0 mt-1">
+              {isAdmin && onDelete && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onDelete(exam)
+                  }}
+                  className="p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
+                  aria-label="Excluir exame"
+                >
+                  <TrashIcon className="w-4 h-4" />
+                </button>
+              )}
+              <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
+            </div>
           </div>
 
           {/* Info pills */}
@@ -504,6 +523,8 @@ function ExamsPage() {
   const { board: boardFromUrl } = Route.useSearch()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const createDraftMutation = useCreateDraftExamBaseMutation()
+  const deleteMutation = useDeleteExamBaseMutation()
+  const [examToDelete, setExamToDelete] = useState<ExamBase | null>(null)
 
   async function handleCreateExam() {
     const { id } = await createDraftMutation.mutateAsync()
@@ -894,6 +915,34 @@ function ExamsPage() {
         onSuccess={refetchExamBases}
       />
 
+      {/* Delete confirmation dialog */}
+      <Dialog open={!!examToDelete} onClose={() => setExamToDelete(null)} maxWidth="xs" fullWidth>
+        <DialogTitle>Excluir exame</DialogTitle>
+        <DialogContent>
+          <p className="text-sm text-slate-600">
+            Tem certeza que deseja excluir <strong>{examToDelete?.name || 'este exame'}</strong>?
+            Todas as questões, tentativas e dados relacionados serão removidos permanentemente.
+          </p>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setExamToDelete(null)} disabled={deleteMutation.isPending}>
+            Cancelar
+          </Button>
+          <Button
+            variant="contained"
+            color="error"
+            disabled={deleteMutation.isPending}
+            onClick={async () => {
+              if (!examToDelete) return
+              await deleteMutation.mutateAsync(examToDelete.id)
+              setExamToDelete(null)
+            }}
+          >
+            {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
       {/* ═══════════ EXAM GRID ═══════════ */}
       {isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
@@ -939,6 +988,7 @@ function ExamsPage() {
               exam={exam}
               isAdmin={isAdmin}
               animDelay={250 + idx * 40}
+              onDelete={isAdmin ? setExamToDelete : undefined}
             />
           ))}
         </div>

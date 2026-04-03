@@ -56,6 +56,10 @@ class ExamBaseService {
     return await apiFetch<{ id: string }>(`${this.urlPath}/draft`, { method: 'POST' })
   }
 
+  async remove(id: string) {
+    return await apiFetch<{ ok: true }>(`${this.urlPath}/${id}`, { method: 'DELETE' })
+  }
+
   async extractMetadata(input: { url?: string; role?: string; pdfFile?: File }): Promise<ExtractedExamMetadata> {
     const formData = new FormData()
     if (input.url) formData.append('url', input.url)
