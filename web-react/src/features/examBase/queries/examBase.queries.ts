@@ -47,6 +47,16 @@ export function useExtractExamMetadataMutation() {
   })
 }
 
+export function useDeleteExamBaseMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (examBaseId: string) => examBaseService.remove(examBaseId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.examBases })
+    },
+  })
+}
+
 export function useUpdateExamBaseMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({

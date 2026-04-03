@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -100,5 +101,12 @@ export class ExamBaseController {
   @Roles('ADMIN')
   update(@Param('id') id: string, @Body() dto: UpdateExamBaseDto) {
     return this.examBases.update(id, dto);
+  }
+
+  /** Deletes an exam base and all related data (questions, attempts, etc.). Admin only. */
+  @Delete(':id')
+  @Roles('ADMIN')
+  remove(@Param('id') id: string) {
+    return this.examBases.remove(id);
   }
 }

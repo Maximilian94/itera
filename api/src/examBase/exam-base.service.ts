@@ -445,6 +445,18 @@ export class ExamBaseService {
     });
   }
 
+  async remove(examBaseId: string) {
+    const exists = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { id: true, slug: true },
+    });
+    if (!exists) throw new NotFoundException('exam base not found');
+
+    await this.prisma.examBase.delete({ where: { id: examBaseId } });
+    await this.triggerRevalidate(exists.slug);
+    return { ok: true };
+  }
+
   async update(
     examBaseId: string,
     input: {
