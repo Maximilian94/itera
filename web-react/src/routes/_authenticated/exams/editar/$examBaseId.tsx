@@ -646,7 +646,7 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. Claude Sonnet 4.6 extrairá todas as questões diretamente do PDF.
+          Envie o PDF da prova. Mistral OCR extrairá o conteúdo e GPT-4.1-mini estruturará as questões.
         </Typography>
 
         <div className="flex items-center gap-2 mb-3">

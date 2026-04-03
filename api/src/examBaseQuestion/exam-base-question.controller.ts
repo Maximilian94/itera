@@ -103,22 +103,49 @@ export class ExamBaseQuestionController {
   }
 
   /**
-   * Parses question structure directly from a PDF using Claude Sonnet 4.6.
-   * Sends the PDF natively — no Nanonets/markdown step needed.
+   * Parses question structure from a PDF using Mistral OCR → GPT-4.1-mini.
+   * Step 1: Mistral OCR extracts markdown + images from the PDF.
+   * Step 2: Images are uploaded to GCS and markdown refs are replaced with URLs.
+   * Step 3: GPT-4.1-mini structures the questions from the enriched markdown.
    * Returns { questions: ParsedQuestionStructure[] }. Admin only.
    */
   @Post('parse-from-pdf')
   @Roles('ADMIN')
   @UseInterceptors(FileInterceptor('file'))
   async parseFromPdf(
-    @Param('examBaseId') _examBaseId: string,
+    @Param('examBaseId') examBaseId: string,
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
   ) {
     if (!file) throw new BadRequestException('file is required');
     if (file.mimetype !== 'application/pdf') {
       throw new BadRequestException('Only PDF files are accepted');
     }
-    const questions = await this.pdfAi.parseQuestionsStructureFromPdf(file.buffer);
+
+    // Step 1: Mistral OCR → markdown + images
+    const { markdown, images } = await this.pdfAi.extractMarkdownWithMistralOcr(file.buffer);
+
+    // Step 2: Upload images to GCS and replace refs in markdown
+    let enrichedMarkdown = markdown;
+    for (const [id, base64Data] of images) {
+      try {
+        const match = base64Data.match(/^data:(image\/\w+);base64,(.+)$/s);
+        if (!match) continue;
+        const [, mimetype, raw] = match;
+        const buffer = Buffer.from(raw, 'base64');
+        const url = await this.storage.uploadStatementImage(examBaseId, buffer, mimetype);
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        enrichedMarkdown = enrichedMarkdown.replace(
+          new RegExp(`!\\[([^\\]]*)\\]\\(${escaped}\\)`, 'g'),
+          `![image](${url})`,
+        );
+      } catch {
+        // Skip images that fail to upload
+      }
+    }
+
+    // Step 3: GPT-4.1-mini structures the questions
+    const questions = await this.pdfAi.parseFullMarkdownStructure(enrichedMarkdown);
+
     return { questions };
   }
 
