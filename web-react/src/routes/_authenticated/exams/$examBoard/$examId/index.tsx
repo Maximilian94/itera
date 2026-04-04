@@ -601,40 +601,53 @@ function RouteComponent() {
               )}
               {isAdmin && examBase && (
               <>
-              <Tooltip
-                title={
-                  (examBase.published ?? false)
-                    ? 'Despublicar exame (usuários não poderão vê-lo)'
+              {(() => {
+                const isPublished = examBase.published ?? false
+                const hasUnreviewed = !isPublished &&
+                  examBase.reviewStats != null &&
+                  examBase.reviewStats.totalCount > 0 &&
+                  examBase.reviewStats.reviewedCount < examBase.reviewStats.totalCount
+                const pendingCount = hasUnreviewed
+                  ? examBase.reviewStats!.totalCount - examBase.reviewStats!.reviewedCount
+                  : 0
+                const tooltipText = isPublished
+                  ? 'Despublicar exame (usuários não poderão vê-lo)'
+                  : hasUnreviewed
+                    ? `Não é possível publicar: ${pendingCount} questão${pendingCount !== 1 ? 'ões' : ''} ainda não ${pendingCount !== 1 ? 'foram revisadas' : 'foi revisada'}`
                     : 'Publicar exame (usuários poderão vê-lo e fazer provas)'
-                }
-              >
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPublished.mutate(!(examBase.published ?? false))
-                  }
-                  disabled={setPublished.isPending}
-                  className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-sm ${
-                    (examBase.published ?? false)
-                      ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                      : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                  } disabled:opacity-60 disabled:cursor-not-allowed`}
-                >
-                  {setPublished.isPending ? (
-                    <span className="animate-pulse">…</span>
-                  ) : (examBase.published ?? false) ? (
-                    <>
-                      <EyeSlashIcon className="w-4 h-4" />
-                      Despublicar
-                    </>
-                  ) : (
-                    <>
-                      <GlobeAltIcon className="w-4 h-4" />
-                      Publicar
-                    </>
-                  )}
-                </button>
-              </Tooltip>
+                return (
+                <Tooltip title={tooltipText}>
+                  <span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setPublished.mutate(!isPublished)
+                    }
+                    disabled={setPublished.isPending || hasUnreviewed}
+                    className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors cursor-pointer shadow-sm ${
+                      isPublished
+                        ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                        : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    } disabled:opacity-60 disabled:cursor-not-allowed`}
+                  >
+                    {setPublished.isPending ? (
+                      <span className="animate-pulse">…</span>
+                    ) : isPublished ? (
+                      <>
+                        <EyeSlashIcon className="w-4 h-4" />
+                        Despublicar
+                      </>
+                    ) : (
+                      <>
+                        <GlobeAltIcon className="w-4 h-4" />
+                        Publicar
+                      </>
+                    )}
+                  </button>
+                  </span>
+                </Tooltip>
+                )
+              })()}
               <button
                 type="button"
                 onClick={() => setIsEditing(true)}
@@ -759,6 +772,78 @@ function RouteComponent() {
           </div>
         </Card>
       </div>
+
+      {/* Review status (admin only) */}
+      {isAdmin && examBase?.reviewStats && examBase.reviewStats.totalCount > 0 && (() => {
+        const { reviewedCount, totalCount } = examBase.reviewStats
+        const pendingCount = totalCount - reviewedCount
+        const allReviewed = reviewedCount === totalCount
+        const pct = (reviewedCount / totalCount) * 100
+        return (
+          <Card
+            noElevation
+            className={`p-6 border overflow-hidden relative ${
+              allReviewed
+                ? 'border-green-200 bg-green-50/30'
+                : 'border-amber-200 bg-amber-50/30'
+            }`}
+          >
+            <div className="flex items-start gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                allReviewed ? 'bg-green-100' : 'bg-amber-100'
+              }`}>
+                <CheckCircleIcon className={`w-5 h-5 ${allReviewed ? 'text-green-600' : 'text-amber-500'}`} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Revisão de questões
+                    </h2>
+                    <p className={`text-sm mt-0.5 ${allReviewed ? 'text-green-600' : 'text-amber-600'}`}>
+                      {allReviewed
+                        ? 'Todas as questões foram revisadas — pronto para publicar'
+                        : `${pendingCount} questão${pendingCount !== 1 ? 'ões' : ''} pendente${pendingCount !== 1 ? 's' : ''} de revisão`}
+                    </p>
+                  </div>
+                  {!allReviewed && (
+                    <Link
+                      to="/exams/$examBoard/$examId/questoes-v2"
+                      params={{ examBoard, examId }}
+                      className="no-underline"
+                    >
+                      <Button
+                        variant="contained"
+                        size="small"
+                        color="warning"
+                        sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2 }}
+                      >
+                        Revisar questões
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+                <div className="mt-3">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium text-slate-500">Progresso</span>
+                    <span className={`text-xs font-semibold ${allReviewed ? 'text-green-600' : 'text-amber-600'}`}>
+                      {reviewedCount}/{totalCount} revisadas ({pct.toFixed(0)}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        allReviewed ? 'bg-green-500' : 'bg-amber-400'
+                      }`}
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Card>
+        )
+      })()}
 
       {/* Notas internas (só para admins) */}
       {isAdmin && (
