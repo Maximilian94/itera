@@ -365,6 +365,28 @@ export class ExamBaseService {
         'Não é possível publicar um exam base sem ter um slug definido. Use o endpoint POST /:id/generate-slug para gerar o slug.',
       );
     }
+
+    if (published) {
+      const questions = await this.prisma.examBaseQuestion.findMany({
+        where: { examBaseId },
+        select: {
+          id: true,
+          position: true,
+          reviews: { select: { id: true } },
+        },
+      });
+
+      const unreviewed = questions.filter((q) => q.reviews.length === 0);
+      if (unreviewed.length > 0) {
+        const positions = unreviewed
+          .map((q) => q.position + 1)
+          .sort((a, b) => a - b)
+          .join(', ');
+        throw new BadRequestException(
+          `Não é possível publicar: as questões ${positions} ainda não foram revisadas. Todas as questões precisam de ao menos uma revisão.`,
+        );
+      }
+    }
     const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
       data: { published },

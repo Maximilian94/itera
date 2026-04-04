@@ -15,7 +15,7 @@ import {
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
 import { Markdown } from '@/components/Markdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
@@ -61,9 +61,12 @@ import {
   useGenerateExplanationsMutation,
   useGenerateMetadataMutation,
   useGenerateSubjectMutation,
+  useReviewQuestionMutation,
+  useRemoveReviewMutation,
   getApiMessage,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
+import { authService } from '@/features/auth/services/auth.service'
 import { formatExamBaseTitle } from '@/lib/utils'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
@@ -284,6 +287,16 @@ export function ExamAttemptPlayer({
   const generateMetadataMutation = useGenerateMetadataMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateSubjectMutation = useGenerateSubjectMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+
+  // Review mutations
+  const reviewQuestionMutation = useReviewQuestionMutation(examBaseId ?? '')
+  const removeReviewMutation = useRemoveReviewMutation(examBaseId ?? '')
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+    enabled: isManagementMode,
+  })
+  const currentUserId = profileData?.user?.id
 
   // Check if inline editing is enabled (only in management mode; admin edits via management page only)
   const canInlineEdit = isManagementMode
@@ -1006,6 +1019,59 @@ export function ExamAttemptPlayer({
                     const changedFieldSx = { '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'warning.main', borderWidth: 2 } } }
                     return (
                     <div className="flex flex-col gap-6">
+                      {/* Review bar */}
+                      {canInlineEdit && (() => {
+                        const mq = managementQuestions[currentQuestionIndex]
+                        const myReview = mq?.reviews?.find((r: { reviewerId: string }) => r.reviewerId === currentUserId)
+                        const isCreator = mq?.createdById === currentUserId
+                        const reviewCount = mq?.reviews?.length ?? 0
+                        return (
+                          <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
+                            reviewCount > 0
+                              ? 'bg-green-50 border-green-200'
+                              : 'bg-amber-50 border-amber-200'
+                          }`}>
+                            {reviewCount > 0 ? (
+                              <CheckCircleIcon className="w-5 h-5 text-green-600 shrink-0" />
+                            ) : (
+                              <span className="w-5 h-5 rounded-full border-2 border-amber-400 shrink-0" />
+                            )}
+                            <span className={`text-sm flex-1 ${reviewCount > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+                              {myReview
+                                ? 'Você revisou esta questão'
+                                : reviewCount > 0
+                                  ? `${reviewCount} revisão(ões)`
+                                  : 'Aguardando revisão'}
+                            </span>
+                            {myReview ? (
+                              <Button
+                                size="small"
+                                color="inherit"
+                                sx={{ textTransform: 'none', fontSize: '0.8rem' }}
+                                onClick={() => removeReviewMutation.mutate(currentQuestion.id)}
+                                disabled={removeReviewMutation.isPending}
+                              >
+                                Desfazer
+                              </Button>
+                            ) : isCreator ? (
+                              <span className="text-xs text-amber-600 italic">
+                                Outro admin precisa revisar
+                              </span>
+                            ) : (
+                              <Button
+                                size="small"
+                                variant="contained"
+                                color="success"
+                                sx={{ textTransform: 'none', fontSize: '0.8rem' }}
+                                onClick={() => reviewQuestionMutation.mutate(currentQuestion.id)}
+                                disabled={reviewQuestionMutation.isPending}
+                              >
+                                {reviewQuestionMutation.isPending ? 'Revisando…' : 'Aprovar revisão'}
+                              </Button>
+                            )}
+                          </div>
+                        )
+                      })()}
                       {/* Ações de IA */}
                       {canInlineEdit && (
                         <div className="flex flex-col gap-2">
@@ -1738,19 +1804,46 @@ export function ExamAttemptPlayer({
           </div>
           )}
           <Card noElevation className="p-3 flex flex-col flex-1 min-h-0 overflow-hidden">
+            {canInlineEdit && (() => {
+              const reviewed = managementQuestions.filter((q) => q.reviews && q.reviews.length > 0).length
+              const total = managementQuestions.length
+              return (
+                <div className="mb-2 shrink-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-slate-500">Revisão</span>
+                    <span className={`text-xs font-semibold ${reviewed === total && total > 0 ? 'text-green-600' : 'text-slate-500'}`}>
+                      {reviewed}/{total}
+                    </span>
+                  </div>
+                  <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${reviewed === total && total > 0 ? 'bg-green-500' : 'bg-amber-400'}`}
+                      style={{ width: total > 0 ? `${(reviewed / total) * 100}%` : '0%' }}
+                    />
+                  </div>
+                </div>
+              )
+            })()}
             <span className="text-xs font-medium text-slate-500 block mb-2 shrink-0">Questões</span>
             <div className="overflow-auto min-h-0 p-1.5">
               <div className="grid grid-cols-5 gap-1 content-start">
-                {questions.map((_, index) => (
+                {questions.map((_, index) => {
+                  const q = managementQuestions[index]
+                  const hasReview = canInlineEdit && q?.reviews && q.reviews.length > 0
+                  return (
                   <button
                     key={questions[index].id}
                     type="button"
                     onClick={() => handleSelectQuestion(index)}
-                    className={getQuestionButtonStyle(index)}
+                    className={`relative ${getQuestionButtonStyle(index)}`}
                   >
                     {index + 1}
+                    {canInlineEdit && (
+                      <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${hasReview ? 'bg-green-500' : 'bg-amber-400'}`} />
+                    )}
                   </button>
-                ))}
+                  )
+                })}
               </div>
             </div>
           </Card>

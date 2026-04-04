@@ -78,6 +78,7 @@ const questionSelect = {
   createdAt: true,
   updatedAt: true,
   examBaseId: true,
+  createdById: true,
   subject: true,
   topic: true,
   subtopics: true,
@@ -96,6 +97,13 @@ const questionSelect = {
       key: true,
       text: true,
       explanation: true,
+    },
+  },
+  reviews: {
+    select: {
+      id: true,
+      createdAt: true,
+      reviewerId: true,
     },
   },
 };
@@ -1218,7 +1226,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     return question;
   }
 
-  async create(examBaseId: string, dto: CreateExamBaseQuestionDto) {
+  async create(examBaseId: string, dto: CreateExamBaseQuestionDto, userId?: string) {
     const correctAlternative = dto.correctAlternative?.trim();
     const alternatives = dto.alternatives ?? [];
 
@@ -1241,6 +1249,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       const question = await tx.examBaseQuestion.create({
         data: {
           examBaseId,
+          createdById: userId || null,
           subject: dto.subject,
           topic: dto.topic,
           subtopics: dto.subtopics ?? [],
@@ -1325,6 +1334,18 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       }
     }
 
+    // Invalidar reviews se campos de conteúdo foram alterados
+    const contentChanged =
+      dto.statement !== undefined ||
+      dto.correctAlternative !== undefined ||
+      dto.referenceText !== undefined;
+
+    if (contentChanged) {
+      await this.prisma.examBaseQuestionReview.deleteMany({
+        where: { questionId },
+      });
+    }
+
     return this.prisma.examBaseQuestion.update({
       where: { id: questionId },
       data: {
@@ -1371,6 +1392,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     );
 
     try {
+      await this.prisma.examBaseQuestionReview.deleteMany({ where: { questionId } });
       return await this.prisma.examBaseQuestionAlternative.create({
         data: {
           examBaseQuestionId: questionId,
@@ -1406,6 +1428,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     );
 
     try {
+      await this.prisma.examBaseQuestionReview.deleteMany({ where: { questionId } });
       return await this.prisma.examBaseQuestionAlternative.update({
         where: { id: alternativeId },
         data: {
@@ -1438,6 +1461,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       questionId,
       alternativeId,
     );
+    await this.prisma.examBaseQuestionReview.deleteMany({ where: { questionId } });
     await this.prisma.examBaseQuestionAlternative.delete({
       where: { id: alternativeId },
     });
@@ -1447,6 +1471,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
   async createBatch(
     examBaseId: string,
     questions: CreateExamBaseQuestionDto[],
+    userId?: string,
   ) {
     if (questions.length === 0) return [];
 
@@ -1464,6 +1489,7 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
         const question = await tx.examBaseQuestion.create({
           data: {
             examBaseId,
+            createdById: userId || null,
             subject: dto.subject,
             topic: dto.topic,
             subtopics: dto.subtopics ?? [],
@@ -1497,6 +1523,47 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
       }
 
       return created;
+    });
+  }
+
+  async reviewQuestion(examBaseId: string, questionId: string, reviewerId: string) {
+    await assertQuestionBelongsToExamBase(this.prisma, examBaseId, questionId);
+
+    const question = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: { createdById: true },
+    });
+
+    if (question?.createdById && question.createdById === reviewerId) {
+      throw new BadRequestException(
+        'O revisor não pode ser a mesma pessoa que criou a questão.',
+      );
+    }
+
+    await this.prisma.examBaseQuestionReview.upsert({
+      where: {
+        questionId_reviewerId: { questionId, reviewerId },
+      },
+      create: { questionId, reviewerId },
+      update: {},
+    });
+
+    return this.prisma.examBaseQuestion.findUniqueOrThrow({
+      where: { id: questionId },
+      select: questionSelect,
+    });
+  }
+
+  async removeReview(examBaseId: string, questionId: string, reviewerId: string) {
+    await assertQuestionBelongsToExamBase(this.prisma, examBaseId, questionId);
+
+    await this.prisma.examBaseQuestionReview.deleteMany({
+      where: { questionId, reviewerId },
+    });
+
+    return this.prisma.examBaseQuestion.findUniqueOrThrow({
+      where: { id: questionId },
+      select: questionSelect,
     });
   }
 }

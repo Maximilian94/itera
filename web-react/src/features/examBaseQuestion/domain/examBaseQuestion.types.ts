@@ -7,11 +7,18 @@ export type ExamBaseQuestionAlternative = {
   explanation: string
 }
 
+export type ExamBaseQuestionReview = {
+  id: string
+  createdAt: string
+  reviewerId: string
+}
+
 export type ExamBaseQuestion = {
   id: string
   createdAt: string
   updatedAt: string
   examBaseId: string
+  createdById: string | null
   subject: string
   topic: string
   subtopics: string[]
@@ -24,6 +31,7 @@ export type ExamBaseQuestion = {
   /** Posição na prova (0-based). */
   position?: number
   alternatives: ExamBaseQuestionAlternative[]
+  reviews: ExamBaseQuestionReview[]
 }
 
 export type CreateExamBaseQuestionInput = {

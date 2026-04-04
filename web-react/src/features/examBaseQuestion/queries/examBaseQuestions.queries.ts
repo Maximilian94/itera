@@ -204,6 +204,28 @@ export function useUpdateExamBaseQuestionMutation(
   })
 }
 
+export function useReviewQuestionMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (questionId: string) =>
+      examBaseQuestionsService.review(examBaseId, questionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
+
+export function useRemoveReviewMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (questionId: string) =>
+      examBaseQuestionsService.removeReview(examBaseId, questionId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
+
 export function useDeleteExamBaseQuestionMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({

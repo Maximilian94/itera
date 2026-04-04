@@ -335,6 +335,20 @@ parseQuestionsStructureFromChunk(
     )
   },
 
+  review(examBaseId: string, questionId: string): Promise<ExamBaseQuestion> {
+    return apiFetch<ExamBaseQuestion>(
+      `${basePath(examBaseId)}/${questionId}/review`,
+      { method: 'POST' },
+    )
+  },
+
+  removeReview(examBaseId: string, questionId: string): Promise<ExamBaseQuestion> {
+    return apiFetch<ExamBaseQuestion>(
+      `${basePath(examBaseId)}/${questionId}/review`,
+      { method: 'DELETE' },
+    )
+  },
+
   generateExplanationsInline(
     examBaseId: string,
     input: {

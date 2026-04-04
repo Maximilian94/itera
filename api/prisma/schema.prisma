@@ -65,6 +65,8 @@ model User {
   refundRequests    RefundRequest[]
   subscriptions     Subscription[]
   trainingSessions  TrainingSession[]
+  createdQuestions  ExamBaseQuestion[] @relation("questionCreator")
+  questionReviews  ExamBaseQuestionReview[] @relation("questionReviewer")
 
   @@map("users")
 }
@@ -234,6 +236,10 @@ model ExamBaseQuestion {
   examBaseId String   @db.Uuid
   examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
 
+  /// ADMIN que criou a questão (nullable para questões existentes)
+  createdById String? @db.Uuid
+  createdBy   User?   @relation("questionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+
   subject   String?
   topic     String?
   subtopics String[] @default([])
@@ -260,6 +266,7 @@ model ExamBaseQuestion {
   trainingRetryAnswers  TrainingRetryAnswer[]
   studyItemQuestionLinks TrainingStudyItemQuestionLink[]
   recommendationQuestionLinks SubjectFeedbackRecommendationQuestionLink[]
+  reviews               ExamBaseQuestionReview[]
 
   @@index([examBaseId])
   @@index([examBaseId, position])
@@ -289,6 +296,22 @@ model ExamBaseQuestionAlternative {
   @@unique([examBaseQuestionId, key])
   @@index([examBaseQuestionId])
   @@map("exam_base_question_alternatives")
+}
+
+/// Registro de revisão de uma questão por um ADMIN.
+model ExamBaseQuestionReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+
+  questionId String           @db.Uuid
+  question   ExamBaseQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  reviewerId String @db.Uuid
+  reviewer   User   @relation("questionReviewer", fields: [reviewerId], references: [id])
+
+  @@unique([questionId, reviewerId])
+  @@index([questionId])
+  @@map("exam_base_question_reviews")
 }
 
 model ExamBaseAttempt {

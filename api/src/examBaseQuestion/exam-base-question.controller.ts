@@ -8,6 +8,7 @@ import {
   Patch,
   Post,
   Query,
+  Req,
   UploadedFile,
   UseInterceptors,
 } from '@nestjs/common';
@@ -213,8 +214,9 @@ export class ExamBaseQuestionController {
   createBatch(
     @Param('examBaseId') examBaseId: string,
     @Body() body: { questions: CreateExamBaseQuestionDto[] },
+    @Req() req: { user: { userId: string } },
   ) {
-    return this.service.createBatch(examBaseId, body.questions ?? []);
+    return this.service.createBatch(examBaseId, body.questions ?? [], req.user.userId);
   }
 
   @Get()
@@ -270,8 +272,9 @@ export class ExamBaseQuestionController {
   create(
     @Param('examBaseId') examBaseId: string,
     @Body() dto: CreateExamBaseQuestionDto,
+    @Req() req: { user: { userId: string } },
   ) {
-    return this.service.create(examBaseId, dto);
+    return this.service.create(examBaseId, dto, req.user.userId);
   }
 
   /** Faz parsing de questões a partir de Markdown. Apenas ADMIN. */
@@ -367,6 +370,28 @@ export class ExamBaseQuestionController {
     @Param('questionId') questionId: string,
   ) {
     return this.service.generateExplanations(examBaseId, questionId);
+  }
+
+  /** Marca questão como revisada pelo ADMIN logado. */
+  @Post(':questionId/review')
+  @Roles('ADMIN')
+  reviewQuestion(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.service.reviewQuestion(examBaseId, questionId, req.user.userId);
+  }
+
+  /** Remove a revisão do ADMIN logado. */
+  @Delete(':questionId/review')
+  @Roles('ADMIN')
+  removeReview(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+    @Req() req: { user: { userId: string } },
+  ) {
+    return this.service.removeReview(examBaseId, questionId, req.user.userId);
   }
 
   /** Atualiza uma questão da base. Apenas ADMIN. */
