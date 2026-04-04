@@ -71,6 +71,7 @@ type FormState = {
   salaryBase: string
   minPassingGradeNonQuota: string
   examBoardId: string
+  editalUrl: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -84,6 +85,7 @@ const EMPTY_FORM: FormState = {
   salaryBase: '',
   minPassingGradeNonQuota: '',
   examBoardId: '',
+  editalUrl: '',
 }
 
 const NEW_BOARD_SENTINEL = '__new__'
@@ -100,6 +102,7 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     salaryBase: data.salaryBase ?? prev.salaryBase,
     minPassingGradeNonQuota: data.minPassingGradeNonQuota ?? prev.minPassingGradeNonQuota,
     examBoardId: prev.examBoardId,
+    editalUrl: data.editalUrl ?? prev.editalUrl,
   }
 }
 
@@ -288,6 +291,7 @@ function MetadataStep({
       salaryBase: examBase.salaryBase ?? '',
       minPassingGradeNonQuota: examBase.minPassingGradeNonQuota ?? '',
       examBoardId: examBase.examBoardId ?? '',
+      editalUrl: examBase.editalUrl ?? '',
     })
   }, [examBase])
 
@@ -330,11 +334,12 @@ function MetadataStep({
       salaryBase: form.salaryBase || null,
       minPassingGradeNonQuota: form.minPassingGradeNonQuota || null,
       examBoardId: form.examBoardId || null,
+      editalUrl: form.editalUrl.trim() || null,
     })
     onNext()
   }
 
-  const canAdvance = form.name.trim() !== '' && form.role.trim() !== '' && form.examDate.trim() !== ''
+  const canAdvance = form.name.trim() !== '' && form.role.trim() !== '' && form.examDate.trim() !== '' && form.editalUrl.trim() !== ''
   const canExtract = pdfFile != null && !extractMutation.isPending
 
   return (
@@ -406,6 +411,14 @@ function MetadataStep({
           label="Nome do concurso *"
           value={form.name}
           onChange={(e) => set('name', e.target.value)}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="URL do edital *"
+          value={form.editalUrl}
+          onChange={(e) => set('editalUrl', e.target.value)}
+          placeholder="https://exemplo.gov.br/edital.pdf"
           fullWidth
           size="small"
         />
