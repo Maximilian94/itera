@@ -397,7 +397,7 @@ export class ExamBaseQuestionPdfAiService {
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
-        max_tokens: 65536,
+        max_tokens: 32768,
         temperature: 0,
         response_format: {
           type: 'json_schema',
