@@ -20,6 +20,7 @@ export type ExamBase = {
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
+  reviewStats?: { reviewedCount: number; totalCount: number }
 }
 
 export type CreateExamBaseInput = {

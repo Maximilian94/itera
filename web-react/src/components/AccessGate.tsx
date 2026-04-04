@@ -1,8 +1,10 @@
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
+import { authService } from '@/features/auth/services/auth.service'
 import { Link } from '@tanstack/react-router'
 import { Button } from '@mui/material'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
+import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 
 /**
@@ -34,8 +36,15 @@ export function AccessGate({
     isEliteAtLimit,
   } = useRequireAccess()
   const { openPortal, loading: portalLoading } = useOpenPortal('/treino/novo')
+  const { data: profileData, isLoading: profileLoading } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+  const isAdmin = profileData?.user?.role === 'ADMIN'
 
-  if (isLoading) return null
+  if (isLoading || profileLoading) return null
+
+  if (isAdmin) return <>{children}</>
 
   // For trainings, check if the plan allows it or limit reached
   if (type === 'treino' && trainingBlockedMessage) {

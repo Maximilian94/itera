@@ -37,9 +37,13 @@ import {
   useAvailableSubjectsQuery,
   useCopyQuestionMutation,
   useReorderQuestionsMutation,
+  useReviewQuestionMutation,
+  useRemoveReviewMutation,
   getApiMessage,
   type ParsedQuestionItem,
 } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { authService } from '@/features/auth/services/auth.service'
+import { useQuery } from '@tanstack/react-query'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { Card } from '@/components/Card'
 import { formatExamBaseTitle } from '@/lib/utils'
@@ -47,12 +51,14 @@ import {
   ArrowLeftIcon,
   ArrowDownIcon,
   ArrowUpIcon,
+  CheckCircleIcon,
   DocumentTextIcon,
   PlusCircleIcon,
   PencilSquareIcon,
   SparklesIcon,
   ArrowPathIcon,
 } from '@heroicons/react/24/outline'
+import { CheckCircleIcon as CheckCircleSolidIcon } from '@heroicons/react/24/solid'
 
 export const Route = createFileRoute(
   '/_authenticated/exams/$examBoard/$examId/questoes',
@@ -91,6 +97,13 @@ function QuestoesPage() {
   const createQuestion = useCreateExamBaseQuestionMutation(examBaseId)
   const parseFromMarkdown = useParseQuestionsFromMarkdownMutation(examBaseId)
   const extractFromPdf = useExtractFromPdfMutation(examBaseId)
+  const reviewQuestion = useReviewQuestionMutation(examBaseId)
+  const removeReview = useRemoveReviewMutation(examBaseId)
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+  const currentUserId = profileData?.user?.id
   const pdfInputRef = useRef<HTMLInputElement>(null)
 
   const handleAddQuestionOpen = () => {
@@ -326,10 +339,22 @@ function QuestoesPage() {
                               <ArrowDownIcon className="w-4 h-4" />
                             </button>
                           </div>
-                          <div className="flex flex-col gap-1 min-w-0">
-                            <Typography variant="body2" fontWeight={600} className="text-slate-800">
-                              {q.subject} — {q.topic}
-                            </Typography>
+                          <div className="flex flex-col gap-1 min-w-0 flex-1">
+                            <div className="flex items-center gap-2">
+                              <Typography variant="body2" fontWeight={600} className="text-slate-800">
+                                {q.subject} — {q.topic}
+                              </Typography>
+                              {q.reviews && q.reviews.length > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                                  <CheckCircleSolidIcon className="w-3.5 h-3.5" />
+                                  Revisada
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                  Pendente
+                                </span>
+                              )}
+                            </div>
                             <Typography variant="body2" color="text.secondary" className="truncate">
                               {q.statement ? q.statement.slice(0, 80) : ''}
                               {q.statement && q.statement.length > 80 ? '…' : ''}
@@ -339,6 +364,55 @@ function QuestoesPage() {
                       </AccordionSummary>
                       <AccordionDetails sx={{ pt: 0 }}>
                         <Stack spacing={2}>
+                          {/* Review action */}
+                          {(() => {
+                            const myReview = q.reviews?.find((r) => r.reviewerId === currentUserId)
+                            const isCreator = q.createdById === currentUserId
+                            return (
+                              <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
+                                {myReview ? (
+                                  <>
+                                    <CheckCircleSolidIcon className="w-5 h-5 text-green-600 shrink-0" />
+                                    <span className="text-sm text-green-700 font-medium flex-1">
+                                      Você revisou esta questão
+                                    </span>
+                                    <Button
+                                      size="small"
+                                      color="inherit"
+                                      onClick={() => removeReview.mutate(q.id)}
+                                      disabled={removeReview.isPending}
+                                    >
+                                      Desfazer revisão
+                                    </Button>
+                                  </>
+                                ) : isCreator ? (
+                                  <>
+                                    <CheckCircleIcon className="w-5 h-5 text-slate-400 shrink-0" />
+                                    <span className="text-sm text-slate-500 flex-1">
+                                      Você criou esta questão — outro ADMIN precisa revisar
+                                    </span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <CheckCircleIcon className="w-5 h-5 text-slate-400 shrink-0" />
+                                    <span className="text-sm text-slate-500 flex-1">
+                                      {q.reviews?.length ? `${q.reviews.length} revisão(ões)` : 'Nenhuma revisão ainda'}
+                                    </span>
+                                    <Button
+                                      size="small"
+                                      variant="contained"
+                                      color="success"
+                                      startIcon={<CheckCircleIcon className="w-4 h-4" />}
+                                      onClick={() => reviewQuestion.mutate(q.id)}
+                                      disabled={reviewQuestion.isPending}
+                                    >
+                                      {reviewQuestion.isPending ? 'Revisando…' : 'Marcar como revisada'}
+                                    </Button>
+                                  </>
+                                )}
+                              </div>
+                            )
+                          })()}
                           {q.statementImageUrl && (
                             <Box
                               sx={{

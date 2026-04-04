@@ -249,12 +249,40 @@ export class ExamBaseService {
       }
     }
 
+    // Review stats for admins
+    let reviewStatsByExamBaseId: Map<
+      string,
+      { reviewedCount: number; totalCount: number }
+    > | null = null;
+
+    if (showUnpublished) {
+      const allQuestions = await this.prisma.examBaseQuestion.findMany({
+        where: { examBaseId: { in: examBases.map((e) => e.id) } },
+        select: {
+          examBaseId: true,
+          reviews: { select: { id: true }, take: 1 },
+        },
+      });
+
+      reviewStatsByExamBaseId = new Map();
+      for (const q of allQuestions) {
+        const current = reviewStatsByExamBaseId.get(q.examBaseId) ?? {
+          reviewedCount: 0,
+          totalCount: 0,
+        };
+        current.totalCount += 1;
+        if (q.reviews.length > 0) current.reviewedCount += 1;
+        reviewStatsByExamBaseId.set(q.examBaseId, current);
+      }
+    }
+
     return examBases.map((exam) => {
       const userStats = statsByExamBaseId.get(exam.id) ?? {
         attemptCount: 0,
         bestScore: null as number | null,
       };
-      return { ...exam, userStats };
+      const reviewStats = reviewStatsByExamBaseId?.get(exam.id) ?? null;
+      return { ...exam, userStats, ...(reviewStats ? { reviewStats } : {}) };
     });
   }
 
@@ -364,6 +392,28 @@ export class ExamBaseService {
       throw new BadRequestException(
         'Não é possível publicar um exam base sem ter um slug definido. Use o endpoint POST /:id/generate-slug para gerar o slug.',
       );
+    }
+
+    if (published) {
+      const questions = await this.prisma.examBaseQuestion.findMany({
+        where: { examBaseId },
+        select: {
+          id: true,
+          position: true,
+          reviews: { select: { id: true } },
+        },
+      });
+
+      const unreviewed = questions.filter((q) => q.reviews.length === 0);
+      if (unreviewed.length > 0) {
+        const positions = unreviewed
+          .map((q) => q.position + 1)
+          .sort((a, b) => a - b)
+          .join(', ');
+        throw new BadRequestException(
+          `Não é possível publicar: as questões ${positions} ainda não foram revisadas. Todas as questões precisam de ao menos uma revisão.`,
+        );
+      }
     }
     const result = await this.prisma.examBase.update({
       where: { id: examBaseId },
