@@ -60,4 +60,13 @@ export class CreateExamBaseQuestionDto {
   @ValidateNested({ each: true })
   @Type(() => CreateAlternativeDto)
   alternatives?: CreateAlternativeDto[];
+
+  /** Flag de discordância da IA (uso interno). */
+  @IsOptional()
+  aiDisagreement?: boolean;
+
+  /** Razão da discordância da IA (uso interno). */
+  @IsOptional()
+  @IsString()
+  aiDisagreementReason?: string;
 }

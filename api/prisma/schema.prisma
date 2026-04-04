@@ -255,6 +255,10 @@ model ExamBaseQuestion {
   // Ex: "A", "B", "C", "D"
   correctAlternative String?
 
+  // Flag de discordância da IA (uso interno, visível apenas para revisores)
+  aiDisagreement       Boolean @default(false)
+  aiDisagreementReason String?
+
   // habilidades cobradas (string por enquanto)
   skills String[] @default([])
 

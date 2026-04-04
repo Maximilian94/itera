@@ -1630,6 +1630,8 @@ function ExplanationsStep({
       referenceText: q.referenceText ?? undefined,
       statementImageUrl: q.statementImageUrl ?? undefined,
       correctAlternative: q.correctAlternative ?? undefined,
+      aiDisagreement: q.answerDoubt,
+      aiDisagreementReason: q.doubtReason,
       alternatives: q.alternatives.map((a) => ({
         key: a.key,
         text: a.text,

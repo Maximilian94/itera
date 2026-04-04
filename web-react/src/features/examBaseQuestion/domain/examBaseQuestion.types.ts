@@ -27,6 +27,10 @@ export type ExamBaseQuestion = {
   /** Texto de referência da prova (ex.: texto base compartilhado por várias questões). */
   referenceText: string | null
   correctAlternative: string | null
+  /** Flag de discordância da IA (uso interno). */
+  aiDisagreement: boolean
+  /** Razão da discordância da IA (uso interno). */
+  aiDisagreementReason: string | null
   skills: string[]
   /** Posição na prova (0-based). */
   position?: number
@@ -43,6 +47,8 @@ export type CreateExamBaseQuestionInput = {
   referenceText?: string | null
   skills?: string[]
   correctAlternative?: string
+  aiDisagreement?: boolean
+  aiDisagreementReason?: string | null
   alternatives?: { key: string; text: string; explanation: string }[]
 }
 

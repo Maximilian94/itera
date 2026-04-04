@@ -90,7 +90,9 @@ export function QuestionEditor({
   const [newAltExplanation, setNewAltExplanation] = useState('')
   const [altError, setAltError] = useState<string | null>(null)
   const [generateExplainError, setGenerateExplainError] = useState<string | null>(null)
-  const [disagreementWarning, setDisagreementWarning] = useState<string | null>(null)
+  const [disagreementWarning, setDisagreementWarning] = useState<string | null>(
+    question.aiDisagreementReason ?? null,
+  )
   const [editAltKey, setEditAltKey] = useState('')
   const [editAltText, setEditAltText] = useState('')
   const [editAltExplanation, setEditAltExplanation] = useState('')
