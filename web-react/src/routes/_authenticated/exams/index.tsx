@@ -225,6 +225,36 @@ function ExamCard({
             </span>
           </div>
 
+          {/* Review progress (admin only) */}
+          {isAdmin && exam.reviewStats && exam.reviewStats.totalCount > 0 && (() => {
+            const { reviewedCount, totalCount } = exam.reviewStats
+            const allReviewed = reviewedCount === totalCount
+            const pct = (reviewedCount / totalCount) * 100
+            return (
+              <div className="mb-3">
+                <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircleIcon className={`w-3 h-3 ${allReviewed ? 'text-green-500' : 'text-amber-400'}`} />
+                    <span className={`text-[0.65rem] font-medium ${allReviewed ? 'text-green-600' : 'text-amber-600'}`}>
+                      {allReviewed ? 'Todas revisadas' : `${reviewedCount}/${totalCount} revisadas`}
+                    </span>
+                  </div>
+                  {!allReviewed && (
+                    <span className="text-[0.6rem] text-amber-500 font-medium">
+                      {totalCount - reviewedCount} pendente{totalCount - reviewedCount !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="w-full h-1 rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${allReviewed ? 'bg-green-500' : 'bg-amber-400'}`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+              </div>
+            )
+          })()}
+
           {/* Stats row */}
           <div className="flex items-center justify-between pt-3 border-t border-slate-100">
             <div className="flex items-center gap-4">
