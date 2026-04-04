@@ -113,10 +113,18 @@ export class ExamBaseQuestionController {
   async ocrFromPdf(
     @Param('examBaseId') examBaseId: string,
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
+    @Query('provider') provider?: 'mistral' | 'nanonets',
   ) {
     if (!file) throw new BadRequestException('file is required');
     if (file.mimetype !== 'application/pdf') {
       throw new BadRequestException('Only PDF files are accepted');
+    }
+
+    const ocrProvider = provider ?? 'mistral';
+
+    if (ocrProvider === 'nanonets') {
+      const markdown = await this.service.extractPdfToMarkdown(file);
+      return { markdown };
     }
 
     const { markdown, images } = await this.pdfAi.extractMarkdownWithMistralOcr(file.buffer);

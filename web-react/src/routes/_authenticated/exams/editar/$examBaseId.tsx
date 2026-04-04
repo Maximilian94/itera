@@ -46,6 +46,8 @@ import {
   Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Tooltip,
   Typography,
 } from '@mui/material'
@@ -615,6 +617,7 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
+  const [ocrProvider, setOcrProvider] = useState<'mistral' | 'nanonets'>('mistral')
   const [status, setStatus] = useState<'idle' | 'ocr' | 'structuring' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -627,7 +630,7 @@ function ExamPdfStep({
     setQuestions([])
 
     try {
-      const { markdown } = await examBaseQuestionsService.ocrFromPdf(examBaseId, file)
+      const { markdown } = await examBaseQuestionsService.ocrFromPdf(examBaseId, file, ocrProvider)
       setStatus('structuring')
       const { questions: all } = await examBaseQuestionsService.parseQuestionsFromMarkdownStructure(examBaseId, markdown)
       setQuestions(all)
@@ -648,8 +651,23 @@ function ExamPdfStep({
           Prova (PDF)
         </Typography>
         <Typography variant="body2" color="text.secondary" mb={2.5}>
-          Envie o PDF da prova. Mistral OCR extrairá o conteúdo e GPT-4.1-mini estruturará as questões.
+          Envie o PDF da prova. O OCR extrairá o conteúdo e GPT-4.1-mini estruturará as questões.
         </Typography>
+
+        <Typography variant="body2" fontWeight={500} mb={0.5}>
+          Provedor de OCR
+        </Typography>
+        <ToggleButtonGroup
+          value={ocrProvider}
+          exclusive
+          onChange={(_, v) => { if (v) setOcrProvider(v) }}
+          size="small"
+          sx={{ mb: 2 }}
+          disabled={isParsing}
+        >
+          <ToggleButton value="mistral">Mistral OCR</ToggleButton>
+          <ToggleButton value="nanonets">Nanonets</ToggleButton>
+        </ToggleButtonGroup>
 
         <div className="flex items-center gap-2 mb-3">
           <Button
@@ -687,7 +705,7 @@ function ExamPdfStep({
 
         {status === 'ocr' && (
           <>
-            <StepProgressBar label="Etapa 1/2 — Extraindo texto do PDF (Mistral OCR)..." value={-1} />
+            <StepProgressBar label={`Etapa 1/2 — Extraindo texto do PDF (${ocrProvider === 'mistral' ? 'Mistral OCR' : 'Nanonets'})...`} value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
             </Button>

@@ -315,11 +315,12 @@ parseQuestionsStructureFromChunk(
   ocrFromPdf(
     examBaseId: string,
     file: File,
+    provider: 'mistral' | 'nanonets' = 'mistral',
   ): Promise<{ markdown: string }> {
     const formData = new FormData()
     formData.append('file', file)
     return apiFetch<{ markdown: string }>(
-      `${basePath(examBaseId)}/ocr-from-pdf`,
+      `${basePath(examBaseId)}/ocr-from-pdf?provider=${provider}`,
       { method: 'POST', body: formData },
     )
   },
