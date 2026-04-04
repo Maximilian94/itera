@@ -397,7 +397,7 @@ export class ExamBaseQuestionPdfAiService {
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
-        max_tokens: 16384,
+        max_tokens: 65536,
         temperature: 0,
         response_format: {
           type: 'json_schema',
@@ -454,8 +454,12 @@ export class ExamBaseQuestionPdfAiService {
       throw new BadRequestException(`OpenAI API error (${res.status}): ${body.slice(0, 300)}`);
     }
 
-    const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    const data = (await res.json()) as { choices?: { finish_reason?: string; message?: { content?: string } }[] };
+    const choice = data.choices?.[0];
+    if (choice?.finish_reason === 'length') {
+      throw new BadRequestException('A resposta da IA foi truncada (muito longa). Tente com um PDF menor ou com menos questões.');
+    }
+    const content = choice?.message?.content?.trim() ?? '';
     if (!content) return [];
 
     const parsed = JSON.parse(content) as { questions: unknown[] };
