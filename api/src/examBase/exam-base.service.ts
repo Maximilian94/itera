@@ -120,6 +120,12 @@ export class ExamBaseService {
         published: true,
         editalUrl: true,
         processingPhase: true,
+        vacancyCount: true,
+        applicantCount: true,
+        registrationFee: true,
+        registrationDate: true,
+        description: true,
+        workload: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -308,6 +314,12 @@ export class ExamBaseService {
         published: true,
         editalUrl: true,
         processingPhase: true,
+        vacancyCount: true,
+        applicantCount: true,
+        registrationFee: true,
+        registrationDate: true,
+        description: true,
+        workload: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -524,6 +536,12 @@ export class ExamBaseService {
       editalUrl?: string | null;
       adminNotes?: string | null;
       processingPhase?: ProcessingPhase;
+      vacancyCount?: number | null;
+      applicantCount?: number | null;
+      registrationFee?: string | number | null;
+      registrationDate?: string | null;
+      description?: string | null;
+      workload?: string | null;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -564,6 +582,12 @@ export class ExamBaseService {
         editalUrl: input.editalUrl === undefined ? undefined : normalizeOptionalText(input.editalUrl),
         adminNotes: input.adminNotes === undefined ? undefined : normalizeOptionalText(input.adminNotes),
         processingPhase: input.processingPhase,
+        vacancyCount: input.vacancyCount === undefined ? undefined : input.vacancyCount,
+        applicantCount: input.applicantCount === undefined ? undefined : input.applicantCount,
+        registrationFee: input.registrationFee === undefined ? undefined : input.registrationFee,
+        registrationDate: input.registrationDate === undefined ? undefined : (input.registrationDate ? new Date(input.registrationDate) : null),
+        description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
+        workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
       },
       select: {
         id: true,
@@ -580,6 +604,12 @@ export class ExamBaseService {
         editalUrl: true,
         adminNotes: true,
         processingPhase: true,
+        vacancyCount: true,
+        applicantCount: true,
+        registrationFee: true,
+        registrationDate: true,
+        description: true,
+        workload: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
