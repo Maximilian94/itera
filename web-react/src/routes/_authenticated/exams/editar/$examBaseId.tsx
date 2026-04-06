@@ -72,6 +72,12 @@ type FormState = {
   minPassingGradeNonQuota: string
   examBoardId: string
   editalUrl: string
+  vacancyCount: string
+  applicantCount: string
+  registrationFee: string
+  registrationDate: string
+  description: string
+  workload: string
 }
 
 const EMPTY_FORM: FormState = {
@@ -86,6 +92,12 @@ const EMPTY_FORM: FormState = {
   minPassingGradeNonQuota: '',
   examBoardId: '',
   editalUrl: '',
+  vacancyCount: '',
+  applicantCount: '',
+  registrationFee: '',
+  registrationDate: '',
+  description: '',
+  workload: '',
 }
 
 const NEW_BOARD_SENTINEL = '__new__'
@@ -103,6 +115,12 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     minPassingGradeNonQuota: data.minPassingGradeNonQuota ?? prev.minPassingGradeNonQuota,
     examBoardId: prev.examBoardId,
     editalUrl: data.editalUrl ?? prev.editalUrl,
+    vacancyCount: data.vacancyCount != null ? String(data.vacancyCount) : prev.vacancyCount,
+    applicantCount: data.applicantCount != null ? String(data.applicantCount) : prev.applicantCount,
+    registrationFee: data.registrationFee ?? prev.registrationFee,
+    registrationDate: data.registrationDate ? data.registrationDate.slice(0, 10) : prev.registrationDate,
+    description: data.description ?? prev.description,
+    workload: data.workload ?? prev.workload,
   }
 }
 
@@ -292,6 +310,12 @@ function MetadataStep({
       minPassingGradeNonQuota: examBase.minPassingGradeNonQuota ?? '',
       examBoardId: examBase.examBoardId ?? '',
       editalUrl: examBase.editalUrl ?? '',
+      vacancyCount: examBase.vacancyCount != null ? String(examBase.vacancyCount) : '',
+      applicantCount: examBase.applicantCount != null ? String(examBase.applicantCount) : '',
+      registrationFee: examBase.registrationFee ?? '',
+      registrationDate: examBase.registrationDate ? examBase.registrationDate.slice(0, 10) : '',
+      description: examBase.description ?? '',
+      workload: examBase.workload ?? '',
     })
   }, [examBase])
 
@@ -335,6 +359,12 @@ function MetadataStep({
       minPassingGradeNonQuota: form.minPassingGradeNonQuota || null,
       examBoardId: form.examBoardId || null,
       editalUrl: form.editalUrl.trim() || null,
+      vacancyCount: form.vacancyCount ? parseInt(form.vacancyCount, 10) : null,
+      applicantCount: form.applicantCount ? parseInt(form.applicantCount, 10) : null,
+      registrationFee: form.registrationFee || null,
+      registrationDate: form.registrationDate || null,
+      description: form.description.trim() || null,
+      workload: form.workload.trim() || null,
     })
     onNext()
   }
@@ -483,6 +513,61 @@ function MetadataStep({
           value={form.minPassingGradeNonQuota}
           onChange={(e) => set('minPassingGradeNonQuota', e.target.value)}
           inputProps={{ step: '0.01', min: 0, max: 100 }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Quantidade de vagas"
+          type="number"
+          value={form.vacancyCount}
+          onChange={(e) => set('vacancyCount', e.target.value)}
+          inputProps={{ min: 0, step: 1 }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Quantidade de inscritos"
+          type="number"
+          value={form.applicantCount}
+          onChange={(e) => set('applicantCount', e.target.value)}
+          inputProps={{ min: 0, step: 1 }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Taxa de inscrição (R$)"
+          type="number"
+          value={form.registrationFee}
+          onChange={(e) => set('registrationFee', e.target.value)}
+          inputProps={{ step: '0.01', min: 0 }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Data da inscrição"
+          type="date"
+          value={form.registrationDate}
+          onChange={(e) => set('registrationDate', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Carga horária"
+          value={form.workload}
+          onChange={(e) => set('workload', e.target.value)}
+          placeholder="Ex: 40h semanais"
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Descrição da vaga"
+          value={form.description}
+          onChange={(e) => set('description', e.target.value)}
+          placeholder="Descrição das atribuições do cargo conforme o edital"
+          multiline
+          minRows={3}
+          maxRows={8}
           fullWidth
           size="small"
         />

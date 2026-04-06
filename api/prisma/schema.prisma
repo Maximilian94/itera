@@ -207,6 +207,14 @@ model ExamBase {
   salaryBase              Decimal?         @db.Decimal(10,2)
   examDate                DateTime
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
+  vacancyCount            Int?
+  applicantCount          Int?
+  registrationFee         Decimal?         @db.Decimal(10,2)
+  registrationDate        DateTime?
+  /// Descrição da vaga conforme consta no edital (função, atribuições, etc.)
+  description             String?
+  workload                String?
+
   /// When false, exam is only visible to admins. When true, visible to all users.
   published               Boolean          @default(false)
   /// URL pública do edital (PDF ou página)

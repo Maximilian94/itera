@@ -16,6 +16,12 @@ export type ExamBase = {
   editalUrl: string | null
   adminNotes?: string | null
   processingPhase?: ProcessingPhase
+  vacancyCount: number | null
+  applicantCount: number | null
+  registrationFee: string | null
+  registrationDate: string | null
+  description: string | null
+  workload: string | null
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   _count?: { questions: number }
@@ -49,6 +55,12 @@ export type ExtractedExamMetadata = {
   examBoardName?: string | null
   examBoardAlias?: string | null
   editalUrl?: string | null
+  vacancyCount?: number | null
+  applicantCount?: number | null
+  registrationFee?: string | null
+  registrationDate?: string | null
+  description?: string | null
+  workload?: string | null
 }
 
 export type UpdateExamBaseInput = {
@@ -66,5 +78,11 @@ export type UpdateExamBaseInput = {
   examBoardId?: string | null
   minPassingGradeNonQuota?: string | null
   processingPhase?: ProcessingPhase
+  vacancyCount?: number | null
+  applicantCount?: number | null
+  registrationFee?: string | null
+  registrationDate?: string | null
+  description?: string | null
+  workload?: string | null
 }
 
