@@ -18,6 +18,7 @@ import {
   BanknotesIcon,
   BuildingLibraryIcon,
   DocumentTextIcon,
+  ExclamationTriangleIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
@@ -65,6 +66,17 @@ export const Route = createFileRoute('/_authenticated/exams/')({
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
+
+function getMissingEditalFields(exam: ExamBase): string[] {
+  const missing: string[] = []
+  if (exam.vacancyCount == null) missing.push('Vagas')
+  if (exam.applicantCount == null) missing.push('Inscritos')
+  if (!exam.registrationFee) missing.push('Taxa de inscrição')
+  if (!exam.registrationDate) missing.push('Data de inscrição')
+  if (!exam.description) missing.push('Descrição')
+  if (!exam.workload) missing.push('Carga horária')
+  return missing
+}
 
 function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
   if (scope === 'MUNICIPAL') return 'Municipal'
@@ -206,6 +218,18 @@ function ExamCard({
                 Não publicado
               </span>
             )}
+            {isAdmin && (() => {
+              const missing = getMissingEditalFields(exam)
+              if (missing.length === 0) return null
+              return (
+                <Tooltip title={`Campos faltando: ${missing.join(', ')}`} placement="top">
+                  <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                    <ExclamationTriangleIcon className="w-3 h-3" />
+                    {missing.length} campo{missing.length !== 1 ? 's' : ''} do edital
+                  </span>
+                </Tooltip>
+              )
+            })()}
             <span
               className={`inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${governmentScopeColor(exam.governmentScope)}`}
             >

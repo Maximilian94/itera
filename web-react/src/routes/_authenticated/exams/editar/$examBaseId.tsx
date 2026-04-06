@@ -346,8 +346,8 @@ function MetadataStep({
     }
   }
 
-  async function handleNext() {
-    await updateMutation.mutateAsync({
+  function buildPayload() {
+    return {
       name: form.name || undefined,
       role: form.role || undefined,
       institution: form.institution || null,
@@ -365,7 +365,19 @@ function MetadataStep({
       registrationDate: form.registrationDate || null,
       description: form.description.trim() || null,
       workload: form.workload.trim() || null,
-    })
+    }
+  }
+
+  const [saved, setSaved] = useState(false)
+
+  async function handleSave() {
+    await updateMutation.mutateAsync(buildPayload())
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function handleNext() {
+    await updateMutation.mutateAsync(buildPayload())
     onNext()
   }
 
@@ -627,7 +639,22 @@ function MetadataStep({
           </Alert>
         )}
 
-        <div className="flex justify-end pt-2">
+        {saved && (
+          <Alert severity="success" sx={{ py: 0.5 }}>
+            Salvo com sucesso!
+          </Alert>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button
+            variant="outlined"
+            onClick={handleSave}
+            disabled={!canAdvance || updateMutation.isPending}
+            startIcon={updateMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <SaveIcon />}
+            sx={{ borderColor: 'violet.600', color: 'violet.600' }}
+          >
+            Salvar
+          </Button>
           <Button
             variant="contained"
             onClick={handleNext}
