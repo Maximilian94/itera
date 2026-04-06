@@ -23,4 +23,10 @@ export type ExtractedExamMetadata = {
   examBoardName?: string;
   examBoardAlias?: string;
   editalUrl?: string | null;
+  vacancyCount?: number | null;
+  applicantCount?: number | null;
+  registrationFee?: string | null;
+  registrationDate?: string | null;
+  description?: string | null;
+  workload?: string | null;
 };

@@ -1,5 +1,5 @@
 import { GovernmentScope, ProcessingPhase } from '@prisma/client';
-import { IsDateString, IsDecimal, IsEnum, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import { IsDateString, IsDecimal, IsEnum, IsInt, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
 
 export class UpdateExamBaseDto {
   @IsOptional()
@@ -57,5 +57,29 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsEnum(ProcessingPhase)
   processingPhase?: ProcessingPhase;
+
+  @IsOptional()
+  @IsInt()
+  vacancyCount?: number | null;
+
+  @IsOptional()
+  @IsInt()
+  applicantCount?: number | null;
+
+  @IsOptional()
+  @IsDecimal({ decimal_digits: '0,2' })
+  registrationFee?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  registrationDate?: string | null;
+
+  @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @IsOptional()
+  @IsString()
+  workload?: string | null;
 }
 
