@@ -8,15 +8,17 @@ import {
   Stack,
   TextField,
   Tooltip,
+  CircularProgress,
 } from '@mui/material'
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import PlayArrowIcon from '@mui/icons-material/PlayArrow'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
-import { useSetPublishedMutation } from '@/features/examBase/queries/examBase.queries'
+import { useExtractExamMetadataMutation, useSetPublishedMutation } from '@/features/examBase/queries/examBase.queries'
 import { examBaseService } from '@/features/examBase/services/examBase.service'
 import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facade'
-import type { ExamBase } from '@/features/examBase/domain/examBase.types'
+import type { ExamBase, ExtractedExamMetadata } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateExamBaseAttemptMutation,
   useExamBaseAttemptHistoryQuery,
@@ -114,11 +116,20 @@ function RouteComponent() {
   const [editExamBoardId, setEditExamBoardId] = useState<string>('')
   const [editSlug, setEditSlug] = useState('')
   const [editEditalUrl, setEditEditalUrl] = useState('')
+  const [editVacancyCount, setEditVacancyCount] = useState('')
+  const [editApplicantCount, setEditApplicantCount] = useState('')
+  const [editRegistrationFee, setEditRegistrationFee] = useState('')
+  const [editRegistrationDate, setEditRegistrationDate] = useState('')
+  const [editDescription, setEditDescription] = useState('')
+  const [editWorkload, setEditWorkload] = useState('')
   const [isEditingAdminNotes, setIsEditingAdminNotes] = useState(false)
   const [adminNotesDraft, setAdminNotesDraft] = useState('')
   const [isSavingAdminNotes, setIsSavingAdminNotes] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [generateSlugLoading, setGenerateSlugLoading] = useState(false)
+  const [editPdfFile, setEditPdfFile] = useState<File | null>(null)
+  const editFileInputRef = useRef<HTMLInputElement>(null)
+  const extractMutation = useExtractExamMetadataMutation()
   const [startExamDialogOpen, setStartExamDialogOpen] = useState(false)
 
   const examBaseId = examId
@@ -198,6 +209,12 @@ function RouteComponent() {
       setEditExamBoardId(examBase.examBoardId ?? '')
       setEditSlug(examBase.slug ?? '')
       setEditEditalUrl(examBase.editalUrl ?? '')
+      setEditVacancyCount(examBase.vacancyCount != null ? String(examBase.vacancyCount) : '')
+      setEditApplicantCount(examBase.applicantCount != null ? String(examBase.applicantCount) : '')
+      setEditRegistrationFee(examBase.registrationFee ?? '')
+      setEditRegistrationDate(examBase.registrationDate ? isoToDateInput(examBase.registrationDate) : '')
+      setEditDescription(examBase.description ?? '')
+      setEditWorkload(examBase.workload ?? '')
       setEditError(null)
     }
   }, [isEditing, examBase])
@@ -241,6 +258,12 @@ function RouteComponent() {
         examBoardId: editExamBoardId || null,
         slug: editSlug.trim() || null,
         editalUrl: editEditalUrl.trim() || null,
+        vacancyCount: editVacancyCount ? parseInt(editVacancyCount, 10) : null,
+        applicantCount: editApplicantCount ? parseInt(editApplicantCount, 10) : null,
+        registrationFee: editRegistrationFee.trim() || null,
+        registrationDate: editRegistrationDate.trim() || null,
+        description: editDescription.trim() || null,
+        workload: editWorkload.trim() || null,
       })
       await refetchExamBases()
       setIsEditing(false)
@@ -249,6 +272,34 @@ function RouteComponent() {
     } finally {
       setIsSaving(false)
     }
+  }
+
+  function applyExtractedToEdit(data: ExtractedExamMetadata) {
+    if (data.name) setEditName(data.name)
+    if (data.role) setEditRole(data.role)
+    if (data.institution) setEditInstitution(data.institution)
+    if (data.governmentScope) setEditGovernmentScope(data.governmentScope)
+    if (data.state) setEditState(data.state)
+    if (data.city) setEditCity(data.city)
+    if (data.salaryBase) setEditSalaryBase(data.salaryBase)
+    if (data.minPassingGradeNonQuota) setEditMinPassingGradeNonQuota(data.minPassingGradeNonQuota)
+    if (data.examDate) setEditExamDate(data.examDate.slice(0, 10))
+    if (data.editalUrl) setEditEditalUrl(data.editalUrl)
+    if (data.vacancyCount != null) setEditVacancyCount(String(data.vacancyCount))
+    if (data.applicantCount != null) setEditApplicantCount(String(data.applicantCount))
+    if (data.registrationFee) setEditRegistrationFee(data.registrationFee)
+    if (data.registrationDate) setEditRegistrationDate(data.registrationDate.slice(0, 10))
+    if (data.description) setEditDescription(data.description)
+    if (data.workload) setEditWorkload(data.workload)
+  }
+
+  async function handleExtractInEdit() {
+    if (!editPdfFile) return
+    const data = await extractMutation.mutateAsync({
+      role: editRole.trim() || undefined,
+      pdfFile: editPdfFile,
+    })
+    applyExtractedToEdit(data)
   }
 
   const finishedAttempts = attempts.filter(
@@ -327,6 +378,58 @@ function RouteComponent() {
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
+            {/* AI extraction panel */}
+            <div className="mb-5 p-4 rounded-xl border border-dashed border-violet-300 bg-violet-50/40">
+              <p className="text-sm font-semibold text-slate-700 mb-2">Extrair com IA</p>
+              <p className="text-xs text-slate-500 mb-3">Faça upload do PDF do edital para preencher os campos automaticamente.</p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={() => editFileInputRef.current?.click()}
+                  sx={{ textTransform: 'none', borderRadius: 2 }}
+                >
+                  {editPdfFile ? editPdfFile.name : 'Upload PDF'}
+                </Button>
+                {editPdfFile && (
+                  <button
+                    type="button"
+                    className="text-xs text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                    onClick={() => { setEditPdfFile(null); if (editFileInputRef.current) editFileInputRef.current.value = '' }}
+                  >
+                    Remover
+                  </button>
+                )}
+                <input
+                  ref={editFileInputRef}
+                  type="file"
+                  accept=".pdf"
+                  className="hidden"
+                  onChange={(e) => setEditPdfFile(e.target.files?.[0] ?? null)}
+                />
+                <Button
+                  variant="contained"
+                  size="small"
+                  startIcon={extractMutation.isPending ? <CircularProgress size={14} color="inherit" /> : <AutoAwesomeIcon sx={{ fontSize: 16 }} />}
+                  disabled={!editPdfFile || extractMutation.isPending}
+                  onClick={handleExtractInEdit}
+                  sx={{ textTransform: 'none', fontWeight: 600, borderRadius: 2, bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  {extractMutation.isPending ? 'Extraindo...' : 'Extrair metadados'}
+                </Button>
+              </div>
+              {extractMutation.isError && (
+                <Alert severity="error" sx={{ mt: 2, py: 0.5 }}>
+                  {(extractMutation.error as Error)?.message ?? 'Erro ao extrair metadados'}
+                </Alert>
+              )}
+              {extractMutation.isSuccess && (
+                <Alert severity="success" sx={{ mt: 2, py: 0.5 }}>
+                  Metadados extraídos! Revise os campos abaixo.
+                </Alert>
+              )}
+            </div>
+
             {editError && (
               <Alert
                 severity="error"
@@ -422,6 +525,59 @@ function RouteComponent() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField
+                  label="Quantidade de vagas"
+                  type="number"
+                  value={editVacancyCount}
+                  onChange={(e) => setEditVacancyCount(e.target.value)}
+                  inputProps={{ min: 0, step: 1 }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Quantidade de inscritos"
+                  type="number"
+                  value={editApplicantCount}
+                  onChange={(e) => setEditApplicantCount(e.target.value)}
+                  inputProps={{ min: 0, step: 1 }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Taxa de inscrição (R$)"
+                  type="number"
+                  value={editRegistrationFee}
+                  onChange={(e) => setEditRegistrationFee(e.target.value)}
+                  inputProps={{ step: '0.01', min: 0 }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Carga horária"
+                  value={editWorkload}
+                  onChange={(e) => setEditWorkload(e.target.value)}
+                  placeholder="Ex: 40h semanais"
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <TextField
+                  label="Data da inscrição"
+                  type="date"
+                  value={editRegistrationDate}
+                  onChange={(e) => setEditRegistrationDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
                   label="Data do exame"
                   type="date"
                   value={editExamDate}
@@ -493,6 +649,18 @@ function RouteComponent() {
                   </Select>
                 </FormControl>
               </div>
+              <TextField
+                label="Descrição da vaga"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Descrição das atribuições do cargo conforme o edital"
+                multiline
+                minRows={3}
+                maxRows={8}
+                size="small"
+                fullWidth
+                sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+              />
               <div className="flex justify-end gap-2 pt-2">
                 <Button
                   variant="outlined"
