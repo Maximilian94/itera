@@ -685,10 +685,14 @@ ${responseTypeDescription}
 
 Regras para topic:
 - Use SEMPRE o nome técnico da matéria/assunto, não uma descrição em linguagem comum. Exemplos: em vez de "Pronúncia correta das palavras" use "Prosódia"; em vez de "Escrita correta" use "Ortografia"; em vez de "Concordância entre sujeito e verbo" use "Concordância verbal". O nome técnico é usado para recomendações de estudo, então deve ser o termo pelo qual o conteúdo é conhecido em programas de ensino e materiais didáticos.
+- Use SEMPRE Title Case (primeira letra de cada palavra em maiúscula) nos nomes de topic. Exemplos: "Saúde Coletiva", "Legislação Do SUS", "Concordância Verbal".
+- O topic NÃO pode ser igual à matéria (subject). O topic deve ser mais específico que a matéria. Exemplo: se a matéria é "Enfermagem", o topic NÃO pode ser "Enfermagem" — deve ser algo como "Sistematização da Assistência de Enfermagem" ou "Enfermagem em Urgência e Emergência". Se a matéria é "Matemática", o topic NÃO pode ser "Matemática".
 
 Regras para subtopics:
 - Liste os subtópicos específicos abordados pela questão dentro do topic principal.
 - Use nomes técnicos precisos, como aparecem em programas de ensino e materiais didáticos.
+- Use SEMPRE Title Case (primeira letra de cada palavra em maiúscula) nos nomes de subtopics.
+- Os subtopics NÃO podem ser iguais ao topic nem à matéria (subject). Cada subtopic deve ser mais específico e granular que o topic.
 
 Regras para skills:
 - Liste as habilidades/competências que a questão avalia (ex.: "Identificar sinais de choque hipovolêmico", "Calcular gotejamento de soro").
