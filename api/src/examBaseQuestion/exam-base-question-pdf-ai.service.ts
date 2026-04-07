@@ -25,7 +25,20 @@ Retorne SOMENTE um objeto JSON com os pares número-letra, sem texto adicional:
 
 // ─── Question structure parsing (Claude Sonnet — per chunk, no answers/explanations) ──
 
-function buildStructureSystemPrompt(): string {
+function buildStructureSystemPrompt(hasCombinedSources: boolean): string {
+  const combinedInstructions = hasCombinedSources
+    ? `
+FONTES COMBINADAS:
+   - Você receberá:
+     a) "MARKDOWN PRINCIPAL" (Nanonets): texto com formatação rica (**negrito**, *itálico*), mas SEM imagens reais
+     b) "REFERÊNCIAS DE IMAGEM" (Mistral): trechos com referências de imagem reais no formato ![image](https://...) e contexto ao redor para identificar a qual questão pertencem
+   - Use o MARKDOWN PRINCIPAL como base para o texto (enunciados, alternativas, referenceText)
+   - Para cada referência de imagem nas REFERÊNCIAS DE IMAGEM, identifique pelo contexto a qual questão ela pertence e inclua o ![image](url) no campo statement ou referenceText da questão correspondente
+   - NUNCA inclua descrições textuais de imagens (como <img>...</img> ou texto descrevendo o visual). Use APENAS a referência ![image](url) real
+   - hasImage: true se a questão contém uma referência ![image](url)
+`
+    : '';
+
   return `
 Você é um especialista em concursos públicos brasileiros.
 
@@ -41,7 +54,7 @@ INSTRUÇÕES OBRIGATÓRIAS:
    - hasImage: true APENAS se o enunciado ou alguma alternativa referenciar explicitamente uma figura, imagem, gráfico ou tabela não representável como texto
    - referenceText: texto de contexto que precede um grupo de questões e é compartilhado por elas (ex: textos para interpretação, situações-problema, etc.); null se não houver
    - NÃO inclua respostas corretas nem explicações — apenas a estrutura da questão
-
+${combinedInstructions}
 2. IDENTIFICAÇÃO DO ASSUNTO
    - subject: matéria/área da questão. REGRA PRINCIPAL: se a prova já organiza as questões em seções com nome explícito (ex: cabeçalhos como "POLÍTICA DE SAÚDE", "ATENÇÃO PRIMÁRIA À SAÚDE", "FARMACOLOGIA"), use EXATAMENTE esse nome como subject para todas as questões dessa seção — sem alterar a grafia, sem resumir, sem substituir por sinônimo. Só defina o subject por conta própria se não houver nenhuma categorização explícita na prova. Questões da mesma seção devem sempre ter o mesmo subject.
    - topic: conceito central testado pela questão, usando nomenclatura técnica oficial (ex: "Hipertensão Arterial Sistêmica", "Lei Orgânica da Saúde — Lei 8.080/90", "Sistematização da Assistência de Enfermagem (SAE)"). Deve ser específico o suficiente para funcionar como um título de capítulo em material de estudo — nem tão amplo quanto a matéria, nem tão granular quanto um subtópico.
@@ -283,7 +296,7 @@ export class ExamBaseQuestionPdfAiService {
             },
           },
           messages: [
-            { role: 'system', content: buildStructureSystemPrompt() },
+            { role: 'system', content: buildStructureSystemPrompt(false) },
             { role: 'user', content: `Extraia todas as questões e retorne em questions:\n\n${chunk}` },
           ],
         }),
@@ -315,6 +328,28 @@ export class ExamBaseQuestionPdfAiService {
   ): Promise<ParsedQuestionStructure[]> {
     const { markdown } = await this.extractMarkdownWithMistralOcr(pdfBuffer);
     return this.parseFullMarkdownStructure(markdown);
+  }
+
+  /**
+   * Extracts image references with surrounding context from Mistral markdown.
+   * Returns a compact string with just enough context for GPT to match images to questions.
+   */
+  private extractImageContexts(imageMarkdown: string): string {
+    const lines = imageMarkdown.split('\n');
+    const snippets: string[] = [];
+    const contextLines = 3; // lines before/after each image ref
+
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes('![image](https://storage.googleapis.com/')) {
+        const start = Math.max(0, i - contextLines);
+        const end = Math.min(lines.length - 1, i + contextLines);
+        const snippet = lines.slice(start, end + 1).join('\n');
+        snippets.push(snippet);
+      }
+    }
+
+    if (snippets.length === 0) return '(nenhuma imagem encontrada)';
+    return snippets.join('\n\n---\n\n');
   }
 
   /**
@@ -378,10 +413,22 @@ export class ExamBaseQuestionPdfAiService {
    */
   async parseFullMarkdownStructure(
     markdown: string,
+    imageMarkdown?: string,
   ): Promise<ParsedQuestionStructure[]> {
     const openaiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!openaiKey) {
       throw new BadRequestException('OPENAI_API_KEY não configurada. Configure-a no .env.');
+    }
+
+    const hasCombined = !!imageMarkdown?.trim();
+    let userContent: string;
+    if (hasCombined) {
+      // Extract only image references with surrounding context from Mistral markdown
+      // to avoid doubling the payload size
+      const imageContextSnippets = this.extractImageContexts(imageMarkdown!);
+      userContent = `Extraia todas as questões e retorne em questions. Use o MARKDOWN PRINCIPAL para texto e as REFERÊNCIAS DE IMAGEM para associar as imagens às questões corretas:\n\n--- MARKDOWN PRINCIPAL (Nanonets — texto formatado) ---\n${markdown}\n\n--- REFERÊNCIAS DE IMAGEM (Mistral) ---\n${imageContextSnippets}`;
+    } else {
+      userContent = `Extraia todas as questões e retorne em questions:\n\n${markdown}`;
     }
 
     const { fetch: undiciFetch, Agent } = await import('undici');
@@ -443,8 +490,8 @@ export class ExamBaseQuestionPdfAiService {
           },
         },
         messages: [
-          { role: 'system', content: buildStructureSystemPrompt() },
-          { role: 'user', content: `Extraia todas as questões e retorne em questions:\n\n${markdown}` },
+          { role: 'system', content: buildStructureSystemPrompt(hasCombined) },
+          { role: 'user', content: userContent },
         ],
       }),
     });

@@ -742,7 +742,7 @@ function ExamPdfStep({
   onBack: () => void
 }) {
   const [file, setFile] = useState<File | null>(null)
-  const [ocrProvider, setOcrProvider] = useState<'mistral' | 'nanonets'>('mistral')
+  const [ocrProvider, setOcrProvider] = useState<'mistral' | 'nanonets' | 'combined'>('combined')
   const [status, setStatus] = useState<'idle' | 'ocr' | 'structuring' | 'done' | 'error'>('idle')
   const [questions, setQuestions] = useState<ParsedQuestionStructure[]>([])
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
@@ -755,9 +755,9 @@ function ExamPdfStep({
     setQuestions([])
 
     try {
-      const { markdown } = await examBaseQuestionsService.ocrFromPdf(examBaseId, file, ocrProvider)
+      const { markdown, imageMarkdown } = await examBaseQuestionsService.ocrFromPdf(examBaseId, file, ocrProvider)
       setStatus('structuring')
-      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromMarkdownStructure(examBaseId, markdown)
+      const { questions: all } = await examBaseQuestionsService.parseQuestionsFromMarkdownStructure(examBaseId, markdown, imageMarkdown)
       setQuestions(all)
       setStatus('done')
     } catch (err) {
@@ -790,6 +790,7 @@ function ExamPdfStep({
           sx={{ mb: 2 }}
           disabled={isParsing}
         >
+          <ToggleButton value="combined">Combinado</ToggleButton>
           <ToggleButton value="mistral">Mistral OCR</ToggleButton>
           <ToggleButton value="nanonets">Nanonets</ToggleButton>
         </ToggleButtonGroup>
@@ -830,7 +831,7 @@ function ExamPdfStep({
 
         {status === 'ocr' && (
           <>
-            <StepProgressBar label={`Etapa 1/2 — Extraindo texto do PDF (${ocrProvider === 'mistral' ? 'Mistral OCR' : 'Nanonets'})...`} value={-1} />
+            <StepProgressBar label={`Etapa 1/2 — Extraindo texto do PDF (${ocrProvider === 'combined' ? 'Nanonets + Mistral' : ocrProvider === 'mistral' ? 'Mistral OCR' : 'Nanonets'})...`} value={-1} />
             <Button variant="contained" startIcon={<CircularProgress size={16} color="inherit" />} disabled sx={{ mt: 2, bgcolor: 'violet.600' }}>
               Extraindo...
             </Button>

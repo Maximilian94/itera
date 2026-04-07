@@ -114,7 +114,7 @@ export class ExamBaseQuestionController {
   async ocrFromPdf(
     @Param('examBaseId') examBaseId: string,
     @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
-    @Query('provider') provider?: 'mistral' | 'nanonets',
+    @Query('provider') provider?: 'mistral' | 'nanonets' | 'combined',
   ) {
     if (!file) throw new BadRequestException('file is required');
     if (file.mimetype !== 'application/pdf') {
@@ -126,6 +126,39 @@ export class ExamBaseQuestionController {
     if (ocrProvider === 'nanonets') {
       const markdown = await this.service.extractPdfToMarkdown(file);
       return { markdown };
+    }
+
+    if (ocrProvider === 'combined') {
+      // Run both in parallel: Nanonets for formatted text, Mistral for images
+      const [nanonetsMarkdown, mistralResult] = await Promise.all([
+        this.service.extractPdfToMarkdown(file),
+        this.pdfAi.extractMarkdownWithMistralOcr(file.buffer),
+      ]);
+
+      // Upload Mistral images to GCS and replace refs in Mistral markdown
+      let enrichedMistralMd = mistralResult.markdown;
+      for (const [id, base64Data] of mistralResult.images) {
+        try {
+          const match = base64Data.match(/^data:(image\/\w+);base64,(.+)$/s);
+          if (!match) continue;
+          const [, mimetype, raw] = match;
+          const buffer = Buffer.from(raw, 'base64');
+          const url = await this.storage.uploadStatementImage(examBaseId, buffer, mimetype);
+          const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          enrichedMistralMd = enrichedMistralMd.replace(
+            new RegExp(`!\\[([^\\]]*)\\]\\(${escaped}\\)`, 'g'),
+            `![image](${url})`,
+          );
+        } catch {
+          // Skip images that fail to upload
+        }
+      }
+
+      // Return both markdowns so the structuring step can merge them
+      return {
+        markdown: nanonetsMarkdown,
+        imageMarkdown: enrichedMistralMd,
+      };
     }
 
     const { markdown, images } = await this.pdfAi.extractMarkdownWithMistralOcr(file.buffer);
@@ -160,10 +193,10 @@ export class ExamBaseQuestionController {
   @Roles('ADMIN')
   async parseFromPdf(
     @Param('examBaseId') _examBaseId: string,
-    @Body() body: { markdown: string },
+    @Body() body: { markdown: string; imageMarkdown?: string },
   ) {
     if (!body.markdown?.trim()) throw new BadRequestException('markdown is required');
-    const questions = await this.pdfAi.parseFullMarkdownStructure(body.markdown);
+    const questions = await this.pdfAi.parseFullMarkdownStructure(body.markdown, body.imageMarkdown);
     return { questions };
   }
 
