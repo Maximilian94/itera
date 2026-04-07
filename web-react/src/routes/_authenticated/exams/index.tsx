@@ -9,6 +9,7 @@ import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { fetchEstados, type IbgeEstado } from '@/lib/ibge'
 import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 import dayjs from 'dayjs'
 import { useState, useMemo, useEffect } from 'react'
@@ -16,9 +17,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRightIcon,
   BanknotesIcon,
-  BuildingLibraryIcon,
   DocumentTextIcon,
-  ExclamationTriangleIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
@@ -32,10 +31,10 @@ import {
   TrashIcon,
 } from '@heroicons/react/24/outline'
 import { CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
-import { CalendarDaysIcon } from '@heroicons/react/24/solid'
 import { ArrowPathIcon } from '@heroicons/react/24/outline'
 import {
   Alert,
+  Autocomplete,
   Button,
   Dialog,
   DialogActions,
@@ -67,15 +66,38 @@ export const Route = createFileRoute('/_authenticated/exams/')({
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function getMissingEditalFields(exam: ExamBase): string[] {
-  const missing: string[] = []
-  if (exam.vacancyCount == null) missing.push('Vagas')
-  if (exam.applicantCount == null) missing.push('Inscritos')
-  if (!exam.registrationFee) missing.push('Taxa de inscrição')
-  if (!exam.registrationDate) missing.push('Data de inscrição')
-  if (!exam.description) missing.push('Descrição')
-  if (!exam.workload) missing.push('Carga horária')
-  return missing
+/**
+ * Bandeiras dos estados brasileiros via IBGE CDN (formato SVG).
+ * Fonte: https://www.ibge.gov.br/ — emblemas oficiais.
+ */
+const STATE_FLAGS: Record<string, string> = {
+  AC: 'https://upload.wikimedia.org/wikipedia/commons/4/4c/Bandeira_do_Acre.svg',
+  AL: 'https://upload.wikimedia.org/wikipedia/commons/8/88/Bandeira_de_Alagoas.svg',
+  AP: 'https://upload.wikimedia.org/wikipedia/commons/0/0c/Bandeira_do_Amap%C3%A1.svg',
+  AM: 'https://upload.wikimedia.org/wikipedia/commons/6/6b/Bandeira_do_Amazonas.svg',
+  BA: 'https://upload.wikimedia.org/wikipedia/commons/2/28/Bandeira_da_Bahia.svg',
+  CE: 'https://upload.wikimedia.org/wikipedia/commons/2/2e/Bandeira_do_Cear%C3%A1.svg',
+  DF: 'https://upload.wikimedia.org/wikipedia/commons/3/3c/Bandeira_do_Distrito_Federal_%28Brasil%29.svg',
+  ES: 'https://upload.wikimedia.org/wikipedia/commons/4/43/Bandeira_do_Esp%C3%ADrito_Santo.svg',
+  GO: 'https://upload.wikimedia.org/wikipedia/commons/b/be/Flag_of_Goi%C3%A1s.svg',
+  MA: 'https://upload.wikimedia.org/wikipedia/commons/4/45/Bandeira_do_Maranh%C3%A3o.svg',
+  MT: 'https://upload.wikimedia.org/wikipedia/commons/0/0b/Bandeira_de_Mato_Grosso.svg',
+  MS: 'https://upload.wikimedia.org/wikipedia/commons/6/64/Bandeira_de_Mato_Grosso_do_Sul.svg',
+  MG: 'https://upload.wikimedia.org/wikipedia/commons/f/f4/Bandeira_de_Minas_Gerais.svg',
+  PA: 'https://upload.wikimedia.org/wikipedia/commons/0/02/Bandeira_do_Par%C3%A1.svg',
+  PB: 'https://upload.wikimedia.org/wikipedia/commons/b/bb/Bandeira_da_Para%C3%ADba.svg',
+  PR: 'https://upload.wikimedia.org/wikipedia/commons/9/93/Bandeira_do_Paran%C3%A1.svg',
+  PE: 'https://upload.wikimedia.org/wikipedia/commons/5/59/Bandeira_de_Pernambuco.svg',
+  PI: 'https://upload.wikimedia.org/wikipedia/commons/3/33/Bandeira_do_Piau%C3%AD.svg',
+  RJ: 'https://upload.wikimedia.org/wikipedia/commons/7/73/Bandeira_do_estado_do_Rio_de_Janeiro.svg',
+  RN: 'https://upload.wikimedia.org/wikipedia/commons/3/30/Bandeira_do_Rio_Grande_do_Norte.svg',
+  RS: 'https://upload.wikimedia.org/wikipedia/commons/6/63/Bandeira_do_Rio_Grande_do_Sul.svg',
+  RO: 'https://upload.wikimedia.org/wikipedia/commons/f/fa/Bandeira_de_Rond%C3%B4nia.svg',
+  RR: 'https://upload.wikimedia.org/wikipedia/commons/9/98/Bandeira_de_Roraima.svg',
+  SC: 'https://upload.wikimedia.org/wikipedia/commons/1/1a/Bandeira_de_Santa_Catarina.svg',
+  SP: 'https://upload.wikimedia.org/wikipedia/commons/2/2b/Bandeira_do_estado_de_S%C3%A3o_Paulo.svg',
+  SE: 'https://upload.wikimedia.org/wikipedia/commons/b/be/Bandeira_de_Sergipe.svg',
+  TO: 'https://upload.wikimedia.org/wikipedia/commons/f/ff/Bandeira_do_Tocantins.svg',
 }
 
 function governmentScopeLabel(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
@@ -91,60 +113,89 @@ function governmentScopeColor(scope: 'MUNICIPAL' | 'STATE' | 'FEDERAL') {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Exam Board Pill                                                    */
+/*  Filter Autocomplete                                                */
 /* ------------------------------------------------------------------ */
 
-function BoardPill({
-  board,
-  count,
-  isActive,
-  onClick,
+type FilterOption = { value: string; label: string; count?: number; icon?: string }
+
+function FilterAutocomplete({
+  label,
+  value,
+  options,
+  onChange,
 }: {
-  board: { id: string; name: string; alias?: string | null; logoUrl?: string | null }
-  count: number
-  isActive: boolean
-  onClick: () => void
+  label: string
+  value: string
+  options: FilterOption[]
+  onChange: (value: string) => void
 }) {
+  const selected = options.find((o) => o.value === value) ?? null
+
   return (
-    <Tooltip title={board.name}>
-      <button
-        type="button"
-        onClick={onClick}
-        className={`flex items-center gap-2.5 px-3.5 py-2 rounded-xl border transition-all duration-200 text-left shrink-0 cursor-pointer ${
-          isActive
-            ? 'border-cyan-300 bg-cyan-50 shadow-sm'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
-        }`}
-      >
-        {board.logoUrl && (
-          <img
-            src={board.logoUrl}
-            alt={board.alias ?? board.name}
-            className="w-7 h-7 object-contain rounded"
+    <Autocomplete<FilterOption>
+      size="small"
+      options={options}
+      value={selected}
+      onChange={(_, opt) => onChange(opt?.value ?? '')}
+      getOptionLabel={(opt) =>
+        opt.count != null ? `${opt.label} (${opt.count})` : opt.label
+      }
+      isOptionEqualToValue={(opt, val) => opt.value === val.value}
+      renderOption={(props, opt) => (
+        <li {...props} key={opt.value}>
+          <div className="flex items-center gap-2 w-full">
+            {opt.icon && (
+              <img
+                src={opt.icon}
+                alt=""
+                className="w-5 h-4 object-cover rounded-sm shrink-0"
+              />
+            )}
+            <span className="truncate">{opt.label}</span>
+            {opt.count != null && (
+              <span className="ml-auto text-xs text-slate-400 shrink-0">{opt.count}</span>
+            )}
+          </div>
+        </li>
+      )}
+      renderInput={(params) => {
+        const selOpt = selected
+        return (
+          <TextField
+            {...params}
+            label={label}
+            slotProps={{
+              input: {
+                ...params.InputProps,
+                startAdornment: selOpt?.icon ? (
+                  <img
+                    src={selOpt.icon}
+                    alt=""
+                    className="w-5 h-4 object-cover rounded-sm shrink-0 ml-1"
+                  />
+                ) : undefined,
+              },
+            }}
           />
-        )}
-        <div className="min-w-0">
-          <p
-            className={`text-xs font-semibold truncate ${
-              isActive ? 'text-cyan-800' : 'text-slate-700'
-            }`}
-          >
-            {board.alias ?? board.name}
-          </p>
-        <p className="text-[0.65rem] text-slate-400">
-          {count} {count === 1 ? 'prova' : 'provas'}
-        </p>
-      </div>
-    </button>
-    </Tooltip>
+        )
+      }}
+      sx={{ minWidth: 180 }}
+      noOptionsText="Nenhuma opção"
+    />
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Exam Base Card                                                     */
+/*  Exam Row                                                           */
 /* ------------------------------------------------------------------ */
 
-function ExamCard({
+function scoreColor(score: number) {
+  if (score >= 70) return 'bg-emerald-100 text-emerald-700'
+  if (score >= 50) return 'bg-amber-100 text-amber-700'
+  return 'bg-rose-100 text-rose-600'
+}
+
+function ExamRow({
   exam,
   isAdmin,
   animDelay = 0,
@@ -157,177 +208,139 @@ function ExamCard({
 }) {
   const questionCount = exam._count?.questions ?? 0
   const hasAttempts = (exam.userStats?.attemptCount ?? 0) > 0
+  const bestScore = exam.userStats?.bestScore
   const canNavigate = Boolean(exam.examBoardId)
 
   const content = (
-    <Card
-      className="p-0 border border-slate-200 hover:border-slate-300 hover:shadow-sm transition-all duration-200 cursor-pointer group overflow-hidden h-full"
+    <div
+      className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all duration-200 cursor-pointer"
+      style={{ animation: `fade-in-up 0.35s ease-out ${animDelay}ms both` }}
     >
-      <div
-        style={{
-          animation: `fade-in-up 0.45s ease-out ${animDelay}ms both`,
-        }}
-      >
-        <div className="p-2">
-          {/* Header row */}
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3 min-w-0">
-              {exam.examBoard?.logoUrl && (
-                <Tooltip title={exam.examBoard.name ?? ''}>
-                  <img
-                    src={exam.examBoard.logoUrl}
-                    alt={exam.examBoard.alias ?? exam.examBoard.name ?? ''}
-                    className="w-9 h-9 object-contain rounded-lg shrink-0"
-                  />
-                </Tooltip>
-              )}
-              <div className="min-w-0">
-                <p className="text-sm font-semibold text-slate-800 truncate">
-                  {formatExamBaseTitle(exam)}
-                </p>
-                <p className="text-xs text-slate-500 truncate">{exam.role}</p>
-              </div>
+      {/* Score badge — most actionable info, visible first */}
+      <div className="w-11 h-11 shrink-0 flex items-center justify-center">
+        {hasAttempts && bestScore != null ? (
+          <Tooltip title={`Melhor nota · ${exam.userStats!.attemptCount} tentativa${exam.userStats!.attemptCount !== 1 ? 's' : ''}`}>
+            <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center ${scoreColor(bestScore)}`}>
+              <span className="text-sm font-bold tabular-nums leading-none">{bestScore.toFixed(0)}%</span>
             </div>
-            <div className="flex items-center gap-1 shrink-0 mt-1">
-              {isAdmin && onDelete && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onDelete(exam)
-                  }}
-                  className="p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100"
-                  aria-label="Excluir exame"
-                >
-                  <TrashIcon className="w-4 h-4" />
-                </button>
-              )}
-              <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all" />
-            </div>
+          </Tooltip>
+        ) : exam.examBoard?.logoUrl ? (
+          <Tooltip title={exam.examBoard.name ?? ''}>
+            <img
+              src={exam.examBoard.logoUrl}
+              alt={exam.examBoard.alias ?? exam.examBoard.name ?? ''}
+              className="w-10 h-10 object-contain rounded-lg"
+            />
+          </Tooltip>
+        ) : (
+          <div className="w-11 h-11 rounded-xl bg-slate-50 flex items-center justify-center">
+            <DocumentTextIcon className="w-5 h-5 text-slate-300" />
           </div>
+        )}
+      </div>
 
-          {/* Info pills */}
-          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+      {/* Main content — 2 lines */}
+      <div className="min-w-0 flex-1">
+        {/* Line 1: Title · Board · Date */}
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="text-sm font-semibold text-slate-800 truncate">
+            {formatExamBaseTitle(exam)}
+          </p>
+          {exam.examBoard && (
+            <span className="hidden sm:inline shrink-0 text-[0.65rem] text-slate-400 font-medium">
+              · {exam.examBoard.alias ?? exam.examBoard.name}
+            </span>
+          )}
+          <span className="hidden sm:inline shrink-0 text-[0.65rem] text-slate-400">
+            · {dayjs(exam.examDate).format('MMM/YYYY')}
+          </span>
+        </div>
+
+        {/* Line 2: meta pills */}
+        <div className="flex items-center gap-1.5 mt-0.5">
             {isAdmin && !(exam.published ?? true) && (
-              <span
-                className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-amber-100 text-amber-800"
-                title="Este exame não está publicado. Usuários não podem vê-lo."
-              >
-                <EyeSlashIcon className="w-3 h-3" />
-                Não publicado
+              <span className="inline-flex items-center gap-1 text-[0.6rem] font-medium px-1.5 py-px rounded-full bg-amber-100 text-amber-800">
+                <EyeSlashIcon className="w-2.5 h-2.5" />
+                Rascunho
               </span>
             )}
-            {isAdmin && (() => {
-              const missing = getMissingEditalFields(exam)
-              if (missing.length === 0) return null
-              return (
-                <Tooltip title={`Campos faltando: ${missing.join(', ')}`} placement="top">
-                  <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
-                    <ExclamationTriangleIcon className="w-3 h-3" />
-                    {missing.length} campo{missing.length !== 1 ? 's' : ''} do edital
-                  </span>
-                </Tooltip>
-              )
-            })()}
             <span
-              className={`inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full ${governmentScopeColor(exam.governmentScope)}`}
+              className={`inline-flex items-center text-[0.6rem] font-medium px-1.5 py-px rounded-full ${governmentScopeColor(exam.governmentScope)}`}
             >
-              <BuildingLibraryIcon className="w-3 h-3" />
               {governmentScopeLabel(exam.governmentScope)}
             </span>
             {(exam.state || exam.city) && (
-              <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-                <MapPinIcon className="w-3 h-3" />
-                {exam.city ? `${exam.city} / ` : ''}
-                {exam.state ?? ''}
+              <span className="hidden sm:inline-flex items-center gap-0.5 text-[0.6rem] font-medium px-1.5 py-px rounded-full bg-slate-100 text-slate-500">
+                <MapPinIcon className="w-2.5 h-2.5" />
+                {exam.city ? `${exam.city}/${exam.state}` : exam.state}
               </span>
             )}
-            <span className="inline-flex items-center gap-1 text-[0.65rem] font-medium px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">
-              <CalendarDaysIcon className="w-3 h-3" />
-              {dayjs(exam.examDate).format('MMM/YYYY')}
-            </span>
-          </div>
-
-          {/* Review progress (admin only) */}
-          {isAdmin && exam.reviewStats && exam.reviewStats.totalCount > 0 && (() => {
-            const { reviewedCount, totalCount } = exam.reviewStats
-            const allReviewed = reviewedCount === totalCount
-            const pct = (reviewedCount / totalCount) * 100
-            return (
-              <div className="mb-3">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="flex items-center gap-1.5">
-                    <CheckCircleIcon className={`w-3 h-3 ${allReviewed ? 'text-green-500' : 'text-amber-400'}`} />
-                    <span className={`text-[0.65rem] font-medium ${allReviewed ? 'text-green-600' : 'text-amber-600'}`}>
-                      {allReviewed ? 'Todas revisadas' : `${reviewedCount}/${totalCount} revisadas`}
-                    </span>
-                  </div>
-                  {!allReviewed && (
-                    <span className="text-[0.6rem] text-amber-500 font-medium">
-                      {totalCount - reviewedCount} pendente{totalCount - reviewedCount !== 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
-                <div className="w-full h-1 rounded-full bg-slate-200 overflow-hidden">
-                  <div
-                    className={`h-full rounded-full transition-all ${allReviewed ? 'bg-green-500' : 'bg-amber-400'}`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-              </div>
-            )
-          })()}
-
-          {/* Stats row */}
-          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
-            <div className="flex items-center gap-4">
-              <Tooltip title="Questões">
-                <div className="flex items-center gap-1.5">
-                  <DocumentTextIcon className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-xs text-slate-500 tabular-nums">
-                    {questionCount} questões
-                  </span>
-                </div>
-              </Tooltip>
-              {exam.salaryBase && (
-                <Tooltip title="Salário base">
-                  <div className="flex items-center gap-1.5">
-                    <BanknotesIcon className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-xs text-slate-500">
-                      {formatBRL(exam.salaryBase)}
-                    </span>
-                  </div>
-                </Tooltip>
-              )}
-            </div>
-
-            {hasAttempts && (
-              <div className="flex items-center gap-3">
-                <Tooltip title="Melhor nota">
-                  <div className="flex items-center gap-1">
-                    <TrophyIcon className="w-3.5 h-3.5 text-amber-500" />
-                    <span className="text-xs font-semibold text-amber-700 tabular-nums">
-                      {exam.userStats?.bestScore != null
-                        ? `${exam.userStats.bestScore.toFixed(0)}%`
-                        : '—'}
-                    </span>
-                  </div>
-                </Tooltip>
-                <Tooltip title="Tentativas">
-                  <div className="flex items-center gap-1">
-                    <ArrowPathIcon className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="text-xs text-slate-500 tabular-nums">
-                      {exam.userStats!.attemptCount}x
-                    </span>
-                  </div>
-                </Tooltip>
-              </div>
-            )}
-          </div>
         </div>
       </div>
-    </Card>
+
+      {/* Right side stats */}
+      <div className="hidden sm:flex items-center gap-4 shrink-0">
+        {/* Questions */}
+        <Tooltip title="Questões">
+          <div className="flex items-center gap-1 text-xs text-slate-500">
+            <DocumentTextIcon className="w-3.5 h-3.5 text-slate-400" />
+            <span className="tabular-nums">{questionCount}</span>
+          </div>
+        </Tooltip>
+
+        {/* Salary */}
+        {exam.salaryBase && (
+          <Tooltip title="Salário base">
+            <div className="hidden lg:flex items-center gap-1 text-xs text-slate-500">
+              <BanknotesIcon className="w-3.5 h-3.5 text-slate-400" />
+              {formatBRL(exam.salaryBase)}
+            </div>
+          </Tooltip>
+        )}
+
+        {/* Attempts */}
+        {hasAttempts && (
+          <Tooltip title="Tentativas">
+            <div className="flex items-center gap-1 text-xs text-slate-500">
+              <ArrowPathIcon className="w-3.5 h-3.5 text-slate-400" />
+              <span className="tabular-nums">{exam.userStats!.attemptCount}x</span>
+            </div>
+          </Tooltip>
+        )}
+      </div>
+
+      {/* Admin review progress */}
+      {isAdmin && exam.reviewStats && exam.reviewStats.totalCount > 0 && (
+        <Tooltip title={`${exam.reviewStats.reviewedCount}/${exam.reviewStats.totalCount} revisadas`}>
+          <div className="hidden md:flex items-center shrink-0 w-14">
+            <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
+              <div
+                className={`h-full rounded-full ${exam.reviewStats.reviewedCount === exam.reviewStats.totalCount ? 'bg-green-500' : 'bg-amber-400'}`}
+                style={{ width: `${(exam.reviewStats.reviewedCount / exam.reviewStats.totalCount) * 100}%` }}
+              />
+            </div>
+          </div>
+        </Tooltip>
+      )}
+
+      {/* Admin delete */}
+      {isAdmin && onDelete && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+            onDelete(exam)
+          }}
+          className="p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 shrink-0"
+          aria-label="Excluir exame"
+        >
+          <TrashIcon className="w-4 h-4" />
+        </button>
+      )}
+
+      <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
+    </div>
   )
 
   if (canNavigate) {
@@ -637,6 +650,8 @@ function ExamsPage() {
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(
     boardFromUrl ?? null,
   )
+  const [selectedState, setSelectedState] = useState('')
+  const [selectedCity, setSelectedCity] = useState('')
 
   useEffect(() => {
     setSelectedBoardId(boardFromUrl ?? null)
@@ -655,15 +670,68 @@ function ExamsPage() {
     await queryClient.invalidateQueries({ queryKey: ['examBases'] })
   }
 
-  // Board counts
-  const boardCounts = useMemo(() => {
+  const { data: ibgeEstados = [] } = useQuery({
+    queryKey: ['ibge', 'estados'],
+    queryFn: fetchEstados,
+    staleTime: 1000 * 60 * 60 * 24,
+  })
+
+  // Filter options derived from data
+  const stateOptions = useMemo(() => {
     const map = new Map<string, number>()
     for (const eb of examBases ?? []) {
-      if (eb.examBoardId) {
-        map.set(eb.examBoardId, (map.get(eb.examBoardId) ?? 0) + 1)
+      if (eb.state) {
+        map.set(eb.state, (map.get(eb.state) ?? 0) + 1)
       }
     }
-    return map
+    const siglaToEstado = new Map<string, IbgeEstado>()
+    for (const e of ibgeEstados) siglaToEstado.set(e.sigla, e)
+
+    return Array.from(map.entries())
+      .sort((a, b) => {
+        const nomeA = siglaToEstado.get(a[0])?.nome ?? a[0]
+        const nomeB = siglaToEstado.get(b[0])?.nome ?? b[0]
+        return nomeA.localeCompare(nomeB)
+      })
+      .map(([sigla, count]) => {
+        const estado = siglaToEstado.get(sigla)
+        const nome = estado ? estado.nome : sigla
+        return {
+          value: sigla,
+          label: nome,
+          count,
+          icon: STATE_FLAGS[sigla],
+        }
+      })
+  }, [examBases, ibgeEstados])
+
+  const cityOptions = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const eb of examBases ?? []) {
+      if (eb.city && (!selectedState || eb.state === selectedState)) {
+        map.set(eb.city, (map.get(eb.city) ?? 0) + 1)
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([city, count]) => ({ value: city, label: city, count }))
+  }, [examBases, selectedState])
+
+  const boardOptions = useMemo(() => {
+    const map = new Map<string, { name: string; alias?: string | null; count: number }>()
+    for (const eb of examBases ?? []) {
+      if (eb.examBoardId && eb.examBoard) {
+        const existing = map.get(eb.examBoardId)
+        if (existing) {
+          existing.count++
+        } else {
+          map.set(eb.examBoardId, { name: eb.examBoard.name, alias: eb.examBoard.alias, count: 1 })
+        }
+      }
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => (a[1].alias ?? a[1].name).localeCompare(b[1].alias ?? b[1].name))
+      .map(([id, { name, alias, count }]) => ({ value: id, label: alias ?? name, count }))
   }, [examBases])
 
   // Filtered exams
@@ -672,6 +740,14 @@ function ExamsPage() {
 
     if (selectedBoardId) {
       list = list.filter((e) => e.examBoardId === selectedBoardId)
+    }
+
+    if (selectedState) {
+      list = list.filter((e) => e.state === selectedState)
+    }
+
+    if (selectedCity) {
+      list = list.filter((e) => e.city === selectedCity)
     }
 
     if (search.trim()) {
@@ -689,7 +765,9 @@ function ExamsPage() {
     }
 
     return list
-  }, [examBases, selectedBoardId, search])
+  }, [examBases, selectedBoardId, selectedState, selectedCity, search])
+
+  const hasActiveFilters = !!selectedBoardId || !!selectedState || !!selectedCity || !!search
 
   // Stats
   const totalExams = (examBases ?? []).length
@@ -898,12 +976,12 @@ function ExamsPage() {
       </div>
 
       {/* ═══════════ SEARCH & FILTERS ═══════════ */}
-      <div className="flex flex-col gap-4">
+      <div
+        className="flex flex-col gap-3"
+        style={{ animation: 'fade-in-up 0.5s ease-out 100ms both' }}
+      >
         {/* Search bar */}
-        <div
-          className="relative"
-          style={{ animation: 'fade-in-up 0.5s ease-out 100ms both' }}
-        >
+        <div className="relative">
           <MagnifyingGlassIcon className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400 pointer-events-none" />
           <input
             type="text"
@@ -923,50 +1001,55 @@ function ExamsPage() {
           )}
         </div>
 
-        {/* Exam board filter pills */}
-        {(examBoards ?? []).length > 0 && (
-          <div
-            className="flex items-center gap-2 overflow-x-auto pb-1 -mb-1"
-            style={{ animation: 'fade-in-up 0.5s ease-out 150ms both' }}
-          >
-            <div className="flex items-center gap-1.5 text-slate-400 shrink-0 mr-1">
-              <FunnelIcon className="w-3.5 h-3.5" />
-              <span className="text-[0.65rem] font-medium uppercase tracking-wide">
-                Banca
-              </span>
-            </div>
+        {/* Filter dropdowns */}
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-slate-400 shrink-0 mr-1">
+            <FunnelIcon className="w-3.5 h-3.5" />
+            <span className="text-[0.65rem] font-medium uppercase tracking-wide">
+              Filtros
+            </span>
+          </div>
 
+          <FilterAutocomplete
+            label="Estado"
+            value={selectedState}
+            options={stateOptions}
+            onChange={(v) => {
+              setSelectedState(v)
+              if (v !== selectedState) setSelectedCity('')
+            }}
+          />
+
+          <FilterAutocomplete
+            label="Cidade"
+            value={selectedCity}
+            options={cityOptions}
+            onChange={setSelectedCity}
+          />
+
+          <FilterAutocomplete
+            label="Banca"
+            value={selectedBoardId ?? ''}
+            options={boardOptions}
+            onChange={(v) => setBoardFilter(v || null)}
+          />
+
+          {hasActiveFilters && (
             <button
               type="button"
-              onClick={() => setBoardFilter(null)}
-              className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-all shrink-0 cursor-pointer ${
-                selectedBoardId === null
-                  ? 'border-cyan-300 bg-cyan-50 text-cyan-700'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-              }`}
+              onClick={() => {
+                setSearch('')
+                setBoardFilter(null)
+                setSelectedState('')
+                setSelectedCity('')
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg font-medium transition-colors cursor-pointer"
             >
-              Todas
+              <XMarkIcon className="w-3.5 h-3.5" />
+              Limpar
             </button>
-
-            {(examBoards ?? []).map((board) => {
-              const count = boardCounts.get(board.id) ?? 0
-              if (count === 0) return null
-              return (
-                <BoardPill
-                  key={board.id}
-                  board={board}
-                  count={count}
-                  isActive={selectedBoardId === board.id}
-                  onClick={() =>
-                    setBoardFilter(
-                      selectedBoardId === board.id ? null : board.id,
-                    )
-                  }
-                />
-              )
-            })}
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ═══════════ RESULTS HEADER ═══════════ */}
@@ -976,20 +1059,10 @@ function ExamsPage() {
       >
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-semibold text-slate-800">
-            {selectedBoardId || search
+            {hasActiveFilters
               ? `${filteredExams.length} resultado${filteredExams.length !== 1 ? 's' : ''}`
               : 'Todas as provas'}
           </h2>
-          {selectedBoardId && (
-            <button
-              type="button"
-              onClick={() => setBoardFilter(null)}
-              className="inline-flex items-center gap-1 text-xs text-cyan-600 hover:text-cyan-700 font-medium cursor-pointer"
-            >
-              <XMarkIcon className="w-3.5 h-3.5" />
-              Limpar filtro
-            </button>
-          )}
         </div>
         <div className="flex items-center gap-3">
           {!isLoading && (
@@ -1047,11 +1120,11 @@ function ExamsPage() {
         </DialogActions>
       </Dialog>
 
-      {/* ═══════════ EXAM GRID ═══════════ */}
+      {/* ═══════════ EXAM LIST ═══════════ */}
       {isLoading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-pulse">
+        <div className="flex flex-col gap-2 animate-pulse">
           {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="h-48 rounded-xl bg-slate-200/60" />
+            <div key={i} className="h-16 rounded-xl bg-slate-200/60" />
           ))}
         </div>
       ) : filteredExams.length === 0 ? (
@@ -1070,12 +1143,14 @@ function ExamsPage() {
                   : 'Não há provas disponíveis no momento.'}
               </p>
             </div>
-            {(search || selectedBoardId) && (
+            {hasActiveFilters && (
               <button
                 type="button"
                 onClick={() => {
                   setSearch('')
                   setBoardFilter(null)
+                  setSelectedState('')
+                  setSelectedCity('')
                 }}
                 className="text-xs text-cyan-600 hover:text-cyan-700 font-medium mt-1 cursor-pointer"
               >
@@ -1085,13 +1160,13 @@ function ExamsPage() {
           </div>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-2">
           {filteredExams.map((exam, idx) => (
-            <ExamCard
+            <ExamRow
               key={exam.id}
               exam={exam}
               isAdmin={isAdmin}
-              animDelay={250 + idx * 40}
+              animDelay={200 + idx * 30}
               onDelete={isAdmin ? setExamToDelete : undefined}
             />
           ))}
