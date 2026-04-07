@@ -3,11 +3,12 @@ import {
   useExamBoardQueries,
 } from '@/features/examBoard/queries/examBoard.queries'
 import {
+  useExamBaseQueries,
   useExamBaseQuery,
   useExtractExamMetadataMutation,
   useUpdateExamBaseMutation,
 } from '@/features/examBase/queries/examBase.queries'
-import type { ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
+import type { ExamBase, ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
   type ParsedQuestionStructure,
@@ -51,7 +52,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { formatExamBaseTitle } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 
 export const Route = createFileRoute('/_authenticated/exams/editar/$examBaseId')({
@@ -285,6 +287,7 @@ function MetadataStep({
 }) {
   const { data: examBase } = useExamBaseQuery(examBaseId)
   const { data: examBoards = [] } = useExamBoardQueries()
+  const { data: allExamBases } = useExamBaseQueries()
   const extractMutation = useExtractExamMetadataMutation()
   const updateMutation = useUpdateExamBaseMutation(examBaseId)
 
@@ -293,6 +296,7 @@ function MetadataStep({
   const [showNewBoardForm, setShowNewBoardForm] = useState(false)
   const [extractedBoardName, setExtractedBoardName] = useState<string | null>(null)
   const [extractedBoardAlias, setExtractedBoardAlias] = useState<string | null>(null)
+  const [duplicates, setDuplicates] = useState<ExamBase[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Populate form from loaded examBase (in case of page refresh)
@@ -321,6 +325,25 @@ function MetadataStep({
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }))
+    if (key === 'city' || key === 'examDate' || key === 'governmentScope') {
+      setDuplicates([])
+    }
+  }
+
+  function checkDuplicatesForForm(newForm: FormState) {
+    const city = newForm.city.trim().toLowerCase()
+    const year = newForm.examDate ? new Date(newForm.examDate).getFullYear() : null
+    if (!city || !year || !allExamBases) {
+      setDuplicates([])
+      return
+    }
+    const matches = allExamBases.filter((eb) => {
+      if (eb.id === examBaseId) return false
+      const ebCity = eb.city?.trim().toLowerCase()
+      const ebYear = eb.examDate ? new Date(eb.examDate).getFullYear() : null
+      return ebCity === city && ebYear === year
+    })
+    setDuplicates(matches)
   }
 
   async function handleExtract() {
@@ -329,7 +352,9 @@ function MetadataStep({
       role: form.role.trim() || undefined,
       pdfFile,
     })
-    setForm((prev) => applyExtracted(prev, data))
+    const newForm = applyExtracted(form, data)
+    setForm(newForm)
+    checkDuplicatesForForm(newForm)
     if (data.examBoardName) {
       setExtractedBoardName(data.examBoardName)
       if (data.examBoardAlias) setExtractedBoardAlias(data.examBoardAlias)
@@ -630,6 +655,28 @@ function MetadataStep({
         {updateMutation.isError && (
           <Alert severity="error">
             {(updateMutation.error as Error)?.message ?? 'Erro ao salvar'}
+          </Alert>
+        )}
+
+        {duplicates.length > 0 && (
+          <Alert
+            severity="warning"
+            onClose={() => setDuplicates([])}
+          >
+            <strong>Já existe(m) exame(s) para essa cidade e ano:</strong>
+            <ul className="mt-1 mb-0 pl-4 list-disc">
+              {duplicates.map((d) => (
+                <li key={d.id}>
+                  <Link
+                    to="/exams/editar/$examBaseId"
+                    params={{ examBaseId: d.id }}
+                    className="text-violet-600 underline hover:text-violet-800"
+                  >
+                    {formatExamBaseTitle(d)}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Alert>
         )}
 

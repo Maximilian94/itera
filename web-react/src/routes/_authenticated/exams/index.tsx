@@ -352,14 +352,17 @@ function CreateExamDialog({
   open,
   onClose,
   examBoards,
+  examBases,
   onSuccess,
 }: {
   open: boolean
   onClose: () => void
   examBoards: Array<{ id: string; name: string; alias?: string | null }>
+  examBases: ExamBase[] | undefined
   onSuccess: () => void
 }) {
   const [error, setError] = useState<string | null>(null)
+  const [duplicates, setDuplicates] = useState<ExamBase[]>([])
   const [createName, setCreateName] = useState('')
   const [createRole, setCreateRole] = useState('')
   const [createInstitution, setCreateInstitution] = useState('')
@@ -405,9 +408,10 @@ function CreateExamDialog({
     setCreateExamDate('')
     setCreateExamBoardId('')
     setError(null)
+    setDuplicates([])
   }
 
-  async function handleCreate() {
+  async function doCreate() {
     setError(null)
     try {
       await examBaseService.create({
@@ -432,6 +436,30 @@ function CreateExamDialog({
     }
   }
 
+  async function handleCreate() {
+    if (duplicates.length > 0) {
+      await doCreate()
+      return
+    }
+
+    const city = createCity.trim().toLowerCase()
+    const year = createExamDate ? new Date(createExamDate).getFullYear() : null
+
+    if (city && year && examBases) {
+      const matches = examBases.filter((eb) => {
+        const ebCity = eb.city?.trim().toLowerCase()
+        const ebYear = eb.examDate ? new Date(eb.examDate).getFullYear() : null
+        return ebCity === city && ebYear === year
+      })
+      if (matches.length > 0) {
+        setDuplicates(matches)
+        return
+      }
+    }
+
+    await doCreate()
+  }
+
   function handleClose() {
     resetForm()
     onClose()
@@ -445,6 +473,25 @@ function CreateExamDialog({
           {error && (
             <Alert severity="error" onClose={() => setError(null)}>
               {error}
+            </Alert>
+          )}
+          {duplicates.length > 0 && (
+            <Alert severity="warning" onClose={() => setDuplicates([])}>
+              <strong>Já existe(m) exame(s) para essa cidade e ano:</strong>
+              <ul className="mt-1 mb-0 pl-4 list-disc">
+                {duplicates.map((d) => (
+                  <li key={d.id}>
+                    <Link
+                      to="/exams/editar/$examBaseId"
+                      params={{ examBaseId: d.id }}
+                      className="text-violet-600 underline hover:text-violet-800"
+                    >
+                      {formatExamBaseTitle(d)}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+              <span className="text-sm">Clique em &quot;Criar mesmo assim&quot; para continuar.</span>
             </Alert>
           )}
           <TextField
@@ -476,6 +523,7 @@ function CreateExamDialog({
               onChange={(e) => {
                 const v = e.target.value as 'MUNICIPAL' | 'STATE' | 'FEDERAL'
                 setCreateGovernmentScope(v)
+                setDuplicates([])
                 if (v === 'FEDERAL') {
                   setCreateState('')
                   setCreateCity('')
@@ -493,8 +541,8 @@ function CreateExamDialog({
             governmentScope={createGovernmentScope}
             state={createState}
             city={createCity}
-            onStateChange={setCreateState}
-            onCityChange={setCreateCity}
+            onStateChange={(v) => { setCreateState(v); setDuplicates([]) }}
+            onCityChange={(v) => { setCreateCity(v); setDuplicates([]) }}
             fullWidth
           />
           <TextField
@@ -518,7 +566,7 @@ function CreateExamDialog({
             label="Data do exame"
             type="date"
             value={createExamDate}
-            onChange={(e) => setCreateExamDate(e.target.value)}
+            onChange={(e) => { setCreateExamDate(e.target.value); setDuplicates([]) }}
             InputLabelProps={{ shrink: true }}
             fullWidth
           />
@@ -548,9 +596,10 @@ function CreateExamDialog({
           variant="contained"
           onClick={handleCreate}
           disabled={!canCreate}
+          color={duplicates.length > 0 ? 'warning' : 'primary'}
           startIcon={<PlusIcon className="w-4 h-4" />}
         >
-          Criar
+          {duplicates.length > 0 ? 'Criar mesmo assim' : 'Criar'}
         </Button>
       </DialogActions>
     </Dialog>
@@ -966,6 +1015,7 @@ function ExamsPage() {
         open={createDialogOpen}
         onClose={() => setCreateDialogOpen(false)}
         examBoards={examBoards ?? []}
+        examBases={examBases}
         onSuccess={refetchExamBases}
       />
 
