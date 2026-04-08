@@ -7,9 +7,12 @@ import { Route as TreinoRoute } from '@/routes/_authenticated/treino'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
+import { Route as AdminUsersRoute } from '@/routes/_authenticated/admin/users'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
-import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, BuildingLibraryIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { useQuery } from '@tanstack/react-query'
+import { authService } from '@/features/auth/services/auth.service'
+import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, BuildingLibraryIcon, UsersIcon } from '@heroicons/react/24/solid'
+import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, UsersIcon as UsersIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import { Link, useMatchRoute, useNavigate, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
 import { Menu, MenuItem } from '@mui/material'
 
@@ -35,6 +38,11 @@ export const SideBarV2 = () => {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
     const open = Boolean(anchorEl)
     const avatarRef = useRef<HTMLButtonElement>(null)
+    const { data: profileData } = useQuery({
+        queryKey: ['auth', 'profile'],
+        queryFn: () => authService.getProfile(),
+    })
+    const isAdmin = profileData?.user?.role === 'ADMIN'
 
     const displayName = [user?.firstName, user?.lastName].filter(Boolean).join(' ') || 'Usuário'
     const planLabel = access.status !== 'inactive' && access.plan
@@ -86,24 +94,15 @@ export const SideBarV2 = () => {
             icon: ClockIconOutline,
             activeIcon: ClockIcon,
         },
-        // {
-        //     label: 'Questions Database',
-        //     href: DatabaseRoute.to,
-        //     icon: HomeIconOutline,
-        //     activeIcon: HomeIcon,
-        // },
-        // {
-        //     label: 'Exam Boards',
-        //     href: ExamBoardsRoute.to,
-        //     icon: HomeIconOutline,
-        //     activeIcon: HomeIcon,
-        // },
-        // {
-        //     label: 'Exam Base',
-        //     href: ExamBasesRoute.to,
-        //     icon: HomeIconOutline,
-        //     activeIcon: HomeIcon,
-        // },
+    ]
+
+    const adminPages: typeof pages = [
+        {
+            label: 'Usuários',
+            href: AdminUsersRoute.to,
+            icon: UsersIconOutline,
+            activeIcon: UsersIcon,
+        },
     ]
 
     return (
@@ -115,6 +114,14 @@ export const SideBarV2 = () => {
                     {pages.map((page) => (
                         <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} />
                     ))}
+                    {isAdmin && (
+                        <>
+                            <div className="w-6 h-px bg-white/20 my-1" />
+                            {adminPages.map((page) => (
+                                <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} />
+                            ))}
+                        </>
+                    )}
                 </div>
 
                 <div className="flex flex-col items-center justify-center gap-0.5">

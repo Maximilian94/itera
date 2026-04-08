@@ -34,6 +34,7 @@ import { Route as AuthenticatedTreinoEstudoRouteImport } from './routes/_authent
 import { Route as AuthenticatedTreinoDiagnosticoRouteImport } from './routes/_authenticated/treino/diagnostico'
 import { Route as AuthenticatedTreinoTrainingIdRouteImport } from './routes/_authenticated/treino/$trainingId'
 import { Route as AuthenticatedExamsEditarRouteImport } from './routes/_authenticated/exams/editar'
+import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedTreinoTrainingIdIndexRouteImport } from './routes/_authenticated/treino/$trainingId/index'
 import { Route as AuthenticatedExamsExamBoardIndexRouteImport } from './routes/_authenticated/exams/$examBoard/index'
 import { Route as AuthenticatedTreinoTrainingIdRetentativaRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa'
@@ -187,6 +188,11 @@ const AuthenticatedExamsEditarRoute =
     path: '/editar',
     getParentRoute: () => AuthenticatedExamsRoute,
   } as any)
+const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
+  id: '/admin/users',
+  path: '/admin/users',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedTreinoTrainingIdIndexRoute =
   AuthenticatedTreinoTrainingIdIndexRouteImport.update({
     id: '/',
@@ -311,6 +317,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/treino': typeof AuthenticatedTreinoRouteWithChildren
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
@@ -353,6 +360,7 @@ export interface FileRoutesByTo {
   '/history': typeof AuthenticatedHistoryRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
+  '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
@@ -395,6 +403,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/treino': typeof AuthenticatedTreinoRouteWithChildren
+  '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/_authenticated/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
   '/_authenticated/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
@@ -441,6 +450,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planos'
     | '/treino'
+    | '/admin/users'
     | '/exams/editar'
     | '/treino/$trainingId'
     | '/treino/diagnostico'
@@ -483,6 +493,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/onboarding'
     | '/planos'
+    | '/admin/users'
     | '/exams/editar'
     | '/treino/diagnostico'
     | '/treino/estudo'
@@ -524,6 +535,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/planos'
     | '/_authenticated/treino'
+    | '/_authenticated/admin/users'
     | '/_authenticated/exams/editar'
     | '/_authenticated/treino/$trainingId'
     | '/_authenticated/treino/diagnostico'
@@ -737,6 +749,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/exams/editar'
       preLoaderRoute: typeof AuthenticatedExamsEditarRouteImport
       parentRoute: typeof AuthenticatedExamsRoute
+    }
+    '/_authenticated/admin/users': {
+      id: '/_authenticated/admin/users'
+      path: '/admin/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/treino/$trainingId/': {
       id: '/_authenticated/treino/$trainingId/'
@@ -1031,6 +1050,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedTreinoRoute: typeof AuthenticatedTreinoRouteWithChildren
+  AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1046,6 +1066,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedTreinoRoute: AuthenticatedTreinoRouteWithChildren,
+  AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
