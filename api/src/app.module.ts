@@ -23,6 +23,7 @@ import { StripeWebhookModule } from './stripe-webhook/stripe-webhook.module';
 import { ClerkModule } from './clerk/clerk.module';
 import { EmailModule } from './email/email.module';
 import { getBullConnectionOptions } from './email/queue.config';
+import { AdminModule } from './admin/admin.module';
 
 @Module({
   imports: [
@@ -48,6 +49,7 @@ import { getBullConnectionOptions } from './email/queue.config';
     StripeWebhookModule,
     ClerkModule,
     EmailModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [
