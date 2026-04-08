@@ -43,6 +43,30 @@ export type ExamBaseAttemptHistoryItem = {
   trendPercentage?: number | null
 }
 
+/** Admin view: attempt by any user with full answer details. */
+export type AdminExamBaseAttempt = {
+  id: string
+  startedAt: string
+  finishedAt: string | null
+  scorePercentage: number | null
+  isPartial: boolean
+  subjectFilter: string[]
+  totalQuestions: number
+  answeredCount: number
+  correctCount: number
+  user: {
+    id: string
+    email: string
+  }
+  answers: Array<{
+    questionId: string
+    selectedAlternativeId: string | null
+    selectedAlternativeKey: string | null
+    correctAlternativeId: string | null
+    isCorrect: boolean
+  }>
+}
+
 /** Full feedback for a finished attempt (overall + per-subject stats and AI feedback). */
 export type ExamAttemptFeedback = {
   examTitle: string

@@ -194,6 +194,103 @@ export class ExamBaseAttemptService {
     });
   }
 
+  /**
+   * Lists ALL attempts for a given exam base across all users (admin-only).
+   * Returns user info, answers with correctness, timestamps, and score.
+   */
+  async listAllAttempts(examBaseId: string) {
+    const examBase = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { id: true },
+    });
+    if (!examBase) throw new NotFoundException('exam base not found');
+
+    const attempts = await this.prisma.examBaseAttempt.findMany({
+      where: { examBaseId },
+      orderBy: { startedAt: 'desc' },
+      select: {
+        id: true,
+        examBaseId: true,
+        startedAt: true,
+        finishedAt: true,
+        scorePercentage: true,
+        subjectFilter: true,
+        user: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        answers: {
+          select: {
+            examBaseQuestionId: true,
+            selectedAlternativeId: true,
+            selectedAlternative: {
+              select: { id: true, key: true },
+            },
+          },
+        },
+      },
+    });
+
+    const questions = await this.prisma.examBaseQuestion.findMany({
+      where: { examBaseId },
+      orderBy: { position: 'asc' },
+      select: {
+        id: true,
+        subject: true,
+        correctAlternative: true,
+        alternatives: { select: { id: true, key: true } },
+      },
+    });
+
+    const correctAltByQuestion = new Map<string, string>();
+    for (const q of questions) {
+      const alt = q.alternatives.find((a) => a.key === q.correctAlternative);
+      if (alt) correctAltByQuestion.set(q.id, alt.id);
+    }
+    const totalQuestions = questions.length;
+
+    return attempts.map((a) => {
+      const subjectFilter = Array.isArray(a.subjectFilter) ? a.subjectFilter : [];
+      const isPartial = subjectFilter.length > 0;
+      const answeredCount = a.answers.filter((ans) => ans.selectedAlternativeId != null).length;
+      let correctCount = 0;
+      for (const ans of a.answers) {
+        const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
+        if (correctId && ans.selectedAlternativeId === correctId) {
+          correctCount += 1;
+        }
+      }
+
+      return {
+        id: a.id,
+        startedAt: a.startedAt,
+        finishedAt: a.finishedAt,
+        scorePercentage: a.scorePercentage != null ? Number(a.scorePercentage) : null,
+        isPartial,
+        subjectFilter,
+        totalQuestions: isPartial
+          ? questions.filter((q) => q.subject != null && subjectFilter.includes(q.subject)).length
+          : totalQuestions,
+        answeredCount,
+        correctCount,
+        user: {
+          id: a.user.id,
+          email: a.user.email,
+        },
+        answers: a.answers.map((ans) => ({
+          questionId: ans.examBaseQuestionId,
+          selectedAlternativeId: ans.selectedAlternativeId,
+          selectedAlternativeKey: ans.selectedAlternative?.key ?? null,
+          correctAlternativeId: correctAltByQuestion.get(ans.examBaseQuestionId) ?? null,
+          isCorrect: ans.selectedAlternativeId != null &&
+            ans.selectedAlternativeId === correctAltByQuestion.get(ans.examBaseQuestionId),
+        })),
+      };
+    });
+  }
+
   async list(examBaseId: string, userId: string) {
     const examBase = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },

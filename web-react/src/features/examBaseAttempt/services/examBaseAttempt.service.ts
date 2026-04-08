@@ -5,6 +5,7 @@ import type {
   ExamBaseAttemptHistoryItem,
   ExamAttemptFeedback,
   UpsertAnswerInput,
+  AdminExamBaseAttempt,
 } from '../domain/examBaseAttempt.types'
 
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/attempts`
@@ -70,6 +71,11 @@ export const examBaseAttemptService = {
     return apiFetch(`${basePath(examBaseId)}/${attemptId}/feedback`, {
       method: 'GET',
     })
+  },
+
+  /** Admin: list all attempts for an exam base across all users. */
+  listAllAdmin(examBaseId: string): Promise<AdminExamBaseAttempt[]> {
+    return apiFetch(`${basePath(examBaseId)}/admin/all`, { method: 'GET' })
   },
 
   /**
