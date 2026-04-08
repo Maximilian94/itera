@@ -3,6 +3,7 @@ import { OnboardingOrAccessGuard } from '../common/guards/onboarding-or-access.g
 import { ExamBaseAttemptService } from './exam-base-attempt.service';
 import { CreateAttemptDto } from './dto/create-attempt.dto';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
+import { Roles } from '../common/decorators/roles.decorator';
 
 /**
  * Controller for exam base attempts.
@@ -22,6 +23,12 @@ export class ExamBaseAttemptController {
     @Req() req: { user: { userId: string } },
   ) {
     return this.service.list(examBaseId, req.user.userId);
+  }
+
+  @Get('admin/all')
+  @Roles('ADMIN')
+  listAll(@Param('examBaseId') examBaseId: string) {
+    return this.service.listAllAttempts(examBaseId);
   }
 
   @Post()

@@ -6,6 +6,8 @@ export const examBaseAttemptKeys = {
   list: (examBaseId: string) => ['examBaseAttempts', examBaseId] as const,
   history: (examBaseId?: string) =>
     ['examBaseAttempts', 'history', examBaseId ?? 'all'] as const,
+  adminAll: (examBaseId: string) =>
+    ['examBaseAttempts', 'adminAll', examBaseId] as const,
   one: (examBaseId: string, attemptId: string) =>
     ['examBaseAttempt', examBaseId, attemptId] as const,
   feedback: (examBaseId: string, attemptId: string) =>
@@ -16,6 +18,14 @@ export function useExamBaseAttemptHistoryQuery(examBaseId?: string) {
   return useQuery({
     queryKey: examBaseAttemptKeys.history(examBaseId),
     queryFn: () => examBaseAttemptService.listHistory(examBaseId),
+  })
+}
+
+export function useAdminExamBaseAttemptsQuery(examBaseId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: examBaseAttemptKeys.adminAll(examBaseId ?? ''),
+    queryFn: () => examBaseAttemptService.listAllAdmin(examBaseId!),
+    enabled: Boolean(examBaseId) && enabled,
   })
 }
 

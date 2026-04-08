@@ -22,6 +22,7 @@ import type { ExamBase, ExtractedExamMetadata } from '@/features/examBase/domain
 import {
   useCreateExamBaseAttemptMutation,
   useExamBaseAttemptHistoryQuery,
+  useAdminExamBaseAttemptsQuery,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
 import type { ExamBaseAttemptHistoryItem } from '@/features/examBaseAttempt/domain/examBaseAttempt.types'
@@ -47,9 +48,12 @@ import {
   BookOpenIcon,
   CalendarDaysIcon,
   ChevronRightIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
   ClockIcon,
   ExclamationTriangleIcon,
   PlayIcon,
+  UserIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
 import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
@@ -149,6 +153,9 @@ function RouteComponent() {
   })
 
   const isAdmin = profileData?.user?.role === 'ADMIN'
+  const { data: adminAttempts = [], isLoading: isLoadingAdminAttempts } =
+    useAdminExamBaseAttemptsQuery(examBaseId, isAdmin)
+  const [expandedAttemptId, setExpandedAttemptId] = useState<string | null>(null)
 
   /** Opens the start exam dialog to choose full exam or subject filter. */
   const handleOpenStartExam = () => {
@@ -1285,6 +1292,204 @@ function RouteComponent() {
         title="Como deseja fazer a prova?"
         confirmLabel="Iniciar prova"
       />
+
+      {/* Histórico de tentativas — Admin */}
+      {isAdmin && (
+        <Card noElevation className="p-6 border border-slate-200">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                <UserIcon className="w-5 h-5 text-violet-600" />
+                Histórico de tentativas (Admin)
+              </h2>
+              <p className="text-sm text-slate-500 mt-0.5">
+                {adminAttempts.length}{' '}
+                {adminAttempts.length === 1 ? 'tentativa' : 'tentativas'} de{' '}
+                {new Set(adminAttempts.map((a) => a.user.id)).size}{' '}
+                {new Set(adminAttempts.map((a) => a.user.id)).size === 1 ? 'aluno' : 'alunos'}
+              </p>
+            </div>
+          </div>
+
+          {isLoadingAdminAttempts && (
+            <div className="flex items-center gap-2 mt-4">
+              <CircularProgress size={16} />
+              <span className="text-sm text-slate-500">Carregando…</span>
+            </div>
+          )}
+
+          {!isLoadingAdminAttempts && adminAttempts.length === 0 && (
+            <p className="text-sm text-slate-500 mt-4">
+              Nenhuma tentativa realizada nesta prova.
+            </p>
+          )}
+
+          {!isLoadingAdminAttempts && adminAttempts.length > 0 && (
+            <div className="flex flex-col gap-2 mt-4">
+              {adminAttempts.map((attempt) => {
+                const isExpanded = expandedAttemptId === attempt.id
+                const userName = attempt.user.email
+                const status =
+                  attempt.finishedAt == null
+                    ? { label: 'Em andamento', className: 'text-amber-600 bg-amber-50', Icon: ClockIcon }
+                    : attempt.scorePercentage != null &&
+                        examBase?.minPassingGradeNonQuota != null &&
+                        attempt.scorePercentage >= Number(examBase.minPassingGradeNonQuota)
+                      ? { label: attempt.isPartial ? 'Aprovado (parcial)' : 'Aprovado', className: 'text-emerald-600 bg-emerald-50', Icon: CheckCircleIcon }
+                      : { label: attempt.isPartial ? 'Reprovado (parcial)' : 'Reprovado', className: 'text-rose-600 bg-rose-50', Icon: ExclamationTriangleIcon }
+
+                const duration =
+                  attempt.startedAt && attempt.finishedAt
+                    ? (() => {
+                        const mins = dayjs(attempt.finishedAt).diff(dayjs(attempt.startedAt), 'minute')
+                        const h = Math.floor(mins / 60)
+                        const m = mins % 60
+                        return h > 0 ? `${h}h ${m}min` : `${m}min`
+                      })()
+                    : null
+
+                return (
+                  <div key={attempt.id} className="rounded-xl border border-slate-200 overflow-hidden">
+                    {/* Row header */}
+                    <div
+                      role="button"
+                      onClick={() => setExpandedAttemptId(isExpanded ? null : attempt.id)}
+                      className="flex flex-wrap items-center justify-between gap-3 p-4 cursor-pointer hover:bg-slate-50 transition-colors"
+                    >
+                      <div className="flex flex-wrap items-center gap-4 min-w-0">
+                        {/* User */}
+                        <div className="flex items-center gap-2 min-w-0">
+                          <UserIcon className="w-4 h-4 text-slate-400 shrink-0" />
+                          <span className="text-sm font-medium text-slate-800 truncate max-w-[200px]" title={userName}>
+                            {userName}
+                          </span>
+                        </div>
+                        {/* Date */}
+                        <div className="flex items-center gap-1.5">
+                          <CalendarDaysIcon className="w-4 h-4 text-slate-400" />
+                          <span className="text-sm text-slate-600">
+                            {dayjs(attempt.startedAt).format('DD/MM/YYYY HH:mm')}
+                          </span>
+                        </div>
+                        {/* Duration */}
+                        {duration && (
+                          <div className="flex items-center gap-1.5">
+                            <ClockIcon className="w-4 h-4 text-slate-400" />
+                            <span className="text-sm text-slate-600">{duration}</span>
+                          </div>
+                        )}
+                        {/* Score */}
+                        <div className="flex items-center gap-1.5">
+                          <TrophyIcon className="w-4 h-4 text-amber-500" />
+                          <span className="text-sm font-semibold text-slate-800">
+                            {attempt.scorePercentage != null
+                              ? `${attempt.scorePercentage.toFixed(1)}%`
+                              : '—'}
+                          </span>
+                          <span className="text-xs text-slate-500">
+                            ({attempt.correctCount}/{attempt.totalQuestions})
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-xs font-medium ${status.className}`}>
+                          <status.Icon className="w-3.5 h-3.5" />
+                          {status.label}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUpIcon className="w-4 h-4 text-slate-400" />
+                        ) : (
+                          <ChevronDownIcon className="w-4 h-4 text-slate-400" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <div className="border-t border-slate-100 bg-slate-50 p-4">
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-slate-500 block text-xs">Email</span>
+                            <span className="text-slate-800 font-medium">{attempt.user.email}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Início</span>
+                            <span className="text-slate-800">{dayjs(attempt.startedAt).format('DD/MM/YYYY HH:mm:ss')}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Término</span>
+                            <span className="text-slate-800">
+                              {attempt.finishedAt ? dayjs(attempt.finishedAt).format('DD/MM/YYYY HH:mm:ss') : '—'}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Duração</span>
+                            <span className="text-slate-800">{duration ?? '—'}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Respondidas</span>
+                            <span className="text-slate-800">{attempt.answeredCount}/{attempt.totalQuestions}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Acertos</span>
+                            <span className="text-slate-800">{attempt.correctCount}/{attempt.totalQuestions}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500 block text-xs">Nota</span>
+                            <span className="text-slate-800 font-semibold">
+                              {attempt.scorePercentage != null ? `${attempt.scorePercentage.toFixed(1)}%` : '—'}
+                            </span>
+                          </div>
+                          {attempt.isPartial && (
+                            <div>
+                              <span className="text-slate-500 block text-xs">Filtro de matérias</span>
+                              <span className="text-slate-800">{attempt.subjectFilter.join(', ')}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Answer grid */}
+                        <div>
+                          <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                            Respostas ({attempt.answers.length})
+                          </h4>
+                          <div className="flex flex-wrap gap-1.5">
+                            {attempt.answers.map((ans, idx) => {
+                              const bg = ans.selectedAlternativeId == null
+                                ? 'bg-slate-200 text-slate-500'
+                                : ans.isCorrect
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : 'bg-rose-100 text-rose-700'
+                              return (
+                                <Tooltip
+                                  key={ans.questionId}
+                                  title={
+                                    ans.selectedAlternativeId == null
+                                      ? `Q${idx + 1}: Não respondida`
+                                      : ans.isCorrect
+                                        ? `Q${idx + 1}: ${ans.selectedAlternativeKey} (correta)`
+                                        : `Q${idx + 1}: ${ans.selectedAlternativeKey} (errada)`
+                                  }
+                                >
+                                  <span
+                                    className={`inline-flex items-center justify-center w-7 h-7 rounded text-xs font-semibold ${bg}`}
+                                  >
+                                    {ans.selectedAlternativeKey ?? '–'}
+                                  </span>
+                                </Tooltip>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </Card>
+      )}
 
       {/* Gerenciar questões (Admin) */}
       {isAdmin && (
