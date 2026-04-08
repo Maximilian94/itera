@@ -29,6 +29,20 @@ import { jsonrepair } from 'jsonrepair';
 
 const alternativesOrderBy = { key: 'asc' as const };
 
+/**
+ * Fetches an image from a URL and returns a base64 data URL.
+ * OpenAI models require images as data URLs, not HTTP URLs.
+ */
+async function toBase64DataUrl(imageUrl: string): Promise<string> {
+  const res = await fetch(imageUrl);
+  if (!res.ok) {
+    throw new BadRequestException(`Failed to fetch image: ${res.status}`);
+  }
+  const contentType = res.headers.get('content-type') || 'image/png';
+  const buffer = Buffer.from(await res.arrayBuffer());
+  return `data:${contentType};base64,${buffer.toString('base64')}`;
+}
+
 /** Max questions per API chunk to avoid model truncation/laziness. */
 const MAX_QUESTIONS_PER_CHUNK = 10;
 
@@ -583,15 +597,17 @@ ${alternativesText}
 
 Retorne o objeto JSON no formato GenerateExplanationsResponse.`;
 
-    const userContent: { role: 'user'; content: string | object[] } = input.statementImageUrl?.trim()
-      ? {
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: input.statementImageUrl, detail: 'high' } },
-            { type: 'text', text: userPromptText },
-          ],
-        }
-      : { role: 'user', content: userPromptText };
+    let userContent: { role: 'user'; content: string | object[] } = { role: 'user', content: userPromptText };
+    if (input.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(input.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -724,15 +740,17 @@ ${alternativesText}
 
 Retorne o objeto JSON no formato GenerateMetadataResponse (topic, subtopics, skills).`;
 
-    const userContent: { role: 'user'; content: string | object[] } = question.statementImageUrl?.trim()
-      ? {
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: question.statementImageUrl, detail: 'high' } },
-            { type: 'text', text: userPromptText },
-          ],
-        }
-      : { role: 'user', content: userPromptText };
+    let userContent: { role: 'user'; content: string | object[] } = { role: 'user', content: userPromptText };
+    if (question.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(question.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -850,15 +868,17 @@ ${alternativesText}
 
 Retorne o JSON: {"subject": "Nome da Matéria"}`;
 
-    const userContent: { role: 'user'; content: string | object[] } = question.statementImageUrl?.trim()
-      ? {
-          role: 'user',
-          content: [
-            { type: 'image_url', image_url: { url: question.statementImageUrl, detail: 'high' } },
-            { type: 'text', text: userPromptText },
-          ],
-        }
-      : { role: 'user', content: userPromptText };
+    let userContent: { role: 'user'; content: string | object[] } = { role: 'user', content: userPromptText };
+    if (question.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(question.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -1002,25 +1022,17 @@ ${alternativesText}
 
 Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics, explanations para cada alternativa).`;
 
-    const userContent: { role: 'user'; content: string | object[] } = question
-      .statementImageUrl?.trim()
-      ? {
-          role: 'user',
-          content: [
-            {
-              type: 'image_url',
-              image_url: {
-                url: question.statementImageUrl,
-                detail: 'high',
-              },
-            },
-            {
-              type: 'text',
-              text: userPromptText,
-            },
-          ],
-        }
-      : { role: 'user', content: userPromptText };
+    let userContent: { role: 'user'; content: string | object[] } = { role: 'user', content: userPromptText };
+    if (question.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(question.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
 
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
