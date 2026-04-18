@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { UpsertAnswerDto } from './dto/upsert-answer.dto';
 
 const questionSelect = {
@@ -61,6 +62,7 @@ export class ExamBaseAttemptService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   /**
@@ -339,6 +341,18 @@ export class ExamBaseAttemptService {
         startedAt: true,
       },
     });
+
+    this.analytics.capture({
+      userId,
+      event: 'exam_started',
+      properties: {
+        attemptId: attempt.id,
+        examBaseId,
+        source: 'exams_direct',
+        subjectFilter,
+      },
+    });
+
     return attempt;
   }
 
@@ -441,26 +455,46 @@ export class ExamBaseAttemptService {
 
     const question = await this.prisma.examBaseQuestion.findUnique({
       where: { id: dto.questionId },
-      select: { id: true, examBaseId: true },
+      select: {
+        id: true,
+        examBaseId: true,
+        position: true,
+        correctAlternative: true,
+      },
     });
     if (!question || question.examBaseId !== examBaseId)
       throw new NotFoundException('question not found');
 
+    let selectedAlternativeKey: string | null = null;
     if (dto.selectedAlternativeId != null && dto.selectedAlternativeId !== '') {
       const alt = await this.prisma.examBaseQuestionAlternative.findUnique({
         where: { id: dto.selectedAlternativeId },
-        select: { examBaseQuestionId: true },
+        select: { examBaseQuestionId: true, key: true },
       });
       if (!alt || alt.examBaseQuestionId !== dto.questionId)
         throw new BadRequestException(
           'selectedAlternativeId does not belong to this question',
         );
+      selectedAlternativeKey = alt.key;
     }
 
     const selectedId =
       dto.selectedAlternativeId && dto.selectedAlternativeId.trim() !== ''
         ? dto.selectedAlternativeId
         : null;
+
+    // Checked before upsert so we can emit `question_answered` only on the
+    // first real answer for this question — avoids double-counting when the
+    // user changes their mind before finishing.
+    const existingAnswer = await this.prisma.examBaseAttemptAnswer.findUnique({
+      where: {
+        examBaseAttemptId_examBaseQuestionId: {
+          examBaseAttemptId: attemptId,
+          examBaseQuestionId: dto.questionId,
+        },
+      },
+      select: { examBaseAttemptId: true },
+    });
 
     await this.prisma.examBaseAttemptAnswer.upsert({
       where: {
@@ -476,6 +510,24 @@ export class ExamBaseAttemptService {
       },
       update: { selectedAlternativeId: selectedId },
     });
+
+    if (!existingAnswer && selectedId != null) {
+      const correct =
+        question.correctAlternative != null &&
+        selectedAlternativeKey === question.correctAlternative;
+      this.analytics.capture({
+        userId,
+        event: 'question_answered',
+        properties: {
+          attemptId,
+          examBaseId,
+          questionId: dto.questionId,
+          questionPosition: question.position,
+          correct,
+          selectedAlternativeId: selectedId,
+        },
+      });
+    }
 
     return {
       questionId: dto.questionId,
@@ -566,6 +618,25 @@ export class ExamBaseAttemptService {
         finishedAt: true,
       },
     });
+
+    if (updated && updated.startedAt && updated.finishedAt) {
+      const durationSeconds = Math.round(
+        (updated.finishedAt.getTime() - updated.startedAt.getTime()) / 1000,
+      );
+      this.analytics.capture({
+        userId,
+        event: 'exam_finished',
+        properties: {
+          attemptId,
+          examBaseId,
+          scorePercentage,
+          totalCorrect,
+          totalQuestions,
+          durationSeconds,
+        },
+      });
+    }
+
     return updated!;
   }
 
