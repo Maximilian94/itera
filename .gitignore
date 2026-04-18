@@ -10,6 +10,12 @@
 **/coverage/
 **/*.log
 
+# Evita que um `npm install` acidental no root do repo recrie um lockfile
+# fantasma, que faz o Next.js 16 detectar o root errado e quebrar a resolução
+# de módulos (ex.: tailwindcss). Lockfiles em subdirs (api/, web-react/ etc.)
+# continuam sendo trackeados normalmente.
+/package-lock.json
+
 # Secrets (credenciais GCP etc.; a pasta api/secret existe, o conteúdo não é commitado)
 api/secret/*
 
