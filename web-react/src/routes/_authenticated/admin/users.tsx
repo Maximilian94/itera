@@ -201,12 +201,12 @@ function AdminUsersPage() {
                   onClick={() => setSelectedUser(user)}
                 >
                   <td className="px-4 py-3 font-medium text-slate-800">
-                    {user.email}
+                    <span data-sensitive="">{user.email}</span>
                     {user.role === 'ADMIN' && (
                       <Chip label="Admin" size="small" color="info" sx={{ ml: 1, height: 20, fontSize: 11 }} />
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-600">
+                  <td className="px-4 py-3 text-slate-600" data-sensitive="">
                     {user.phone || '—'}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
@@ -284,8 +284,8 @@ function UserDetail({ user }: { user: AdminUser }) {
           Informações
         </h3>
         <div className="grid grid-cols-2 gap-x-8 gap-y-3">
-          <InfoItem label="Email" value={user.email} />
-          <InfoItem label="Telefone" value={user.phone || '—'} />
+          <InfoItem label="Email" value={user.email} sensitive />
+          <InfoItem label="Telefone" value={user.phone || '—'} sensitive />
           <InfoItem label="Role" value={user.role} />
           <InfoItem
             label="Cadastro"
@@ -393,13 +393,26 @@ function ExamAttemptRow({ attempt }: { attempt: AdminUserExamAttempt }) {
   )
 }
 
-function InfoItem({ label, value }: { label: string; value: string }) {
+function InfoItem({
+  label,
+  value,
+  sensitive,
+}: {
+  label: string
+  value: string
+  sensitive?: boolean
+}) {
   return (
     <div className="flex flex-col gap-0.5">
       <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">
         {label}
       </span>
-      <span className="text-sm text-slate-700">{value}</span>
+      <span
+        className="text-sm text-slate-700"
+        {...(sensitive ? { 'data-sensitive': '' } : {})}
+      >
+        {value}
+      </span>
     </div>
   )
 }

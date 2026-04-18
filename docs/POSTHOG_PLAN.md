@@ -101,16 +101,30 @@ Ciclo de vida (verdade no DB):
 
 ## 7. Session Replay + Heatmaps
 
-- Ativar session replay com:
+### Configuração no código (feito)
+
+- `posthog-js` no `web-react` já inicializa com:
   ```ts
   session_recording: {
     maskAllInputs: true,
     maskTextSelector: '[data-sensitive]',
   }
   ```
-- Proteger PII: Clerk email, dados de pagamento, perfil.
-- Heatmaps ativos globalmente **exceto** em `/checkout-*` e `/planos`.
-- **Sampling inteligente**: 100% das sessões de usuários que iniciam prova mas abandonam (via feature flag PostHog); % menor pro resto, para caber no tier gratuito.
+- Elementos com PII textual (não-input) marcados com `data-sensitive`:
+  - `account.tsx` — nome e email do próprio usuário.
+  - `admin/users.tsx` — email e telefone de cada usuário na lista e no drawer de detalhes.
+- Adicionar `data-sensitive` em novos lugares sempre que renderizar email, telefone, CPF ou dados de pagamento diretamente no DOM.
+
+### Ações no dashboard do PostHog
+
+1. **Projeto `maximize-app`** → Settings → Session Replay → ativar.
+2. **Sampling** — definir taxa global em ~15% inicialmente (ajuste conforme o volume de replays mensais). Dá pra subir pra 100% depois via feature flag em cohorts específicos (ex.: "iniciou prova mas não finalizou nas últimas 48h") se quiser foco cirúrgico no abandono.
+3. **Console logs & network** — não ativar captura de network (pode vazar tokens/PII em headers).
+4. **Heatmaps** — ativos por padrão no autocapture. Pra análise, **filtrar por URL** no dashboard excluindo `/planos` e `/checkout-*` (não bloqueamos a captura na SDK porque os dados ainda são úteis pra debug; só queremos evitar olhar heatmap sobre pricing/pagamento).
+
+### Tier gratuito
+
+5.000 recordings/mês grátis. Com sampling de 15% e ~300 usuários ativos × 8 sessões/mês = ~360 recordings, caberia folgado. Ajustar pra baixo se escalar.
 
 ## 8. Dashboards a construir
 
