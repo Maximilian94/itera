@@ -292,8 +292,8 @@ function ProfileContent({
 
       <Card noElevation className="p-6 sm:p-8 border border-slate-200/80 rounded-2xl overflow-hidden">
         <div className="flex flex-col gap-5">
-          <ProfileField icon={IdentificationIcon} label="Nome" value={displayName} />
-          <ProfileField icon={EnvelopeIcon} label="Email" value={displayEmail} />
+          <ProfileField icon={IdentificationIcon} label="Nome" value={displayName} sensitive />
+          <ProfileField icon={EnvelopeIcon} label="Email" value={displayEmail} sensitive />
           <ProfileField
             icon={ShieldCheckIcon}
             label="Perfil"
@@ -428,15 +428,22 @@ function ProfileField({
   icon: Icon,
   label,
   value,
+  sensitive,
 }: {
   icon: React.ComponentType<{ className?: string }>
   label: string
   value: string
+  sensitive?: boolean
 }) {
   return (
     <div>
       <ProfileFieldLabel icon={Icon} label={label} />
-      <p className="text-slate-900 font-medium mt-1">{value}</p>
+      <p
+        className="text-slate-900 font-medium mt-1"
+        {...(sensitive ? { 'data-sensitive': '' } : {})}
+      >
+        {value}
+      </p>
     </div>
   )
 }

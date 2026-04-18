@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -24,12 +25,14 @@ import { ClerkModule } from './clerk/clerk.module';
 import { EmailModule } from './email/email.module';
 import { getBullConnectionOptions } from './email/queue.config';
 import { AdminModule } from './admin/admin.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
     }),
+    ScheduleModule.forRoot(),
     BullModule.forRoot({
       connection: getBullConnectionOptions(),
     }),
@@ -50,6 +53,7 @@ import { AdminModule } from './admin/admin.module';
     ClerkModule,
     EmailModule,
     AdminModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [

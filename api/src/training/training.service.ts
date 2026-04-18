@@ -10,6 +10,7 @@ import { TrainingStage } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamBaseAttemptService } from '../examBaseAttempt/exam-base-attempt.service';
+import { AnalyticsService } from '../analytics/analytics.service';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { UpdateStudyDto } from './dto/update-study.dto';
 import { UpsertRetryAnswerDto } from './dto/upsert-retry-answer.dto';
@@ -53,6 +54,7 @@ export class TrainingService {
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
     private readonly examBaseAttemptService: ExamBaseAttemptService,
+    private readonly analytics: AnalyticsService,
   ) {}
 
   private async getSessionForUser(trainingId: string, userId: string) {
@@ -418,6 +420,28 @@ export class TrainingService {
         currentStage: 'EXAM',
       },
       select: { id: true },
+    });
+
+    this.analytics.capture({
+      userId,
+      event: 'training_created',
+      properties: {
+        trainingId: session.id,
+        attemptId: attempt.id,
+        examBaseId,
+        subjectFilter,
+      },
+    });
+    this.analytics.capture({
+      userId,
+      event: 'exam_started',
+      properties: {
+        attemptId: attempt.id,
+        examBaseId,
+        source: 'treino',
+        trainingId: session.id,
+        subjectFilter,
+      },
     });
 
     return {

@@ -57,6 +57,7 @@ export function useClerkAuth(): ClerkAuth {
           id: user.id,
           firstName: user.firstName,
           lastName: user.lastName,
+          createdAt: user.createdAt,
           emailAddresses: [
             {
               emailAddress: user.primaryEmailAddress?.emailAddress || '',

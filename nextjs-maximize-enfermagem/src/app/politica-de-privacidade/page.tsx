@@ -102,6 +102,15 @@ export default function PoliticaDePrivacidadePage() {
             <strong>Stripe:</strong> processamento de pagamentos
           </li>
           <li>
+            <strong>PostHog:</strong> análise de uso do produto e gravação de
+            sessões com o objetivo de entender padrões de navegação, identificar
+            gargalos e melhorar a experiência. Os dados são armazenados em
+            servidores na União Europeia. Campos sensíveis como nome, e-mail,
+            telefone e conteúdo de formulários são mascarados antes de serem
+            enviados. Na landing page, o envio só ocorre após o seu
+            consentimento explícito via banner de cookies.
+          </li>
+          <li>
             <strong>Provedores de hospedagem:</strong> infraestrutura e
             armazenamento
           </li>
@@ -143,9 +152,27 @@ export default function PoliticaDePrivacidadePage() {
         <h2>8. Cookies</h2>
         <p>
           Utilizamos cookies e tecnologias similares para manter sua sessão,
-          lembrar preferências e analisar o uso da plataforma. Você pode
-          configurar seu navegador para recusar cookies, mas isso pode afetar
-          algumas funcionalidades.
+          lembrar preferências e analisar o uso da plataforma. Os cookies são
+          divididos em duas categorias:
+        </p>
+        <ul>
+          <li>
+            <strong>Essenciais:</strong> necessários para o funcionamento
+            básico (autenticação, carrinho, preferências de navegação). Não
+            requerem consentimento.
+          </li>
+          <li>
+            <strong>Analíticos:</strong> usados pelo PostHog para medir o
+            comportamento de uso e gravar sessões. Na landing page, só são
+            ativados depois que você clica em &quot;Aceitar&quot; no banner de
+            cookies. Se você escolher &quot;Rejeitar&quot;, nenhum dado é
+            enviado ao PostHog.
+          </li>
+        </ul>
+        <p>
+          Você pode alterar sua decisão a qualquer momento limpando os dados do
+          site no seu navegador — o banner aparecerá novamente na próxima
+          visita.
         </p>
 
         <h2>9. Alterações</h2>
