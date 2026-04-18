@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SignUpRouteImport } from './routes/sign-up'
 import { Route as SignInRouteImport } from './routes/sign-in'
+import { Route as MobilePreviewRouteImport } from './routes/mobile-preview'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTreinoRouteImport } from './routes/_authenticated/treino'
@@ -62,6 +63,11 @@ const SignUpRoute = SignUpRouteImport.update({
 const SignInRoute = SignInRouteImport.update({
   id: '/sign-in',
   path: '/sign-in',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MobilePreviewRoute = MobilePreviewRouteImport.update({
+  id: '/mobile-preview',
+  path: '/mobile-preview',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -304,6 +310,7 @@ const AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/mobile-preview': typeof MobilePreviewRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/account': typeof AuthenticatedAccountRoute
@@ -349,6 +356,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/mobile-preview': typeof MobilePreviewRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/account': typeof AuthenticatedAccountRoute
@@ -390,6 +398,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/mobile-preview': typeof MobilePreviewRoute
   '/sign-in': typeof SignInRoute
   '/sign-up': typeof SignUpRoute
   '/_authenticated/account': typeof AuthenticatedAccountRoute
@@ -437,6 +446,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/mobile-preview'
     | '/sign-in'
     | '/sign-up'
     | '/account'
@@ -482,6 +492,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/mobile-preview'
     | '/sign-in'
     | '/sign-up'
     | '/account'
@@ -522,6 +533,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/mobile-preview'
     | '/sign-in'
     | '/sign-up'
     | '/_authenticated/account'
@@ -569,6 +581,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  MobilePreviewRoute: typeof MobilePreviewRoute
   SignInRoute: typeof SignInRoute
   SignUpRoute: typeof SignUpRoute
 }
@@ -587,6 +600,13 @@ declare module '@tanstack/react-router' {
       path: '/sign-in'
       fullPath: '/sign-in'
       preLoaderRoute: typeof SignInRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/mobile-preview': {
+      id: '/mobile-preview'
+      path: '/mobile-preview'
+      fullPath: '/mobile-preview'
+      preLoaderRoute: typeof MobilePreviewRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -1076,6 +1096,7 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  MobilePreviewRoute: MobilePreviewRoute,
   SignInRoute: SignInRoute,
   SignUpRoute: SignUpRoute,
 }

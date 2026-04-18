@@ -106,7 +106,7 @@ export const SideBarV2 = () => {
     ]
 
     return (
-        <div className="h-full">
+        <div className="hidden h-full md:block">
             <div
                 className={'w-13 bg-linear-to-b from-cyan-600 to-sky-900 h-full rounded-lg flex flex-col items-center justify-between py-2 gap-2'}
             >

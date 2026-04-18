@@ -6,6 +6,7 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  Drawer,
   IconButton,
   InputAdornment,
   Snackbar,
@@ -17,6 +18,7 @@ import { Link } from '@tanstack/react-router'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
+import { MobileCard, MobileHeader, PhoneSafeArea } from '@/ui/mobile'
 import { Markdown } from '@/components/Markdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { Card } from '@/components/Card'
@@ -33,6 +35,7 @@ import {
   PlayIcon,
   PlusCircleIcon,
   ScissorsIcon,
+  Squares2X2Icon,
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
@@ -69,6 +72,7 @@ import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/e
 import { authService } from '@/features/auth/services/auth.service'
 import { formatExamBaseTitle } from '@/lib/utils'
 import { analytics } from '@/lib/analytics'
+import { useIsMobile } from '@/lib/useIsMobile'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -148,6 +152,8 @@ export interface ExamAttemptPlayerProps {
     firstUnansweredIndex: number
     goToQuestion: (index: number) => void
   }) => void
+  /** Optional primary action rendered in the mobile header for training mode. */
+  mobileHeaderAction?: React.ReactNode
   /** @deprecated Editing is only available via management mode (managementMode). Kept for backward compatibility. */
   enableEditMode?: boolean
   /** Enable management mode. Shows questions from examBase without attempt. */
@@ -168,12 +174,14 @@ export function ExamAttemptPlayer({
   onNavigateToFinal,
   finishRef,
   onTrainingProvaStateChange,
+  mobileHeaderAction,
   enableEditMode: _enableEditMode = false,
   managementMode = false,
   onAddQuestion,
 }: ExamAttemptPlayerProps) {
   const isRetryMode = Boolean(trainingId)
   const isManagementMode = Boolean(managementMode)
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
 
   const attemptQuery = useExamBaseAttemptQuery(
@@ -212,6 +220,7 @@ export function ExamAttemptPlayer({
   )
 
   const [value, setValue] = useState(0)
+  const [mobileQuestionDrawerOpen, setMobileQuestionDrawerOpen] = useState(false)
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward')
@@ -752,10 +761,10 @@ export function ExamAttemptPlayer({
     setSkillsStr(arrayToStringList(currentQuestion?.skills ?? []))
   }, [currentQuestion?.id, currentQuestion?.statementImageUrl, currentQuestion?.subject, currentQuestion?.topic, currentQuestion?.subtopics, currentQuestion?.skills])
 
-  function getQuestionButtonStyle(index: number) {
+  function getQuestionStatus(index: number) {
     const isCurrent = currentQuestionIndex === index
     const q = questions[index]
-    if (!q) return 'flex shrink-0 items-center justify-center w-full h-7 rounded border border-slate-200 bg-slate-100 text-slate-500 text-xs font-medium hover:bg-slate-200 cursor-pointer'
+    if (!q) return { isCurrent, status: 'unanswered' as const }
     const selectedId = answers[q.id] ?? null
     const isAnswered = selectedId != null && selectedId !== ''
     const correctAlt = q.correctAlternative
@@ -771,20 +780,34 @@ export function ExamAttemptPlayer({
       (q.alternatives.length === 0 ||
         q.alternatives.some((a) => !a.explanation?.trim()))
 
+    if (isCorrect) return { isCurrent, status: 'correct' as const }
+    if (isWrong) return { isCurrent, status: 'wrong' as const }
+    if (isAnswered) return { isCurrent, status: 'answered' as const }
+    if (isIncomplete) return { isCurrent, status: 'incomplete' as const }
+    return { isCurrent, status: 'unanswered' as const }
+  }
+
+  function getQuestionButtonStyle(index: number) {
+    const { isCurrent, status } = getQuestionStatus(index)
+
     const base = 'flex shrink-0 items-center justify-center w-full h-7 rounded text-xs font-medium cursor-pointer transition-colors'
     if (isCurrent) {
       return `${base} outline outline-2 outline-cyan-400 outline-offset-0.5 ${
-        isIncomplete
+        status === 'incomplete'
           ? 'bg-amber-100 text-amber-800 border border-amber-300'
-          : isAnswered
+          : status === 'answered'
             ? 'bg-cyan-100 text-cyan-700 border border-cyan-200'
+            : status === 'correct'
+              ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+              : status === 'wrong'
+                ? 'bg-rose-100 text-rose-700 border border-rose-200'
             : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
-    if (isCorrect) return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
-    if (isWrong) return `${base} bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200`
-    if (isAnswered) return `${base} bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200`
-    if (isIncomplete) return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
+    if (status === 'correct') return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
+    if (status === 'wrong') return `${base} bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200`
+    if (status === 'answered') return `${base} bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200`
+    if (status === 'incomplete') return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
   }
 
@@ -893,6 +916,9 @@ export function ExamAttemptPlayer({
     selectedAlternativeId != null &&
     correctAlt != null &&
     selectedAlternativeId !== correctAlt.id
+  const answeredCount = questionCount - unansweredIndices.length
+  const isFirstQuestion = currentQuestionIndex === 0
+  const isLastQuestion = currentQuestionIndex === questionCount - 1
 
   const comingSoonTooltip = 'Em breve disponível. Estamos trabalhando nisso.'
   const tabButtons = [
@@ -903,6 +929,465 @@ export function ExamAttemptPlayer({
     { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
   ]
+
+  if (isMobile && !canInlineEdit) {
+    const playerTitle = examBase
+      ? formatExamBaseTitle(examBase)
+      : isRetryMode
+        ? 'Re-tentativa'
+        : 'Prova'
+    const mobileHeaderButtonSx = {
+      minHeight: 40,
+      minWidth: 0,
+      px: 2,
+      borderRadius: '14px',
+      textTransform: 'none',
+      fontWeight: 800,
+      boxShadow: 'none',
+      whiteSpace: 'nowrap',
+    }
+    const defaultMobileHeaderAction = trainingProvaMode ? null : (
+      isFinished ? (
+        isRetryMode && onNavigateToFinal ? (
+          <Button
+            variant="contained"
+            color="primary"
+            disableElevation
+            onClick={onNavigateToFinal}
+            sx={mobileHeaderButtonSx}
+          >
+            Resultado
+          </Button>
+        ) : feedbackLink ? (
+          <Link
+            to="/exams/$examBoard/$examId/$attemptId/feedback"
+            params={feedbackLink}
+            className="block no-underline"
+          >
+            <Button
+              variant="contained"
+              color="primary"
+              disableElevation
+              sx={mobileHeaderButtonSx}
+            >
+              Feedback
+            </Button>
+          </Link>
+        ) : null
+      ) : (
+        <Button
+          variant="contained"
+          color="primary"
+          disableElevation
+          onClick={handleFinish}
+          disabled={isFinishPending}
+          sx={mobileHeaderButtonSx}
+        >
+          {isFinishPending ? 'Finalizando…' : 'Finalizar'}
+        </Button>
+      )
+    )
+    const resolvedMobileHeaderAction = trainingProvaMode
+      ? mobileHeaderAction
+      : defaultMobileHeaderAction
+    const subjectLabel =
+      [currentQuestion.subject, currentQuestion.topic]
+        .filter(Boolean)
+        .join(' / ') || 'Assunto não informado'
+    const questionMetaLabel = `Q${currentQuestionIndex + 1}/${questionCount}`
+
+    return (
+      <>
+        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pb-[calc(7rem+var(--safe-area-inset-bottom))]">
+          <MobileHeader
+            title={playerTitle}
+            onBack={onBack}
+            actions={resolvedMobileHeaderAction}
+            bottom={
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between gap-3 px-1 text-xs font-medium text-slate-400">
+                  <span className="shrink-0">{questionMetaLabel}</span>
+                  <span className="min-w-0 truncate text-right">{subjectLabel}</span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
+                  <div
+                    className="h-full rounded-full bg-cyan-500 transition-all"
+                    style={{
+                      width: `${(answeredCount / Math.max(questionCount, 1)) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            }
+          />
+
+          <div className="px-2">
+            <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+              {tabButtons
+                .filter((tab) => tab.value === 0 || tab.value === 1)
+                .map((tab) => {
+                  const isActive = value === tab.value
+                  const isDisabled = tab.disabled ?? false
+                  const Icon = tab.value === 1 && currentQuestionHasWrongAnswer && value !== 1
+                    ? BookOpenIconSolid
+                    : tab.icon
+
+                  return (
+                    <button
+                      key={tab.value}
+                      type="button"
+                      onClick={() => !isDisabled && handleChange(null as any, tab.value)}
+                      disabled={isDisabled}
+                      className={`flex items-center justify-center gap-2 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition-colors ${
+                        isActive ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500'
+                      } ${isDisabled ? 'opacity-50' : ''}`}
+                    >
+                      <Icon
+                        className={`h-4 w-4 ${
+                          tab.value === 1 && currentQuestionHasWrongAnswer && value !== 1
+                            ? 'text-amber-500'
+                            : ''
+                        }`}
+                      />
+                      {tab.label}
+                    </button>
+                  )
+                })}
+            </div>
+          </div>
+
+          {value === 0 ? (
+            <div className="px-2">
+              <MobileCard className="space-y-5">
+                {currentQuestion.referenceText ? (
+                  <div className="rounded-2xl bg-slate-50 p-4">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      Texto de referência
+                    </p>
+                    <div className="mt-2 text-sm text-slate-700">
+                      <Markdown>{currentQuestion.referenceText}</Markdown>
+                    </div>
+                  </div>
+                ) : null}
+
+                {currentQuestion.statementImageUrl && !statementImageLoadError ? (
+                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                    <img
+                      src={currentQuestion.statementImageUrl}
+                      alt="Imagem do enunciado"
+                      className="max-h-[280px] w-full object-contain bg-slate-50"
+                      onError={() => setStatementImageLoadError(true)}
+                    />
+                  </div>
+                ) : null}
+
+                <div className="text-base font-medium leading-7 text-slate-900">
+                  <Markdown>{currentQuestion.statement}</Markdown>
+                </div>
+
+                <div className="space-y-3">
+                  {currentQuestion.alternatives.map((alt, index) => {
+                    const isEliminated = eliminatedSet.has(alt.id)
+                    const isSelected = selectedAlternativeId === alt.id
+                    const isCorrect = currentQuestion.correctAlternative === alt.key
+                    const isWrong = isFinished && isSelected && !isCorrect
+                    const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
+                    const showCorrectStyling = isCorrect && isFinished
+                    const optionBg = isFinished
+                      ? isCorrect
+                        ? 'bg-emerald-50 border-emerald-400'
+                        : isWrong
+                          ? 'bg-rose-50 border-rose-400'
+                          : 'bg-white border-slate-200'
+                      : showCorrectStyling
+                        ? 'bg-emerald-50 border-emerald-400'
+                        : isSelected
+                          ? 'bg-cyan-50 border-cyan-400'
+                          : 'bg-white border-slate-200'
+                    const keyBadge = isFinished
+                      ? isCorrect
+                        ? 'bg-emerald-600 text-white'
+                        : isWrong
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-slate-200 text-slate-700'
+                      : isSelected
+                        ? 'bg-cyan-500 text-white'
+                        : 'bg-slate-200 text-slate-700'
+
+                    return (
+                      <div key={alt.id} className="flex items-stretch gap-2">
+                        {!isFinished ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              toggleEliminated(
+                                currentQuestion.id,
+                                alt.id,
+                                !isEliminated,
+                              )
+                            }
+                            className={`flex w-11 shrink-0 items-center justify-center rounded-2xl border transition-colors ${
+                              isEliminated
+                                ? 'border-amber-300 bg-amber-50 text-amber-700'
+                                : 'border-slate-200 bg-white text-slate-400'
+                            }`}
+                            aria-label={
+                              isEliminated
+                                ? 'Desfazer eliminação'
+                                : 'Eliminar alternativa'
+                            }
+                          >
+                            <ScissorsIcon className="h-4 w-4" />
+                          </button>
+                        ) : null}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            !isFinished &&
+                            handleOptionSelected(
+                              currentQuestion.id,
+                              alt.id,
+                              isEliminated,
+                            )
+                          }
+                          disabled={isEliminated || isFinished}
+                          className={`flex min-h-16 flex-1 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors ${optionBg} ${
+                            isEliminated ? 'opacity-50' : ''
+                          }`}
+                        >
+                          <span
+                            className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-sm font-semibold ${keyBadge}`}
+                          >
+                            {keyLabel}
+                          </span>
+                          <span className="flex min-h-9 flex-1 items-center text-sm leading-6 text-slate-800">
+                            <Markdown>{alt.text}</Markdown>
+                          </span>
+                        </button>
+                      </div>
+                    )
+                  })}
+                </div>
+              </MobileCard>
+            </div>
+          ) : (
+            <div className="px-2">
+              <MobileCard className="space-y-4">
+                {!isFinished ? (
+                  <p className="text-sm text-slate-500">
+                    As explicações ficam disponíveis após você finalizar a prova.
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-sm font-semibold text-slate-700">
+                      Resposta correta: {currentQuestion.correctAlternative ?? '—'}
+                    </p>
+                    <div className="space-y-4">
+                      {currentQuestion.alternatives.map((alt, index) => {
+                        const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
+                        const isCorrect = currentQuestion.correctAlternative === alt.key
+                        const wasSelected = selectedAlternativeId === alt.id
+                        const isWrong = wasSelected && !isCorrect
+                        const variant = isCorrect
+                          ? 'correct'
+                          : isWrong
+                            ? 'wrong'
+                            : 'neutral'
+                        const cardStyles = {
+                          correct: 'rounded-2xl overflow-hidden border-2 border-emerald-400 bg-emerald-100',
+                          wrong: 'rounded-2xl overflow-hidden border-2 border-rose-400 bg-rose-100',
+                          neutral: 'rounded-2xl overflow-hidden border border-slate-200 bg-slate-50',
+                        }
+                        const headerTextStyles = {
+                          correct: 'text-emerald-800',
+                          wrong: 'text-rose-800',
+                          neutral: 'text-slate-700',
+                        }
+                        const explanationWrapStyles = {
+                          correct: 'border-t border-emerald-300 bg-emerald-50/70',
+                          wrong: 'border-t border-rose-300 bg-rose-50/70',
+                          neutral: 'border-t border-slate-200 bg-slate-100/70',
+                        }
+
+                        return (
+                          <div key={alt.id} className={cardStyles[variant]}>
+                            <div className="p-4">
+                              <div className="mb-2 flex flex-wrap items-center gap-2">
+                                <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>
+                                  {keyLabel}.
+                                </span>
+                                {isCorrect ? (
+                                  <span className="rounded bg-emerald-200/80 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                    Resposta correta
+                                  </span>
+                                ) : null}
+                                {isWrong ? (
+                                  <span className="rounded bg-rose-200/80 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                                    Sua resposta
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className={`text-sm ${headerTextStyles[variant]}`}>
+                                <Markdown>{alt.text}</Markdown>
+                              </div>
+                            </div>
+                            <div className={`p-4 ${explanationWrapStyles[variant]}`}>
+                              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                Explicação
+                              </p>
+                              {alt.explanation ? (
+                                <div className="text-sm text-slate-700">
+                                  <Markdown>{alt.explanation}</Markdown>
+                                </div>
+                              ) : (
+                                <p className="text-sm italic text-slate-500">
+                                  Sem explicação cadastrada.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+              </MobileCard>
+            </div>
+          )}
+        </div>
+
+        <Drawer
+          anchor="bottom"
+          open={mobileQuestionDrawerOpen}
+          onClose={() => setMobileQuestionDrawerOpen(false)}
+        >
+          <PhoneSafeArea bottom className="rounded-t-3xl bg-white">
+            <div className="mx-auto mt-3 h-1.5 w-12 rounded-full bg-slate-200" />
+            <div className="max-h-[80dvh] overflow-auto px-4 pb-4 pt-3">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Navegar entre questões
+                  </h2>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Toque em um número para trocar rapidamente de questão.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileQuestionDrawerOpen(false)}
+                  className="flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 text-slate-700"
+                  aria-label="Fechar navegador de questões"
+                >
+                  <XMarkIcon className="h-5 w-5" />
+                </button>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-slate-300" />
+                  Nao respondida
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-cyan-400" />
+                  Respondida
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-rose-400" />
+                  Errada
+                </div>
+                <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
+                  <span className="h-3 w-3 rounded-full bg-emerald-400" />
+                  Correta
+                </div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-5 gap-2">
+                {questions.map((_, index) => (
+                  <button
+                    key={questions[index].id}
+                    type="button"
+                    onClick={() => {
+                      handleSelectQuestion(index)
+                      setMobileQuestionDrawerOpen(false)
+                    }}
+                    className={getQuestionButtonStyle(index).replace(
+                      'w-full h-7',
+                      'w-11 h-11',
+                    )}
+                  >
+                    {index + 1}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </PhoneSafeArea>
+        </Drawer>
+
+        <PhoneSafeArea
+          bottom
+          className="fixed inset-x-0 bottom-0 z-50 px-3"
+        >
+          <div className="mx-auto max-w-md overflow-hidden rounded-t-[28px] border border-b-0 border-slate-200 bg-white/98 shadow-[0_-18px_48px_rgba(15,23,42,0.14)] backdrop-blur">
+            <div className="grid grid-cols-[52px_minmax(0,1fr)_52px] items-center gap-2 px-3 pb-2 pt-3">
+              <button
+                type="button"
+                onClick={handlePrevQuestion}
+                disabled={isFirstQuestion}
+                className={`flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border transition-colors ${
+                  isFirstQuestion
+                    ? 'border-slate-200 bg-slate-100 text-slate-400'
+                    : 'border-slate-200 bg-white text-slate-800'
+                }`}
+                aria-label="Voltar para a questão anterior"
+              >
+                <ChevronLeftIcon className={`h-5 w-5 ${isFirstQuestion ? 'text-slate-300' : 'text-slate-500'}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setMobileQuestionDrawerOpen(true)}
+                className="flex h-[52px] min-w-0 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-slate-700 transition-colors"
+                aria-label="Abrir lista de questões"
+              >
+                <span className="truncate text-sm font-semibold">Questões</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleNextQuestion}
+                disabled={isLastQuestion}
+                className={`flex h-[52px] w-[52px] items-center justify-center rounded-[18px] border transition-colors ${
+                  isLastQuestion
+                    ? 'border-slate-200 bg-slate-100 text-slate-400'
+                    : 'border-cyan-600 bg-cyan-600 text-white shadow-[0_14px_28px_rgba(8,145,178,0.28)]'
+                }`}
+                aria-label="Ir para a próxima questão"
+              >
+                <ChevronRightIcon className={`h-5 w-5 ${isLastQuestion ? 'text-slate-300' : 'text-white'}`} />
+              </button>
+            </div>
+          </div>
+        </PhoneSafeArea>
+
+        <Snackbar
+          open={snackbarOpen}
+          autoHideDuration={6000}
+          onClose={() => setSnackbarOpen(false)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert
+            severity="error"
+            onClose={() => setSnackbarOpen(false)}
+            variant="filled"
+          >
+            {snackbarMessage}
+          </Alert>
+        </Snackbar>
+      </>
+    )
+  }
 
   const examTitle = examBase ? formatExamBaseTitle(examBase) : null
   const showPlayerTitleBar = examTitle && !trainingProvaMode

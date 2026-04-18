@@ -7,6 +7,26 @@ const HOST =
 
 let initialized = false
 
+function isMobileViewport() {
+  if (typeof window === 'undefined') return false
+
+  const hasTouchPoints = navigator.maxTouchPoints > 0
+  const mobileUserAgent =
+    /Android|iPhone|iPad|iPod|Mobile|Opera Mini|IEMobile/i.test(
+      navigator.userAgent,
+    )
+
+  return window.innerWidth <= 767 || (mobileUserAgent && hasTouchPoints)
+}
+
+function registerDeviceProperties() {
+  if (!initialized) return
+
+  posthog.register({
+    is_mobile: isMobileViewport(),
+  })
+}
+
 function init() {
   if (initialized) return
   if (!KEY) return
@@ -20,6 +40,8 @@ function init() {
     },
   })
   initialized = true
+  registerDeviceProperties()
+  window.addEventListener('resize', registerDeviceProperties)
 }
 
 function capture(event: string, properties?: Record<string, unknown>) {
@@ -37,7 +59,10 @@ function identify(
   properties?: Record<string, unknown>,
 ) {
   if (!initialized) return
-  posthog.identify(distinctId, properties)
+  posthog.identify(distinctId, {
+    ...properties,
+    is_mobile: isMobileViewport(),
+  })
 }
 
 function reset() {

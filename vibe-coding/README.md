@@ -16,3 +16,4 @@ Criar uma trilha de pão para:
 ## Índice
 
 - [2026-04 — PostHog Analytics](./2026-04-posthog-analytics.md) — instrumentação de product analytics (funis, session replay, LGPD) para investigar abandono de provas.
+- [2026-04 — Mobile Redesign](./2026-04-mobile-redesign.md) — plano para tornar o `web-react/` usável em celular: adaptive components, split físico desktop/mobile, rollout por PostHog flags.
