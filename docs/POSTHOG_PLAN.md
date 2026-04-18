@@ -47,43 +47,57 @@ Objetivo: entender **por que** usuários abandonam o site antes de iniciar uma p
 
 ## 5. SDK — API (`api`)
 
+### Por que rastrear pelo backend também
+
+O frontend **perde eventos** em situações críticas pro nosso problema de abandono:
+
+- Usuário fecha a aba no meio da prova → `exam_finished` nunca é emitido, mas o `question_answered` das últimas questões pode ter chegado. No PostHog isso vira um funil ambíguo: ele abandonou de verdade ou o evento só se perdeu?
+- Perda de rede, crash do navegador, logout em outra aba → mesmo efeito.
+- **`exam_abandoned` não existe no frontend por natureza** — ninguém clica em "abandonar". Abandono é *ausência* de ação ao longo do tempo, e só o backend consegue detectar isso via job agendado.
+
+O backend tem a verdade (linha no DB com `status`, timestamps), então emitir lá garante o evento. Frontend continua útil pra comportamento de **interação** (viewed, paused, time-on-question); backend cobre **ciclo de vida** (started, answered, finished, abandoned).
+
+### Implementação
+
 - Instalar `posthog-node`.
-- Criar um `AnalyticsModule` no Nest com `AnalyticsService` singleton expondo `capture({ userId, event, properties })` e `shutdown()` (chamar no `OnModuleDestroy` pra não perder eventos em flight).
-- Usar nos handlers de exam/training para emitir eventos **autoritativos** pelo backend — clientes mentem (fecham aba, perdem rede), backend não.
+- Criar um `AnalyticsModule` no Nest com `AnalyticsService` singleton expondo:
+  - `capture({ userId, event, properties })`
+  - `shutdown()` — chamar no `OnModuleDestroy` pra não perder eventos em flight.
+- Injetar o service nos handlers de exam/training e emitir eventos autoritativos.
+- Criar um job com `@nestjs/schedule` (`@Cron('0 * * * *')`) que varre `exam_attempts` com `status='in_progress'` sem atividade há >24h e emite `exam_abandoned` (props: `attemptId`, `lastQuestionIndex`, `totalQuestions`, `timeSinceLastActivityMinutes`). Marcar no DB pra não duplicar.
 
 ## 6. Eventos a rastrear
 
+**Regra de ouro**: cada evento tem UMA fonte autoritativa. Evita dupla contagem no funil.
+- **Ciclo de vida da prova** (estado no DB) → emitido **só no backend**.
+- **Comportamento de interação** (UI, navegação, tempo) → emitido **só no frontend**.
+
 ### Frontend (app — `web-react`)
 
-Funil de entrada:
-- `signed_up`
+Funil de entrada (ações de UI):
+- `signed_up` (emitido após sucesso no Clerk)
 - `onboarding_started`
 - `onboarding_completed`
 - `dashboard_viewed`
 
-Monetização:
+Monetização (ações de UI):
 - `plan_page_viewed`
-- `checkout_started`
-- `checkout_completed`
+- `checkout_started` (clique no botão que abre Stripe Checkout)
 
-Ciclo da prova (alta prioridade pro problema de abandono):
-- `training_created` (props: `examBaseId`, `subjectFilter`, `questionCount`)
-- `exam_started` (props: `attemptId`, `source`: `"treino" | "exams_direct"`)
+Comportamento dentro da prova (só front vê):
 - `question_viewed` (props: `questionIndex`, `totalQuestions`, `timeOnPrevQuestionMs`)
-- `question_answered` (props: `questionIndex`, `correct`, `alternativeId`)
 - `exam_paused` (fecha aba ou navega para fora sem finalizar)
-- `exam_finished`
 - `feedback_viewed`
 
-### Backend (API — verdade)
+### Backend (API — `api`)
 
-Mesmos eventos de ciclo de vida, emitidos no handler Nest:
-- `exam_started` (no handler de criar attempt)
-- `question_answered` (no handler de upsert answer)
-- `exam_finished` (no handler de finish)
-- `exam_abandoned` — emitido por job/cron que marca attempts sem atividade há >24h
-
-Motivo: o `exam_finished` do front se perde quando usuário fecha aba; o backend é a fonte de verdade pro funil.
+Ciclo de vida (verdade no DB):
+- `exam_started` (no handler de criar attempt; props: `attemptId`, `examBaseId`, `source`)
+- `training_created` (no handler de criar training; props: `examBaseId`, `subjectFilter`, `questionCount`)
+- `question_answered` (no handler de upsert answer; props: `attemptId`, `questionIndex`, `correct`, `alternativeId`)
+- `exam_finished` (no handler de finish; props: `attemptId`, `score`, `durationMinutes`)
+- `exam_abandoned` (emitido pelo job agendado; props: `attemptId`, `lastQuestionIndex`, `totalQuestions`, `timeSinceLastActivityMinutes`)
+- `checkout_completed` (no webhook Stripe; props: `plan`, `priceId`) — webhook é a fonte de verdade, UI pode perder o retorno.
 
 ## 7. Session Replay + Heatmaps
 
