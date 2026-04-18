@@ -39,6 +39,60 @@
   100% { transform: scale(1) rotate(0deg);     opacity: 1; }
 }
 
+@keyframes question-swipe-in-from-right {
+  from { transform: translate3d(100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes question-swipe-in-from-left {
+  from { transform: translate3d(-100%, 0, 0); }
+  to   { transform: translate3d(0, 0, 0); }
+}
+
+@keyframes question-swipe-out-to-left {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-100%, 0, 0); }
+}
+
+@keyframes question-swipe-out-to-right {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(100%, 0, 0); }
+}
+
+.question-swipe-container {
+  position: relative;
+  overflow-x: clip;
+}
+
+.question-swipe-in-from-right {
+  animation: question-swipe-in-from-right 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform;
+}
+
+.question-swipe-in-from-left {
+  animation: question-swipe-in-from-left 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform;
+}
+
+.question-swipe-out-to-left {
+  animation: question-swipe-out-to-left 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform;
+}
+
+.question-swipe-out-to-right {
+  animation: question-swipe-out-to-right 280ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .question-swipe-in-from-right,
+  .question-swipe-in-from-left,
+  .question-swipe-out-to-left,
+  .question-swipe-out-to-right {
+    animation: none !important;
+  }
+}
+
 html,
 body {
   @apply m-0;
