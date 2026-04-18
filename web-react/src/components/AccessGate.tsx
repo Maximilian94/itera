@@ -1,11 +1,11 @@
-import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
-import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
-import { authService } from '@/features/auth/services/auth.service'
 import { Link } from '@tanstack/react-router'
-import { Button } from '@mui/material'
+import { Button, CircularProgress } from '@mui/material'
 import { LockClosedIcon } from '@heroicons/react/24/outline'
 import { useQuery } from '@tanstack/react-query'
 import dayjs from 'dayjs'
+import { authService } from '@/features/auth/services/auth.service'
+import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 
 /**
  * Gate component that displays an "access required" overlay when the user
@@ -36,13 +36,34 @@ export function AccessGate({
     isEliteAtLimit,
   } = useRequireAccess()
   const { openPortal, loading: portalLoading } = useOpenPortal('/treino/novo')
+  const shouldCheckAdminBypass =
+    !isLoading &&
+    ((type === 'prova' && !hasAccess) ||
+      (type === 'treino' && trainingBlockedMessage != null))
   const { data: profileData, isLoading: profileLoading } = useQuery({
     queryKey: ['auth', 'profile'],
     queryFn: () => authService.getProfile(),
+    enabled: shouldCheckAdminBypass,
   })
   const isAdmin = profileData?.user?.role === 'ADMIN'
 
-  if (isLoading || profileLoading) return null
+  if (isLoading || (shouldCheckAdminBypass && profileLoading)) {
+    return (
+      <div className="flex min-h-[240px] items-center justify-center p-6">
+        <div className="flex max-w-sm items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-600 shadow-sm">
+          <CircularProgress size={20} />
+          <div className="flex flex-col">
+            <span className="text-sm font-medium text-slate-900">
+              Verificando acesso
+            </span>
+            <span className="text-xs text-slate-500">
+              Preparando o conteudo da pagina.
+            </span>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   if (isAdmin) return <>{children}</>
 
