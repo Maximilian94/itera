@@ -142,29 +142,78 @@ Ciclo de vida (verdade no DB):
 
 ## 9. Privacidade / LGPD
 
-- Banner de consent na landing (cookie banner) antes de inicializar o PostHog.
-- `posthog-js` suporta opt-in: `opt_out_capturing_by_default: true` + `opt_in_capturing()` após o consent.
-- Atualizar a política de privacidade para incluir PostHog como subprocessador.
-- Para o app autenticado, consent pode ser parte dos Termos de Uso (aceite implícito no sign-up).
+### Feito
+
+- Banner de consent na landing (`CookieBanner.tsx`) com opt-in/opt-out persistido em `localStorage`.
+- `posthog-js` da landing inicia com `opt_out_capturing_by_default: true` — nenhum evento vai embora antes do consent.
+- Política de privacidade atualizada: PostHog listado como subprocessador na seção 5, seção 8 (cookies) reescrita com distinção essenciais vs analíticos e instruções de revogação.
+- App autenticado (`web-react`) sem banner: aceite é implícito nos Termos de Uso via Clerk sign-up.
+
+### Pendente
+
+- Revisar texto da Política de Privacidade com jurídico/compliance antes de publicar.
 
 ## 10. Rollout
 
-1. Setup do SDK no `web-react` com identify via Clerk e pageview do TanStack Router (etapas 1–3).
-2. Validar eventos no PostHog "Live Events" fazendo login com a própria conta.
-3. Feature flag `analytics_enabled` para poder desligar rápido se algo der errado.
-4. Ativar session replay.
-5. Adicionar eventos de ciclo de vida da prova (front + back, etapas 5–6).
-6. Montar dashboards (etapa 8).
-7. Rodar por 1 semana antes de tirar conclusões — amostras pequenas mentem.
-8. Revisar achados, escolher 1–2 hipóteses para melhorar UX/onboarding.
+Pré-requisitos: todas as etapas de 1–9 concluídas, PR revisada e mergeada.
 
----
+### 1. Merge + deploy
 
-## Decisões pendentes
+- [ ] Criar PR de `feature/posthog-analytics` pra `main`.
+- [ ] CI passou (type-check + build dos 3 apps).
+- [ ] Merge.
+- [ ] Deploy dispara automaticamente em cada serviço (API, landing, app).
 
-- [ ] PostHog Cloud US ou EU? (recomendação: EU pela LGPD)
-- [ ] Cookie banner: construir do zero ou usar uma lib (ex.: `cookieconsent`)?
-- [ ] Começar implementação pela etapa 1–3 (front-end) ou etapa 5 (back-end)?
+### 2. Variáveis de ambiente em produção
+
+Antes ou logo após o deploy, setar em cada serviço:
+
+- **API (Render)**: `POSTHOG_KEY`, `POSTHOG_HOST=https://eu.i.posthog.com`.
+- **Landing (Vercel)**: `NEXT_PUBLIC_POSTHOG_KEY`, `NEXT_PUBLIC_POSTHOG_HOST`.
+- **App (host do web-react)**: `VITE_POSTHOG_KEY`, `VITE_POSTHOG_HOST`.
+
+Usar a **mesma chave** do projeto `maximize-app` na API e no web-react (eventos são complementares no mesmo projeto). Chave separada pro projeto `maximize-landing` na landing.
+
+### 3. Migration do banco
+
+- [ ] `api/prisma/migrations/20260418081000_add_exam_attempt_abandoned_at` vai rodar automaticamente via `prisma migrate deploy` no script `start:prod` já existente. Confirmar nos logs do Render que aplicou.
+
+### 4. Smoke test em produção
+
+Login com a **sua própria conta** (não uma conta admin) e:
+
+- [ ] Landing: banner aparece, "Aceitar" gera `$pageview` no PostHog Live Events do projeto `maximize-landing`.
+- [ ] App: login dispara `identify` com o userId do Clerk (ver em **Persons** no PostHog).
+- [ ] Iniciar prova de teste → `exam_started` (backend) + `question_viewed` (frontend).
+- [ ] Responder 2–3 questões → `question_answered` por questão.
+- [ ] Finalizar → `exam_finished` com score.
+- [ ] Abrir session replay pra confirmar que emails/nomes estão mascarados.
+
+### 5. Cron de abandono
+
+O job roda `EVERY_HOUR`. Não dá pra testar em produção sem esperar 24h de um attempt órfão.
+- [ ] Logar um attempt de teste, anotar o ID, e em 24h+ conferir `exam_abandoned` no PostHog.
+- [ ] Verificar nos logs do Render: `Marking N exam attempt(s) as abandoned.` na hora cheia.
+
+### 6. Janela de observação
+
+- [ ] Rodar por **1 semana** antes de tirar conclusões. Amostras pequenas mentem.
+- [ ] Checar o funil de ativação e drop-off por questão (ver `docs/POSTHOG_DASHBOARD_SETUP.md`).
+
+### 7. Ação a partir dos dados
+
+- [ ] Escolher 1 ou 2 hipóteses **concretas** (ex.: "questão 7 tem 40% de drop e tempo médio de 3 min — enunciado confuso") com base no dashboard + replays.
+- [ ] Abrir issue/PR separada pra cada uma. **Não** tentar resolver tudo em um PR grande.
+- [ ] Repetir ciclo a cada 2–4 semanas.
+
+### Kill switch
+
+Se algo der errado (evento com PII vazando, bug de UX do banner, etc.):
+- Landing: setar `NEXT_PUBLIC_POSTHOG_KEY=""` vazio em prod → SDK no-op. Deploy rápido.
+- App: idem com `VITE_POSTHOG_KEY=""`.
+- API: idem com `POSTHOG_KEY=""`.
+
+Todos os wrappers tratam chave ausente como no-op silencioso.
 
 ## Referências
 
