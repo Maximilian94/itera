@@ -55,7 +55,7 @@ export function PageHero({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg px-6 py-6 -m-2 ${gradientClass}`}
+      className={`relative overflow-hidden rounded-lg px-4 py-5 md:px-6 md:py-6 -m-2 ${gradientClass}`}
       style={{ animation }}
     >
       {/* decorative shapes */}
@@ -70,13 +70,15 @@ export function PageHero({
       >
         <div>
           {greeting && (
-            <p className="text-white/60 text-sm font-medium">{greeting}</p>
+            <p className="text-white/60 text-xs md:text-sm font-medium">
+              {greeting}
+            </p>
           )}
-          <h1 className="text-2xl md:text-3xl font-bold text-white mt-1 tracking-tight">
+          <h1 className="text-xl md:text-3xl font-bold text-white mt-1 tracking-tight">
             {title}
           </h1>
           {description != null && (
-            <p className={`text-sm mt-2 max-w-lg ${descClass}`}>
+            <p className={`text-sm mt-2 max-w-lg leading-6 ${descClass}`}>
               {description}
             </p>
           )}

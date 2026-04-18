@@ -14,6 +14,7 @@ import { ExamAttemptPlayer } from '@/components/ExamAttemptPlayer'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'
 import { useCallback, useState } from 'react'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 export const Route = createFileRoute(
   '/_authenticated/treino/$trainingId/retentativa/',
@@ -22,6 +23,7 @@ export const Route = createFileRoute(
 })
 
 function RetentativaIndexPage() {
+  const isMobile = useIsMobile()
   const { trainingId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -50,6 +52,61 @@ function RetentativaIndexPage() {
         <ExamAttemptPlayer
           trainingId={trainingId}
           trainingProvaMode
+          mobileHeaderAction={
+            retentativaState?.isFinished ? (
+              <Button
+                variant="contained"
+                color="primary"
+                disableElevation
+                onClick={() => navigate({ to: getStagePath('final', trainingId) })}
+                sx={{
+                  minHeight: 40,
+                  minWidth: 0,
+                  px: 2,
+                  borderRadius: '14px',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Fase final
+              </Button>
+            ) : retentativaState ? (
+              <Button
+                variant="contained"
+                color="primary"
+                disableElevation
+                startIcon={
+                  retentativaState.isFinishPending ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : undefined
+                }
+                onClick={() => {
+                  if (retentativaState.hasUnansweredQuestions) {
+                    setUnansweredModalOpen(true)
+                  } else {
+                    triggerFinish()
+                  }
+                }}
+                disabled={retentativaState.isFinishPending}
+                sx={{
+                  minHeight: 40,
+                  minWidth: 0,
+                  px: 2,
+                  borderRadius: '14px',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  boxShadow: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {retentativaState.isFinishPending
+                  ? 'Concluindo…'
+                  : 'Concluir'}
+              </Button>
+            ) : null
+          }
           onBack={() => navigate({ to: getStagePath('estudo', trainingId) })}
           onFinished={handleFinished}
           onNavigateToFinal={() => navigate({ to: getStagePath('final', trainingId) })}
@@ -57,48 +114,50 @@ function RetentativaIndexPage() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-3 justify-between mt-4 shrink-0">
-        <Button
-          variant="outlined"
-          startIcon={<ArrowLeftIcon className="w-5 h-5" />}
-          onClick={() => navigate({ to: getStagePath('estudo', trainingId) })}
-        >
-          Voltar: Estudo
-        </Button>
-        <div className="flex flex-wrap gap-3">
-          {retentativaState && !retentativaState.isFinished && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={() => {
-                if (retentativaState.hasUnansweredQuestions) {
-                  setUnansweredModalOpen(true)
-                } else {
-                  triggerFinish()
-                }
-              }}
-              disabled={retentativaState.isFinishPending}
-              startIcon={
-                retentativaState.isFinishPending ? (
-                  <CircularProgress size={18} color="inherit" />
-                ) : undefined
-              }
-            >
-              {retentativaState.isFinishPending
-                ? 'Concluindo…'
-                : 'Concluir re-tentativa'}
-            </Button>
-          )}
+      {!isMobile && (
+        <div className="flex flex-wrap gap-3 justify-between mt-4 shrink-0">
           <Button
-            variant={retentativaState?.isFinished ? 'contained' : 'outlined'}
-            color="primary"
-            endIcon={<ChartBarIcon className="w-5 h-5" />}
-            onClick={() => navigate({ to: getStagePath('final', trainingId) })}
+            variant="outlined"
+            startIcon={<ArrowLeftIcon className="w-5 h-5" />}
+            onClick={() => navigate({ to: getStagePath('estudo', trainingId) })}
           >
-            Ir para fase final
+            Voltar: Estudo
           </Button>
+          <div className="flex flex-wrap gap-3">
+            {retentativaState && !retentativaState.isFinished && (
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={() => {
+                  if (retentativaState.hasUnansweredQuestions) {
+                    setUnansweredModalOpen(true)
+                  } else {
+                    triggerFinish()
+                  }
+                }}
+                disabled={retentativaState.isFinishPending}
+                startIcon={
+                  retentativaState.isFinishPending ? (
+                    <CircularProgress size={18} color="inherit" />
+                  ) : undefined
+                }
+              >
+                {retentativaState.isFinishPending
+                  ? 'Concluindo…'
+                  : 'Concluir re-tentativa'}
+              </Button>
+            )}
+            <Button
+              variant={retentativaState?.isFinished ? 'contained' : 'outlined'}
+              color="primary"
+              endIcon={<ChartBarIcon className="w-5 h-5" />}
+              onClick={() => navigate({ to: getStagePath('final', trainingId) })}
+            >
+              Ir para fase final
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       <Dialog
         open={unansweredModalOpen}

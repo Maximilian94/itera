@@ -9,12 +9,14 @@ import { ExamAnalysisOverlay } from '@/components/ExamAnalysisOverlay'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'
 import { useCallback, useState } from 'react'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/prova')({
   component: ProvaPage,
 })
 
 function ProvaPage() {
+  const isMobile = useIsMobile()
   const { trainingId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -88,6 +90,58 @@ function ProvaPage() {
               examBaseId={training.examBaseId}
               attemptId={training.attemptId}
               trainingProvaMode
+              mobileHeaderAction={
+                provaState ? (
+                  provaState.isFinished ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disableElevation
+                      onClick={() =>
+                        navigate({ to: getStagePath('diagnostico', trainingId) })
+                      }
+                      sx={{
+                        minHeight: 40,
+                        minWidth: 0,
+                        px: 2,
+                        borderRadius: '14px',
+                        textTransform: 'none',
+                        fontWeight: 800,
+                        boxShadow: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      Diagnóstico
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      disableElevation
+                      onClick={() => {
+                        if (provaState.hasUnansweredQuestions) {
+                          setUnansweredModalOpen(true)
+                        } else {
+                          triggerFinishWithOverlay()
+                        }
+                      }}
+                      disabled={provaState.isFinishPending || showAnalysisOverlay}
+                      sx={{
+                        minHeight: 40,
+                        minWidth: 0,
+                        px: 2,
+                        borderRadius: '14px',
+                        textTransform: 'none',
+                        fontWeight: 800,
+                        boxShadow: 'none',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {provaState.isFinishPending ? 'Finalizando…' : 'Finalizar'}
+                    </Button>
+                  )
+                ) : null
+              }
               feedbackLink={{
                 examBoard: training.examBoardId!,
                 examId: training.examBaseId,
@@ -102,7 +156,7 @@ function ProvaPage() {
         </div>
       )}
 
-      {canOpenExam && training && (
+      {!isMobile && canOpenExam && training && (
         <div className="flex flex-wrap gap-3 justify-between mt-4 shrink-0">
           <Button
             variant="outlined"

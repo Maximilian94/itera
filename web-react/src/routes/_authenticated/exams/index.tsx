@@ -1,5 +1,6 @@
 import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
+import { BottomSheet, ChipFilter, MobileCard } from '@/ui/mobile'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useCreateDraftExamBaseMutation, useDeleteExamBaseMutation } from '@/features/examBase/queries/examBase.queries'
@@ -8,6 +9,7 @@ import { useExamBoardFacade } from '@/features/examBoard/hook/useExamBoard.facad
 import type { ExamBase } from '@/features/examBase/domain/examBase.types'
 import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
+import { useIsMobile } from '@/lib/useIsMobile'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { fetchEstados, type IbgeEstado } from '@/lib/ibge'
 import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
@@ -195,6 +197,8 @@ function scoreColor(score: number) {
   return 'bg-rose-100 text-rose-600'
 }
 
+type ScopeFilterValue = '' | 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+
 function ExamRow({
   exam,
   isAdmin,
@@ -354,6 +358,158 @@ function ExamRow({
       </Link>
     )
   }
+  return content
+}
+
+function ExamsMobileSummaryCard({
+  icon: Icon,
+  label,
+  value,
+  hint,
+  tone,
+}: {
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  label: string
+  value: string
+  hint: string
+  tone: string
+}) {
+  return (
+    <MobileCard>
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}
+        >
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+          <p className="mt-1 text-xs leading-5 text-slate-500">{hint}</p>
+        </div>
+      </div>
+    </MobileCard>
+  )
+}
+
+function ExamCardMobile({
+  exam,
+  isAdmin,
+  onDelete,
+}: {
+  exam: ExamBase
+  isAdmin?: boolean
+  onDelete?: (exam: ExamBase) => void
+}) {
+  const questionCount = exam._count?.questions ?? 0
+  const hasAttempts = (exam.userStats?.attemptCount ?? 0) > 0
+  const bestScore = exam.userStats?.bestScore
+  const canNavigate = Boolean(exam.examBoardId)
+
+  const content = (
+    <MobileCard className="relative p-0">
+      <div className="flex items-start gap-3">
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center">
+          {hasAttempts && bestScore != null ? (
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-2xl text-sm font-bold tabular-nums ${scoreColor(bestScore)}`}
+            >
+              {bestScore.toFixed(0)}%
+            </div>
+          ) : exam.examBoard?.logoUrl ? (
+            <img
+              src={exam.examBoard.logoUrl}
+              alt={exam.examBoard.alias ?? exam.examBoard.name ?? ''}
+              className="h-11 w-11 rounded-2xl object-contain"
+            />
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100">
+              <DocumentTextIcon className="h-5 w-5 text-slate-400" />
+            </div>
+          )}
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold leading-5 text-slate-900">
+                {formatExamBaseTitle(exam)}
+              </p>
+              <p className="mt-1 text-xs text-slate-400">
+                {exam.examBoard
+                  ? `${exam.examBoard.alias ?? exam.examBoard.name} · `
+                  : ''}
+                {dayjs(exam.examDate).format('MMM/YYYY')}
+              </p>
+            </div>
+            {isAdmin && onDelete ? (
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onDelete(exam)
+                }}
+                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                aria-label="Excluir exame"
+              >
+                <TrashIcon className="h-4 w-4" />
+              </button>
+            ) : (
+              <ArrowRightIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" />
+            )}
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {isAdmin && !(exam.published ?? true) ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                <EyeSlashIcon className="h-3 w-3" />
+                Rascunho
+              </span>
+            ) : null}
+            <span
+              className={`inline-flex items-center rounded-full px-2 py-1 text-[11px] font-semibold ${governmentScopeColor(exam.governmentScope)}`}
+            >
+              {governmentScopeLabel(exam.governmentScope)}
+            </span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
+              <DocumentTextIcon className="h-3 w-3" />
+              {questionCount}
+            </span>
+            {hasAttempts ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
+                <ArrowPathIcon className="h-3 w-3" />
+                {exam.userStats!.attemptCount}x
+              </span>
+            ) : null}
+            {exam.city || exam.state ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">
+                <MapPinIcon className="h-3 w-3" />
+                {exam.city ? `${exam.city}/${exam.state}` : exam.state}
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+    </MobileCard>
+  )
+
+  if (canNavigate) {
+    return (
+      <Link
+        to="/exams/$examBoard/$examId"
+        params={{ examBoard: exam.examBoardId!, examId: exam.id }}
+        className="block no-underline text-inherit"
+      >
+        {content}
+      </Link>
+    )
+  }
+
   return content
 }
 
@@ -624,6 +780,7 @@ function CreateExamDialog({
 /* ------------------------------------------------------------------ */
 
 function ExamsPage() {
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
   const { examBases, isLoadingExamBases } = useExamBaseFacade()
   const { examBoards, isLoadingExamBoards } = useExamBoardFacade()
@@ -652,6 +809,8 @@ function ExamsPage() {
   )
   const [selectedState, setSelectedState] = useState('')
   const [selectedCity, setSelectedCity] = useState('')
+  const [selectedScope, setSelectedScope] = useState<ScopeFilterValue>('')
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false)
 
   useEffect(() => {
     setSelectedBoardId(boardFromUrl ?? null)
@@ -750,6 +909,10 @@ function ExamsPage() {
       list = list.filter((e) => e.city === selectedCity)
     }
 
+    if (selectedScope) {
+      list = list.filter((e) => e.governmentScope === selectedScope)
+    }
+
     if (search.trim()) {
       const q = search.toLowerCase()
       list = list.filter(
@@ -765,9 +928,14 @@ function ExamsPage() {
     }
 
     return list
-  }, [examBases, selectedBoardId, selectedState, selectedCity, search])
+  }, [examBases, selectedBoardId, selectedState, selectedCity, selectedScope, search])
 
-  const hasActiveFilters = !!selectedBoardId || !!selectedState || !!selectedCity || !!search
+  const hasActiveFilters =
+    !!selectedBoardId ||
+    !!selectedState ||
+    !!selectedCity ||
+    !!selectedScope ||
+    !!search
 
   // Stats
   const totalExams = (examBases ?? []).length
@@ -823,6 +991,355 @@ function ExamsPage() {
   }, [historyItems])
 
   const isLoading = isLoadingExamBases || isLoadingExamBoards
+  const selectedBoardLabel =
+    boardOptions.find((option) => option.value === (selectedBoardId ?? ''))
+      ?.label ?? null
+  const activeAdvancedFilters = [
+    selectedState,
+    selectedCity,
+    selectedBoardLabel,
+  ].filter(Boolean) as string[]
+  const scopeFilterOptions: Array<{
+    value: 'ALL' | 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+    label: string
+  }> = [
+    { value: 'ALL', label: 'Todos' },
+    { value: 'MUNICIPAL', label: 'Municipal' },
+    { value: 'STATE', label: 'Estadual' },
+    { value: 'FEDERAL', label: 'Federal' },
+  ]
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-4 pb-6">
+        <section className="-mx-2 overflow-hidden rounded-b-[2rem] bg-linear-to-br from-violet-700 to-violet-950 px-4 pb-5 pt-4 text-white shadow-lg shadow-violet-950/20">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-violet-200/80">Explorar</p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight">Exames</h1>
+              <p className="mt-2 max-w-xs text-sm leading-6 text-violet-100/80">
+                Escolha uma prova, volte para onde parou e mantenha o treino vivo no celular.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setMobileFiltersOpen(true)}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur transition-colors hover:bg-white/15"
+              aria-label="Abrir filtros"
+            >
+              <FunnelIcon className="h-5 w-5 text-white" />
+            </button>
+          </div>
+
+          <div className="mt-4 grid grid-cols-3 gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+            <div>
+              <p className="text-lg font-bold tabular-nums text-white">
+                {isLoading ? '—' : totalExams}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                Provas
+              </p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums text-white">
+                {isLoading
+                  ? '—'
+                  : totalQuestions > 999
+                    ? `${(totalQuestions / 1000).toFixed(1)}k`
+                    : totalQuestions}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                Questões
+              </p>
+            </div>
+            <div>
+              <p className="text-lg font-bold tabular-nums text-white">
+                {isLoading ? '—' : examsWithAttempts}
+              </p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                Feitas
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 gap-3">
+          <ExamsMobileSummaryCard
+            icon={DocumentTextIcon}
+            label="Tentativas"
+            value={loadingHistory ? '—' : String(totalAttempts)}
+            hint={`${loadingHistory ? '—' : passedAttempts} aprovadas · ${loadingHistory ? '—' : failedAttempts} reprovadas`}
+            tone="bg-slate-100 text-slate-700"
+          />
+          <ExamsMobileSummaryCard
+            icon={TrophyIcon}
+            label="Aprovação"
+            value={
+              loadingHistory
+                ? '—'
+                : approvalRate != null
+                  ? `${approvalRate.toFixed(0)}%`
+                  : '—'
+            }
+            hint={
+              evolutionPp != null
+                ? `${evolutionPp > 0 ? '+' : ''}${evolutionPp.toFixed(0)} p.p. nas tentativas mais recentes`
+                : 'Complete ao menos 4 tentativas para ver a evolução.'
+            }
+            tone="bg-violet-100 text-violet-700"
+          />
+        </div>
+
+        <div className="relative">
+          <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Buscar cargo, banca, cidade..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            className="w-full rounded-2xl border border-slate-200 bg-white py-3 pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-400 focus:border-violet-300 focus:outline-none focus:ring-2 focus:ring-violet-200 transition-all"
+          />
+          {search ? (
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Limpar busca"
+            >
+              <XMarkIcon className="h-4 w-4" />
+            </button>
+          ) : null}
+        </div>
+
+        <ChipFilter
+          options={scopeFilterOptions}
+          value={selectedScope || 'ALL'}
+          onChange={(value) =>
+            setSelectedScope(value === 'ALL' ? '' : value)
+          }
+        />
+
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-900">
+              {hasActiveFilters
+                ? `${filteredExams.length} resultado${filteredExams.length !== 1 ? 's' : ''}`
+                : 'Todas as provas'}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {activeAdvancedFilters.length > 0
+                ? activeAdvancedFilters.join(' · ')
+                : `${totalExams} ${totalExams === 1 ? 'prova' : 'provas'} no total`}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setMobileFiltersOpen(true)}
+            className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700"
+          >
+            <FunnelIcon className="h-4 w-4" />
+            Filtros
+          </button>
+        </div>
+
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={handleCreateExam}
+            disabled={createDraftMutation.isPending}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
+          >
+            <PlusIcon className="h-4 w-4" />
+            {createDraftMutation.isPending ? 'Criando...' : 'Criar exame'}
+          </button>
+        ) : null}
+
+        <CreateExamDialog
+          open={createDialogOpen}
+          onClose={() => setCreateDialogOpen(false)}
+          examBoards={examBoards ?? []}
+          examBases={examBases}
+          onSuccess={refetchExamBases}
+        />
+
+        <Dialog open={!!examToDelete} onClose={() => setExamToDelete(null)} maxWidth="xs" fullWidth>
+          <DialogTitle>Excluir exame</DialogTitle>
+          <DialogContent>
+            <p className="text-sm text-slate-600">
+              Tem certeza que deseja excluir <strong>{examToDelete?.name || 'este exame'}</strong>?
+              Todas as questões, tentativas e dados relacionados serão removidos permanentemente.
+            </p>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={() => setExamToDelete(null)} disabled={deleteMutation.isPending}>
+              Cancelar
+            </Button>
+            <Button
+              variant="contained"
+              color="error"
+              disabled={deleteMutation.isPending}
+              onClick={async () => {
+                if (!examToDelete) return
+                await deleteMutation.mutateAsync(examToDelete.id)
+                setExamToDelete(null)
+              }}
+            >
+              {deleteMutation.isPending ? 'Excluindo...' : 'Excluir'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        <BottomSheet open={mobileFiltersOpen} onClose={() => setMobileFiltersOpen(false)}>
+          <div className="space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Filtros</h2>
+                <p className="mt-1 text-sm text-slate-500">
+                  Refine por estado, cidade e banca.
+                </p>
+              </div>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('')
+                    setBoardFilter(null)
+                    setSelectedState('')
+                    setSelectedCity('')
+                    setSelectedScope('')
+                  }}
+                  className="text-sm font-semibold text-rose-600"
+                >
+                  Limpar
+                </button>
+              ) : null}
+            </div>
+
+            <FormControl fullWidth size="small">
+              <InputLabel id="mobile-state-label">Estado</InputLabel>
+              <Select
+                labelId="mobile-state-label"
+                value={selectedState}
+                label="Estado"
+                onChange={(event) => {
+                  const nextValue = event.target.value
+                  setSelectedState(nextValue)
+                  if (nextValue !== selectedState) {
+                    setSelectedCity('')
+                  }
+                }}
+              >
+                <MenuItem value="">Todos</MenuItem>
+                {stateOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                    {option.count != null ? ` (${option.count})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth size="small">
+              <InputLabel id="mobile-city-label">Cidade</InputLabel>
+              <Select
+                labelId="mobile-city-label"
+                value={selectedCity}
+                label="Cidade"
+                onChange={(event) => setSelectedCity(event.target.value)}
+              >
+                <MenuItem value="">Todas</MenuItem>
+                {cityOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                    {option.count != null ? ` (${option.count})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <FormControl fullWidth size="small">
+              <InputLabel id="mobile-board-label">Banca</InputLabel>
+              <Select
+                labelId="mobile-board-label"
+                value={selectedBoardId ?? ''}
+                label="Banca"
+                onChange={(event) => setBoardFilter(event.target.value || null)}
+              >
+                <MenuItem value="">Todas</MenuItem>
+                {boardOptions.map((option) => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                    {option.count != null ? ` (${option.count})` : ''}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+
+            <Button
+              variant="contained"
+              fullWidth
+              onClick={() => setMobileFiltersOpen(false)}
+              sx={{ borderRadius: '16px', textTransform: 'none', fontWeight: 700 }}
+            >
+              Ver {filteredExams.length} resultado{filteredExams.length !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        </BottomSheet>
+
+        {isLoading ? (
+          <div className="flex flex-col gap-3 animate-pulse">
+            {[1, 2, 3, 4, 5].map((index) => (
+              <div key={index} className="h-28 rounded-3xl bg-slate-200/70" />
+            ))}
+          </div>
+        ) : filteredExams.length === 0 ? (
+          <MobileCard>
+            <div className="flex flex-col items-center gap-3 py-4 text-center">
+              <div className="flex h-14 w-14 items-center justify-center rounded-full bg-slate-100">
+                <MagnifyingGlassIcon className="h-7 w-7 text-slate-400" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-slate-700">
+                  Nenhuma prova encontrada
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  {search
+                    ? `Nenhum resultado para "${search}".`
+                    : 'Não há provas disponíveis no momento.'}
+                </p>
+              </div>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearch('')
+                    setBoardFilter(null)
+                    setSelectedState('')
+                    setSelectedCity('')
+                    setSelectedScope('')
+                  }}
+                  className="text-sm font-semibold text-cyan-700"
+                >
+                  Limpar filtros
+                </button>
+              ) : null}
+            </div>
+          </MobileCard>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {filteredExams.map((exam) => (
+              <ExamCardMobile
+                key={exam.id}
+                exam={exam}
+                isAdmin={isAdmin}
+                onDelete={isAdmin ? setExamToDelete : undefined}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8 pb-6">
@@ -1042,6 +1559,7 @@ function ExamsPage() {
                 setBoardFilter(null)
                 setSelectedState('')
                 setSelectedCity('')
+                setSelectedScope('')
               }}
               className="inline-flex items-center gap-1 px-2.5 py-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg font-medium transition-colors cursor-pointer"
             >
@@ -1151,6 +1669,7 @@ function ExamsPage() {
                   setBoardFilter(null)
                   setSelectedState('')
                   setSelectedCity('')
+                  setSelectedScope('')
                 }}
                 className="text-xs text-cyan-600 hover:text-cyan-700 font-medium mt-1 cursor-pointer"
               >

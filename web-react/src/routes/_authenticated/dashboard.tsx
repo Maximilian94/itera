@@ -1,6 +1,7 @@
 import { Card } from '@/components/Card'
 import { PageHero } from '@/components/PageHero'
 import { PpTooltip } from '@/components/PpTooltip'
+import { MobileCard } from '@/ui/mobile'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { useClerkAuth } from '@/auth/clerk'
@@ -8,6 +9,7 @@ import type { UserResource } from "@clerk/types";
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
+import { useIsMobile } from '@/lib/useIsMobile'
 import {
   AcademicCapIcon,
   ArrowRightIcon,
@@ -134,6 +136,74 @@ function ActionCard({
   )
 }
 
+function MobileStatCard({
+  icon: Icon,
+  label,
+  value,
+  tone,
+}: {
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  label: string
+  value: string
+  tone: string
+}) {
+  return (
+    <MobileCard className="p-0">
+      <div className="flex items-start gap-3">
+        <div
+          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}
+        >
+          <Icon className="size-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+            {label}
+          </p>
+          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+        </div>
+      </div>
+    </MobileCard>
+  )
+}
+
+function MobileActionTile({
+  to,
+  icon: Icon,
+  title,
+  description,
+  accent,
+  iconBg,
+}: {
+  to: string
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  title: string
+  description: string
+  accent: string
+  iconBg: string
+}) {
+  return (
+    <Link to={to} className="block text-inherit no-underline">
+      <MobileCard className="h-full">
+        <div className="flex flex-col gap-3">
+          <div
+            className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconBg}`}
+          >
+            <Icon className={`size-5 ${accent}`} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">{title}</p>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              {description}
+            </p>
+          </div>
+        </div>
+      </MobileCard>
+    </Link>
+  )
+}
+
 /* ------------------------------------------------------------------ */
 /*  Training in-progress card                                          */
 /* ------------------------------------------------------------------ */
@@ -176,6 +246,7 @@ const STAGE_PROGRESS: Record<string, number> = {
 
 function Dashboard() {
   const navigate = useNavigate()
+  const isMobile = useIsMobile()
   const { user } = useClerkAuth()
   const { access, isLoading: accessLoading } = useAccessState()
   const { isLimitReached, isEliteAtLimit } = useRequireAccess()
@@ -306,6 +377,374 @@ function Dashboard() {
   const activeAttempt = historyItems.find(
     (i) => i.finishedAt == null && i.examBoardId != null,
   )
+  const concludedAttempts = historyItems.filter((i) => i.finishedAt != null).length
+  const scoreSummary =
+    loadingHistory
+      ? 'Carregando sua evolução...'
+      : initialScoreTrend != null
+        ? initialScoreTrend > 0
+          ? `Sua média subiu ${initialScoreTrend.toFixed(1)} p.p. em relação ao mês anterior.`
+          : initialScoreTrend < 0
+            ? `Sua média caiu ${Math.abs(initialScoreTrend).toFixed(1)} p.p. em relação ao mês anterior.`
+            : 'Sua média ficou estável em relação ao mês anterior.'
+        : scoreHistory.length === 0
+          ? 'Conclua provas para começar a acompanhar sua evolução.'
+          : 'Faça provas em mais de um mês para ver a comparação.'
+  const trainingSummary =
+    loadingTrainings
+      ? 'Carregando seus treinos...'
+      : avgTrainingImprovement != null
+        ? avgTrainingImprovement > 0
+          ? `Cada treino concluído gerou, em média, +${avgTrainingImprovement.toFixed(1)} p.p.`
+          : avgTrainingImprovement < 0
+            ? `Sua média caiu ${Math.abs(avgTrainingImprovement).toFixed(1)} p.p. entre início e fim dos treinos.`
+            : 'Seu desempenho ficou estável entre início e fim dos treinos.'
+        : 'Conclua treinos para medir o ganho entre diagnóstico e final.'
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-4 pb-6">
+        <section className="-mx-2 overflow-hidden rounded-b-[2rem] bg-linear-to-br from-cyan-600 via-cyan-700 to-sky-900 px-4 pb-5 pt-4 text-white shadow-lg shadow-cyan-950/20">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-medium text-cyan-100/80">
+                {greeting}{firstName ? ',' : ''}
+              </p>
+              <h1 className="mt-1 text-2xl font-bold tracking-tight">
+                {firstName || 'Bem-vindo'}
+              </h1>
+              <p className="mt-2 max-w-xs text-sm leading-6 text-cyan-100/85">
+                Seu painel agora está pronto para sessões rápidas no celular.
+              </p>
+            </div>
+            <div className="rounded-2xl bg-white/10 px-3 py-2 text-right backdrop-blur">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/70">
+                Treinos
+              </p>
+              <p className="text-sm font-semibold text-white">
+                {access.status === 'active' || access.status === 'trial'
+                  ? `${trainingsUsed}/${trainingsAvailable}`
+                  : 'Assine'}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                <AcademicCapIcon className="size-5 text-white" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
+                  Treinos do mês
+                </p>
+                <p className="text-sm font-semibold text-white">
+                  {access.status === 'active' || access.status === 'trial'
+                    ? `${trainingsUsed} usados de ${trainingsAvailable}`
+                    : 'Assine um plano para desbloquear treinos inteligentes'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
+              <div
+                className="h-full rounded-full bg-white transition-all"
+                style={{
+                  width:
+                    access.status === 'active' || access.status === 'trial'
+                      ? `${Math.min((trainingsUsed / Math.max(trainingsAvailable, 1)) * 100, 100)}%`
+                      : '0%',
+                }}
+              />
+            </div>
+
+            <div className="mt-4 flex flex-col gap-2">
+              {lastActiveTraining ? (
+                <Link
+                  to={getStagePath(
+                    STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
+                    lastActiveTraining.trainingId,
+                  )}
+                  className="no-underline"
+                >
+                  <Button
+                    variant="contained"
+                    color="inherit"
+                    fullWidth
+                    startIcon={<PlayIcon className="w-4 h-4" />}
+                    sx={{
+                      color: '#0f172a',
+                      bgcolor: '#fff',
+                      borderRadius: '16px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      '&:hover': { bgcolor: '#e2e8f0' },
+                    }}
+                  >
+                    Continuar treino
+                  </Button>
+                </Link>
+              ) : canCreateTraining ? (
+                <Link to="/treino/novo" className="no-underline">
+                  <Button
+                    variant="contained"
+                    color="inherit"
+                    fullWidth
+                    startIcon={<PlusIcon className="w-4 h-4" />}
+                    sx={{
+                      color: '#0f172a',
+                      bgcolor: '#fff',
+                      borderRadius: '16px',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      '&:hover': { bgcolor: '#e2e8f0' },
+                    }}
+                  >
+                    Criar treino
+                  </Button>
+                </Link>
+              ) : isLimitReached ? (
+                <Button
+                  variant="contained"
+                  color="inherit"
+                  fullWidth
+                  disabled={portalLoading}
+                  onClick={openPortal}
+                  sx={{
+                    color: '#0f172a',
+                    bgcolor: '#fff',
+                    borderRadius: '16px',
+                    textTransform: 'none',
+                    fontWeight: 700,
+                    '&:hover': { bgcolor: '#e2e8f0' },
+                  }}
+                >
+                  {portalLoading
+                    ? 'Abrindo…'
+                    : isEliteAtLimit
+                      ? 'Ver assinatura'
+                      : 'Fazer upgrade'}
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </section>
+
+        {activeAttempt ? (
+          <MobileCard className="border-cyan-200 bg-cyan-50">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
+                  <PlayIcon className="size-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-cyan-900">
+                    Você tem um exame em andamento
+                  </p>
+                  <p className="mt-1 text-xs leading-5 text-cyan-700/80">
+                    {formatExamBaseTitle({
+                      examDate: activeAttempt.examDate,
+                      institution: activeAttempt.institution,
+                      name: activeAttempt.examBaseName,
+                      state: activeAttempt.state,
+                      city: activeAttempt.city,
+                    })}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="contained"
+                color="primary"
+                fullWidth
+                startIcon={<PlayIcon className="w-4 h-4" />}
+                onClick={() =>
+                  navigate({
+                    to: '/exams/$examBoard/$examId/$attemptId',
+                    params: {
+                      examBoard: activeAttempt.examBoardId!,
+                      examId: activeAttempt.examBaseId,
+                      attemptId: activeAttempt.id,
+                    },
+                  })
+                }
+                sx={{
+                  borderRadius: '16px',
+                  textTransform: 'none',
+                  fontWeight: 700,
+                }}
+              >
+                Continuar exame
+              </Button>
+            </div>
+          </MobileCard>
+        ) : null}
+
+        <div className="grid grid-cols-2 gap-3">
+          <MobileStatCard
+            icon={DocumentTextIcon}
+            label="Provas"
+            value={String(concludedAttempts)}
+            tone="bg-violet-100 text-violet-700"
+          />
+          <MobileStatCard
+            icon={AcademicCapIcon}
+            label="Em andamento"
+            value={String(activeTrainings.length)}
+            tone="bg-emerald-100 text-emerald-700"
+          />
+        </div>
+
+        <MobileCard>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
+              <ArrowTrendingUpIcon className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-sm font-semibold text-slate-900">
+                Sua evolução
+              </h2>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                Resumo rápido do que mudou no seu desempenho.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3">
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Provas
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-700">
+                {scoreSummary}
+              </p>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-3">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Treinos
+              </p>
+              <p className="mt-1 text-sm leading-6 text-slate-700">
+                {trainingSummary}
+              </p>
+            </div>
+            <Link
+              to="/evolucao-como-funciona"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 no-underline"
+            >
+              Como é calculado?
+              <ArrowRightIcon className="w-4 h-4" />
+            </Link>
+          </div>
+        </MobileCard>
+
+        <div>
+          <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+            Ações rápidas
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            <MobileActionTile
+              to="/treino/novo"
+              icon={RocketLaunchIcon}
+              title="Novo treino"
+              description="Comece um ciclo guiado."
+              accent="text-cyan-700"
+              iconBg="bg-cyan-100"
+            />
+            <MobileActionTile
+              to="/treino"
+              icon={AcademicCapIcon}
+              title="Meus treinos"
+              description="Retome o que já começou."
+              accent="text-emerald-700"
+              iconBg="bg-emerald-100"
+            />
+            <MobileActionTile
+              to="/exams"
+              icon={DocumentTextIcon}
+              title="Exames"
+              description="Explore provas disponíveis."
+              accent="text-violet-700"
+              iconBg="bg-violet-100"
+            />
+            <MobileActionTile
+              to="/history"
+              icon={ClockIcon}
+              title="Histórico"
+              description="Veja seu rastro de tentativas."
+              accent="text-slate-700"
+              iconBg="bg-slate-100"
+            />
+          </div>
+        </div>
+
+        {activeTrainings.length > 0 ? (
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                Treinos em andamento
+              </h2>
+              <Link
+                to="/treino"
+                className="text-sm font-semibold text-cyan-700 no-underline"
+              >
+                Ver todos
+              </Link>
+            </div>
+
+            <div className="grid gap-3">
+              {activeTrainings.slice(0, 3).map((t) => {
+                const stageLabel = STAGE_LABELS[t.currentStage] ?? t.currentStage
+                const stageColor =
+                  STAGE_COLORS[t.currentStage] ?? 'bg-slate-100 text-slate-700'
+                const slug = STAGE_SLUG[t.currentStage] ?? 'prova'
+                const progress = STAGE_PROGRESS[t.currentStage] ?? 0
+
+                return (
+                  <Link
+                    key={t.trainingId}
+                    to={getStagePath(slug, t.trainingId)}
+                    className="block text-inherit no-underline"
+                  >
+                    <MobileCard>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {t.examTitle}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Atualizado em {dayjs(t.updatedAt).format('DD/MM/YY')}
+                          </p>
+                        </div>
+                        <ArrowRightIcon className="mt-0.5 size-4 shrink-0 text-slate-300" />
+                      </div>
+
+                      <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className="h-full rounded-full bg-cyan-500"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-between">
+                        <span
+                          className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold ${stageColor}`}
+                        >
+                          {stageLabel}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-500">
+                          {progress}%
+                        </span>
+                      </div>
+                    </MobileCard>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-8 pb-6">
