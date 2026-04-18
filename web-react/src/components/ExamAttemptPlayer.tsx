@@ -715,15 +715,21 @@ export function ExamAttemptPlayer({
   }, [currentQuestionIndex])
 
   useLayoutEffect(() => {
+    const nextQuestion = questions.at(currentQuestionIndex)
+    if (!nextQuestion) {
+      mobilePrevQuestionRef.current = null
+      return
+    }
+
     const prev = mobilePrevQuestionRef.current
-    if (prev && prev.id !== currentQuestion.id) {
+    if (prev && prev.id !== nextQuestion.id) {
       setMobileOutgoingQuestion({ question: prev, direction: slideDirection })
       const timer = window.setTimeout(() => setMobileOutgoingQuestion(null), 300)
-      mobilePrevQuestionRef.current = currentQuestion
+      mobilePrevQuestionRef.current = nextQuestion
       return () => window.clearTimeout(timer)
     }
-    mobilePrevQuestionRef.current = currentQuestion
-  }, [currentQuestion.id, slideDirection])
+    mobilePrevQuestionRef.current = nextQuestion
+  }, [questions, currentQuestionIndex, slideDirection])
 
   const analyticsEligible =
     !isManagementMode && !isRetryMode && !isFinished && Boolean(attemptId)
