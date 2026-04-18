@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { analytics } from "@/lib/analytics";
 
 const NAV_LINKS = [
   { href: "/blogs", label: "Blog" },
@@ -32,6 +33,12 @@ export function Header() {
             <Link
               href="https://app.maximizeenfermagem.com.br"
               className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 transition-colors"
+              onClick={() =>
+                analytics.capture("cta_clicked", {
+                  location: "header_desktop",
+                  target: "app",
+                })
+              }
             >
               Acessar Plataforma
             </Link>
@@ -81,7 +88,13 @@ export function Header() {
             <Link
               href="https://app.maximizeenfermagem.com.br"
               className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white text-center hover:bg-cyan-500 transition-colors"
-              onClick={() => setMobileOpen(false)}
+              onClick={() => {
+                analytics.capture("cta_clicked", {
+                  location: "header_mobile",
+                  target: "app",
+                });
+                setMobileOpen(false);
+              }}
             >
               Acessar Plataforma
             </Link>

@@ -3,6 +3,7 @@ import { Manrope, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { PostHogProvider } from "@/components/PostHogProvider";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -53,9 +54,11 @@ export default function RootLayout({
         className={`${manrope.className} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <Header />
-        {children}
-        <Footer />
+        <PostHogProvider>
+          <Header />
+          {children}
+          <Footer />
+        </PostHogProvider>
       </body>
     </html>
   );
