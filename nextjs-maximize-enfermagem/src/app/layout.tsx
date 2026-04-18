@@ -4,6 +4,7 @@ import "./globals.css";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { PostHogProvider } from "@/components/PostHogProvider";
+import { CookieBanner } from "@/components/CookieBanner";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -58,6 +59,7 @@ export default function RootLayout({
           <Header />
           {children}
           <Footer />
+          <CookieBanner />
         </PostHogProvider>
       </body>
     </html>
