@@ -68,6 +68,7 @@ import {
 import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/examBaseQuestions.service'
 import { authService } from '@/features/auth/services/auth.service'
 import { formatExamBaseTitle } from '@/lib/utils'
+import { analytics } from '@/lib/analytics'
 /** Question shape used by the player (attempt has full; retry before finish has no correctAlternative/explanation). */
 type PlayerQuestion = {
   id: string
@@ -691,6 +692,48 @@ export function ExamAttemptPlayer({
   useEffect(() => {
     setValue(0)
   }, [currentQuestionIndex])
+
+  const analyticsEligible =
+    !isManagementMode && !isRetryMode && !isFinished && Boolean(attemptId)
+
+  const questionViewStartRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!analyticsEligible || !currentQuestion) return
+    const now = Date.now()
+    const prevStart = questionViewStartRef.current
+    const timeOnPrevQuestionMs = prevStart != null ? now - prevStart : null
+    questionViewStartRef.current = now
+    analytics.capture('question_viewed', {
+      attemptId,
+      examBaseId,
+      questionId: currentQuestion.id,
+      questionIndex: currentQuestionIndex,
+      totalQuestions: questionCount,
+      timeOnPrevQuestionMs,
+    })
+  }, [
+    analyticsEligible,
+    currentQuestion,
+    currentQuestionIndex,
+    questionCount,
+    attemptId,
+    examBaseId,
+  ])
+
+  useEffect(() => {
+    if (!analyticsEligible) return
+    const onVisibility = () => {
+      if (document.visibilityState !== 'hidden') return
+      analytics.capture('exam_paused', {
+        attemptId,
+        examBaseId,
+        questionIndex: currentQuestionIndex,
+        reason: 'tab_hidden',
+      })
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => document.removeEventListener('visibilitychange', onVisibility)
+  }, [analyticsEligible, attemptId, examBaseId, currentQuestionIndex])
 
   // Reset inline editing state when switching questions
   useEffect(() => {
