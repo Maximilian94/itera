@@ -5,6 +5,9 @@ import { json } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bodyParser: false });
+  // Triggers onApplicationShutdown hooks (e.g. AnalyticsService flushes
+  // pending PostHog events before the process exits).
+  app.enableShutdownHooks();
   app.use(
     json({
       limit: '10mb',

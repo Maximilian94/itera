@@ -24,6 +24,7 @@ import { ClerkModule } from './clerk/clerk.module';
 import { EmailModule } from './email/email.module';
 import { getBullConnectionOptions } from './email/queue.config';
 import { AdminModule } from './admin/admin.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -50,6 +51,7 @@ import { AdminModule } from './admin/admin.module';
     ClerkModule,
     EmailModule,
     AdminModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [
