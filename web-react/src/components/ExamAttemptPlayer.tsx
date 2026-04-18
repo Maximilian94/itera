@@ -15,10 +15,10 @@ import {
 } from '@mui/material'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import { Link } from '@tanstack/react-router'
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { CustomTabPanel } from '@/ui/customTabPanel'
-import { MobileCard, MobileHeader, PhoneSafeArea } from '@/ui/mobile'
+import { MobileCard, PhoneSafeArea } from '@/ui/mobile'
 import { Markdown } from '@/components/Markdown'
 import { MarkdownEditor } from '@/components/MarkdownEditor'
 import { Card } from '@/components/Card'
@@ -30,6 +30,7 @@ import {
   ClockIcon,
   EyeIcon,
   FlagIcon,
+  LockClosedIcon,
   PencilSquareIcon,
   PhotoIcon,
   PlayIcon,
@@ -221,6 +222,12 @@ export function ExamAttemptPlayer({
 
   const [value, setValue] = useState(0)
   const [mobileQuestionDrawerOpen, setMobileQuestionDrawerOpen] = useState(false)
+  const [mobileReferenceExpanded, setMobileReferenceExpanded] = useState(false)
+  const [mobileOutgoingQuestion, setMobileOutgoingQuestion] = useState<{
+    question: PlayerQuestion
+    direction: 'forward' | 'backward'
+  } | null>(null)
+  const mobilePrevQuestionRef = useRef<PlayerQuestion | null>(null)
 
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [slideDirection, setSlideDirection] = useState<'forward' | 'backward'>('forward')
@@ -228,6 +235,10 @@ export function ExamAttemptPlayer({
     Record<string, Set<string>>
   >({})
   const [scrollToAlternativeId, setScrollToAlternativeId] = useState<string | null>(null)
+  const longPressTimerRef = useRef<number | null>(null)
+  const longPressTriggeredRef = useRef(false)
+  const longPressOriginRef = useRef({ x: 0, y: 0 })
+  const swipeStartRef = useRef<{ x: number; y: number; target: EventTarget | null } | null>(null)
   const [snackbarOpen, setSnackbarOpen] = useState(false)
   const [snackbarMessage, setSnackbarMessage] = useState('')
   const explanationRefsMap = useRef<Record<string, HTMLDivElement | null>>({})
@@ -700,7 +711,19 @@ export function ExamAttemptPlayer({
 
   useEffect(() => {
     setValue(0)
+    setMobileReferenceExpanded(false)
   }, [currentQuestionIndex])
+
+  useLayoutEffect(() => {
+    const prev = mobilePrevQuestionRef.current
+    if (prev && prev.id !== currentQuestion.id) {
+      setMobileOutgoingQuestion({ question: prev, direction: slideDirection })
+      const timer = window.setTimeout(() => setMobileOutgoingQuestion(null), 300)
+      mobilePrevQuestionRef.current = currentQuestion
+      return () => window.clearTimeout(timer)
+    }
+    mobilePrevQuestionRef.current = currentQuestion
+  }, [currentQuestion.id, slideDirection])
 
   const analyticsEligible =
     !isManagementMode && !isRetryMode && !isFinished && Boolean(attemptId)
@@ -990,36 +1013,340 @@ export function ExamAttemptPlayer({
     const resolvedMobileHeaderAction = trainingProvaMode
       ? mobileHeaderAction
       : defaultMobileHeaderAction
-    const subjectLabel =
-      [currentQuestion.subject, currentQuestion.topic]
-        .filter(Boolean)
-        .join(' / ') || 'Assunto não informado'
-    const questionMetaLabel = `Q${currentQuestionIndex + 1}/${questionCount}`
+    const questionMetaLabel = `${answeredCount}/${questionCount}`
+    const progressPercent = (answeredCount / Math.max(questionCount, 1)) * 100
+    const positionLabel = `Questão ${currentQuestionIndex + 1} de ${questionCount}`
+
+    const handleSwipeTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+      if (e.touches.length !== 1) {
+        swipeStartRef.current = null
+        return
+      }
+      const target = e.target as HTMLElement | null
+      if (target && target.closest('[data-no-swipe="true"], input, textarea, [contenteditable="true"]')) {
+        swipeStartRef.current = null
+        return
+      }
+      const t = e.touches[0]
+      swipeStartRef.current = { x: t.clientX, y: t.clientY, target: e.target }
+    }
+    const handleSwipeTouchEnd = (e: React.TouchEvent<HTMLDivElement>) => {
+      const start = swipeStartRef.current
+      swipeStartRef.current = null
+      if (!start) return
+      const t = e.changedTouches[0]
+      const dx = t.clientX - start.x
+      const dy = t.clientY - start.y
+      const SWIPE_MIN = 60
+      if (Math.abs(dx) < SWIPE_MIN) return
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) return
+      if (dx < 0 && !isLastQuestion) handleNextQuestion()
+      else if (dx > 0 && !isFirstQuestion) handlePrevQuestion()
+    }
+
+    const renderMobilePane = (q: PlayerQuestion) => {
+      const paneSelectedAltId = answers[q.id] ?? null
+      const paneEliminatedSet = eliminatedByQuestion[q.id] ?? new Set<string>()
+      return value === 0 ? (
+        <div className="px-2">
+          <MobileCard className="space-y-5">
+            {q.referenceText ? (() => {
+              const isLong = q.referenceText.length > 240
+              const shouldCollapse = isLong && !mobileReferenceExpanded
+              return (
+                <div className="rounded-2xl bg-slate-50 p-4">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Texto de referência
+                    </p>
+                    {isLong ? (
+                      <button
+                        type="button"
+                        onClick={() => setMobileReferenceExpanded((v) => !v)}
+                        className="shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-cyan-700 hover:bg-cyan-50"
+                      >
+                        {mobileReferenceExpanded ? 'Ocultar' : 'Ler texto'}
+                      </button>
+                    ) : null}
+                  </div>
+                  <div
+                    className={`mt-2 text-sm text-slate-700 ${
+                      shouldCollapse
+                        ? 'relative max-h-24 overflow-hidden after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-10 after:bg-gradient-to-t after:from-slate-50 after:to-transparent'
+                        : ''
+                    }`}
+                  >
+                    <Markdown>{q.referenceText}</Markdown>
+                  </div>
+                </div>
+              )
+            })() : null}
+
+            {q.statementImageUrl && !statementImageLoadError ? (
+              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <img
+                  src={q.statementImageUrl}
+                  alt="Imagem do enunciado"
+                  className="max-h-[280px] w-full object-contain bg-slate-50"
+                  onError={() => setStatementImageLoadError(true)}
+                />
+              </div>
+            ) : null}
+
+            <div className="text-base font-medium leading-7 text-slate-900">
+              <Markdown>{q.statement}</Markdown>
+            </div>
+
+            <div className="space-y-3">
+              {q.alternatives.map((alt, index) => {
+                const isEliminated = paneEliminatedSet.has(alt.id)
+                const isSelected = paneSelectedAltId === alt.id
+                const isCorrect = q.correctAlternative === alt.key
+                const isWrong = isFinished && isSelected && !isCorrect
+                const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
+                const showCorrectStyling = isCorrect && isFinished
+                const optionBg = isFinished
+                  ? isCorrect
+                    ? 'bg-emerald-50 border-emerald-400'
+                    : isWrong
+                      ? 'bg-rose-50 border-rose-400'
+                      : 'bg-white border-slate-200'
+                  : showCorrectStyling
+                    ? 'bg-emerald-50 border-emerald-400'
+                    : isSelected
+                      ? 'bg-cyan-50 border-cyan-400'
+                      : 'bg-white border-slate-200'
+                const keyBadge = isFinished
+                  ? isCorrect
+                    ? 'bg-emerald-600 text-white'
+                    : isWrong
+                      ? 'bg-rose-600 text-white'
+                      : 'bg-slate-200 text-slate-700'
+                  : isSelected
+                    ? 'bg-cyan-500 text-white'
+                    : 'bg-slate-200 text-slate-700'
+
+                const clearLongPress = () => {
+                  if (longPressTimerRef.current !== null) {
+                    window.clearTimeout(longPressTimerRef.current)
+                    longPressTimerRef.current = null
+                  }
+                }
+                const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
+                  if (isFinished) return
+                  longPressTriggeredRef.current = false
+                  longPressOriginRef.current = { x: e.clientX, y: e.clientY }
+                  clearLongPress()
+                  longPressTimerRef.current = window.setTimeout(() => {
+                    longPressTriggeredRef.current = true
+                    toggleEliminated(q.id, alt.id, !isEliminated)
+                    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+                      navigator.vibrate(30)
+                    }
+                  }, 500)
+                }
+                const handlePointerMove = (e: React.PointerEvent<HTMLButtonElement>) => {
+                  if (longPressTimerRef.current === null) return
+                  const dx = e.clientX - longPressOriginRef.current.x
+                  const dy = e.clientY - longPressOriginRef.current.y
+                  if (dx * dx + dy * dy > 100) clearLongPress()
+                }
+                const handleClick = () => {
+                  clearLongPress()
+                  if (longPressTriggeredRef.current) {
+                    longPressTriggeredRef.current = false
+                    return
+                  }
+                  if (isFinished || isEliminated) return
+                  handleOptionSelected(q.id, alt.id, isEliminated)
+                }
+
+                return (
+                  <div key={alt.id} className="flex items-stretch gap-2">
+                    <button
+                      type="button"
+                      onPointerDown={handlePointerDown}
+                      onPointerMove={handlePointerMove}
+                      onPointerUp={clearLongPress}
+                      onPointerLeave={clearLongPress}
+                      onPointerCancel={clearLongPress}
+                      onContextMenu={(e) => e.preventDefault()}
+                      onClick={handleClick}
+                      disabled={isFinished}
+                      aria-label={
+                        isEliminated
+                          ? `Alternativa ${keyLabel} eliminada. Pressione e segure para desfazer.`
+                          : `Alternativa ${keyLabel}. Toque para selecionar, pressione e segure para eliminar.`
+                      }
+                      className={`flex min-h-16 flex-1 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors select-none touch-manipulation ${optionBg} ${
+                        isEliminated ? 'opacity-60' : ''
+                      }`}
+                    >
+                      <span
+                        className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-sm font-semibold ${
+                          isEliminated
+                            ? 'bg-amber-100 text-amber-700'
+                            : keyBadge
+                        }`}
+                      >
+                        {isEliminated ? (
+                          <ScissorsIcon className="h-4 w-4" />
+                        ) : (
+                          keyLabel
+                        )}
+                      </span>
+                      <span
+                        className={`flex min-h-9 flex-1 items-center text-sm leading-6 ${
+                          isEliminated
+                            ? 'text-slate-400 line-through'
+                            : 'text-slate-800'
+                        }`}
+                      >
+                        <Markdown>{alt.text}</Markdown>
+                      </span>
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+            {!isFinished ? (
+              <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
+                <ScissorsIcon className="h-3 w-3" />
+                Pressione e segure uma alternativa para eliminá-la.
+              </p>
+            ) : null}
+          </MobileCard>
+        </div>
+      ) : (
+        <div className="px-2">
+          <MobileCard className="space-y-4">
+            {!isFinished ? (
+              <p className="text-sm text-slate-500">
+                As explicações ficam disponíveis após você finalizar a prova.
+              </p>
+            ) : (
+              <>
+                <p className="text-sm font-semibold text-slate-700">
+                  Resposta correta: {q.correctAlternative ?? '—'}
+                </p>
+                <div className="space-y-4">
+                  {q.alternatives.map((alt, index) => {
+                    const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
+                    const isCorrect = q.correctAlternative === alt.key
+                    const wasSelected = paneSelectedAltId === alt.id
+                    const isWrong = wasSelected && !isCorrect
+                    const variant = isCorrect
+                      ? 'correct'
+                      : isWrong
+                        ? 'wrong'
+                        : 'neutral'
+                    const cardStyles = {
+                      correct: 'rounded-2xl overflow-hidden border-2 border-emerald-400 bg-emerald-100',
+                      wrong: 'rounded-2xl overflow-hidden border-2 border-rose-400 bg-rose-100',
+                      neutral: 'rounded-2xl overflow-hidden border border-slate-200 bg-slate-50',
+                    }
+                    const headerTextStyles = {
+                      correct: 'text-emerald-800',
+                      wrong: 'text-rose-800',
+                      neutral: 'text-slate-700',
+                    }
+                    const explanationWrapStyles = {
+                      correct: 'border-t border-emerald-300 bg-emerald-50/70',
+                      wrong: 'border-t border-rose-300 bg-rose-50/70',
+                      neutral: 'border-t border-slate-200 bg-slate-100/70',
+                    }
+
+                    return (
+                      <div key={alt.id} className={cardStyles[variant]}>
+                        <div className="p-4">
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>
+                              {keyLabel}.
+                            </span>
+                            {isCorrect ? (
+                              <span className="rounded bg-emerald-200/80 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                Resposta correta
+                              </span>
+                            ) : null}
+                            {isWrong ? (
+                              <span className="rounded bg-rose-200/80 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                                Sua resposta
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className={`text-sm ${headerTextStyles[variant]}`}>
+                            <Markdown>{alt.text}</Markdown>
+                          </div>
+                        </div>
+                        <div className={`p-4 ${explanationWrapStyles[variant]}`}>
+                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Explicação
+                          </p>
+                          {alt.explanation ? (
+                            <div className="text-sm text-slate-700">
+                              <Markdown>{alt.explanation}</Markdown>
+                            </div>
+                          ) : (
+                            <p className="text-sm italic text-slate-500">
+                              Sem explicação cadastrada.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </>
+            )}
+          </MobileCard>
+        </div>
+      )
+    }
 
     return (
       <>
-        <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pb-[calc(7rem+var(--safe-area-inset-bottom))]">
-          <MobileHeader
-            title={playerTitle}
-            onBack={onBack}
-            actions={resolvedMobileHeaderAction}
-            bottom={
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between gap-3 px-1 text-xs font-medium text-slate-400">
-                  <span className="shrink-0">{questionMetaLabel}</span>
-                  <span className="min-w-0 truncate text-right">{subjectLabel}</span>
-                </div>
-                <div className="h-2 overflow-hidden rounded-full bg-slate-200">
-                  <div
-                    className="h-full rounded-full bg-cyan-500 transition-all"
-                    style={{
-                      width: `${(answeredCount / Math.max(questionCount, 1)) * 100}%`,
-                    }}
-                  />
+        <div
+          className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto overscroll-contain pb-[calc(7rem+var(--safe-area-inset-bottom))]"
+          onTouchStart={handleSwipeTouchStart}
+          onTouchEnd={handleSwipeTouchEnd}
+          onTouchCancel={() => { swipeStartRef.current = null }}
+        >
+          <PhoneSafeArea
+            top
+            className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur"
+          >
+            <div className="flex items-center gap-3 px-4 py-3">
+              {onBack ? (
+                <button
+                  type="button"
+                  onClick={onBack}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-slate-200 text-slate-700"
+                  aria-label="Fechar"
+                >
+                  <XMarkIcon className="size-5" />
+                </button>
+              ) : null}
+              <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                <p className="truncate text-xs font-medium text-slate-500">
+                  {playerTitle}
+                </p>
+                <div className="flex items-center gap-2" aria-label={`${answeredCount} de ${questionCount} respondidas`}>
+                  <span className="shrink-0 text-xs font-semibold text-slate-700">
+                    {questionMetaLabel}
+                  </span>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-cyan-500 transition-all"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            }
-          />
+              {resolvedMobileHeaderAction ? (
+                <div className="shrink-0">{resolvedMobileHeaderAction}</div>
+              ) : null}
+            </div>
+          </PhoneSafeArea>
 
           <div className="px-2">
             <div className="grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
@@ -1028,9 +1355,11 @@ export function ExamAttemptPlayer({
                 .map((tab) => {
                   const isActive = value === tab.value
                   const isDisabled = tab.disabled ?? false
-                  const Icon = tab.value === 1 && currentQuestionHasWrongAnswer && value !== 1
-                    ? BookOpenIconSolid
-                    : tab.icon
+                  const Icon = isDisabled
+                    ? LockClosedIcon
+                    : tab.value === 1 && currentQuestionHasWrongAnswer && value !== 1
+                      ? BookOpenIconSolid
+                      : tab.icon
 
                   return (
                     <button
@@ -1038,13 +1367,14 @@ export function ExamAttemptPlayer({
                       type="button"
                       onClick={() => !isDisabled && handleChange(null as any, tab.value)}
                       disabled={isDisabled}
+                      aria-label={isDisabled ? `${tab.label} (bloqueado até finalizar a prova)` : tab.label}
                       className={`flex items-center justify-center gap-2 rounded-[14px] px-3 py-2.5 text-sm font-semibold transition-colors ${
                         isActive ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500'
-                      } ${isDisabled ? 'opacity-50' : ''}`}
+                      } ${isDisabled ? 'text-slate-400' : ''}`}
                     >
                       <Icon
                         className={`h-4 w-4 ${
-                          tab.value === 1 && currentQuestionHasWrongAnswer && value !== 1
+                          tab.value === 1 && !isDisabled && currentQuestionHasWrongAnswer && value !== 1
                             ? 'text-amber-500'
                             : ''
                         }`}
@@ -1056,205 +1386,33 @@ export function ExamAttemptPlayer({
             </div>
           </div>
 
-          {value === 0 ? (
-            <div className="px-2">
-              <MobileCard className="space-y-5">
-                {currentQuestion.referenceText ? (
-                  <div className="rounded-2xl bg-slate-50 p-4">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                      Texto de referência
-                    </p>
-                    <div className="mt-2 text-sm text-slate-700">
-                      <Markdown>{currentQuestion.referenceText}</Markdown>
-                    </div>
-                  </div>
-                ) : null}
-
-                {currentQuestion.statementImageUrl && !statementImageLoadError ? (
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    <img
-                      src={currentQuestion.statementImageUrl}
-                      alt="Imagem do enunciado"
-                      className="max-h-[280px] w-full object-contain bg-slate-50"
-                      onError={() => setStatementImageLoadError(true)}
-                    />
-                  </div>
-                ) : null}
-
-                <div className="text-base font-medium leading-7 text-slate-900">
-                  <Markdown>{currentQuestion.statement}</Markdown>
-                </div>
-
-                <div className="space-y-3">
-                  {currentQuestion.alternatives.map((alt, index) => {
-                    const isEliminated = eliminatedSet.has(alt.id)
-                    const isSelected = selectedAlternativeId === alt.id
-                    const isCorrect = currentQuestion.correctAlternative === alt.key
-                    const isWrong = isFinished && isSelected && !isCorrect
-                    const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
-                    const showCorrectStyling = isCorrect && isFinished
-                    const optionBg = isFinished
-                      ? isCorrect
-                        ? 'bg-emerald-50 border-emerald-400'
-                        : isWrong
-                          ? 'bg-rose-50 border-rose-400'
-                          : 'bg-white border-slate-200'
-                      : showCorrectStyling
-                        ? 'bg-emerald-50 border-emerald-400'
-                        : isSelected
-                          ? 'bg-cyan-50 border-cyan-400'
-                          : 'bg-white border-slate-200'
-                    const keyBadge = isFinished
-                      ? isCorrect
-                        ? 'bg-emerald-600 text-white'
-                        : isWrong
-                          ? 'bg-rose-600 text-white'
-                          : 'bg-slate-200 text-slate-700'
-                      : isSelected
-                        ? 'bg-cyan-500 text-white'
-                        : 'bg-slate-200 text-slate-700'
-
-                    return (
-                      <div key={alt.id} className="flex items-stretch gap-2">
-                        {!isFinished ? (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              toggleEliminated(
-                                currentQuestion.id,
-                                alt.id,
-                                !isEliminated,
-                              )
-                            }
-                            className={`flex w-11 shrink-0 items-center justify-center rounded-2xl border transition-colors ${
-                              isEliminated
-                                ? 'border-amber-300 bg-amber-50 text-amber-700'
-                                : 'border-slate-200 bg-white text-slate-400'
-                            }`}
-                            aria-label={
-                              isEliminated
-                                ? 'Desfazer eliminação'
-                                : 'Eliminar alternativa'
-                            }
-                          >
-                            <ScissorsIcon className="h-4 w-4" />
-                          </button>
-                        ) : null}
-
-                        <button
-                          type="button"
-                          onClick={() =>
-                            !isFinished &&
-                            handleOptionSelected(
-                              currentQuestion.id,
-                              alt.id,
-                              isEliminated,
-                            )
-                          }
-                          disabled={isEliminated || isFinished}
-                          className={`flex min-h-16 flex-1 items-center gap-3 rounded-2xl border px-3 py-3 text-left transition-colors ${optionBg} ${
-                            isEliminated ? 'opacity-50' : ''
-                          }`}
-                        >
-                          <span
-                            className={`flex h-9 min-w-9 items-center justify-center rounded-xl text-sm font-semibold ${keyBadge}`}
-                          >
-                            {keyLabel}
-                          </span>
-                          <span className="flex min-h-9 flex-1 items-center text-sm leading-6 text-slate-800">
-                            <Markdown>{alt.text}</Markdown>
-                          </span>
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              </MobileCard>
+          <div className="question-swipe-container">
+            {mobileOutgoingQuestion ? (
+              <div
+                key={`outgoing-${mobileOutgoingQuestion.question.id}`}
+                aria-hidden="true"
+                className={`absolute inset-x-0 top-0 pointer-events-none ${
+                  mobileOutgoingQuestion.direction === 'forward'
+                    ? 'question-swipe-out-to-left'
+                    : 'question-swipe-out-to-right'
+                }`}
+              >
+                {renderMobilePane(mobileOutgoingQuestion.question)}
+              </div>
+            ) : null}
+            <div
+              key={currentQuestion.id}
+              className={
+                mobileOutgoingQuestion
+                  ? slideDirection === 'forward'
+                    ? 'question-swipe-in-from-right'
+                    : 'question-swipe-in-from-left'
+                  : ''
+              }
+            >
+              {renderMobilePane(currentQuestion)}
             </div>
-          ) : (
-            <div className="px-2">
-              <MobileCard className="space-y-4">
-                {!isFinished ? (
-                  <p className="text-sm text-slate-500">
-                    As explicações ficam disponíveis após você finalizar a prova.
-                  </p>
-                ) : (
-                  <>
-                    <p className="text-sm font-semibold text-slate-700">
-                      Resposta correta: {currentQuestion.correctAlternative ?? '—'}
-                    </p>
-                    <div className="space-y-4">
-                      {currentQuestion.alternatives.map((alt, index) => {
-                        const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
-                        const isCorrect = currentQuestion.correctAlternative === alt.key
-                        const wasSelected = selectedAlternativeId === alt.id
-                        const isWrong = wasSelected && !isCorrect
-                        const variant = isCorrect
-                          ? 'correct'
-                          : isWrong
-                            ? 'wrong'
-                            : 'neutral'
-                        const cardStyles = {
-                          correct: 'rounded-2xl overflow-hidden border-2 border-emerald-400 bg-emerald-100',
-                          wrong: 'rounded-2xl overflow-hidden border-2 border-rose-400 bg-rose-100',
-                          neutral: 'rounded-2xl overflow-hidden border border-slate-200 bg-slate-50',
-                        }
-                        const headerTextStyles = {
-                          correct: 'text-emerald-800',
-                          wrong: 'text-rose-800',
-                          neutral: 'text-slate-700',
-                        }
-                        const explanationWrapStyles = {
-                          correct: 'border-t border-emerald-300 bg-emerald-50/70',
-                          wrong: 'border-t border-rose-300 bg-rose-50/70',
-                          neutral: 'border-t border-slate-200 bg-slate-100/70',
-                        }
-
-                        return (
-                          <div key={alt.id} className={cardStyles[variant]}>
-                            <div className="p-4">
-                              <div className="mb-2 flex flex-wrap items-center gap-2">
-                                <span className={`text-sm font-semibold ${headerTextStyles[variant]}`}>
-                                  {keyLabel}.
-                                </span>
-                                {isCorrect ? (
-                                  <span className="rounded bg-emerald-200/80 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                    Resposta correta
-                                  </span>
-                                ) : null}
-                                {isWrong ? (
-                                  <span className="rounded bg-rose-200/80 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                                    Sua resposta
-                                  </span>
-                                ) : null}
-                              </div>
-                              <div className={`text-sm ${headerTextStyles[variant]}`}>
-                                <Markdown>{alt.text}</Markdown>
-                              </div>
-                            </div>
-                            <div className={`p-4 ${explanationWrapStyles[variant]}`}>
-                              <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                Explicação
-                              </p>
-                              {alt.explanation ? (
-                                <div className="text-sm text-slate-700">
-                                  <Markdown>{alt.explanation}</Markdown>
-                                </div>
-                              ) : (
-                                <p className="text-sm italic text-slate-500">
-                                  Sem explicação cadastrada.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-              </MobileCard>
-            </div>
-          )}
+          </div>
         </div>
 
         <Drawer
@@ -1287,7 +1445,7 @@ export function ExamAttemptPlayer({
               <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
                 <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
                   <span className="h-3 w-3 rounded-full bg-slate-300" />
-                  Nao respondida
+                  Não respondida
                 </div>
                 <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
                   <span className="h-3 w-3 rounded-full bg-cyan-400" />
@@ -1348,10 +1506,11 @@ export function ExamAttemptPlayer({
               <button
                 type="button"
                 onClick={() => setMobileQuestionDrawerOpen(true)}
-                className="flex h-[52px] min-w-0 items-center justify-center rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-slate-700 transition-colors"
-                aria-label="Abrir lista de questões"
+                className="flex h-[52px] min-w-0 flex-col items-center justify-center rounded-[18px] border border-slate-200 bg-slate-50 px-4 text-slate-700 transition-colors"
+                aria-label={`${positionLabel}. Abrir lista de questões.`}
               >
-                <span className="truncate text-sm font-semibold">Questões</span>
+                <span className="truncate text-sm font-semibold leading-tight">{positionLabel}</span>
+                <span className="text-[11px] font-medium text-slate-500 leading-tight">Ver todas</span>
               </button>
 
               <button
