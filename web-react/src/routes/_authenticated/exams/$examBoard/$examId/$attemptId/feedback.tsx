@@ -1,5 +1,6 @@
 import { Alert, Button } from '@mui/material'
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
 import {
   ArrowLeftIcon,
   DocumentTextIcon,
@@ -13,6 +14,7 @@ import {
   useExamBaseAttemptFeedbackQuery,
   useGenerateSubjectFeedbackMutation,
 } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
+import { analytics } from '@/lib/analytics'
 
 function getSubjectBarColor(
   percentage: number,
@@ -42,6 +44,10 @@ function RouteComponent() {
   const { examBoard, examId, attemptId } = Route.useParams()
   const navigate = useNavigate()
   const examBaseId = examId
+
+  useEffect(() => {
+    analytics.capture('feedback_viewed', { attemptId, examBaseId })
+  }, [attemptId, examBaseId])
 
   const { data, isLoading, error } = useExamBaseAttemptFeedbackQuery(
     examBaseId,

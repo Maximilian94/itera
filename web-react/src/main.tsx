@@ -93,6 +93,22 @@ function InnerApp() {
           .join(' '),
       })
       identifiedUserIdRef.current = userId
+
+      // signed_up: emit exactly once per user per browser, and only when the
+      // Clerk account is fresh enough that this identify can plausibly be the
+      // first post-signup load. Stale accounts logging in on a new device
+      // should not fire signed_up.
+      const flagKey = `posthog:signed_up:${userId}`
+      if (!localStorage.getItem(flagKey)) {
+        const createdAt = auth.user?.createdAt
+        const createdAtMs = createdAt ? new Date(createdAt).getTime() : null
+        const isFreshSignup =
+          createdAtMs != null && Date.now() - createdAtMs < 10 * 60 * 1000
+        if (isFreshSignup) {
+          analytics.capture('signed_up')
+        }
+        localStorage.setItem(flagKey, '1')
+      }
     } else if (!userId && identifiedUserIdRef.current) {
       analytics.reset()
       identifiedUserIdRef.current = null

@@ -13,6 +13,7 @@ import {
 import { stripeService } from '@/features/stripe/services/stripe.service'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { ApiError } from '@/lib/api'
+import { analytics } from '@/lib/analytics'
 import type { PlanInfo, SubscriptionPlan } from '@/features/stripe/domain/stripe.types'
 
 export const Route = createFileRoute('/_authenticated/planos')({
@@ -50,6 +51,10 @@ function PlanosPage() {
   const [portalLoading, setPortalLoading] = useState(false)
   const { access } = useAccessState()
 
+  useEffect(() => {
+    analytics.capture('plan_page_viewed')
+  }, [])
+
   const { data: plans, isLoading: plansLoading } = useQuery({
     queryKey: ['stripe', 'plans'],
     queryFn: () => stripeService.getPlans(),
@@ -67,6 +72,11 @@ function PlanosPage() {
       }
 
       const { successUrl, cancelUrl } = getCheckoutUrls()
+      analytics.capture('checkout_started', {
+        plan: plan.plan,
+        billingInterval,
+        priceId,
+      })
       const { url } = await stripeService.createCheckoutSession({
         priceId,
         successUrl,

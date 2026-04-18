@@ -15,6 +15,7 @@ import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/que
 import { Card } from '@/components/Card'
 import { StartExamDialog } from '@/components/StartExamDialog'
 import { formatExamBaseTitle } from '@/lib/utils'
+import { analytics } from '@/lib/analytics'
 
 export const Route = createFileRoute('/_authenticated/onboarding')({
   component: OnboardingPage,
@@ -40,6 +41,11 @@ function OnboardingPage() {
     }
   }, [canDoFreeTraining, isLoading, navigate])
 
+  useEffect(() => {
+    if (isLoading || !canDoFreeTraining) return
+    analytics.capture('onboarding_started')
+  }, [isLoading, canDoFreeTraining])
+
   const firstExamBase = examBases?.[0]
   const selectedExam = (examBases ?? []).find((e) => e.id === selectedExamBaseId)
   const examToUse = selectedExam ?? firstExamBase
@@ -58,6 +64,10 @@ function OnboardingPage() {
       { examBaseId: examToUse.id, subjectFilter },
       {
         onSuccess: (res) => {
+          analytics.capture('onboarding_completed', {
+            trainingId: res.trainingId,
+            examBaseId: examToUse.id,
+          })
           setStartDialogOpen(false)
           navigate({ to: getStagePath('prova', res.trainingId) })
         },
