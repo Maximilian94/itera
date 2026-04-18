@@ -1,4 +1,4 @@
-import { StrictMode } from 'react'
+import { StrictMode, useEffect, useRef } from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider, createRouter } from '@tanstack/react-router'
 import { ThemeProvider, createTheme } from '@mui/material/styles'
@@ -16,7 +16,10 @@ import './styles.css'
 import reportWebVitals from './reportWebVitals.ts'
 import { useAuth } from '@clerk/clerk-react'
 import { setApiTokenGetter } from '@/lib/api'
+import { analytics } from '@/lib/analytics'
 import { ClerkWrapper, useClerkAuth } from '@/auth/clerk'
+
+analytics.init()
 
 
 const toHex = (color: string) => formatHex(converter('rgb')(color))
@@ -51,6 +54,10 @@ const router = createRouter({
   defaultPreloadStaleTime: 0,
 })
 
+router.subscribe('onResolved', () => {
+  analytics.pageview()
+})
+
 // Register the router instance for type safety
 declare module '@tanstack/react-router' {
   interface Register {
@@ -72,6 +79,25 @@ function InnerApp() {
   const { getToken } = useAuth()
   // Set token getter during render so it's available before any child fetches (useEffect runs too late)
   setApiTokenGetter(getToken)
+
+  const identifiedUserIdRef = useRef<string | null>(null)
+
+  useEffect(() => {
+    if (auth.isLoading) return
+    const userId = auth.user?.id ?? null
+    if (userId && identifiedUserIdRef.current !== userId) {
+      analytics.identify(userId, {
+        email: auth.user?.emailAddresses?.[0]?.emailAddress,
+        name: [auth.user?.firstName, auth.user?.lastName]
+          .filter(Boolean)
+          .join(' '),
+      })
+      identifiedUserIdRef.current = userId
+    } else if (!userId && identifiedUserIdRef.current) {
+      analytics.reset()
+      identifiedUserIdRef.current = null
+    }
+  }, [auth.isLoading, auth.user])
 
   if (auth.isLoading) {
     return (
