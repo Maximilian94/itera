@@ -523,12 +523,14 @@ function CreateExamDialog({
   examBoards,
   examBases,
   onSuccess,
+  fullScreen = false,
 }: {
   open: boolean
   onClose: () => void
   examBoards: Array<{ id: string; name: string; alias?: string | null }>
   examBases: ExamBase[] | undefined
   onSuccess: () => void
+  fullScreen?: boolean
 }) {
   const [error, setError] = useState<string | null>(null)
   const [duplicates, setDuplicates] = useState<ExamBase[]>([])
@@ -635,7 +637,7 @@ function CreateExamDialog({
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
+    <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm" fullScreen={fullScreen}>
       <DialogTitle>Criar exame</DialogTitle>
       <DialogContent>
         <Stack gap={2} mt={1}>
@@ -1010,85 +1012,122 @@ function ExamsPage() {
   ]
 
   if (isMobile) {
+    const activeFilterChips: Array<{
+      key: string
+      label: string
+      onRemove: () => void
+    }> = []
+    if (search) {
+      activeFilterChips.push({
+        key: 'search',
+        label: `"${search}"`,
+        onRemove: () => setSearch(''),
+      })
+    }
+    if (selectedScope) {
+      activeFilterChips.push({
+        key: 'scope',
+        label: governmentScopeLabel(selectedScope),
+        onRemove: () => setSelectedScope(''),
+      })
+    }
+    if (selectedState) {
+      activeFilterChips.push({
+        key: 'state',
+        label: selectedState,
+        onRemove: () => {
+          setSelectedState('')
+          setSelectedCity('')
+        },
+      })
+    }
+    if (selectedCity) {
+      activeFilterChips.push({
+        key: 'city',
+        label: selectedCity,
+        onRemove: () => setSelectedCity(''),
+      })
+    }
+    if (selectedBoardLabel) {
+      activeFilterChips.push({
+        key: 'board',
+        label: selectedBoardLabel,
+        onRemove: () => setBoardFilter(null),
+      })
+    }
+
+    const clearAllFilters = () => {
+      setSearch('')
+      setBoardFilter(null)
+      setSelectedState('')
+      setSelectedCity('')
+      setSelectedScope('')
+    }
+
     return (
       <div className="flex flex-col gap-4 pb-6">
-        <section className="-mx-2 overflow-hidden rounded-b-[2rem] bg-linear-to-br from-violet-700 to-violet-950 px-4 pb-5 pt-4 text-white shadow-lg shadow-violet-950/20">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-violet-200/80">Explorar</p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight">Exames</h1>
-              <p className="mt-2 max-w-xs text-sm leading-6 text-violet-100/80">
-                Escolha uma prova, volte para onde parou e mantenha o treino vivo no celular.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileFiltersOpen(true)}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/10 backdrop-blur transition-colors hover:bg-white/15"
-              aria-label="Abrir filtros"
-            >
-              <FunnelIcon className="h-5 w-5 text-white" />
-            </button>
+        <section className="rounded-3xl bg-linear-to-br from-violet-700 to-violet-950 px-5 py-4 text-white shadow-lg shadow-violet-950/20">
+          <div className="flex items-center justify-between gap-3">
+            <h1 className="text-2xl font-bold tracking-tight">Exames</h1>
+            {isAdmin ? (
+              <button
+                type="button"
+                onClick={handleCreateExam}
+                disabled={createDraftMutation.isPending}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white/15 px-3 text-xs font-semibold text-white backdrop-blur transition-colors hover:bg-white/25 disabled:opacity-50"
+              >
+                <PlusIcon className="h-4 w-4" />
+                {createDraftMutation.isPending ? 'Criando…' : 'Novo'}
+              </button>
+            ) : null}
           </div>
 
-          <div className="mt-4 grid grid-cols-3 gap-3 rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
+          <div className="mt-3 flex items-center gap-4 text-white">
             <div>
-              <p className="text-lg font-bold tabular-nums text-white">
+              <p className="text-lg font-bold tabular-nums leading-none">
                 {isLoading ? '—' : totalExams}
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
                 Provas
               </p>
             </div>
+            <div className="h-7 w-px bg-white/15" />
             <div>
-              <p className="text-lg font-bold tabular-nums text-white">
+              <p className="text-lg font-bold tabular-nums leading-none">
                 {isLoading
                   ? '—'
                   : totalQuestions > 999
                     ? `${(totalQuestions / 1000).toFixed(1)}k`
                     : totalQuestions}
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
                 Questões
               </p>
             </div>
+            <div className="h-7 w-px bg-white/15" />
             <div>
-              <p className="text-lg font-bold tabular-nums text-white">
-                {isLoading ? '—' : examsWithAttempts}
+              <p className="text-lg font-bold tabular-nums leading-none">
+                {loadingHistory ? '—' : totalAttempts}
               </p>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
-                Feitas
+              <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                Tentativas
               </p>
             </div>
+            {approvalRate != null ? (
+              <>
+                <div className="h-7 w-px bg-white/15" />
+                <div>
+                  <p className="text-lg font-bold tabular-nums leading-none">
+                    {approvalRate.toFixed(0)}%
+                  </p>
+                  <p className="mt-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-200/70">
+                    Aprovação
+                  </p>
+                </div>
+              </>
+            ) : null}
           </div>
         </section>
-
-        <div className="grid grid-cols-1 gap-3">
-          <ExamsMobileSummaryCard
-            icon={DocumentTextIcon}
-            label="Tentativas"
-            value={loadingHistory ? '—' : String(totalAttempts)}
-            hint={`${loadingHistory ? '—' : passedAttempts} aprovadas · ${loadingHistory ? '—' : failedAttempts} reprovadas`}
-            tone="bg-slate-100 text-slate-700"
-          />
-          <ExamsMobileSummaryCard
-            icon={TrophyIcon}
-            label="Aprovação"
-            value={
-              loadingHistory
-                ? '—'
-                : approvalRate != null
-                  ? `${approvalRate.toFixed(0)}%`
-                  : '—'
-            }
-            hint={
-              evolutionPp != null
-                ? `${evolutionPp > 0 ? '+' : ''}${evolutionPp.toFixed(0)} p.p. nas tentativas mais recentes`
-                : 'Complete ao menos 4 tentativas para ver a evolução.'
-            }
-            tone="bg-violet-100 text-violet-700"
-          />
-        </div>
 
         <div className="relative">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
@@ -1120,18 +1159,11 @@ function ExamsPage() {
         />
 
         <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-slate-900">
-              {hasActiveFilters
-                ? `${filteredExams.length} resultado${filteredExams.length !== 1 ? 's' : ''}`
-                : 'Todas as provas'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              {activeAdvancedFilters.length > 0
-                ? activeAdvancedFilters.join(' · ')
-                : `${totalExams} ${totalExams === 1 ? 'prova' : 'provas'} no total`}
-            </p>
-          </div>
+          <p className="text-sm font-semibold text-slate-900">
+            {hasActiveFilters
+              ? `${filteredExams.length} resultado${filteredExams.length !== 1 ? 's' : ''}`
+              : `${totalExams} ${totalExams === 1 ? 'prova' : 'provas'}`}
+          </p>
           <button
             type="button"
             onClick={() => setMobileFiltersOpen(true)}
@@ -1139,19 +1171,37 @@ function ExamsPage() {
           >
             <FunnelIcon className="h-4 w-4" />
             Filtros
+            {activeFilterChips.length > 0 ? (
+              <span className="ml-0.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-violet-600 px-1.5 text-[11px] font-bold text-white">
+                {activeFilterChips.length}
+              </span>
+            ) : null}
           </button>
         </div>
 
-        {isAdmin ? (
-          <button
-            type="button"
-            onClick={handleCreateExam}
-            disabled={createDraftMutation.isPending}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-violet-700"
-          >
-            <PlusIcon className="h-4 w-4" />
-            {createDraftMutation.isPending ? 'Criando...' : 'Criar exame'}
-          </button>
+        {activeFilterChips.length > 0 ? (
+          <div className="-mt-1 flex flex-wrap items-center gap-2">
+            {activeFilterChips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.onRemove}
+                className="inline-flex items-center gap-1.5 rounded-full bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700 transition-colors hover:bg-violet-100"
+              >
+                {chip.label}
+                <XMarkIcon className="h-3 w-3" />
+              </button>
+            ))}
+            {activeFilterChips.length > 1 ? (
+              <button
+                type="button"
+                onClick={clearAllFilters}
+                className="text-xs font-semibold text-slate-500 underline"
+              >
+                Limpar tudo
+              </button>
+            ) : null}
+          </div>
         ) : null}
 
         <CreateExamDialog
@@ -1160,6 +1210,7 @@ function ExamsPage() {
           examBoards={examBoards ?? []}
           examBases={examBases}
           onSuccess={refetchExamBases}
+          fullScreen
         />
 
         <Dialog open={!!examToDelete} onClose={() => setExamToDelete(null)} maxWidth="xs" fullWidth>
