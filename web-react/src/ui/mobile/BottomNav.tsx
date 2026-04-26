@@ -13,22 +13,12 @@ import {
   HomeIcon as HomeIconSolid,
   UserIcon as UserIconSolid,
 } from '@heroicons/react/24/solid'
-import {
-  Link,
-  useMatchRoute,
-  type RegisteredRouter,
-  type ToPathOption,
-} from '@tanstack/react-router'
-import { Route as AccountRoute } from '@/routes/_authenticated/account'
-import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
-import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
-import { Route as HistoryRoute } from '@/routes/_authenticated/history'
-import { Route as TreinoRoute } from '@/routes/_authenticated/treino'
+import { Link, useMatchRoute } from '@tanstack/react-router'
 import { PhoneSafeArea } from './PhoneSafeArea'
 
 type BottomNavItem = {
   label: string
-  to: string
+  to: '/dashboard' | '/exams' | '/treino' | '/history' | '/account'
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
@@ -37,33 +27,33 @@ type BottomNavItem = {
 const items: BottomNavItem[] = [
   {
     label: 'Home',
-    to: DashboardRoute.to,
+    to: '/dashboard',
     icon: HomeIcon,
     activeIcon: HomeIconSolid,
   },
   {
     label: 'Exams',
-    to: ExamsRoute.to,
+    to: '/exams',
     icon: DocumentTextIcon,
     activeIcon: DocumentTextIconSolid,
     fuzzy: true,
   },
   {
     label: 'Treino',
-    to: TreinoRoute.to,
+    to: '/treino',
     icon: AcademicCapIcon,
     activeIcon: AcademicCapIconSolid,
     fuzzy: true,
   },
   {
     label: 'Histórico',
-    to: HistoryRoute.to,
+    to: '/history',
     icon: ClockIcon,
     activeIcon: ClockIconSolid,
   },
   {
     label: 'Perfil',
-    to: AccountRoute.to,
+    to: '/account',
     icon: UserIcon,
     activeIcon: UserIconSolid,
     fuzzy: true,
@@ -81,7 +71,7 @@ export function BottomNav() {
       <nav className="mx-auto flex h-[var(--mobile-bottom-nav-height)] max-w-md items-center justify-between px-2">
         {items.map((item) => {
           const isActive = matchRoute({
-            to: item.to as ToPathOption<RegisteredRouter>,
+            to: item.to,
             fuzzy: item.fuzzy ?? false,
           })
           const Icon = isActive ? item.activeIcon : item.icon
