@@ -11,12 +11,17 @@ export function CookieBanner() {
     if (analytics.getConsent() === null) setVisible(true);
   }, []);
 
+  useEffect(() => {
+    document.body.style.overflow = visible ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [visible]);
+
   if (!visible) return null;
 
   const handleAccept = () => {
     analytics.optIn();
-    // Re-fire the pageview for the current route — the initial one was
-    // swallowed while we waited for consent.
     analytics.pageview();
     setVisible(false);
   };
@@ -28,36 +33,43 @@ export function CookieBanner() {
 
   return (
     <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
+      aria-modal="true"
       role="dialog"
       aria-label="Consentimento de cookies"
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-slate-200 bg-white/95 backdrop-blur shadow-lg"
     >
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6">
-        <p className="text-sm text-slate-700 flex-1">
-          Usamos cookies e ferramentas de análise (PostHog) para entender como
-          você navega no site e melhorar a experiência. Saiba mais em nossa{" "}
-          <Link
-            href="/politica-de-privacidade"
-            className="text-cyan-600 hover:text-cyan-500 underline"
-          >
-            Política de Privacidade
-          </Link>
-          .
-        </p>
-        <div className="flex gap-2 shrink-0">
+      <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-6 flex flex-col gap-5">
+        <div className="flex flex-col gap-2">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Sua privacidade importa
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed">
+            Usamos cookies e ferramentas de análise (PostHog) para entender como
+            você navega no site e melhorar a experiência. Ao continuar, você
+            concorda com o uso descrito em nossa{" "}
+            <Link
+              href="/politica-de-privacidade"
+              className="text-cyan-600 hover:text-cyan-500 underline"
+            >
+              Política de Privacidade
+            </Link>
+            .
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row gap-2">
           <button
             type="button"
             onClick={handleReject}
-            className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
+            className="flex-1 rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
             Rejeitar
           </button>
           <button
             type="button"
             onClick={handleAccept}
-            className="rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white hover:bg-cyan-500 transition-colors"
+            className="flex-1 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-cyan-500 transition-colors"
           >
-            Aceitar
+            Aceitar cookies
           </button>
         </div>
       </div>
