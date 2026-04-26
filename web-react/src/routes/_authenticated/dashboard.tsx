@@ -5,15 +5,17 @@ import { MobileCard } from '@/ui/mobile'
 import { useExamBaseAttemptHistoryQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { useClerkAuth } from '@/auth/clerk'
-import type { UserResource } from "@clerk/types";
+import type { UserResource } from '@clerk/types'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
 import { useIsMobile } from '@/lib/useIsMobile'
 import {
   AcademicCapIcon,
+  ArrowDownIcon,
   ArrowRightIcon,
   ArrowTrendingUpIcon,
+  ArrowUpIcon,
   ClockIcon,
   DocumentTextIcon,
   PlayIcon,
@@ -22,6 +24,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { Button } from '@mui/material'
 import { LineChart } from '@mui/x-charts/LineChart'
+import { SparkLineChart } from '@mui/x-charts/SparkLineChart'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { getStagePath } from './treino/-stages.config'
@@ -33,10 +36,6 @@ import colors from 'tailwindcss/colors'
 export const Route = createFileRoute('/_authenticated/dashboard')({
   component: Dashboard,
 })
-
-/* ------------------------------------------------------------------ */
-/*  Helpers                                                            */
-/* ------------------------------------------------------------------ */
 
 function getGreeting(): string {
   const h = new Date().getHours()
@@ -50,7 +49,6 @@ function getFirstName(user: UserResource | null): string {
   return user.firstName ?? ''
 }
 
-/** Linear regression slope (p.p. per exam). Returns null if fewer than 2 points. */
 function linearRegressionSlope(scores: number[]): number | null {
   const n = scores.length
   if (n < 2) return null
@@ -69,9 +67,108 @@ function linearRegressionSlope(scores: number[]): number | null {
   return (n * sumXY - sumX * sumY) / denom
 }
 
-/* ------------------------------------------------------------------ */
-/*  Quick-action link card                                            */
-/* ------------------------------------------------------------------ */
+const STAGE_LABELS: Record<string, string> = {
+  EXAM: 'Fazendo a prova',
+  DIAGNOSIS: 'Diagnóstico',
+  STUDY: 'Estudando',
+  RETRY: 'Re-tentativa',
+  FINAL: 'Concluído',
+}
+
+const STAGE_COLORS: Record<string, string> = {
+  EXAM: 'bg-cyan-100 text-cyan-700',
+  DIAGNOSIS: 'bg-amber-100 text-amber-700',
+  STUDY: 'bg-emerald-100 text-emerald-700',
+  RETRY: 'bg-violet-100 text-violet-700',
+  FINAL: 'bg-rose-100 text-rose-700',
+}
+
+const STAGE_SLUG: Record<string, TreinoStageSlug> = {
+  EXAM: 'prova',
+  DIAGNOSIS: 'diagnostico',
+  STUDY: 'estudo',
+  RETRY: 'retentativa',
+  FINAL: 'final',
+}
+
+const STAGE_PROGRESS: Record<string, number> = {
+  EXAM: 20,
+  DIAGNOSIS: 40,
+  STUDY: 60,
+  RETRY: 80,
+  FINAL: 100,
+}
+
+function MobileStatCard({
+  label,
+  value,
+  delta,
+  deltaLabel,
+}: {
+  label: string
+  value: string
+  delta?: number | null
+  deltaLabel?: string
+}) {
+  const trend =
+    delta == null ? 'flat' : delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
+  const trendStyle =
+    trend === 'up'
+      ? 'bg-emerald-50 text-emerald-700'
+      : trend === 'down'
+        ? 'bg-rose-50 text-rose-700'
+        : 'bg-slate-100 text-slate-500'
+  const TrendIcon =
+    trend === 'up' ? ArrowUpIcon : trend === 'down' ? ArrowDownIcon : null
+
+  return (
+    <MobileCard>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+        {value}
+      </p>
+      {deltaLabel ? (
+        <div
+          className={`mt-2 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${trendStyle}`}
+        >
+          {TrendIcon ? <TrendIcon className="size-3" /> : null}
+          {deltaLabel}
+        </div>
+      ) : null}
+    </MobileCard>
+  )
+}
+
+function MobileActionTile({
+  to,
+  icon: Icon,
+  title,
+  accent,
+  iconBg,
+}: {
+  to: string
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
+  title: string
+  accent: string
+  iconBg: string
+}) {
+  return (
+    <Link to={to} className="block text-inherit no-underline">
+      <MobileCard className="h-full p-3">
+        <div className="flex items-center gap-3">
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${iconBg}`}
+          >
+            <Icon className={`size-5 ${accent}`} />
+          </div>
+          <p className="text-sm font-semibold text-slate-900">{title}</p>
+        </div>
+      </MobileCard>
+    </Link>
+  )
+}
 
 function ActionCard({
   to,
@@ -136,114 +233,6 @@ function ActionCard({
   )
 }
 
-function MobileStatCard({
-  icon: Icon,
-  label,
-  value,
-  tone,
-}: {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
-  label: string
-  value: string
-  tone: string
-}) {
-  return (
-    <MobileCard className="p-0">
-      <div className="flex items-start gap-3">
-        <div
-          className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${tone}`}
-        >
-          <Icon className="size-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-            {label}
-          </p>
-          <p className="mt-1 text-xl font-bold tracking-tight text-slate-900">
-            {value}
-          </p>
-        </div>
-      </div>
-    </MobileCard>
-  )
-}
-
-function MobileActionTile({
-  to,
-  icon: Icon,
-  title,
-  description,
-  accent,
-  iconBg,
-}: {
-  to: string
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
-  title: string
-  description: string
-  accent: string
-  iconBg: string
-}) {
-  return (
-    <Link to={to} className="block text-inherit no-underline">
-      <MobileCard className="h-full">
-        <div className="flex flex-col gap-3">
-          <div
-            className={`flex h-11 w-11 items-center justify-center rounded-2xl ${iconBg}`}
-          >
-            <Icon className={`size-5 ${accent}`} />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-900">{title}</p>
-            <p className="mt-1 text-xs leading-5 text-slate-500">
-              {description}
-            </p>
-          </div>
-        </div>
-      </MobileCard>
-    </Link>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Training in-progress card                                          */
-/* ------------------------------------------------------------------ */
-
-const STAGE_LABELS: Record<string, string> = {
-  EXAM: 'Fazendo a prova',
-  DIAGNOSIS: 'Diagnóstico',
-  STUDY: 'Estudando',
-  RETRY: 'Re-tentativa',
-  FINAL: 'Concluído',
-}
-
-const STAGE_COLORS: Record<string, string> = {
-  EXAM: 'bg-cyan-100 text-cyan-700',
-  DIAGNOSIS: 'bg-amber-100 text-amber-700',
-  STUDY: 'bg-emerald-100 text-emerald-700',
-  RETRY: 'bg-violet-100 text-violet-700',
-  FINAL: 'bg-rose-100 text-rose-700',
-}
-
-const STAGE_SLUG: Record<string, TreinoStageSlug> = {
-  EXAM: 'prova',
-  DIAGNOSIS: 'diagnostico',
-  STUDY: 'estudo',
-  RETRY: 'retentativa',
-  FINAL: 'final',
-}
-
-const STAGE_PROGRESS: Record<string, number> = {
-  EXAM: 20,
-  DIAGNOSIS: 40,
-  STUDY: 60,
-  RETRY: 80,
-  FINAL: 100,
-}
-
-/* ------------------------------------------------------------------ */
-/*  Dashboard                                                          */
-/* ------------------------------------------------------------------ */
-
 function Dashboard() {
   const navigate = useNavigate()
   const isMobile = useIsMobile()
@@ -259,7 +248,6 @@ function Dashboard() {
   const canDoFreeTraining =
     access.status === 'inactive' && (access.canDoFreeTraining ?? false)
 
-  // Redirect new users to onboarding (1 free training)
   useEffect(() => {
     if (accessLoading) return
     if (canDoFreeTraining) {
@@ -270,7 +258,6 @@ function Dashboard() {
   const firstName = user ? getFirstName(user) : ''
   const greeting = getGreeting()
 
-  // Show loading while redirecting to onboarding
   if (accessLoading || canDoFreeTraining) {
     return (
       <div className="flex items-center justify-center min-h-[300px]">
@@ -281,16 +268,12 @@ function Dashboard() {
     )
   }
 
-  // Training stats
   const totalTrainings = trainings.length
   const concludedTrainings = trainings.filter(
     (t) => t.currentStage === 'FINAL',
   ).length
-  const activeTrainings = trainings.filter(
-    (t) => t.currentStage !== 'FINAL',
-  )
+  const activeTrainings = trainings.filter((t) => t.currentStage !== 'FINAL')
 
-  // Training quota (active/trial) or inactive
   const trainingsUsed =
     access.status === 'active' || access.status === 'trial'
       ? access.trainingsUsedThisMonth
@@ -307,8 +290,6 @@ function Dashboard() {
   const canCreateTraining =
     hasTrainingQuota && activeTrainings.length === 0
 
-  // Initial score trend: how much the user's exam scores are rising over time
-  // Data: finished attempts with percentage, ordered by date
   const scoreHistory = historyItems
     .filter((i) => i.finishedAt != null && i.percentage != null)
     .map((i) => ({
@@ -329,22 +310,25 @@ function Dashboard() {
 
   const avgThisMonth =
     attemptsThisMonth.length > 0
-      ? attemptsThisMonth.reduce((s, p) => s + p.score, 0) / attemptsThisMonth.length
+      ? attemptsThisMonth.reduce((s, p) => s + p.score, 0) /
+        attemptsThisMonth.length
       : null
   const avgLastMonth =
     attemptsLastMonth.length > 0
-      ? attemptsLastMonth.reduce((s, p) => s + p.score, 0) / attemptsLastMonth.length
+      ? attemptsLastMonth.reduce((s, p) => s + p.score, 0) /
+        attemptsLastMonth.length
       : null
 
   const initialScoreTrend =
-    avgThisMonth != null && avgLastMonth != null ? avgThisMonth - avgLastMonth : null
+    avgThisMonth != null && avgLastMonth != null
+      ? avgThisMonth - avgLastMonth
+      : null
 
   const trendSlopePerExam =
     scoreHistory.length >= 2
       ? linearRegressionSlope(scoreHistory.map((p) => p.score))
       : null
 
-  // Average improvement per training: (final - initial) averaged over concluded trainings
   const trainingsWithScores = trainings
     .filter(
       (t) =>
@@ -373,280 +357,244 @@ function Dashboard() {
       (t.finalScorePercentage ?? 0) - (t.initialScorePercentage ?? 0),
   }))
 
-  // Quick-action state
   const activeAttempt = historyItems.find(
     (i) => i.finishedAt == null && i.examBoardId != null,
   )
-  const concludedAttempts = historyItems.filter((i) => i.finishedAt != null).length
-  const scoreSummary =
-    loadingHistory
-      ? 'Carregando sua evolução...'
-      : initialScoreTrend != null
-        ? initialScoreTrend > 0
-          ? `Sua média subiu ${initialScoreTrend.toFixed(1)} p.p. em relação ao mês anterior.`
-          : initialScoreTrend < 0
-            ? `Sua média caiu ${Math.abs(initialScoreTrend).toFixed(1)} p.p. em relação ao mês anterior.`
-            : 'Sua média ficou estável em relação ao mês anterior.'
-        : scoreHistory.length === 0
-          ? 'Conclua provas para começar a acompanhar sua evolução.'
-          : 'Faça provas em mais de um mês para ver a comparação.'
-  const trainingSummary =
-    loadingTrainings
-      ? 'Carregando seus treinos...'
-      : avgTrainingImprovement != null
-        ? avgTrainingImprovement > 0
-          ? `Cada treino concluído gerou, em média, +${avgTrainingImprovement.toFixed(1)} p.p.`
-          : avgTrainingImprovement < 0
-            ? `Sua média caiu ${Math.abs(avgTrainingImprovement).toFixed(1)} p.p. entre início e fim dos treinos.`
-            : 'Seu desempenho ficou estável entre início e fim dos treinos.'
-        : 'Conclua treinos para medir o ganho entre diagnóstico e final.'
+  const concludedAttempts = historyItems.filter(
+    (i) => i.finishedAt != null,
+  ).length
+  const concludedAttemptsThisMonth = attemptsThisMonth.length
+  const concludedAttemptsLastMonth = attemptsLastMonth.length
+  const attemptsDelta =
+    concludedAttemptsThisMonth - concludedAttemptsLastMonth
+
+  const sparklineData = scoreHistory.slice(-10).map((p) => p.score)
+  const latestScore =
+    scoreHistory.length > 0 ? scoreHistory[scoreHistory.length - 1].score : null
+
+  const goPrimary = () => {
+    if (activeAttempt) {
+      navigate({
+        to: '/exams/$examBoard/$examId/$attemptId',
+        params: {
+          examBoard: activeAttempt.examBoardId!,
+          examId: activeAttempt.examBaseId,
+          attemptId: activeAttempt.id,
+        },
+      })
+      return
+    }
+    if (lastActiveTraining) {
+      navigate({
+        to: getStagePath(
+          STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
+          lastActiveTraining.trainingId,
+        ),
+      })
+      return
+    }
+    if (canCreateTraining) {
+      navigate({ to: '/treino/novo' })
+      return
+    }
+  }
+
+  const primaryCta = activeAttempt
+    ? { label: 'Continuar exame', icon: PlayIcon, available: true }
+    : lastActiveTraining
+      ? { label: 'Continuar treino', icon: PlayIcon, available: true }
+      : canCreateTraining
+        ? { label: 'Criar treino', icon: PlusIcon, available: true }
+        : isLimitReached
+          ? {
+              label: isEliteAtLimit ? 'Ver assinatura' : 'Fazer upgrade',
+              icon: RocketLaunchIcon,
+              available: true,
+            }
+          : { label: 'Explorar exames', icon: DocumentTextIcon, available: true }
+
+  const handlePrimaryCta = () => {
+    if (isLimitReached && !activeAttempt && !lastActiveTraining) {
+      openPortal()
+      return
+    }
+    if (!activeAttempt && !lastActiveTraining && !canCreateTraining) {
+      navigate({ to: '/exams', search: { board: undefined } })
+      return
+    }
+    goPrimary()
+  }
 
   if (isMobile) {
     return (
       <div className="flex flex-col gap-4 pb-6">
-        <section className="-mx-2 overflow-hidden rounded-b-[2rem] bg-linear-to-br from-cyan-600 via-cyan-700 to-sky-900 px-4 pb-5 pt-4 text-white shadow-lg shadow-cyan-950/20">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium text-cyan-100/80">
-                {greeting}{firstName ? ',' : ''}
+        <section className="overflow-hidden rounded-3xl bg-linear-to-br from-cyan-600 via-cyan-700 to-sky-900 p-5 text-white shadow-lg shadow-cyan-950/20">
+          <p className="text-xs font-medium text-cyan-100/80">
+            {greeting}
+            {firstName ? ',' : ''}
+          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight">
+            {firstName || 'Bem-vindo'}
+          </h1>
+
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 py-3 backdrop-blur">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan-100/70">
+                Treinos do mês
               </p>
-              <h1 className="mt-1 text-2xl font-bold tracking-tight">
-                {firstName || 'Bem-vindo'}
-              </h1>
-              <p className="mt-2 max-w-xs text-sm leading-6 text-cyan-100/85">
-                Seu painel agora está pronto para sessões rápidas no celular.
-              </p>
-            </div>
-            <div className="rounded-2xl bg-white/10 px-3 py-2 text-right backdrop-blur">
-              <p className="text-[11px] uppercase tracking-[0.18em] text-cyan-100/70">
-                Treinos
-              </p>
-              <p className="text-sm font-semibold text-white">
+              <p className="mt-0.5 text-sm font-semibold text-white">
                 {access.status === 'active' || access.status === 'trial'
-                  ? `${trainingsUsed}/${trainingsAvailable}`
-                  : 'Assine'}
+                  ? `${trainingsUsed} / ${trainingsAvailable}`
+                  : 'Sem assinatura'}
               </p>
             </div>
-          </div>
-
-          <div className="mt-4 rounded-[1.5rem] border border-white/10 bg-white/10 p-4 backdrop-blur">
-            <div className="flex items-center gap-3">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-white/15">
-                <AcademicCapIcon className="size-5 text-white" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-100/70">
-                  Treinos do mês
-                </p>
-                <p className="text-sm font-semibold text-white">
-                  {access.status === 'active' || access.status === 'trial'
-                    ? `${trainingsUsed} usados de ${trainingsAvailable}`
-                    : 'Assine um plano para desbloquear treinos inteligentes'}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/15">
+            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/20">
               <div
                 className="h-full rounded-full bg-white transition-all"
                 style={{
                   width:
                     access.status === 'active' || access.status === 'trial'
-                      ? `${Math.min((trainingsUsed / Math.max(trainingsAvailable, 1)) * 100, 100)}%`
+                      ? `${Math.min(
+                          (trainingsUsed / Math.max(trainingsAvailable, 1)) *
+                            100,
+                          100,
+                        )}%`
                       : '0%',
                 }}
               />
             </div>
-
-            <div className="mt-4 flex flex-col gap-2">
-              {lastActiveTraining ? (
-                <Link
-                  to={getStagePath(
-                    STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
-                    lastActiveTraining.trainingId,
-                  )}
-                  className="no-underline"
-                >
-                  <Button
-                    variant="contained"
-                    color="inherit"
-                    fullWidth
-                    startIcon={<PlayIcon className="w-4 h-4" />}
-                    sx={{
-                      color: '#0f172a',
-                      bgcolor: '#fff',
-                      borderRadius: '16px',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      '&:hover': { bgcolor: '#e2e8f0' },
-                    }}
-                  >
-                    Continuar treino
-                  </Button>
-                </Link>
-              ) : canCreateTraining ? (
-                <Link to="/treino/novo" className="no-underline">
-                  <Button
-                    variant="contained"
-                    color="inherit"
-                    fullWidth
-                    startIcon={<PlusIcon className="w-4 h-4" />}
-                    sx={{
-                      color: '#0f172a',
-                      bgcolor: '#fff',
-                      borderRadius: '16px',
-                      textTransform: 'none',
-                      fontWeight: 700,
-                      '&:hover': { bgcolor: '#e2e8f0' },
-                    }}
-                  >
-                    Criar treino
-                  </Button>
-                </Link>
-              ) : isLimitReached ? (
-                <Button
-                  variant="contained"
-                  color="inherit"
-                  fullWidth
-                  disabled={portalLoading}
-                  onClick={openPortal}
-                  sx={{
-                    color: '#0f172a',
-                    bgcolor: '#fff',
-                    borderRadius: '16px',
-                    textTransform: 'none',
-                    fontWeight: 700,
-                    '&:hover': { bgcolor: '#e2e8f0' },
-                  }}
-                >
-                  {portalLoading
-                    ? 'Abrindo…'
-                    : isEliteAtLimit
-                      ? 'Ver assinatura'
-                      : 'Fazer upgrade'}
-                </Button>
-              ) : null}
-            </div>
           </div>
+
+          <Button
+            variant="contained"
+            color="inherit"
+            fullWidth
+            disabled={portalLoading}
+            startIcon={<primaryCta.icon className="w-4 h-4" />}
+            onClick={handlePrimaryCta}
+            sx={{
+              mt: 2,
+              color: '#0f172a',
+              bgcolor: '#fff',
+              borderRadius: '16px',
+              textTransform: 'none',
+              fontWeight: 700,
+              py: 1.25,
+              '&:hover': { bgcolor: '#e2e8f0' },
+            }}
+          >
+            {portalLoading ? 'Abrindo…' : primaryCta.label}
+          </Button>
         </section>
-
-        {activeAttempt ? (
-          <MobileCard className="border-cyan-200 bg-cyan-50">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
-                  <PlayIcon className="size-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-cyan-900">
-                    Você tem um exame em andamento
-                  </p>
-                  <p className="mt-1 text-xs leading-5 text-cyan-700/80">
-                    {formatExamBaseTitle({
-                      examDate: activeAttempt.examDate,
-                      institution: activeAttempt.institution,
-                      name: activeAttempt.examBaseName,
-                      state: activeAttempt.state,
-                      city: activeAttempt.city,
-                    })}
-                  </p>
-                </div>
-              </div>
-
-              <Button
-                variant="contained"
-                color="primary"
-                fullWidth
-                startIcon={<PlayIcon className="w-4 h-4" />}
-                onClick={() =>
-                  navigate({
-                    to: '/exams/$examBoard/$examId/$attemptId',
-                    params: {
-                      examBoard: activeAttempt.examBoardId!,
-                      examId: activeAttempt.examBaseId,
-                      attemptId: activeAttempt.id,
-                    },
-                  })
-                }
-                sx={{
-                  borderRadius: '16px',
-                  textTransform: 'none',
-                  fontWeight: 700,
-                }}
-              >
-                Continuar exame
-              </Button>
-            </div>
-          </MobileCard>
-        ) : null}
 
         <div className="grid grid-cols-2 gap-3">
           <MobileStatCard
-            icon={DocumentTextIcon}
-            label="Provas"
+            label="Provas concluídas"
             value={String(concludedAttempts)}
-            tone="bg-violet-100 text-violet-700"
+            delta={attemptsDelta}
+            deltaLabel={
+              concludedAttemptsThisMonth > 0 || concludedAttemptsLastMonth > 0
+                ? `${attemptsDelta >= 0 ? '+' : ''}${attemptsDelta} no mês`
+                : undefined
+            }
           />
           <MobileStatCard
-            icon={AcademicCapIcon}
-            label="Em andamento"
+            label="Treinos ativos"
             value={String(activeTrainings.length)}
-            tone="bg-emerald-100 text-emerald-700"
+            deltaLabel={
+              concludedTrainings > 0
+                ? `${concludedTrainings} concluído${concludedTrainings !== 1 ? 's' : ''}`
+                : undefined
+            }
           />
         </div>
 
         <MobileCard>
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-cyan-100 text-cyan-700">
-              <ArrowTrendingUpIcon className="size-5" />
-            </div>
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-slate-900">
-                Sua evolução
-              </h2>
+              <div className="flex items-center gap-2">
+                <ArrowTrendingUpIcon className="size-4 text-cyan-600" />
+                <h2 className="text-sm font-semibold text-slate-900">
+                  Sua evolução
+                </h2>
+              </div>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Resumo rápido do que mudou no seu desempenho.
+                {loadingHistory
+                  ? 'Carregando...'
+                  : initialScoreTrend != null
+                    ? initialScoreTrend > 0
+                      ? `Sua média subiu ${initialScoreTrend.toFixed(1)} p.p. esse mês.`
+                      : initialScoreTrend < 0
+                        ? `Sua média caiu ${Math.abs(initialScoreTrend).toFixed(1)} p.p. esse mês.`
+                        : 'Sua média ficou estável esse mês.'
+                    : scoreHistory.length === 0
+                      ? 'Conclua provas para acompanhar.'
+                      : 'Faça provas em mais de um mês para comparar.'}
               </p>
             </div>
+            {latestScore != null ? (
+              <div className="text-right">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Última
+                </p>
+                <p className="text-lg font-bold tracking-tight text-slate-900">
+                  {latestScore.toFixed(0)}%
+                </p>
+              </div>
+            ) : null}
           </div>
 
-          <div className="mt-4 grid gap-3">
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Provas
-              </p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">
-                {scoreSummary}
+          {sparklineData.length >= 2 ? (
+            <div className="mt-3 h-16 w-full">
+              <SparkLineChart
+                data={sparklineData}
+                height={64}
+                color={colors.cyan[500]}
+                area
+                showHighlight
+                showTooltip
+                yAxis={{ min: 0, max: 100 }}
+              />
+            </div>
+          ) : (
+            <div className="mt-3 flex h-16 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+              <p className="text-xs text-slate-500">
+                Sem dados suficientes ainda
               </p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                Treinos
+          )}
+
+          <div className="mt-3 flex items-center justify-between">
+            {trendSlopePerExam != null ? (
+              <p className="text-[11px] text-slate-500">
+                {trendSlopePerExam > 0
+                  ? `+${trendSlopePerExam.toFixed(1)} p.p. por prova`
+                  : trendSlopePerExam < 0
+                    ? `${trendSlopePerExam.toFixed(1)} p.p. por prova`
+                    : 'Estável entre provas'}
               </p>
-              <p className="mt-1 text-sm leading-6 text-slate-700">
-                {trainingSummary}
-              </p>
-            </div>
+            ) : (
+              <span />
+            )}
             <Link
               to="/evolucao-como-funciona"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-cyan-700 no-underline"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-700 no-underline"
             >
               Como é calculado?
-              <ArrowRightIcon className="w-4 h-4" />
+              <ArrowRightIcon className="w-3 h-3" />
             </Link>
           </div>
         </MobileCard>
 
         <div>
           <h2 className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
-            Ações rápidas
+            Atalhos
           </h2>
           <div className="grid grid-cols-2 gap-3">
             <MobileActionTile
               to="/treino/novo"
               icon={RocketLaunchIcon}
               title="Novo treino"
-              description="Comece um ciclo guiado."
               accent="text-cyan-700"
               iconBg="bg-cyan-100"
             />
@@ -654,7 +602,6 @@ function Dashboard() {
               to="/treino"
               icon={AcademicCapIcon}
               title="Meus treinos"
-              description="Retome o que já começou."
               accent="text-emerald-700"
               iconBg="bg-emerald-100"
             />
@@ -662,7 +609,6 @@ function Dashboard() {
               to="/exams"
               icon={DocumentTextIcon}
               title="Exames"
-              description="Explore provas disponíveis."
               accent="text-violet-700"
               iconBg="bg-violet-100"
             />
@@ -670,7 +616,6 @@ function Dashboard() {
               to="/history"
               icon={ClockIcon}
               title="Histórico"
-              description="Veja seu rastro de tentativas."
               accent="text-slate-700"
               iconBg="bg-slate-100"
             />
@@ -693,7 +638,8 @@ function Dashboard() {
 
             <div className="grid gap-3">
               {activeTrainings.slice(0, 3).map((t) => {
-                const stageLabel = STAGE_LABELS[t.currentStage] ?? t.currentStage
+                const stageLabel =
+                  STAGE_LABELS[t.currentStage] ?? t.currentStage
                 const stageColor =
                   STAGE_COLORS[t.currentStage] ?? 'bg-slate-100 text-slate-700'
                 const slug = STAGE_SLUG[t.currentStage] ?? 'prova'
@@ -712,7 +658,8 @@ function Dashboard() {
                             {t.examTitle}
                           </p>
                           <p className="mt-1 text-xs text-slate-500">
-                            Atualizado em {dayjs(t.updatedAt).format('DD/MM/YY')}
+                            Atualizado em{' '}
+                            {dayjs(t.updatedAt).format('DD/MM/YY')}
                           </p>
                         </div>
                         <ArrowRightIcon className="mt-0.5 size-4 shrink-0 text-slate-300" />
@@ -748,14 +695,12 @@ function Dashboard() {
 
   return (
     <div className="flex flex-col gap-8 pb-6">
-      {/* ═══════════ WELCOME HERO ═══════════ */}
       <PageHero
         greeting={`${greeting}${firstName ? ',' : ''}`}
         title={firstName || 'Bem-vindo'}
         description="Acompanhe seu progresso, continue seus treinos e avance nos seus estudos para concursos."
       />
 
-      {/* ═══════════ TREINOS DISPONÍVEIS ═══════════ */}
       <div style={{ animation: 'fade-in-up 0.5s ease-out 50ms both' }}>
         <Card noElevation className="p-5 border border-slate-200">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -819,7 +764,10 @@ function Dashboard() {
                   {isEliteAtLimit && (
                     <p className="text-xs text-slate-500 sm:mr-2 self-center">
                       Novos treinos em{' '}
-                      {dayjs().add(1, 'month').startOf('month').format('DD/MM/YYYY')}
+                      {dayjs()
+                        .add(1, 'month')
+                        .startOf('month')
+                        .format('DD/MM/YYYY')}
                     </p>
                   )}
                   <Button
@@ -842,12 +790,10 @@ function Dashboard() {
         </Card>
       </div>
 
-      {/* ═══════════ EVOLUÇÃO (NOTA INICIAL + TREINOS) ═══════════ */}
       <div
         className="grid grid-cols-1 lg:grid-cols-2 gap-4"
         style={{ animation: 'fade-in-up 0.5s ease-out 400ms both' }}
       >
-        {/* Evolução da nota inicial */}
         <Card noElevation className="p-5 border border-slate-200">
           <div className="mb-4">
             <div className="flex items-center gap-3">
@@ -966,7 +912,6 @@ function Dashboard() {
           )}
         </Card>
 
-        {/* Evolução nos treinos */}
         <Card noElevation className="p-5 border border-slate-200">
           <div className="mb-4">
             <div className="flex items-center gap-3">
@@ -1003,8 +948,6 @@ function Dashboard() {
                       ) : (
                         'Sua nota se mantém estável do início ao fim dos treinos'
                       )
-                    ) : trainingImprovementHistory.length === 0 ? (
-                      'Conclua treinos para ver sua evolução'
                     ) : (
                       'Conclua treinos para ver sua evolução'
                     )}
@@ -1064,11 +1007,8 @@ function Dashboard() {
         </Card>
       </div>
 
-      {/* ═══════════ AÇÕES RÁPIDAS ═══════════ */}
       <div style={{ animation: 'fade-in-up 0.5s ease-out 450ms both' }}>
-        <h2
-          className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
-        >
+        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3">
           Ações rápidas
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1116,7 +1056,6 @@ function Dashboard() {
         </div>
       </div>
 
-      {/* ═══════════ ACTIVE TRAININGS ═══════════ */}
       {activeTrainings.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -1132,18 +1071,17 @@ function Dashboard() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeTrainings.slice(0, 3).map((t, idx) => {
-              const stageLabel = STAGE_LABELS[t.currentStage] ?? t.currentStage
+              const stageLabel =
+                STAGE_LABELS[t.currentStage] ?? t.currentStage
               const stageColor =
                 STAGE_COLORS[t.currentStage] ?? 'bg-slate-100 text-slate-700'
               const slug = STAGE_SLUG[t.currentStage] ?? 'prova'
               const progress = STAGE_PROGRESS[t.currentStage] ?? 0
 
-              const linkTo = getStagePath(slug, t.trainingId)
-
               return (
                 <Link
                   key={t.trainingId}
-                  to={linkTo}
+                  to={getStagePath(slug, t.trainingId)}
                   className="no-underline text-inherit block"
                 >
                   <Card
@@ -1162,7 +1100,6 @@ function Dashboard() {
                         <ArrowRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 transition-colors shrink-0 mt-0.5" />
                       </div>
 
-                      {/* Progress bar */}
                       <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden mb-2.5">
                         <div
                           className="h-full rounded-full bg-cyan-500 transition-all duration-500"
@@ -1189,7 +1126,6 @@ function Dashboard() {
         </div>
       )}
 
-      {/* ═══════════ CONTINUE EXAM CTA ═══════════ */}
       {activeAttempt && (
         <Card
           noElevation
@@ -1236,7 +1172,6 @@ function Dashboard() {
           </div>
         </Card>
       )}
-
     </div>
   )
 }
