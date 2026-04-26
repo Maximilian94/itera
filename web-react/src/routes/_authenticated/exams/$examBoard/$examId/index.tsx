@@ -60,6 +60,9 @@ import { formatBRL, formatExamBaseTitle } from '@/lib/utils'
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { StartExamDialog } from '@/components/StartExamDialog'
+import { MobileCard } from '@/ui/mobile'
+import { useIsMobile } from '@/lib/useIsMobile'
+import { ChevronLeftIcon } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 
@@ -101,6 +104,7 @@ function dateInputToIso(value: string) {
 
 function RouteComponent() {
   const { examBoard, examId } = Route.useParams()
+  const isMobile = useIsMobile()
   const queryClient = useQueryClient()
   const [examBase, setExamBase] = useState<ExamBase | null>(null)
   const [isEditing, setIsEditing] = useState(false)
@@ -338,6 +342,355 @@ function RouteComponent() {
     ? formatExamBaseTitle(examBase)
     : 'Exame'
   const questionCount = examBase?._count?.questions ?? 0
+
+  if (isMobile && !isEditing) {
+    const startCtaLabel = createAttempt.isPending ? 'Iniciando…' : 'Iniciar prova'
+    return (
+      <div
+        className="flex flex-col gap-4"
+        style={{
+          paddingBottom:
+            'calc(var(--mobile-bottom-nav-height) + var(--safe-area-inset-bottom) + 4.5rem)',
+        }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <Link
+            to="/exams"
+            search={{ board: undefined }}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-white text-slate-600 no-underline shadow-sm ring-1 ring-slate-200"
+            aria-label="Voltar"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </Link>
+          {isAdmin && examBase ? (
+            <button
+              type="button"
+              onClick={() => setIsEditing(true)}
+              className="inline-flex h-10 items-center gap-1.5 rounded-2xl bg-violet-600 px-3 text-xs font-semibold text-white shadow-sm"
+            >
+              <PencilSquareIcon className="h-4 w-4" />
+              Editar
+            </button>
+          ) : null}
+        </div>
+
+        <MobileCard>
+          <div className="flex items-start gap-3">
+            {examBase?.examBoard?.logoUrl ? (
+              <img
+                src={examBase.examBoard.logoUrl}
+                alt={examBase.examBoard.alias ?? examBase.examBoard.name ?? ''}
+                className="h-12 w-12 shrink-0 rounded-2xl border border-slate-200 bg-white object-contain p-1.5"
+              />
+            ) : (
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
+                <DocumentTextIcon className="h-5 w-5 text-slate-400" />
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-base font-bold leading-snug text-slate-900">
+                {pageTitle}
+              </h1>
+              {examBase?.role ? (
+                <p className="mt-0.5 text-xs text-slate-500">{examBase.role}</p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            {examBase ? (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${governmentScopeColor(examBase.governmentScope)}`}
+              >
+                <BuildingLibraryIcon className="h-3 w-3" />
+                {governmentScopeLabel(examBase.governmentScope)}
+              </span>
+            ) : null}
+            {examBase?.state || examBase?.city ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                <MapPinIcon className="h-3 w-3" />
+                {examBase?.city ? `${examBase.city}/` : ''}
+                {examBase?.state ?? ''}
+              </span>
+            ) : null}
+            {questionCount > 0 ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
+                <DocumentTextIcon className="h-3 w-3" />
+                {questionCount}
+              </span>
+            ) : null}
+            {isAdmin && examBase ? (
+              <span
+                className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[11px] font-semibold ${
+                  (examBase.published ?? false)
+                    ? 'bg-emerald-50 text-emerald-700'
+                    : 'bg-amber-50 text-amber-700'
+                }`}
+              >
+                {(examBase.published ?? false) ? (
+                  <GlobeAltIcon className="h-3 w-3" />
+                ) : (
+                  <EyeSlashIcon className="h-3 w-3" />
+                )}
+                {(examBase.published ?? false) ? 'Publicado' : 'Rascunho'}
+              </span>
+            ) : null}
+          </div>
+
+          {examBase?.editalUrl ? (
+            <a
+              href={examBase.editalUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-cyan-700 no-underline"
+            >
+              <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+              Ver edital
+            </a>
+          ) : null}
+        </MobileCard>
+
+        <div className="grid grid-cols-2 gap-3">
+          <MobileCard className="p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Última nota
+            </p>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className={`text-2xl font-bold ${lastScoreColorClass}`}>
+                {lastScore != null ? `${lastScore.toFixed(0)}%` : '—'}
+              </span>
+              {hasTrend && trendDiff != null ? (
+                <span
+                  className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
+                    trendDiff >= 0
+                      ? 'bg-emerald-50 text-emerald-700'
+                      : 'bg-rose-50 text-rose-700'
+                  }`}
+                >
+                  {trendDiff >= 0 ? (
+                    <ArrowTrendingUpIcon className="h-3 w-3" />
+                  ) : (
+                    <ArrowTrendingDownIcon className="h-3 w-3" />
+                  )}
+                  {trendDiff >= 0 ? '+' : ''}
+                  {trendDiff.toFixed(0)}
+                </span>
+              ) : null}
+            </div>
+            <p className="mt-1 text-[11px] text-slate-500">
+              Corte {minPassingDisplay}
+            </p>
+          </MobileCard>
+
+          <MobileCard className="p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              Salário
+            </p>
+            <p className="mt-1 text-base font-bold tracking-tight text-slate-900">
+              {examBase?.salaryBase ? formatBRL(examBase.salaryBase) : '—'}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              {examBase?.examDate
+                ? dayjs(examBase.examDate).format('DD/MM/YYYY')
+                : '—'}
+            </p>
+          </MobileCard>
+        </div>
+
+        {questionCount > 0 ? (
+          <MobileCard>
+            <div className="flex items-center gap-2">
+              <BookOpenIcon className="h-4 w-4 text-cyan-600" />
+              <h2 className="text-sm font-semibold text-slate-900">
+                Questões por matéria
+              </h2>
+            </div>
+            {isLoadingSubjectStats ? (
+              <div className="mt-3 flex flex-col gap-2">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-6 rounded-lg bg-slate-100 animate-pulse"
+                  />
+                ))}
+              </div>
+            ) : subjectStats.length === 0 ? (
+              <p className="mt-3 text-xs text-slate-500">
+                Nenhuma matéria definida.
+              </p>
+            ) : (
+              <div className="mt-3 flex flex-col gap-2">
+                {[...subjectStats]
+                  .sort((a, b) => b.count - a.count)
+                  .slice(0, 6)
+                  .map(({ subject, count }) => {
+                    const pct = (count / questionCount) * 100
+                    return (
+                      <div key={subject}>
+                        <div className="mb-1 flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-medium text-slate-700">
+                            {subject}
+                          </span>
+                          <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-500">
+                            {count}
+                          </span>
+                        </div>
+                        <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                          <div
+                            className="h-full rounded-full bg-linear-to-r from-cyan-500 to-violet-500"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    )
+                  })}
+                {subjectStats.length > 6 ? (
+                  <p className="mt-1 text-[11px] text-slate-400">
+                    +{subjectStats.length - 6} matérias
+                  </p>
+                ) : null}
+              </div>
+            )}
+          </MobileCard>
+        ) : null}
+
+        <div>
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+              Tentativas {attempts.length > 0 ? `(${attempts.length})` : ''}
+            </h2>
+          </div>
+          {attemptsError ? (
+            <MobileCard>
+              <p className="text-sm text-rose-600">Erro ao carregar tentativas.</p>
+            </MobileCard>
+          ) : isLoadingAttempts ? (
+            <div className="flex flex-col gap-3">
+              {[1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="h-20 animate-pulse rounded-3xl bg-slate-200/70"
+                />
+              ))}
+            </div>
+          ) : attempts.length === 0 ? (
+            <MobileCard>
+              <p className="text-sm text-slate-500">
+                Nenhuma tentativa ainda. Toque em &quot;Iniciar prova&quot; para
+                começar.
+              </p>
+            </MobileCard>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {attempts.map((item: ExamBaseAttemptHistoryItem) => {
+                const path = item.finishedAt
+                  ? '/exams/$examBoard/$examId/$attemptId/feedback'
+                  : '/exams/$examBoard/$examId/$attemptId'
+                const isClickable = item.examBoardId != null
+                const status =
+                  item.finishedAt == null
+                    ? {
+                        label: 'Em andamento',
+                        icon: ClockIcon,
+                        className: 'bg-amber-50 text-amber-700',
+                      }
+                    : item.passed === true
+                      ? {
+                          label: item.isPartial ? 'Aprovado (parcial)' : 'Aprovado',
+                          icon: CheckCircleIcon,
+                          className: 'bg-emerald-50 text-emerald-700',
+                        }
+                      : {
+                          label: item.isPartial
+                            ? 'Reprovado (parcial)'
+                            : 'Reprovado',
+                          icon: ExclamationTriangleIcon,
+                          className: 'bg-rose-50 text-rose-700',
+                        }
+                const StatusIcon = status.icon
+                const scoreText =
+                  item.percentage != null
+                    ? `${item.percentage.toFixed(0)}%`
+                    : '—'
+                const dateText = item.finishedAt
+                  ? dayjs(item.finishedAt).format('DD/MM/YY HH:mm')
+                  : dayjs(item.startedAt).format('DD/MM/YY HH:mm')
+
+                return (
+                  <div
+                    key={item.id}
+                    role={isClickable ? 'button' : undefined}
+                    onClick={() =>
+                      isClickable &&
+                      navigate({
+                        to: path,
+                        params: { examBoard, examId, attemptId: item.id },
+                      } as any)
+                    }
+                    className={isClickable ? 'cursor-pointer' : ''}
+                  >
+                    <MobileCard>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-slate-100">
+                          <span className="text-sm font-bold tabular-nums text-slate-800">
+                            {scoreText}
+                          </span>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <span
+                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${status.className}`}
+                          >
+                            <StatusIcon className="h-3 w-3" />
+                            {status.label}
+                          </span>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {dateText}
+                          </p>
+                        </div>
+                        {isClickable ? (
+                          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
+                        ) : null}
+                      </div>
+                    </MobileCard>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+        <div
+          className="fixed inset-x-0 z-30 px-4"
+          style={{
+            bottom:
+              'calc(var(--mobile-bottom-nav-height) + var(--safe-area-inset-bottom) + 0.5rem)',
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleOpenStartExam}
+            disabled={createAttempt.isPending || !hasAccess}
+            className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 text-sm font-semibold text-white shadow-lg shadow-cyan-900/25 transition-all hover:bg-cyan-700 disabled:opacity-50"
+          >
+            <PlayIcon className="h-5 w-5" />
+            {!hasAccess ? 'Assine para iniciar' : startCtaLabel}
+          </button>
+        </div>
+
+        <StartExamDialog
+          open={startExamDialogOpen}
+          onClose={() => setStartExamDialogOpen(false)}
+          onConfirm={handleStartExam}
+          subjectStats={subjectStats}
+          isLoading={isLoadingSubjectStats}
+          isSubmitting={createAttempt.isPending}
+          title="Como deseja fazer a prova?"
+          confirmLabel="Iniciar prova"
+          fullScreen
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-6 pb-6">

@@ -25,6 +25,7 @@ export interface StartExamDialogProps {
   title?: string
   /** Label for confirm button (e.g. "Iniciar prova" or "Iniciar treino") */
   confirmLabel?: string
+  fullScreen?: boolean
 }
 
 export function StartExamDialog({
@@ -36,6 +37,7 @@ export function StartExamDialog({
   isSubmitting = false,
   title = 'Como deseja fazer a prova?',
   confirmLabel = 'Iniciar prova',
+  fullScreen = false,
 }: StartExamDialogProps) {
   const [mode, setMode] = useState<StartExamDialogMode>('full')
   const [selectedSubjects, setSelectedSubjects] = useState<Set<string>>(
@@ -82,7 +84,7 @@ export function StartExamDialog({
   }
 
   return (
-    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth fullScreen={fullScreen}>
       <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         {isLoading ? (
