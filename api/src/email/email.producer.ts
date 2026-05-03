@@ -6,6 +6,7 @@ import {
   EmailSource,
   getEmailJobId,
 } from './email-job.types';
+import type { DiagnosticoResultado } from '@domain/diagnostico/diagnostico.interface';
 import { EmailDispatchLogService } from './email-dispatch-log.service';
 
 export const EMAIL_QUEUE_NAME = 'email';
@@ -230,6 +231,27 @@ export class EmailProducerService {
       to,
       clerkUserId: options.clerkUserId,
       source: options.source ?? 'clerk',
+      externalEventId: options.externalEventId,
+      params,
+    });
+  }
+
+  async enqueueDiagnosticoResultadoEmail(
+    to: string,
+    params: { firstName?: string; resultado: DiagnosticoResultado },
+    options: {
+      leadId: string;
+      diagnosticoRespostaId: string;
+      source?: EmailSource;
+      externalEventId?: string;
+    },
+  ): Promise<boolean> {
+    return this.enqueue({
+      type: 'diagnostico_resultado',
+      to,
+      leadId: options.leadId,
+      diagnosticoRespostaId: options.diagnosticoRespostaId,
+      source: options.source ?? 'system',
       externalEventId: options.externalEventId,
       params,
     });

@@ -1,10 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { Lead, Prisma } from '@prisma/client';
 import type {
   AttributionData,
   QualificacaoPayload,
 } from '@domain/diagnostico/diagnostico.interface';
 import { PrismaService } from '../prisma/prisma.service';
+import { LeadEventService } from './lead-event.service';
+import { TagService } from './tag.service';
+import { computeTagsFromQualificacao } from './qualificacao-tag.helper';
 
 export interface UpsertLeadInput {
   name?: string;
@@ -17,7 +20,11 @@ export interface UpsertLeadInput {
 
 @Injectable()
 export class LeadService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly tagService: TagService,
+    private readonly leadEventService: LeadEventService,
+  ) {}
 
   /**
    * First-touch upsert: ao criar lead novo, persiste attribution + ip + ua.
@@ -69,14 +76,37 @@ export class LeadService {
     });
   }
 
+  /**
+   * Persiste a qualificação, aplica tags derivadas + 'qualificacao_concluida'
+   * e registra o evento. Lança NotFoundException se o lead não existir.
+   */
   async updateQualificacao(
     leadId: string,
     qualificacao: QualificacaoPayload,
   ): Promise<Lead> {
-    return this.prisma.lead.update({
+    const existing = await this.prisma.lead.findUnique({
+      where: { id: leadId },
+    });
+    if (!existing) {
+      throw new NotFoundException(`Lead não encontrado: ${leadId}`);
+    }
+
+    const lead = await this.prisma.lead.update({
       where: { id: leadId },
       data: { qualificacao: qualificacao as unknown as Prisma.InputJsonValue },
     });
+
+    const tags = [
+      ...computeTagsFromQualificacao(qualificacao),
+      'qualificacao_concluida',
+    ];
+    await this.tagService.applyTags(leadId, tags);
+
+    await this.leadEventService.record(leadId, 'qualificacao_concluida', {
+      qualificacao: qualificacao as unknown as Prisma.InputJsonValue,
+    });
+
+    return lead;
   }
 
   async findById(leadId: string): Promise<Lead | null> {

@@ -1,5 +1,8 @@
 import { Test } from '@nestjs/testing';
+import { NotFoundException } from '@nestjs/common';
 import { LeadService } from './lead.service';
+import { LeadEventService } from './lead-event.service';
+import { TagService } from './tag.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const FIXED_LEAD = {
@@ -35,6 +38,8 @@ describe('LeadService', () => {
       update: jest.Mock;
     };
   };
+  let tagService: { applyTags: jest.Mock };
+  let leadEventService: { record: jest.Mock };
 
   beforeEach(async () => {
     prisma = {
@@ -44,11 +49,15 @@ describe('LeadService', () => {
         update: jest.fn(),
       },
     };
+    tagService = { applyTags: jest.fn().mockResolvedValue(undefined) };
+    leadEventService = { record: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         LeadService,
         { provide: PrismaService, useValue: prisma },
+        { provide: TagService, useValue: tagService },
+        { provide: LeadEventService, useValue: leadEventService },
       ],
     }).compile();
 
@@ -146,27 +155,50 @@ describe('LeadService', () => {
   });
 
   describe('updateQualificacao', () => {
-    it('persiste payload como JSONB', async () => {
+    const QUALIFICACAO = {
+      jaEnfermeiro: 'formado',
+      trabalhaSaude: 'enfermeiro',
+      estudandoConcurso: 'ativamente',
+      intencaoConcurso: '3m',
+    } as const;
+
+    it('persiste payload, aplica tags + qualificacao_concluida e grava event', async () => {
+      prisma.lead.findUnique.mockResolvedValue(FIXED_LEAD);
       prisma.lead.update.mockResolvedValue(FIXED_LEAD);
 
-      await service.updateQualificacao('lead-1', {
-        jaEnfermeiro: 'formado',
-        trabalhaSaude: 'enfermeiro',
-        estudandoConcurso: 'ativamente',
-        intencaoConcurso: '3m',
-      });
+      await service.updateQualificacao('lead-1', QUALIFICACAO);
 
       expect(prisma.lead.update).toHaveBeenCalledWith({
         where: { id: 'lead-1' },
-        data: {
-          qualificacao: {
-            jaEnfermeiro: 'formado',
-            trabalhaSaude: 'enfermeiro',
-            estudandoConcurso: 'ativamente',
-            intencaoConcurso: '3m',
-          },
-        },
+        data: { qualificacao: QUALIFICACAO },
       });
+      expect(tagService.applyTags).toHaveBeenCalledWith(
+        'lead-1',
+        expect.arrayContaining([
+          'enfermeiro_formado',
+          'trabalha_saude',
+          'estudando_concurso',
+          'intencao_concurso_3m',
+          'qualificacao_concluida',
+        ]),
+      );
+      expect(leadEventService.record).toHaveBeenCalledWith(
+        'lead-1',
+        'qualificacao_concluida',
+        { qualificacao: QUALIFICACAO },
+      );
+    });
+
+    it('lança NotFoundException quando lead não existe', async () => {
+      prisma.lead.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.updateQualificacao('lead-inexistente', QUALIFICACAO),
+      ).rejects.toThrow(NotFoundException);
+
+      expect(prisma.lead.update).not.toHaveBeenCalled();
+      expect(tagService.applyTags).not.toHaveBeenCalled();
+      expect(leadEventService.record).not.toHaveBeenCalled();
     });
   });
 });
