@@ -98,6 +98,9 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^@domain/(.*)$": "<rootDir>/../../domain/$1"
+    },
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

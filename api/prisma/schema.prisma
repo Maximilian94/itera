@@ -700,3 +700,97 @@ model RefundRequest {
   @@index([purchaseId])
   @@map("refund_requests")
 }
+
+// ---- Leads / Diagnostico ----
+
+/// Lead pré-conversão capturado nas LPs (`/lp/*`) via wizard de diagnóstico.
+/// Linka com `User` por email no momento da compra. Attribution é first-touch
+/// (preenchido apenas no primeiro upsert).
+model Lead {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
+  name            String?
+  phone           String?
+  /// Origem da LP: 'edital' | 'plantao' | 'wizard_direto'. Derivado do landingPage.
+  fonteLp         String?
+  unsubscribedAt  DateTime?
+  createdAt       DateTime  @default(now())
+
+  // First-touch attribution: persisted apenas no primeiro submit.
+  utmSource     String?
+  utmMedium     String?
+  utmCampaign   String?
+  utmContent    String?
+  utmTerm       String?
+  fbclid        String?
+  gclid         String?
+  landingPage   String?
+  referrer      String?
+  ipAddress     String?
+  userAgent     String?
+  fbp           String?
+  fbc           String?
+
+  /// Qualificação comercial (segundo submit, opcional). Shape em domain/diagnostico/.
+  qualificacao  Json?
+
+  tags                  LeadTag[]
+  events                LeadEvent[]
+  diagnosticoRespostas  DiagnosticoResposta[]
+
+  @@map("leads")
+}
+
+/// Tag aplicada a leads. Seedada na migration com tags base
+/// (origem, marketing source, perfil, qualificação, engajamento).
+model Tag {
+  id        String    @id @default(uuid()) @db.Uuid
+  name      String    @unique
+  color     String?
+  createdAt DateTime  @default(now())
+
+  leads LeadTag[]
+
+  @@map("tags")
+}
+
+/// Junção M2M entre Lead e Tag. Tag = "estado" (esse lead é X?).
+model LeadTag {
+  leadId    String   @db.Uuid
+  lead      Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  tagId     String   @db.Uuid
+  tag       Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  appliedAt DateTime @default(now())
+
+  @@id([leadId, tagId])
+  @@index([tagId])
+  @@map("lead_tags")
+}
+
+/// Histórico append-only de eventos do lead. Event = "história" (quando ele fez X?).
+model LeadEvent {
+  id         String   @id @default(uuid()) @db.Uuid
+  leadId     String   @db.Uuid
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type       String
+  payload    Json?
+  createdAt  DateTime @default(now())
+
+  @@index([leadId, createdAt(sort: Desc)])
+  @@index([type])
+  @@map("lead_events")
+}
+
+/// Submissão do diagnóstico. Append-only: cada submit cria nova linha.
+/// `respostas` shape: { q1: 'A', ..., q10: 'D' }. `resultado` shape em domain/diagnostico/.
+model DiagnosticoResposta {
+  id         String   @id @default(uuid()) @db.Uuid
+  leadId     String   @db.Uuid
+  lead       Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  respostas  Json
+  resultado  Json
+  createdAt  DateTime @default(now())
+
+  @@index([leadId])
+  @@map("diagnostico_respostas")
+}
