@@ -9,6 +9,7 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import { RESEND_CLIENT } from './providers/resend-client.provider';
 import {
+  buildDiagnosticoResultadoVariables,
   buildFirstTrainingCompletedEmailVariables,
   getEmailVerifiedGreeting,
   getInactivityReminderHtml,
@@ -19,6 +20,7 @@ import {
   getSubscriptionCanceledPlanText,
   getWelcomeGreeting,
 } from './templates';
+import type { DiagnosticoResultado } from '@domain/diagnostico/diagnostico.interface';
 
 /**
  * Central service for sending transactional emails.
@@ -362,6 +364,49 @@ export class EmailService {
 
     this.logger.log(
       `Email-verified email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
+    );
+    return { id: data?.id ?? '' };
+  }
+
+  /** Diagnostic result email — perfil + scores + ponto forte/atenção + CTA. */
+  async sendDiagnosticoResultadoEmail(
+    to: string,
+    params: { firstName?: string; resultado: DiagnosticoResultado },
+  ): Promise<{ id: string }> {
+    const trimmedTo = to?.trim();
+    if (!trimmedTo) {
+      throw new BadRequestException(
+        'O destinatário do email (to) não pode estar vazio.',
+      );
+    }
+
+    const subject = `Seu diagnóstico de estudo: ${params.resultado.perfil.nome}`;
+    this.logger.log(
+      `Enviando diagnostico-resultado email para ${trimmedTo}: ${subject}`,
+    );
+
+    const { data, error } = await this.resend.emails.send({
+      from: 'Maximize Enfermagem <equipe@mail.maximizeenfermagem.com.br>',
+      to: trimmedTo,
+      subject,
+      replyTo: 'contato@maximizeenfermagem.com.br',
+      template: {
+        id: 'diagnostico-resultado',
+        variables: buildDiagnosticoResultadoVariables(params),
+      },
+    });
+
+    if (error) {
+      this.logger.error(
+        `Falha ao enviar diagnostico-resultado email para ${trimmedTo}: ${JSON.stringify(error)}`,
+      );
+      throw new InternalServerErrorException(
+        `Não foi possível enviar o email. Tente novamente mais tarde. (${error.message ?? 'Erro desconhecido'})`,
+      );
+    }
+
+    this.logger.log(
+      `Diagnostico-resultado email enviado com sucesso para ${trimmedTo} (id: ${data?.id ?? 'N/A'})`,
     );
     return { id: data?.id ?? '' };
   }

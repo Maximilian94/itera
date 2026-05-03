@@ -76,6 +76,26 @@ export class EmailProcessor extends WorkerHost {
           if ((e as { code?: string })?.code !== 'P2002') throw e;
         }
         break;
+      case 'diagnostico_resultado': {
+        // Inline prisma.leadEvent.create (em vez de LeadEventService) pra evitar
+        // ciclo EmailModule ↔ LeadModule (LeadModule importa EmailModule na fase 3).
+        const sent = await this.emailService.sendDiagnosticoResultadoEmail(
+          payload.to,
+          payload.params,
+        );
+        await this.prisma.leadEvent.create({
+          data: {
+            leadId: payload.leadId,
+            type: 'email_enviado',
+            payload: {
+              jobType: 'diagnostico_resultado',
+              resendMessageId: sent.id,
+              subject: `Seu diagnóstico de estudo: ${payload.params.resultado.perfil.nome}`,
+            },
+          },
+        });
+        break;
+      }
       default:
         this.logger.warn(`Tipo de email desconhecido: ${(payload as EmailJobPayload).type}`);
         return;

@@ -38,3 +38,8 @@ export {
   getEmailVerifiedGreeting,
   type EmailVerifiedTemplateParams,
 } from './email-verified.template';
+
+export {
+  buildDiagnosticoResultadoVariables,
+  type DiagnosticoResultadoTemplateParams,
+} from './diagnostico-resultado.template';

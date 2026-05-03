@@ -3,6 +3,8 @@
  * Cada job tem um `type` e payload específico para type-safety.
  */
 
+import type { DiagnosticoResultado } from '@domain/diagnostico/diagnostico.interface';
+
 export type EmailJobType =
   | 'welcome'
   | 'subscription_activated'
@@ -10,7 +12,8 @@ export type EmailJobType =
   | 'subscription_canceled'
   | 'first_training_completed'
   | 'inactivity_reminder'
-  | 'email_verified';
+  | 'email_verified'
+  | 'diagnostico_resultado';
 
 export type EmailSource = 'clerk' | 'stripe' | 'system';
 
@@ -81,6 +84,16 @@ export interface EmailVerifiedEmailJob extends EmailJobBase {
   params: { firstName?: string };
 }
 
+export interface DiagnosticoResultadoEmailJob extends EmailJobBase {
+  type: 'diagnostico_resultado';
+  to: string;
+  /** Lead ID - usado para registrar o evento email_enviado em lead_events. */
+  leadId: string;
+  /** ID da submissão; jobId determinístico vira diagnostico_resultado_${id}. */
+  diagnosticoRespostaId: string;
+  params: { firstName?: string; resultado: DiagnosticoResultado };
+}
+
 export type EmailJobPayload =
   | WelcomeEmailJob
   | SubscriptionActivatedEmailJob
@@ -88,7 +101,8 @@ export type EmailJobPayload =
   | SubscriptionCanceledEmailJob
   | FirstTrainingCompletedEmailJob
   | InactivityReminderEmailJob
-  | EmailVerifiedEmailJob;
+  | EmailVerifiedEmailJob
+  | DiagnosticoResultadoEmailJob;
 
 /** Gera jobId determinístico para deduplicação. BullMQ não permite ':' no jobId. */
 export function getEmailJobId(payload: EmailJobPayload): string {
@@ -107,6 +121,8 @@ export function getEmailJobId(payload: EmailJobPayload): string {
       return `inactivity_reminder_${payload.userId}_${payload.params.daysInactive}`;
     case 'email_verified':
       return `email_verified_${payload.clerkUserId}`;
+    case 'diagnostico_resultado':
+      return `diagnostico_resultado_${payload.diagnosticoRespostaId}`;
     default:
       return `${(payload as EmailJobPayload).type}_${Date.now()}`;
   }
