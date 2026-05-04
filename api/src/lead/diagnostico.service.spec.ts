@@ -8,6 +8,7 @@ import { LeadEventService } from './lead-event.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailProducerService } from '../email/email.producer';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { MetaConversionsService } from '../meta-conversions/meta-conversions.service';
 
 const PAYLOAD: DiagnosticoSubmissionPayload = {
   email: 'fulana@example.com',
@@ -59,6 +60,7 @@ describe('DiagnosticoService.submit', () => {
   let prisma: { diagnosticoResposta: { create: jest.Mock } };
   let emailProducer: { enqueueDiagnosticoResultadoEmail: jest.Mock };
   let analytics: { capture: jest.Mock };
+  let metaConversions: { sendLeadEvent: jest.Mock };
 
   beforeEach(async () => {
     leadService = {
@@ -77,6 +79,7 @@ describe('DiagnosticoService.submit', () => {
       enqueueDiagnosticoResultadoEmail: jest.fn().mockResolvedValue(true),
     };
     analytics = { capture: jest.fn() };
+    metaConversions = { sendLeadEvent: jest.fn().mockResolvedValue(undefined) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -87,6 +90,7 @@ describe('DiagnosticoService.submit', () => {
         { provide: PrismaService, useValue: prisma },
         { provide: EmailProducerService, useValue: emailProducer },
         { provide: AnalyticsService, useValue: analytics },
+        { provide: MetaConversionsService, useValue: metaConversions },
       ],
     }).compile();
 
@@ -174,5 +178,33 @@ describe('DiagnosticoService.submit', () => {
 
     const result = await service.submit(PAYLOAD, {});
     expect(result.leadId).toBe('lead-1');
+  });
+
+  it('dispara CAPI Lead com event_id, hashes e metadata do request', async () => {
+    await service.submit(PAYLOAD, {
+      ipAddress: '127.0.0.1',
+      userAgent: 'jest',
+      eventSourceUrl: 'https://maximizeenfermagem.com.br/diagnostico',
+    });
+
+    expect(metaConversions.sendLeadEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: PAYLOAD.eventId,
+        email: 'fulana@example.com',
+        firstName: 'Fulana',
+        externalId: 'lead-1',
+        fbp: undefined,
+        fbc: undefined,
+        ipAddress: '127.0.0.1',
+        userAgent: 'jest',
+        eventSourceUrl: 'https://maximizeenfermagem.com.br/diagnostico',
+      }),
+    );
+  });
+
+  it('NÃO dispara CAPI quando consentMarketing=false (LGPD)', async () => {
+    await service.submit({ ...PAYLOAD, consentMarketing: false }, {});
+
+    expect(metaConversions.sendLeadEvent).not.toHaveBeenCalled();
   });
 });

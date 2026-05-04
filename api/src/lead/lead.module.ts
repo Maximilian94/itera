@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AnalyticsModule } from '../analytics/analytics.module';
 import { EmailModule } from '../email/email.module';
+import { MetaConversionsModule } from '../meta-conversions/meta-conversions.module';
 import { DiagnosticoService } from './diagnostico.service';
 import { LeadController } from './lead.controller';
 import { LeadEventService } from './lead-event.service';
@@ -17,7 +18,7 @@ import { ResendWebhookService } from './webhooks/resend-webhook.service';
  * AnalyticsModule (pra capturar diagnostico_concluido autoritativo).
  */
 @Module({
-  imports: [EmailModule, AnalyticsModule],
+  imports: [EmailModule, AnalyticsModule, MetaConversionsModule],
   controllers: [LeadController, ResendWebhookController],
   providers: [
     LeadService,

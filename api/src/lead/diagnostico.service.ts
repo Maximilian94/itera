@@ -4,6 +4,7 @@ import type { DiagnosticoSubmissionPayload } from '@domain/diagnostico/diagnosti
 import { PrismaService } from '../prisma/prisma.service';
 import { AnalyticsService } from '../analytics/analytics.service';
 import { EmailProducerService } from '../email/email.producer';
+import { MetaConversionsService } from '../meta-conversions/meta-conversions.service';
 import { LeadService } from './lead.service';
 import { TagService } from './tag.service';
 import { LeadEventService } from './lead-event.service';
@@ -39,11 +40,12 @@ export class DiagnosticoService {
     private readonly leadEventService: LeadEventService,
     private readonly emailProducer: EmailProducerService,
     private readonly analytics: AnalyticsService,
+    private readonly metaConversions: MetaConversionsService,
   ) {}
 
   async submit(
     payload: DiagnosticoSubmissionPayload,
-    context: { ipAddress?: string; userAgent?: string },
+    context: { ipAddress?: string; userAgent?: string; eventSourceUrl?: string },
   ): Promise<SubmitDiagnosticoResult> {
     const lead = await this.leadService.upsertByEmail(payload.email, {
       name: payload.name,
@@ -105,6 +107,24 @@ export class DiagnosticoService {
       this.logger.warn(
         `PostHog capture falhou (ignorando): ${e instanceof Error ? e.message : String(e)}`,
       );
+    }
+
+    // Meta Conversions API (server-side). Mesmo event_id que o Pixel —
+    // Meta dedupica os dois. Best-effort: o service nunca lança.
+    // LGPD: só dispara com consent marketing aceito.
+    if (payload.consentMarketing) {
+      await this.metaConversions.sendLeadEvent({
+        eventId: payload.eventId,
+        email: lead.email,
+        phone: payload.phone,
+        firstName: payload.name,
+        externalId: lead.id,
+        fbp: payload.attribution?.fbp,
+        fbc: payload.attribution?.fbc,
+        ipAddress: context.ipAddress,
+        userAgent: context.userAgent,
+        eventSourceUrl: context.eventSourceUrl,
+      });
     }
 
     return { leadId: lead.id, diagnosticoRespostaId: resposta.id };

@@ -42,10 +42,15 @@ export class LeadController {
 
     const ipAddress = extractIp(req);
     const userAgent = req.headers['user-agent'];
+    // event_source_url do CAPI: URL onde o submit aconteceu, não a do request.
+    // O wizard fica em /diagnostico, então o referer é exatamente isso.
+    const eventSourceUrl =
+      typeof req.headers.referer === 'string' ? req.headers.referer : undefined;
 
     const { leadId } = await this.diagnosticoService.submit(dto, {
       ipAddress,
       userAgent,
+      eventSourceUrl,
     });
 
     return { ok: true, leadId };
