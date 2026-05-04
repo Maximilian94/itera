@@ -13,6 +13,9 @@ import {
   updateQualificacao,
 } from "@/lib/diagnostico/api";
 import { analytics } from "@/lib/analytics";
+import {
+  firePixelViewContent,
+} from "@/lib/meta-pixel/events";
 import type {
   Alternativa,
   DiagnosticoResultado,
@@ -162,6 +165,7 @@ export function Wizard() {
 
   const handleStart = useCallback(() => {
     analytics.capture("wizard_iniciado", { fonteLp: "edital" });
+    firePixelViewContent();
     dispatch({ type: "iniciar" });
   }, []);
 
@@ -331,6 +335,7 @@ function renderStep(state: State, h: Handlers) {
     case "lead_capture":
       return (
         <LeadCaptureScreen
+          eventId={state.eventId}
           onSubmit={h.onLeadSubmit}
           submitting={state.submitting}
           errorMessage={state.errorMessage ?? undefined}

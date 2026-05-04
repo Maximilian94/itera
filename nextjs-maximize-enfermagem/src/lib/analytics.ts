@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { metaPixel } from "./meta-pixel/init";
 
 const KEY = process.env.NEXT_PUBLIC_POSTHOG_KEY;
 const HOST =
@@ -29,7 +30,12 @@ function init() {
   initialized = true;
 
   const consent = getConsent();
-  if (consent === "accepted") posthog.opt_in_capturing();
+  if (consent === "accepted") {
+    posthog.opt_in_capturing();
+    // Meta Pixel: re-init em refresh com consent prévio. PageView vai ser
+    // disparado pelo pageview() do PostHogProvider.
+    metaPixel.init();
+  }
   if (consent === "rejected") posthog.opt_out_capturing();
 }
 
@@ -37,12 +43,21 @@ function optIn() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(CONSENT_KEY, "accepted");
   if (initialized) posthog.opt_in_capturing();
+  // Pixel só carrega depois do opt-in. PageView dispara aqui pra cobrir o
+  // pageview da rota atual (que rolou antes do consent).
+  metaPixel.init();
+  metaPixel.pageView();
 }
 
 function optOut() {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(CONSENT_KEY, "rejected");
   if (initialized) posthog.opt_out_capturing();
+  // Pixel: nada a desligar — se nunca init'd, fbq não existe; se init'd
+  // antes do opt-out (cenário raro: usuário aceita, depois rejeita), futuras
+  // chamadas a metaPixel.* checariam consent... mas hoje o gate é só "init"
+  // gated por consent. Cookies _fbp/_fbc precisam ser limpos manualmente
+  // pelo browser. Não vale a complexidade pra o caso raro.
 }
 
 function capture(event: string, properties?: Record<string, unknown>) {
@@ -53,6 +68,8 @@ function capture(event: string, properties?: Record<string, unknown>) {
 function pageview() {
   if (!initialized) return;
   posthog.capture("$pageview");
+  // Pixel pageview é no-op se não init'd, então ok rodar sem checar consent.
+  metaPixel.pageView();
 }
 
 export const analytics = {

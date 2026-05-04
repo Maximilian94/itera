@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowRightIcon } from "@heroicons/react/20/solid";
+import { firePixelLead } from "@/lib/meta-pixel/events";
 
 export interface LeadCaptureValues {
   name: string;
@@ -12,12 +13,15 @@ export interface LeadCaptureValues {
 }
 
 interface LeadCaptureScreenProps {
+  /** UUID gerado pelo Wizard. Usado pra deduplicar Pixel + CAPI no Meta. */
+  eventId: string;
   onSubmit: (values: LeadCaptureValues) => Promise<void> | void;
   submitting?: boolean;
   errorMessage?: string;
 }
 
 export function LeadCaptureScreen({
+  eventId,
   onSubmit,
   submitting,
   errorMessage,
@@ -42,6 +46,11 @@ export function LeadCaptureScreen({
       setValidationError("Por favor, informe um e-mail válido.");
       return;
     }
+
+    // Fire-and-forget: Pixel Lead com mesmo event_id que o backend manda
+    // pro CAPI. Não awaitamos pra não bloquear submit por latência do
+    // facebook.com/tr (que pode levar centenas de ms).
+    firePixelLead({ eventId, email: trimmedEmail });
 
     await onSubmit({
       name: trimmedName,

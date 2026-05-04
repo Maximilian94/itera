@@ -44,9 +44,10 @@ export function CookieBanner() {
             Sua privacidade importa
           </h2>
           <p className="text-sm text-slate-600 leading-relaxed">
-            Usamos cookies e ferramentas de análise (PostHog) para entender como
-            você navega no site e melhorar a experiência. Ao continuar, você
-            concorda com o uso descrito em nossa{" "}
+            Usamos cookies e ferramentas de análise (PostHog) e marketing
+            (Meta Pixel) para entender como você navega no site, melhorar a
+            experiência e medir nossas campanhas. Ao continuar, você concorda
+            com o uso descrito em nossa{" "}
             <Link
               href="/politica-de-privacidade"
               className="text-cyan-600 hover:text-cyan-500 underline"
