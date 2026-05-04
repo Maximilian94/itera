@@ -6,6 +6,8 @@ import { LeadController } from './lead.controller';
 import { LeadEventService } from './lead-event.service';
 import { LeadService } from './lead.service';
 import { TagService } from './tag.service';
+import { ResendWebhookController } from './webhooks/resend-webhook.controller';
+import { ResendWebhookService } from './webhooks/resend-webhook.service';
 
 /**
  * Infraestrutura de leads (pré-conversão). Capturados pelo wizard de
@@ -16,12 +18,13 @@ import { TagService } from './tag.service';
  */
 @Module({
   imports: [EmailModule, AnalyticsModule],
-  controllers: [LeadController],
+  controllers: [LeadController, ResendWebhookController],
   providers: [
     LeadService,
     TagService,
     LeadEventService,
     DiagnosticoService,
+    ResendWebhookService,
   ],
   exports: [LeadService, TagService, LeadEventService, DiagnosticoService],
 })
