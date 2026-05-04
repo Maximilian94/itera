@@ -1,3 +1,4 @@
+import { readAttribution } from "@/lib/attribution/storage";
 import type {
   DiagnosticoSubmissionPayload,
   QualificacaoPayload,
@@ -9,6 +10,9 @@ import type {
  * Endpoints:
  *  - POST  /leads/diagnostico
  *  - PATCH /leads/:leadId/qualificacao
+ *
+ * `submitDiagnostico` injeta `attribution` lendo do localStorage
+ * (gravado no primeiro pageview por AttributionTracker).
  */
 
 const getApiBaseUrl = () => {
@@ -27,10 +31,16 @@ export interface SubmitDiagnosticoResponse {
 export async function submitDiagnostico(
   payload: DiagnosticoSubmissionPayload,
 ): Promise<SubmitDiagnosticoResponse> {
+  // First-touch attribution: caller-supplied wins; senão, lê do localStorage.
+  const attribution = payload.attribution ?? readAttribution()?.data;
+  const enriched: DiagnosticoSubmissionPayload = attribution
+    ? { ...payload, attribution }
+    : payload;
+
   const res = await fetch(`${getApiBaseUrl()}/leads/diagnostico`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(enriched),
   });
 
   if (!res.ok) {

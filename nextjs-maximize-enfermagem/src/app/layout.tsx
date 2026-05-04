@@ -6,6 +6,7 @@ import { Footer } from "@/components/Footer";
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { CookieBanner } from "@/components/CookieBanner";
 import { SiteChrome } from "@/components/SiteChrome";
+import { AttributionTracker } from "@/components/AttributionTracker";
 
 const manrope = Manrope({
   variable: "--font-manrope",
@@ -57,6 +58,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <PostHogProvider>
+          <AttributionTracker />
           <SiteChrome header={<Header />} footer={<Footer />}>
             {children}
           </SiteChrome>
