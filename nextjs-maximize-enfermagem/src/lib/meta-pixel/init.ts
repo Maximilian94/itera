@@ -33,6 +33,15 @@ declare global {
 }
 
 const PIXEL_ID = process.env.NEXT_PUBLIC_META_PIXEL_ID;
+/**
+ * Test Event Code do Meta. Quando setado, todos os eventos disparados vão
+ * pra aba "Test events" do dataset em tempo real, em vez de só pro
+ * Overview (que tem delay de 15-60min). Útil pra validar setup em dev.
+ * **Não setar em produção** — eventos com test code não viram conversões
+ * reais. Encontrado no painel Meta → Events Manager → seu dataset →
+ * aba "Test events" (campo destacado no topo).
+ */
+const TEST_EVENT_CODE = process.env.NEXT_PUBLIC_META_TEST_EVENT_CODE;
 const PIXEL_SCRIPT_SRC = "https://connect.facebook.net/en_US/fbevents.js";
 
 let initialized = false;
@@ -80,9 +89,21 @@ export function init(): void {
   initialized = true;
 }
 
+function buildOptions(options?: TrackOptions): Record<string, string> | undefined {
+  const merged: Record<string, string> = {};
+  if (options?.eventID) merged.eventID = options.eventID;
+  if (TEST_EVENT_CODE) merged.test_event_code = TEST_EVENT_CODE;
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 export function pageView(): void {
   if (!initialized || typeof window === "undefined" || !window.fbq) return;
-  window.fbq("track", "PageView");
+  const opts = buildOptions();
+  if (opts) {
+    window.fbq("track", "PageView", {}, opts);
+  } else {
+    window.fbq("track", "PageView");
+  }
 }
 
 interface TrackOptions {
@@ -96,8 +117,9 @@ export function track(
   options?: TrackOptions,
 ): void {
   if (!initialized || typeof window === "undefined" || !window.fbq) return;
-  if (options?.eventID) {
-    window.fbq("track", event, params ?? {}, { eventID: options.eventID });
+  const opts = buildOptions(options);
+  if (opts) {
+    window.fbq("track", event, params ?? {}, opts);
   } else {
     window.fbq("track", event, params ?? {});
   }
