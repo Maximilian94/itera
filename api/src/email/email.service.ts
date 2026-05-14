@@ -10,6 +10,7 @@ import { Resend } from 'resend';
 import { RESEND_CLIENT } from './providers/resend-client.provider';
 import {
   buildDiagnosticoResultadoVariables,
+  PERFIL_TO_RESEND_TEMPLATE_ID,
   buildFirstTrainingCompletedEmailVariables,
   getEmailVerifiedGreeting,
   getInactivityReminderHtml,
@@ -381,8 +382,14 @@ export class EmailService {
     }
 
     const subject = `Seu diagnóstico de estudo: ${params.resultado.perfil.nome}`;
+    const templateId = PERFIL_TO_RESEND_TEMPLATE_ID[params.resultado.perfil.slug];
+    if (!templateId) {
+      throw new InternalServerErrorException(
+        `Template não encontrado para perfil "${params.resultado.perfil.slug}".`,
+      );
+    }
     this.logger.log(
-      `Enviando diagnostico-resultado email para ${trimmedTo}: ${subject}`,
+      `Enviando ${templateId} para ${trimmedTo}: ${subject}`,
     );
 
     const { data, error } = await this.resend.emails.send({
@@ -391,7 +398,7 @@ export class EmailService {
       subject,
       replyTo: 'contato@maximizeenfermagem.com.br',
       template: {
-        id: 'diagnostico-resultado',
+        id: templateId,
         variables: buildDiagnosticoResultadoVariables(params),
       },
     });

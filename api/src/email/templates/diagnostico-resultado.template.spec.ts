@@ -1,6 +1,9 @@
 import 'reflect-metadata';
 import type { DiagnosticoResultado } from '@domain/diagnostico/diagnostico.interface';
-import { buildDiagnosticoResultadoVariables } from './diagnostico-resultado.template';
+import {
+  buildDiagnosticoResultadoVariables,
+  PERFIL_TO_RESEND_TEMPLATE_ID,
+} from './diagnostico-resultado.template';
 
 const resultadoEmEvolucao: DiagnosticoResultado = {
   totalScore: 18,
@@ -31,57 +34,31 @@ const resultadoEmEvolucao: DiagnosticoResultado = {
 };
 
 describe('buildDiagnosticoResultadoVariables', () => {
-  it('mapeia categorias para variáveis SCORE_* com sufixo %', () => {
+  it('mapeia categorias para variáveis *_SCORE como número (sem %)', () => {
     const vars = buildDiagnosticoResultadoVariables({
       firstName: 'Fulana',
       resultado: resultadoEmEvolucao,
     });
 
-    expect(vars.SCORE_CLAREZA).toBe('67%');
-    expect(vars.SCORE_CONSISTENCIA).toBe('67%');
-    expect(vars.SCORE_METODO).toBe('33%');
-    expect(vars.SCORE_RETENCAO).toBe('83%');
+    expect(vars.DIRECTION_SCORE).toBe('67');
+    expect(vars.CONSISTENCY_SCORE).toBe('67');
+    expect(vars.METHOD_SCORE).toBe('33');
+    expect(vars.RETENTION_SCORE).toBe('83');
   });
 
-  it('converte categorias de pontoForte/pontoAtencao para labels PT-BR', () => {
-    const vars = buildDiagnosticoResultadoVariables({
-      resultado: resultadoEmEvolucao,
-    });
-
-    expect(vars.PONTO_FORTE).toBe('Retenção');
-    expect(vars.PONTO_ATENCAO).toBe('Qualidade do Método');
-  });
-
-  it('saúda usando firstName quando presente', () => {
+  it('usa firstName trimado em LEAD_NAME', () => {
     const vars = buildDiagnosticoResultadoVariables({
       firstName: '  Fulana  ',
       resultado: resultadoEmEvolucao,
     });
-    expect(vars.GREETING).toBe('Olá, Fulana!');
+    expect(vars.LEAD_NAME).toBe('Fulana');
   });
 
-  it('cai em "Olá!" sem firstName', () => {
+  it('LEAD_NAME cai em "estudante" sem firstName', () => {
     const vars = buildDiagnosticoResultadoVariables({
       resultado: resultadoEmEvolucao,
     });
-    expect(vars.GREETING).toBe('Olá!');
-  });
-
-  it('renderiza perfil_sobrecarregado com totalScore baixo', () => {
-    const vars = buildDiagnosticoResultadoVariables({
-      resultado: {
-        ...resultadoEmEvolucao,
-        totalScore: 4,
-        perfil: {
-          slug: 'sobrecarregado',
-          nome: 'Estudante Sobrecarregado',
-          mensagemPrincipal: 'Você não precisa estudar mais conteúdos...',
-        },
-      },
-    });
-    expect(vars.TOTAL_SCORE).toBe('4');
-    expect(vars.PERFIL_NOME).toBe('Estudante Sobrecarregado');
-    expect(vars.PERFIL_MENSAGEM).toContain('Você não precisa');
+    expect(vars.LEAD_NAME).toBe('estudante');
   });
 
   it('arredonda percentages fracionados', () => {
@@ -96,9 +73,36 @@ describe('buildDiagnosticoResultadoVariables', () => {
         ],
       },
     });
-    expect(vars.SCORE_CLAREZA).toBe('22%');
-    expect(vars.SCORE_CONSISTENCIA).toBe('33%');
-    expect(vars.SCORE_METODO).toBe('56%');
-    expect(vars.SCORE_RETENCAO).toBe('83%');
+    expect(vars.DIRECTION_SCORE).toBe('22');
+    expect(vars.CONSISTENCY_SCORE).toBe('33');
+    expect(vars.METHOD_SCORE).toBe('56');
+    expect(vars.RETENTION_SCORE).toBe('83');
+  });
+
+  it('inclui CTA_URL', () => {
+    const vars = buildDiagnosticoResultadoVariables({
+      resultado: resultadoEmEvolucao,
+    });
+    expect(vars.CTA_URL).toBe('https://app.maximizeenfermagem.com.br');
+  });
+});
+
+describe('PERFIL_TO_RESEND_TEMPLATE_ID', () => {
+  it('mapeia os 4 perfis para template ids correspondentes (com slugs exatos do Resend)', () => {
+    // Estes valores precisam bater EXATAMENTE com os ids dos templates no
+    // painel Resend. Resend strip diacríticos no slug, daí o "diagnstico"
+    // sem 'ó' em 3 dos 4 ids.
+    expect(PERFIL_TO_RESEND_TEMPLATE_ID.sobrecarregado).toBe(
+      'diagnostico-estudante-sobrecarregado',
+    );
+    expect(PERFIL_TO_RESEND_TEMPLATE_ID.esforcado_sem_direcao).toBe(
+      'diagnstico-esforado-sem-direo',
+    );
+    expect(PERFIL_TO_RESEND_TEMPLATE_ID.em_evolucao).toBe(
+      'diagnstico-estudante-em-evoluo',
+    );
+    expect(PERFIL_TO_RESEND_TEMPLATE_ID.estrategico).toBe(
+      'diagnstico-estudante-estratgico',
+    );
   });
 });

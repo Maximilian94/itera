@@ -41,5 +41,6 @@ export {
 
 export {
   buildDiagnosticoResultadoVariables,
+  PERFIL_TO_RESEND_TEMPLATE_ID,
   type DiagnosticoResultadoTemplateParams,
 } from './diagnostico-resultado.template';
