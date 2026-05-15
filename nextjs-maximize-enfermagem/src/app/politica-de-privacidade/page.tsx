@@ -70,6 +70,14 @@ export default function PoliticaDePrivacidadePage() {
             <strong>Dados técnicos:</strong> endereço IP, tipo de navegador e
             dispositivo, para fins de segurança e melhoria do serviço.
           </li>
+          <li>
+            <strong>Dados de atribuição (na landing page):</strong> parâmetros
+            de UTM da URL (utm_source, utm_medium, utm_campaign, utm_content)
+            e identificadores de clique de anúncios (fbclid do
+            Facebook/Instagram, gclid do Google), capturados na primeira
+            visita para medirmos a origem do tráfego e a eficácia das nossas
+            campanhas pagas.
+          </li>
         </ul>
 
         <h2>3. Finalidade do Tratamento</h2>
@@ -109,6 +117,28 @@ export default function PoliticaDePrivacidadePage() {
             telefone e conteúdo de formulários são mascarados antes de serem
             enviados. Na landing page, o envio só ocorre após o seu
             consentimento explícito via banner de cookies.
+          </li>
+          <li>
+            <strong>Meta (Facebook/Instagram):</strong> utilizamos o Meta
+            Pixel (JavaScript no navegador) e a Conversions API
+            (servidor-para-servidor) para medir o desempenho dos nossos
+            anúncios no Facebook e Instagram, atribuir conversões à campanha
+            de origem e formar audiências para retargeting. Compartilhamos
+            eventos como visualização da landing page, início e conclusão do
+            diagnóstico, junto de identificadores hasheados (SHA-256) de
+            e-mail e telefone. Na landing page, o envio só ocorre após o seu
+            consentimento explícito via banner de cookies — se você rejeitar,
+            nenhum dado é enviado à Meta. A Meta atua como controladora
+            independente desses dados; sua política está disponível em{" "}
+            <a
+              href="https://www.facebook.com/privacy/policy/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-cyan-600 hover:text-cyan-500"
+            >
+              facebook.com/privacy/policy
+            </a>
+            .
           </li>
           <li>
             <strong>Provedores de hospedagem:</strong> infraestrutura e
@@ -167,6 +197,15 @@ export default function PoliticaDePrivacidadePage() {
             ativados depois que você clica em &quot;Aceitar&quot; no banner de
             cookies. Se você escolher &quot;Rejeitar&quot;, nenhum dado é
             enviado ao PostHog.
+          </li>
+          <li>
+            <strong>Marketing:</strong> cookies do Meta Pixel
+            (<code>_fbp</code> e <code>_fbc</code>) que identificam o
+            navegador e o clique de origem em anúncios do Facebook/Instagram.
+            Permitem atribuir conversões à campanha correta e formar
+            audiências para retargeting. Só são ativados depois que você
+            clica em &quot;Aceitar&quot; no banner de cookies. Se você
+            rejeitar, o Pixel não é carregado e nenhum dado é enviado à Meta.
           </li>
         </ul>
         <p>
