@@ -2,7 +2,7 @@
 
 Funil de captura de leads pré-pagamento via diagnóstico de **comportamento de estudo** (não de conhecimento técnico). LPs (`/lp/edital`, futuras `/lp/plantao`) redirecionam pra um wizard standalone estilo Typeform em `/diagnostico`. Resultado é entregue na tela + por email transacional. Infraestrutura de leads (perfil + tags + events) reusável; instrumentação completa pra paid marketing no Meta (Pixel + CAPI deduplicados).
 
-> **Status: planejamento.** Implementação ainda não iniciada. Doc é a especificação acordada e será atualizado conforme construção.
+> **Status (2026-05-15): código MVP completo e funcional em dev.** Fases 1-8 commitadas + LPs (`/lp/edital`, `/lp/plantao`) + política de privacidade atualizada. CAPI e Pixel validados em ambiente local com pixel novo `1579183207543864`. Pendências finais antes de paid: §14 abaixo.
 >
 > Documentos relacionados:
 > - `vibe-coding/2026-04-posthog-analytics.md` — taxonomia PostHog na qual este feature se encaixa.
@@ -1155,3 +1155,99 @@ export interface QualificacaoPayload {
 - **Last-touch attribution adicional** (atualiza UTMs em cada visita) pra comparar com first-touch.
 - **Variantes do questionário** por LP — `/lp/plantao` poderia ter perguntas adaptadas pra realidade de plantão. Wizard genérico aceita config diferente baseado em `?lp=` na URL.
 - **Refazer diagnóstico** — botão "refazer" no resultado pra pessoa atualizar perfil meses depois (cria nova `DiagnosticoResposta`, atualiza tag de perfil pra a nova).
+
+---
+
+## 14. Status de implementação (snapshot 2026-05-15)
+
+Este snapshot reflete o que está commitado em `main` e o que ainda falta. Pra continuar em outro chat, comece daqui.
+
+### 14.1. Fases concluídas (8 de 10 + LPs + privacy)
+
+| Fase | Commit | Detalhe |
+|---|---|---|
+| 1 — Infra de leads (backend) | `a6457cf` | `Lead`, `Tag`, `LeadTag`, `LeadEvent`, `DiagnosticoResposta` no schema. Migration aplicada com 24 tags seedadas. |
+| 2 — Email transacional (código) | `ec82e1a` | Job `diagnostico_resultado` na fila BullMQ + handler. |
+| 3 — Submit orchestration | `54f595b` | `DiagnosticoService.submit` + endpoints públicos `/leads/diagnostico` e `/leads/:id/qualificacao`. |
+| 4 — Wizard frontend | `8d10e92` | `/diagnostico` standalone com `SiteChrome` escondendo Header/Footer. State machine via `useReducer`. |
+| 5 — Webhook Resend | `8c6506d` | `POST /webhooks/resend` com verificação Svix + idempotência via `WebhookEvent`. |
+| 6 — First-touch attribution | `e0d0de8` | `lib/attribution/` no front + `AttributionTracker` no root layout. TTL 90d. |
+| 7 — Meta Pixel (frontend) | `fa379ac` (+ fix `bbdbe4b`, test code `9efddcf`) | Gated por consent LGPD. `PIXEL_ID` desacoplado de PostHog. |
+| 8 — CAPI (backend) | `1f5558f` | `MetaConversionsService` com hash SHA256 e best-effort. |
+| LPs | `b9e55d8` (edital), `5d67f3a` (plantao) | Frustracao + Gancho (CTA pro `/diagnostico`) + PropostaValor + Credibilidade. |
+| Privacy policy Meta | `5b44095` | Política menciona Pixel + CAPI + LGPD. |
+
+### 14.2. Mudanças em relação ao plano original
+
+**Refator email: 4 templates → 1 template (`76e410a`)**
+- Plano original (`§5.8`): 1 template `diagnostico-resultado` com variáveis.
+- Implementação inicial (`56ee3f9`): 4 templates Resend, um por perfil, com conteúdo hardcoded no HTML.
+- **Refator final** (`76e410a`): voltou pra **uma única template `seu-perfil-de-estudo`** com TODO o conteúdo textual entrando como variável (`PROFILE_NAME`, `PROFILE_DESCRIPTION`, `STRENGTH_1..3`, `IMPROVEMENT_1..3`, `REVEAL_LEAD_1/2 + REVEAL_BODY_1/2`, `FOCUS_INTRO + FOCUS_STEP_1..3`, `ROADMAP_STEP_1..4`, etc.) derivado de `PROFILE_CONTENT_MAP` em código.
+- Por quê: manter 4 HTMLs sincronizados era frágil — cada mudança visual rolava 4x. Conteúdo coupled ao scoring + UX, vive melhor em código.
+- Cada eixo do score ganha label + cor derivados via `scoreToLabelAndColors`: <50 "Precisa de atenção" `#C4582A` | 50-69 "Bom" `#256B8F` | ≥70 "Forte" `#2D8F5B`.
+- `CTA_URL` agora tem `utm_source=diagnostico&utm_medium=email` (template appenda `utm_content`).
+
+**Shuffle de alternativas (`0c37212`)**
+- Plano: alternativas sempre na ordem A=3, B=2, C=1, D=0 (`§5.4`).
+- Implementação: `lib/diagnostico/shuffle-perguntas.ts` embaralha a ordem visual uma vez por sessão (lazy init no `useState` do Wizard). O badge mostrado (`A/B/C/D`) é a posição shuffled, mas o `key` interno carrega o score original via `ANSWER_SCORES`. Anti-bias de viés de seleção (gente que sempre marca A).
+- Spec §5.3-5.4 do doc ainda descreve o modelo sem shuffle — código diverge.
+
+**Pixel ID rotacionado**
+- ID original (`1391610619317021`) era de um App Mobile criado por engano via developers.facebook.com. Painel Meta filtrava events do browser como inválidos pra esse tipo de dataset.
+- Novo Pixel ID Web: `1579183207543864`. Trocado em `NEXT_PUBLIC_META_PIXEL_ID` e `META_PIXEL_ID` (ambos no `.env`, gitignored).
+- App "Maximize CAPI" (`1387443556525717`) emite o token CAPI via System User.
+
+### 14.3. Pendências antes de ir live com paid
+
+**Fase 0a — Resend** (✅ feito durante a implementação)
+- Template `seu-perfil-de-estudo` publicado e funcionando.
+
+**Fase 0b.2 — Verificar domínio `maximizeenfermagem.com.br` no Meta** (⚠️ pendente)
+- DNS TXT + verificação no Business Manager. Sem isso, AEM não confia no `Lead` → otimização de anúncio fraca.
+
+**Fase 0b.4 — Configurar AEM** (⚠️ pendente)
+- Marcar `Lead` como evento priority #1 no Events Manager. Necessário pra iOS 14+ ATT.
+
+**Fase 0b.3 — Verificar Resend domain** (⚠️ pendente)
+- Setup SPF/DKIM/DMARC pro `mail.maximizeenfermagem.com.br` no Resend. Sem isso, deliverability cai.
+
+**Fase 9 — Validação paid + observabilidade** (✅ parcial)
+- 9.1 Dedupe Pixel + CAPI: ✅ confirmado em log da API (`events_received=1`, mesmo `event_id`).
+- 9.2 Funil PostHog: ⚠️ depende de gastar com paid pra validar com volume real.
+- 9.3 Match Quality ≥ 7: ⚠️ medir depois de domínio verificado.
+
+**Fase 10 — QA final** (⚠️ pendente)
+- 10.1 Copy review com persona real.
+- 10.2 Balanceamento de scoring (após 50-100 submits reais).
+- 10.3 Render do email em Gmail/Outlook/Apple Mail.
+
+### 14.4. Estado dos `.env` (gitignored — só local)
+
+**`api/.env`** (relevante pra essa feature):
+```
+META_PIXEL_ID="1579183207543864"
+META_CAPI_ACCESS_TOKEN="EAAS..."           # System User do app Maximize CAPI
+RESEND_API_KEY_PROD="re_..."               # já configurado
+# META_TEST_EVENT_CODE — opcional, leave empty in prod
+# RESEND_WEBHOOK_SECRET — pendente, configurar quando o webhook for live
+```
+
+**`nextjs-maximize-enfermagem/.env`** (relevante):
+```
+NEXT_PUBLIC_META_PIXEL_ID="1579183207543864"
+NEXT_PUBLIC_META_TEST_EVENT_CODE="..."     # opcional, usado em dev pra test events
+NEXT_PUBLIC_API_URL="http://localhost:3000"
+```
+
+`api/env.sample` (commitado) documenta `META_PIXEL_ID`, `META_CAPI_ACCESS_TOKEN`, `META_TEST_EVENT_CODE` com instruções de geração.
+
+### 14.5. Como retomar em outro chat
+
+1. **Ler este §14** primeiro pra contexto rápido.
+2. **`git log --oneline -20`** pra ver commits recentes (último: `0c37212`).
+3. **Estado do feature em 1 linha:** código MVP completo, validado localmente. Falta config operacional Meta (domínio + AEM) + Resend domain antes de paid.
+4. **Próximos passos prováveis:**
+   - Verificar domínio no Meta + Resend (operacional, sem código).
+   - Push pro origin/main e deploy.
+   - Rodar paid pequeno (R$50-100/dia) pra validar match quality real.
+   - Fase 10: copy review com persona real, balanceamento de scoring.
