@@ -10,7 +10,7 @@ import { Resend } from 'resend';
 import { RESEND_CLIENT } from './providers/resend-client.provider';
 import {
   buildDiagnosticoResultadoVariables,
-  PERFIL_TO_RESEND_TEMPLATE_ID,
+  DIAGNOSTICO_RESULTADO_TEMPLATE_ID,
   buildFirstTrainingCompletedEmailVariables,
   getEmailVerifiedGreeting,
   getInactivityReminderHtml,
@@ -369,7 +369,12 @@ export class EmailService {
     return { id: data?.id ?? '' };
   }
 
-  /** Diagnostic result email — perfil + scores + ponto forte/atenção + CTA. */
+  /**
+   * Diagnostic result email — perfil + scores + ponto forte/atenção + CTA.
+   *
+   * Refator (2026-05): única template Resend (`seu-perfil-de-estudo`) com todo
+   * conteúdo textual entrando como variável a partir de PROFILE_CONTENT_MAP.
+   */
   async sendDiagnosticoResultadoEmail(
     to: string,
     params: { firstName?: string; resultado: DiagnosticoResultado },
@@ -382,14 +387,8 @@ export class EmailService {
     }
 
     const subject = `Seu diagnóstico de estudo: ${params.resultado.perfil.nome}`;
-    const templateId = PERFIL_TO_RESEND_TEMPLATE_ID[params.resultado.perfil.slug];
-    if (!templateId) {
-      throw new InternalServerErrorException(
-        `Template não encontrado para perfil "${params.resultado.perfil.slug}".`,
-      );
-    }
     this.logger.log(
-      `Enviando ${templateId} para ${trimmedTo}: ${subject}`,
+      `Enviando ${DIAGNOSTICO_RESULTADO_TEMPLATE_ID} para ${trimmedTo}: ${subject}`,
     );
 
     const { data, error } = await this.resend.emails.send({
@@ -398,7 +397,7 @@ export class EmailService {
       subject,
       replyTo: 'contato@maximizeenfermagem.com.br',
       template: {
-        id: templateId,
+        id: DIAGNOSTICO_RESULTADO_TEMPLATE_ID,
         variables: buildDiagnosticoResultadoVariables(params),
       },
     });
