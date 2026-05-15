@@ -17,3 +17,4 @@ Criar uma trilha de pão para:
 
 - [2026-04 — PostHog Analytics](./2026-04-posthog-analytics.md) — instrumentação de product analytics (funis, session replay, LGPD) para investigar abandono de provas.
 - [2026-04 — Mobile Redesign](./2026-04-mobile-redesign.md) — plano para tornar o `web-react/` usável em celular: adaptive components, split físico desktop/mobile, rollout por PostHog flags.
+- [2026-05 — Diagnóstico Edital](./2026-05-diagnostico-edital.md) — captura de leads via questionário na LP `/lp/edital` com infra genérica de leads (perfil + tags + events) reusável por LPs futuras.
