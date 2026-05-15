@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useReducer, useRef } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { PERGUNTAS } from "@/data/diagnostico/perguntas";
 import {
   PERGUNTAS_QUALIFICACAO,
@@ -8,6 +8,7 @@ import {
   type QualificacaoValue,
 } from "@/data/diagnostico/qualificacao";
 import { computeResultado } from "@/lib/diagnostico/scoring";
+import { shuffleAlternativas } from "@/lib/diagnostico/shuffle-perguntas";
 import {
   submitDiagnostico,
   updateQualificacao,
@@ -162,6 +163,9 @@ function isQualificacaoComplete(
 
 export function Wizard() {
   const [state, dispatch] = useReducer(reducer, undefined, makeInitialState);
+  // Shuffle das alternativas uma vez por sessão (lazy init). Mantém a ordem
+  // estável entre re-renders e dentro do mesmo wizard run.
+  const [perguntas] = useState(() => shuffleAlternativas(PERGUNTAS));
 
   const handleStart = useCallback(() => {
     analytics.capture("wizard_iniciado", { fonteLp: "edital" });
@@ -290,7 +294,7 @@ export function Wizard() {
       </div>
 
       <main className="flex flex-1 items-center justify-center px-4 py-10 sm:py-16">
-        {renderStep(state, {
+        {renderStep(state, perguntas, {
           onStart: handleStart,
           onResponder: handleResponder,
           onAnalyzingDone: handleAnalyzingDone,
@@ -313,13 +317,17 @@ interface Handlers {
   ) => void;
 }
 
-function renderStep(state: State, h: Handlers) {
+function renderStep(
+  state: State,
+  perguntas: typeof PERGUNTAS,
+  h: Handlers,
+) {
   switch (state.step.kind) {
     case "welcome":
       return <WelcomeScreen onStart={h.onStart} />;
 
     case "pergunta": {
-      const pergunta = PERGUNTAS[state.step.index];
+      const pergunta = perguntas[state.step.index];
       return (
         <PerguntaScreen
           pergunta={pergunta}

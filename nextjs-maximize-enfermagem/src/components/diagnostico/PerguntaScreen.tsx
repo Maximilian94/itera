@@ -24,8 +24,11 @@ export function PerguntaScreen({
       </h2>
 
       <ul className="mt-8 space-y-3" role="radiogroup" aria-label={pergunta.enunciado}>
-        {pergunta.alternativas.map((alt) => {
+        {pergunta.alternativas.map((alt, index) => {
           const isSelected = selecionada === alt.key;
+          // Badge mostra a posição shuffled (A, B, C, D), não o key da alternativa.
+          // O key carrega o score via ANSWER_SCORES — sai junto pelo onResponder.
+          const badge = String.fromCharCode(65 + index);
           return (
             <li key={alt.key}>
               <button
@@ -46,7 +49,7 @@ export function PerguntaScreen({
                       : "bg-slate-100 text-slate-600 group-hover:bg-cyan-100 group-hover:text-cyan-700"
                   }`}
                 >
-                  {alt.key}
+                  {badge}
                 </span>
                 <span className="text-base leading-relaxed text-slate-700">
                   {alt.texto}
