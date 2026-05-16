@@ -45,6 +45,7 @@ interface State {
   qualificacao: Partial<Record<QualificacaoFieldKey, QualificacaoValue>>;
   resultado: DiagnosticoResultado | null;
   leadId: string | null;
+  email: string | null;
   eventId: string;
   submitting: boolean;
   errorMessage: string | null;
@@ -55,7 +56,7 @@ type Action =
   | { type: "responder_pergunta"; perguntaId: string; alt: Alternativa }
   | { type: "analise_concluida" }
   | { type: "lead_submit_inicio" }
-  | { type: "lead_submit_sucesso"; leadId: string }
+  | { type: "lead_submit_sucesso"; leadId: string; email: string }
   | { type: "lead_submit_erro"; mensagem: string }
   | {
       type: "responder_qualificacao";
@@ -72,6 +73,7 @@ function makeInitialState(): State {
     qualificacao: {},
     resultado: null,
     leadId: null,
+    email: null,
     eventId: typeof crypto !== "undefined" ? crypto.randomUUID() : fallbackUuid(),
     submitting: false,
     errorMessage: null,
@@ -114,6 +116,7 @@ function reducer(state: State, action: Action): State {
         ...state,
         submitting: false,
         leadId: action.leadId,
+        email: action.email,
         step: { kind: "qualificacao", index: 0 },
       };
 
@@ -211,7 +214,11 @@ export function Wizard() {
           perfil: state.resultado.perfil.slug,
         });
 
-        dispatch({ type: "lead_submit_sucesso", leadId: res.leadId });
+        dispatch({
+          type: "lead_submit_sucesso",
+          leadId: res.leadId,
+          email: values.email,
+        });
       } catch (e) {
         const mensagem =
           e instanceof Error
@@ -244,6 +251,7 @@ export function Wizard() {
     const payload = state.qualificacao;
     let cancelled = false;
     (async () => {
+      const startedAt = Date.now();
       try {
         await updateQualificacao(leadId, payload);
         if (!cancelled) {
@@ -251,10 +259,16 @@ export function Wizard() {
         }
       } catch {
         // Qualificação é bonus — não bloqueia experiência.
-      } finally {
-        if (!cancelled) {
-          dispatch({ type: "qualificacao_concluida" });
-        }
+      }
+      // Garante que a tela de análise apareça por um mínimo, mesmo que o
+      // PATCH retorne rápido — preserva o feel de "sistema analisando".
+      const elapsed = Date.now() - startedAt;
+      const remaining = MIN_ANALYSIS_MS - elapsed;
+      if (remaining > 0) {
+        await new Promise((resolve) => setTimeout(resolve, remaining));
+      }
+      if (!cancelled) {
+        dispatch({ type: "qualificacao_concluida" });
       }
     })();
 
@@ -338,7 +352,12 @@ function renderStep(
     }
 
     case "analyzing":
-      return <AnalyzingScreen onComplete={h.onAnalyzingDone} />;
+      return (
+        <AnalyzingScreen
+          onComplete={h.onAnalyzingDone}
+          durationMs={3500}
+        />
+      );
 
     case "lead_capture":
       return (
@@ -363,12 +382,28 @@ function renderStep(
     }
 
     case "submitting_qualificacao":
-      return <AnalyzingScreen onComplete={() => undefined} durationMs={999999} />;
+      return (
+        <AnalyzingScreen
+          stages={QUALIFICACAO_STAGES}
+          stageDurationMs={1800}
+          eyebrow="Análise aprofundada"
+        />
+      );
 
     case "resultado":
-      return state.resultado ? <ResultadoScreen resultado={state.resultado} /> : null;
+      return state.resultado && state.email ? (
+        <ResultadoScreen resultado={state.resultado} email={state.email} />
+      ) : null;
   }
 }
+
+const QUALIFICACAO_STAGES = [
+  "Mapeando padrões nas suas respostas",
+  "Cruzando com perfis de aprovados",
+  "Preparando suas dicas personalizadas",
+] as const;
+
+const MIN_ANALYSIS_MS = 5400;
 
 interface Progress {
   current: number;
