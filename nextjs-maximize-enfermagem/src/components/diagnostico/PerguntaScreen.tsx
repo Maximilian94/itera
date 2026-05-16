@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowLeftIcon,
-  CheckIcon,
-  SparklesIcon,
-} from "@heroicons/react/20/solid";
+import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/20/solid";
 import type { Pergunta } from "@/data/diagnostico/perguntas";
 import type { Alternativa } from "@/lib/diagnostico/types";
 
@@ -182,7 +178,6 @@ export function PerguntaScreen({
   }, [onVoltar, selecionada]);
 
   const activeAlt = pending ?? selecionada;
-  const isHalfwayCheckpoint = pergunta.ordem === 6;
 
   return (
     <div className="anim-fade-up flex w-full max-w-2xl flex-col">
@@ -195,13 +190,6 @@ export function PerguntaScreen({
           <ArrowLeftIcon aria-hidden="true" className="size-4" />
           Voltar
         </button>
-      ) : null}
-
-      {isHalfwayCheckpoint ? (
-        <div className="anim-fade-up mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
-          <SparklesIcon aria-hidden="true" className="size-3.5" />
-          Metade do diagnóstico — segue firme!
-        </div>
       ) : null}
 
       <p className="text-sm font-semibold uppercase tracking-wider text-cyan-700">

@@ -24,6 +24,7 @@ import type {
   QualificacaoPayload,
 } from "@/lib/diagnostico/types";
 import { AnalyzingScreen } from "./AnalyzingScreen";
+import { CheckpointScreen } from "./CheckpointScreen";
 import { LeadCaptureScreen, type LeadCaptureValues } from "./LeadCaptureScreen";
 import { PerguntaScreen } from "./PerguntaScreen";
 import { ProgressBar } from "./ProgressBar";
@@ -34,6 +35,7 @@ import { WelcomeScreen } from "./WelcomeScreen";
 type Step =
   | { kind: "welcome" }
   | { kind: "pergunta"; index: number }
+  | { kind: "checkpoint" }
   | { kind: "analyzing" }
   | { kind: "lead_capture" }
   | { kind: "qualificacao"; index: number }
@@ -50,7 +52,10 @@ interface State {
   eventId: string;
   submitting: boolean;
   errorMessage: string | null;
+  checkpointSeen: boolean;
 }
+
+const CHECKPOINT_AFTER_INDEX = Math.floor(PERGUNTAS.length / 2) - 1;
 
 type Action =
   | { type: "iniciar" }
@@ -68,6 +73,7 @@ type Action =
   | { type: "goto_qualificacao"; index: number }
   | { type: "qualificacao_submit_inicio" }
   | { type: "qualificacao_concluida" }
+  | { type: "checkpoint_concluido" }
   | { type: "restore"; persisted: PersistedState };
 
 const STORAGE_KEY = "diagnostico_wizard_v1";
@@ -80,6 +86,7 @@ interface PersistedState {
   leadId: string | null;
   email: string | null;
   eventId: string;
+  checkpointSeen: boolean;
 }
 
 function loadPersisted(): PersistedState | null {
@@ -106,6 +113,7 @@ function savePersisted(state: State) {
       leadId: state.leadId,
       email: state.email,
       eventId: state.eventId,
+      checkpointSeen: state.checkpointSeen,
     };
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch {
@@ -133,6 +141,7 @@ function makeInitialState(): State {
     eventId: typeof crypto !== "undefined" ? crypto.randomUUID() : fallbackUuid(),
     submitting: false,
     errorMessage: null,
+    checkpointSeen: false,
   };
 }
 
@@ -148,10 +157,19 @@ function reducer(state: State, action: Action): State {
       const nextIndex = currentIndex + 1;
       const lastIndex = PERGUNTAS.length - 1;
 
-      const nextStep: Step =
-        currentIndex >= lastIndex
-          ? { kind: "analyzing" }
-          : { kind: "pergunta", index: nextIndex };
+      // Detour pelo checkpoint na primeira vez que atingir o meio do quiz.
+      // Após "voltar" e re-responder, checkpointSeen previne loop.
+      const hitsCheckpoint =
+        currentIndex === CHECKPOINT_AFTER_INDEX && !state.checkpointSeen;
+
+      let nextStep: Step;
+      if (currentIndex >= lastIndex) {
+        nextStep = { kind: "analyzing" };
+      } else if (hitsCheckpoint) {
+        nextStep = { kind: "checkpoint" };
+      } else {
+        nextStep = { kind: "pergunta", index: nextIndex };
+      }
 
       // Tela de análise computa resultado em paralelo. Aqui já gravamos
       // pra que esteja pronto antes de avançar pro lead capture.
@@ -159,6 +177,14 @@ function reducer(state: State, action: Action): State {
         currentIndex >= lastIndex ? computeResultado(respostas) : state.resultado;
 
       return { ...state, respostas, resultado, step: nextStep };
+    }
+
+    case "checkpoint_concluido": {
+      return {
+        ...state,
+        checkpointSeen: true,
+        step: { kind: "pergunta", index: CHECKPOINT_AFTER_INDEX + 1 },
+      };
     }
 
     case "goto_pergunta": {
@@ -226,6 +252,7 @@ function reducer(state: State, action: Action): State {
         leadId: action.persisted.leadId ?? null,
         email: action.persisted.email ?? null,
         eventId: action.persisted.eventId,
+        checkpointSeen: action.persisted.checkpointSeen ?? false,
       };
     }
 
@@ -323,6 +350,10 @@ export function Wizard() {
   // e botão "Voltar" usando o mesmo caminho.
   const handleVoltar = useCallback(() => {
     window.history.back();
+  }, []);
+
+  const handleCheckpointContinuar = useCallback(() => {
+    dispatch({ type: "checkpoint_concluido" });
   }, []);
 
   // Restaura estado persistido na primeira montagem (refresh / nova aba
@@ -482,6 +513,7 @@ export function Wizard() {
           onLeadSubmit: handleLeadSubmit,
           onQualificacao: handleQualificacao,
           onVoltar: handleVoltar,
+          onCheckpointContinuar: handleCheckpointContinuar,
         })}
       </main>
     </div>
@@ -498,6 +530,7 @@ interface Handlers {
     value: QualificacaoValue,
   ) => void;
   onVoltar: () => void;
+  onCheckpointContinuar: () => void;
 }
 
 function renderStep(
@@ -521,6 +554,15 @@ function renderStep(
         />
       );
     }
+
+    case "checkpoint":
+      return (
+        <CheckpointScreen
+          current={CHECKPOINT_AFTER_INDEX + 1}
+          total={PERGUNTAS.length}
+          onContinue={h.onCheckpointContinuar}
+        />
+      );
 
     case "analyzing":
       return (
@@ -607,6 +649,7 @@ function computeProgress(step: Step): Progress | null {
         total: PERGUNTAS_QUALIFICACAO.length,
         label: `Contexto · ${step.index + 1} de ${PERGUNTAS_QUALIFICACAO.length}`,
       };
+    case "checkpoint":
     case "submitting_qualificacao":
     case "resultado":
       return null;
