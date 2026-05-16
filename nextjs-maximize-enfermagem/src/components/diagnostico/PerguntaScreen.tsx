@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, CheckIcon } from "@heroicons/react/20/solid";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  SparklesIcon,
+} from "@heroicons/react/20/solid";
 import type { Pergunta } from "@/data/diagnostico/perguntas";
 import type { Alternativa } from "@/lib/diagnostico/types";
 
@@ -13,6 +17,8 @@ interface PerguntaScreenProps {
 }
 
 const ADVANCE_DELAY_MS = 320;
+const SWIPE_MIN_DISTANCE = 60;
+const SWIPE_MAX_DURATION_MS = 500;
 
 export function PerguntaScreen({
   pergunta,
@@ -23,11 +29,18 @@ export function PerguntaScreen({
   const [pending, setPending] = useState<Alternativa | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const groupRef = useRef<HTMLUListElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
+  }, []);
+
+  // Foca o título ao entrar na pergunta — bom pra leitor de tela e
+  // pra resetar onde o foco fica depois de cada click.
+  useEffect(() => {
+    headingRef.current?.focus();
   }, []);
 
   function handleResponder(alt: Alternativa) {
@@ -67,7 +80,6 @@ export function PerguntaScreen({
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
-      // ← voltar
       if (e.key === "ArrowLeft") {
         if (onVoltar) {
           e.preventDefault();
@@ -76,7 +88,6 @@ export function PerguntaScreen({
         return;
       }
 
-      // → avança com foco atual ou selecionada anterior
       if (e.key === "ArrowRight") {
         const cur = getFocusedIdx();
         if (cur >= 0) {
@@ -91,7 +102,6 @@ export function PerguntaScreen({
         return;
       }
 
-      // ↑↓ navegação de foco entre alternativas
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const cur = getFocusedIdx();
@@ -106,8 +116,6 @@ export function PerguntaScreen({
         return;
       }
 
-      // Enter: se foco está num radio, o click nativo cuida.
-      // Se foco está em outro lugar e existe selecionada, avança.
       if (e.key === "Enter") {
         const focused = document.activeElement as HTMLElement | null;
         const isRadioFocused =
@@ -121,7 +129,6 @@ export function PerguntaScreen({
         return;
       }
 
-      // Hotkeys A-D / 1-4: aceita só tecla de um caractere.
       if (e.key.length !== 1) return;
       let idx = -1;
       const k = e.key.toUpperCase();
@@ -137,7 +144,45 @@ export function PerguntaScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pergunta.alternativas, onVoltar, selecionada]);
 
+  // Swipe gestures — só mobile. ← avança, → volta.
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let startT = 0;
+
+    function onTouchStart(e: TouchEvent) {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      startT = Date.now();
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      const dt = Date.now() - startT;
+      if (dt > SWIPE_MAX_DURATION_MS) return;
+      if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return;
+      if (Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      if (dx > 0) {
+        if (onVoltar) onVoltar();
+      } else if (selecionada) {
+        handleResponder(selecionada);
+      }
+    }
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onVoltar, selecionada]);
+
   const activeAlt = pending ?? selecionada;
+  const isHalfwayCheckpoint = pergunta.ordem === 6;
 
   return (
     <div className="anim-fade-up flex w-full max-w-2xl flex-col">
@@ -152,10 +197,21 @@ export function PerguntaScreen({
         </button>
       ) : null}
 
-      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
+      {isHalfwayCheckpoint ? (
+        <div className="anim-fade-up mb-4 inline-flex w-fit items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
+          <SparklesIcon aria-hidden="true" className="size-3.5" />
+          Metade do diagnóstico — segue firme!
+        </div>
+      ) : null}
+
+      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-700">
         Pergunta {pergunta.ordem} de 10
       </p>
-      <h2 className="mt-3 text-balance text-2xl font-semibold leading-snug text-sky-900 sm:text-3xl">
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="mt-3 text-balance text-2xl font-semibold leading-snug text-sky-900 outline-none sm:text-3xl"
+      >
         {pergunta.enunciado}
       </h2>
 
@@ -202,8 +258,7 @@ export function PerguntaScreen({
       </ul>
 
       <p className="mt-5 hidden text-xs text-slate-400 sm:block">
-        Atalhos:{" "}
-        <Kbd>A</Kbd>–<Kbd>D</Kbd> responde · <Kbd>↑</Kbd>
+        Atalhos: <Kbd>A</Kbd>–<Kbd>D</Kbd> responde · <Kbd>↑</Kbd>
         <Kbd>↓</Kbd> navega · <Kbd>←</Kbd> volta · <Kbd>→</Kbd> avança ·{" "}
         <Kbd>Enter</Kbd> confirma
       </p>

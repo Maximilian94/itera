@@ -16,6 +16,8 @@ interface QualificacaoScreenProps {
 }
 
 const ADVANCE_DELAY_MS = 320;
+const SWIPE_MIN_DISTANCE = 60;
+const SWIPE_MAX_DURATION_MS = 500;
 
 export function QualificacaoScreen({
   pergunta,
@@ -27,11 +29,16 @@ export function QualificacaoScreen({
   const [pending, setPending] = useState<QualificacaoValue | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const groupRef = useRef<HTMLUListElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
+  }, []);
+
+  useEffect(() => {
+    headingRef.current?.focus();
   }, []);
 
   function handleResponder(value: QualificacaoValue) {
@@ -132,6 +139,42 @@ export function QualificacaoScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pergunta.opcoes, onVoltar, selecionada]);
 
+  useEffect(() => {
+    let startX = 0;
+    let startY = 0;
+    let startT = 0;
+
+    function onTouchStart(e: TouchEvent) {
+      const t = e.touches[0];
+      startX = t.clientX;
+      startY = t.clientY;
+      startT = Date.now();
+    }
+
+    function onTouchEnd(e: TouchEvent) {
+      const t = e.changedTouches[0];
+      const dx = t.clientX - startX;
+      const dy = t.clientY - startY;
+      const dt = Date.now() - startT;
+      if (dt > SWIPE_MAX_DURATION_MS) return;
+      if (Math.abs(dx) < SWIPE_MIN_DISTANCE) return;
+      if (Math.abs(dy) > Math.abs(dx) * 0.7) return;
+      if (dx > 0) {
+        if (onVoltar) onVoltar();
+      } else if (selecionada) {
+        handleResponder(selecionada);
+      }
+    }
+
+    window.addEventListener("touchstart", onTouchStart, { passive: true });
+    window.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      window.removeEventListener("touchstart", onTouchStart);
+      window.removeEventListener("touchend", onTouchEnd);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onVoltar, selecionada]);
+
   const activeValue = pending ?? selecionada;
 
   return (
@@ -147,10 +190,14 @@ export function QualificacaoScreen({
         </button>
       ) : null}
 
-      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
+      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-700">
         Pra entendermos seu contexto · {pergunta.ordem} de {ordemTotal}
       </p>
-      <h2 className="mt-3 text-balance text-2xl font-semibold leading-snug text-sky-900 sm:text-3xl">
+      <h2
+        ref={headingRef}
+        tabIndex={-1}
+        className="mt-3 text-balance text-2xl font-semibold leading-snug text-sky-900 outline-none sm:text-3xl"
+      >
         {pergunta.enunciado}
       </h2>
 

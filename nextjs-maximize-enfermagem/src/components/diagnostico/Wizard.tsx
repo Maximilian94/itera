@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState } from "react";
+import Image from "next/image";
 import { PERGUNTAS } from "@/data/diagnostico/perguntas";
 import {
   PERGUNTAS_QUALIFICACAO,
@@ -66,7 +67,60 @@ type Action =
     }
   | { type: "goto_qualificacao"; index: number }
   | { type: "qualificacao_submit_inicio" }
-  | { type: "qualificacao_concluida" };
+  | { type: "qualificacao_concluida" }
+  | { type: "restore"; persisted: PersistedState };
+
+const STORAGE_KEY = "diagnostico_wizard_v1";
+
+interface PersistedState {
+  step: Step;
+  respostas: Record<string, Alternativa>;
+  qualificacao: Partial<Record<QualificacaoFieldKey, QualificacaoValue>>;
+  resultado: DiagnosticoResultado | null;
+  leadId: string | null;
+  email: string | null;
+  eventId: string;
+}
+
+function loadPersisted(): PersistedState | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PersistedState;
+    if (!parsed?.step || !parsed.eventId) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function savePersisted(state: State) {
+  if (typeof window === "undefined") return;
+  try {
+    const payload: PersistedState = {
+      step: state.step,
+      respostas: state.respostas,
+      qualificacao: state.qualificacao,
+      resultado: state.resultado,
+      leadId: state.leadId,
+      email: state.email,
+      eventId: state.eventId,
+    };
+    window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+  } catch {
+    // sessionStorage cheio ou bloqueado — falha silenciosa.
+  }
+}
+
+function clearPersisted() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 function makeInitialState(): State {
   return {
@@ -162,6 +216,19 @@ function reducer(state: State, action: Action): State {
     case "qualificacao_concluida":
       return { ...state, step: { kind: "resultado" } };
 
+    case "restore": {
+      return {
+        ...state,
+        step: action.persisted.step,
+        respostas: action.persisted.respostas ?? {},
+        qualificacao: action.persisted.qualificacao ?? {},
+        resultado: action.persisted.resultado ?? null,
+        leadId: action.persisted.leadId ?? null,
+        email: action.persisted.email ?? null,
+        eventId: action.persisted.eventId,
+      };
+    }
+
     default:
       return state;
   }
@@ -216,7 +283,6 @@ export function Wizard() {
         const res = await submitDiagnostico({
           email: values.email,
           name: values.name,
-          phone: values.phone,
           fonteLp: "edital",
           respostas: state.respostas,
           resultado: state.resultado,
@@ -258,6 +324,32 @@ export function Wizard() {
   const handleVoltar = useCallback(() => {
     window.history.back();
   }, []);
+
+  // Restaura estado persistido na primeira montagem (refresh / nova aba
+  // com sessionStorage compartilhado). Initial render é sempre default pra
+  // evitar mismatch de hidratação — o restore acontece após o mount.
+  const restoredRef = useRef(false);
+  useEffect(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const persisted = loadPersisted();
+    if (persisted) {
+      dispatch({ type: "restore", persisted });
+    }
+  }, []);
+
+  // Persiste a cada mudança de estado. Limpa ao chegar no resultado.
+  useEffect(() => {
+    if (state.step.kind === "resultado") {
+      clearPersisted();
+      return;
+    }
+    if (state.step.kind === "welcome") {
+      // Welcome é estado inicial — não vale a pena salvar.
+      return;
+    }
+    savePersisted(state);
+  }, [state]);
 
   // Skip do push pra ações que vieram de popstate (back do browser).
   const skipPushRef = useRef(false);
@@ -358,9 +450,19 @@ export function Wizard() {
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50">
       <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
-        <span className="text-sm font-semibold text-cyan-700">
-          Maximize Enfermagem
-        </span>
+        <div className="flex items-center gap-2">
+          <Image
+            src="/logo.svg"
+            alt=""
+            width={28}
+            height={28}
+            priority
+            className="size-7"
+          />
+          <span className="text-sm font-semibold text-cyan-700">
+            Maximize Enfermagem
+          </span>
+        </div>
         {progress ? (
           <div className="w-full sm:ml-auto sm:max-w-xs">
             <ProgressBar
