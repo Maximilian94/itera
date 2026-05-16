@@ -36,6 +36,26 @@ export function PerguntaScreen({
     timerRef.current = setTimeout(() => onResponder(alt), ADVANCE_DELAY_MS);
   }
 
+  function getRadioButtons(): HTMLButtonElement[] {
+    return Array.from(
+      groupRef.current?.querySelectorAll<HTMLButtonElement>(
+        'button[role="radio"]',
+      ) ?? [],
+    );
+  }
+
+  function focusByIndex(idx: number) {
+    const buttons = getRadioButtons();
+    if (buttons.length === 0) return;
+    const wrapped = ((idx % buttons.length) + buttons.length) % buttons.length;
+    buttons[wrapped]?.focus();
+  }
+
+  function getFocusedIdx(): number {
+    const buttons = getRadioButtons();
+    return buttons.findIndex((b) => b === document.activeElement);
+  }
+
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as Element | null;
@@ -47,6 +67,62 @@ export function PerguntaScreen({
       }
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // ← voltar
+      if (e.key === "ArrowLeft") {
+        if (onVoltar) {
+          e.preventDefault();
+          onVoltar();
+        }
+        return;
+      }
+
+      // → avança com foco atual ou selecionada anterior
+      if (e.key === "ArrowRight") {
+        const cur = getFocusedIdx();
+        if (cur >= 0) {
+          e.preventDefault();
+          handleResponder(pergunta.alternativas[cur].key);
+          return;
+        }
+        if (selecionada) {
+          e.preventDefault();
+          handleResponder(selecionada);
+        }
+        return;
+      }
+
+      // ↑↓ navegação de foco entre alternativas
+      if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+        e.preventDefault();
+        const cur = getFocusedIdx();
+        const dir = e.key === "ArrowDown" ? 1 : -1;
+        const next =
+          cur === -1
+            ? dir === 1
+              ? 0
+              : pergunta.alternativas.length - 1
+            : cur + dir;
+        focusByIndex(next);
+        return;
+      }
+
+      // Enter: se foco está num radio, o click nativo cuida.
+      // Se foco está em outro lugar e existe selecionada, avança.
+      if (e.key === "Enter") {
+        const focused = document.activeElement as HTMLElement | null;
+        const isRadioFocused =
+          focused?.tagName === "BUTTON" &&
+          focused.getAttribute("role") === "radio";
+        if (isRadioFocused) return;
+        if (selecionada) {
+          e.preventDefault();
+          handleResponder(selecionada);
+        }
+        return;
+      }
+
+      // Hotkeys A-D / 1-4: aceita só tecla de um caractere.
+      if (e.key.length !== 1) return;
       let idx = -1;
       const k = e.key.toUpperCase();
       if (k >= "A" && k <= "D") idx = k.charCodeAt(0) - 65;
@@ -59,27 +135,7 @@ export function PerguntaScreen({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pergunta.alternativas]);
-
-  function handleArrowKeys(e: React.KeyboardEvent<HTMLUListElement>) {
-    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    e.preventDefault();
-    const buttons = Array.from(
-      groupRef.current?.querySelectorAll<HTMLButtonElement>(
-        'button[role="radio"]',
-      ) ?? [],
-    );
-    if (buttons.length === 0) return;
-    const currentIdx = buttons.findIndex((b) => b === document.activeElement);
-    const dir = e.key === "ArrowDown" ? 1 : -1;
-    const nextIdx =
-      currentIdx === -1
-        ? dir === 1
-          ? 0
-          : buttons.length - 1
-        : (currentIdx + dir + buttons.length) % buttons.length;
-    buttons[nextIdx]?.focus();
-  }
+  }, [pergunta.alternativas, onVoltar, selecionada]);
 
   const activeAlt = pending ?? selecionada;
 
@@ -89,7 +145,7 @@ export function PerguntaScreen({
         <button
           type="button"
           onClick={onVoltar}
-          className="mb-3 -ml-1 inline-flex w-fit items-center gap-1 rounded-md px-1 py-0.5 text-sm font-medium text-slate-500 hover:text-cyan-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
+          className="mb-3 -ml-1.5 inline-flex w-fit cursor-pointer items-center gap-1.5 rounded-md px-2 py-1 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-cyan-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
         >
           <ArrowLeftIcon aria-hidden="true" className="size-4" />
           Voltar
@@ -108,7 +164,6 @@ export function PerguntaScreen({
         className="mt-8 space-y-3"
         role="radiogroup"
         aria-label={pergunta.enunciado}
-        onKeyDown={handleArrowKeys}
       >
         {pergunta.alternativas.map((alt, index) => {
           const isActive = activeAlt === alt.key;
@@ -121,7 +176,7 @@ export function PerguntaScreen({
                 role="radio"
                 aria-checked={isActive}
                 onClick={() => handleResponder(alt.key)}
-                className={`group flex w-full items-start gap-4 rounded-xl border-2 px-5 py-4 text-left transition-all duration-200 ${
+                className={`group flex w-full cursor-pointer items-start gap-4 rounded-xl border-2 px-5 py-4 text-left transition-all duration-200 ${
                   isActive
                     ? "border-cyan-600 bg-cyan-50 shadow-sm"
                     : "border-slate-200 bg-white hover:border-cyan-300 hover:bg-cyan-50/30"
@@ -147,23 +202,19 @@ export function PerguntaScreen({
       </ul>
 
       <p className="mt-5 hidden text-xs text-slate-400 sm:block">
-        Dica: use{" "}
-        <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
-          A
-        </kbd>
-        –
-        <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
-          D
-        </kbd>{" "}
-        ou{" "}
-        <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
-          ↑
-        </kbd>
-        <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
-          ↓
-        </kbd>{" "}
-        pra navegar.
+        Atalhos:{" "}
+        <Kbd>A</Kbd>–<Kbd>D</Kbd> responde · <Kbd>↑</Kbd>
+        <Kbd>↓</Kbd> navega · <Kbd>←</Kbd> volta · <Kbd>→</Kbd> avança ·{" "}
+        <Kbd>Enter</Kbd> confirma
       </p>
     </div>
+  );
+}
+
+function Kbd({ children }: { children: React.ReactNode }) {
+  return (
+    <kbd className="rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">
+      {children}
+    </kbd>
   );
 }

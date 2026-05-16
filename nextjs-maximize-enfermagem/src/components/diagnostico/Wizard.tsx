@@ -54,7 +54,7 @@ interface State {
 type Action =
   | { type: "iniciar" }
   | { type: "responder_pergunta"; perguntaId: string; alt: Alternativa }
-  | { type: "voltar_pergunta" }
+  | { type: "goto_pergunta"; index: number }
   | { type: "analise_concluida" }
   | { type: "lead_submit_inicio" }
   | { type: "lead_submit_sucesso"; leadId: string; email: string }
@@ -64,7 +64,7 @@ type Action =
       field: QualificacaoFieldKey;
       value: QualificacaoValue;
     }
-  | { type: "voltar_qualificacao" }
+  | { type: "goto_qualificacao"; index: number }
   | { type: "qualificacao_submit_inicio" }
   | { type: "qualificacao_concluida" };
 
@@ -107,24 +107,17 @@ function reducer(state: State, action: Action): State {
       return { ...state, respostas, resultado, step: nextStep };
     }
 
-    case "voltar_pergunta": {
-      if (state.step.kind !== "pergunta" || state.step.index === 0) {
-        return state;
-      }
-      return {
-        ...state,
-        step: { kind: "pergunta", index: state.step.index - 1 },
-      };
+    case "goto_pergunta": {
+      const clamped = Math.max(0, Math.min(action.index, PERGUNTAS.length - 1));
+      return { ...state, step: { kind: "pergunta", index: clamped } };
     }
 
-    case "voltar_qualificacao": {
-      if (state.step.kind !== "qualificacao" || state.step.index === 0) {
-        return state;
-      }
-      return {
-        ...state,
-        step: { kind: "qualificacao", index: state.step.index - 1 },
-      };
+    case "goto_qualificacao": {
+      const clamped = Math.max(
+        0,
+        Math.min(action.index, PERGUNTAS_QUALIFICACAO.length - 1),
+      );
+      return { ...state, step: { kind: "qualificacao", index: clamped } };
     }
 
     case "analise_concluida":
@@ -259,12 +252,54 @@ export function Wizard() {
     [],
   );
 
-  const handleVoltarPergunta = useCallback(() => {
-    dispatch({ type: "voltar_pergunta" });
+  // Voltar = back do browser. O listener de popstate abaixo despacha
+  // goto_* com base na entry anterior. Centralizar aqui mantém browser-back
+  // e botão "Voltar" usando o mesmo caminho.
+  const handleVoltar = useCallback(() => {
+    window.history.back();
   }, []);
 
-  const handleVoltarQualificacao = useCallback(() => {
-    dispatch({ type: "voltar_qualificacao" });
+  // Skip do push pra ações que vieram de popstate (back do browser).
+  const skipPushRef = useRef(false);
+
+  useEffect(() => {
+    if (skipPushRef.current) {
+      skipPushRef.current = false;
+      return;
+    }
+    if (state.step.kind === "pergunta") {
+      window.history.pushState(
+        { wizardStep: `p${state.step.index}` },
+        "",
+      );
+    } else if (state.step.kind === "qualificacao") {
+      window.history.pushState(
+        { wizardStep: `q${state.step.index}` },
+        "",
+      );
+    }
+  }, [state.step]);
+
+  useEffect(() => {
+    function onPopState(e: PopStateEvent) {
+      const wizardStep = (e.state as { wizardStep?: string } | null)
+        ?.wizardStep;
+      if (!wizardStep) return;
+      skipPushRef.current = true;
+      if (wizardStep.startsWith("p")) {
+        const idx = Number(wizardStep.slice(1));
+        if (Number.isFinite(idx)) {
+          dispatch({ type: "goto_pergunta", index: idx });
+        }
+      } else if (wizardStep.startsWith("q")) {
+        const idx = Number(wizardStep.slice(1));
+        if (Number.isFinite(idx)) {
+          dispatch({ type: "goto_qualificacao", index: idx });
+        }
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   // Quando entra em submitting_qualificacao, dispara PATCH e avança.
@@ -344,8 +379,7 @@ export function Wizard() {
           onAnalyzingDone: handleAnalyzingDone,
           onLeadSubmit: handleLeadSubmit,
           onQualificacao: handleQualificacao,
-          onVoltarPergunta: handleVoltarPergunta,
-          onVoltarQualificacao: handleVoltarQualificacao,
+          onVoltar: handleVoltar,
         })}
       </main>
     </div>
@@ -361,8 +395,7 @@ interface Handlers {
     field: QualificacaoFieldKey,
     value: QualificacaoValue,
   ) => void;
-  onVoltarPergunta: () => void;
-  onVoltarQualificacao: () => void;
+  onVoltar: () => void;
 }
 
 function renderStep(
@@ -382,7 +415,7 @@ function renderStep(
           pergunta={pergunta}
           selecionada={state.respostas[pergunta.id]}
           onResponder={(alt) => h.onResponder(pergunta.id, pergunta.ordem, alt)}
-          onVoltar={state.step.index > 0 ? h.onVoltarPergunta : undefined}
+          onVoltar={state.step.index > 0 ? h.onVoltar : undefined}
         />
       );
     }
@@ -414,9 +447,7 @@ function renderStep(
           ordemTotal={PERGUNTAS_QUALIFICACAO.length}
           selecionada={state.qualificacao[pergunta.field]}
           onResponder={(value) => h.onQualificacao(pergunta.field, value)}
-          onVoltar={
-            state.step.index > 0 ? h.onVoltarQualificacao : undefined
-          }
+          onVoltar={state.step.index > 0 ? h.onVoltar : undefined}
         />
       );
     }
