@@ -8,7 +8,6 @@ import { firePixelLead } from "@/lib/meta-pixel/events";
 export interface LeadCaptureValues {
   name: string;
   email: string;
-  phone?: string;
   consentMarketing: boolean;
 }
 
@@ -28,9 +27,24 @@ export function LeadCaptureScreen({
 }: LeadCaptureScreenProps) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
   const [consent, setConsent] = useState(true);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+
+  const handleEmailBlur = () => {
+    const trimmed = email.trim();
+    if (!trimmed || !isValidEmail(trimmed)) {
+      setEmailSuggestion(null);
+      return;
+    }
+    setEmailSuggestion(suggestEmailFix(trimmed));
+  };
+
+  const acceptSuggestion = () => {
+    if (!emailSuggestion) return;
+    setEmail(emailSuggestion);
+    setEmailSuggestion(null);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +69,6 @@ export function LeadCaptureScreen({
     await onSubmit({
       name: trimmedName,
       email: trimmedEmail,
-      phone: phone.trim() || undefined,
       consentMarketing: consent,
     });
   };
@@ -64,15 +77,19 @@ export function LeadCaptureScreen({
 
   return (
     <div className="flex w-full max-w-xl flex-col">
-      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-600">
+      <p className="text-sm font-semibold uppercase tracking-wider text-cyan-700">
         Última etapa
       </p>
       <h2 className="mt-3 text-balance text-3xl font-semibold leading-tight text-sky-900 sm:text-4xl">
         Pra onde devemos enviar seu diagnóstico?
       </h2>
       <p className="mt-3 text-base leading-relaxed text-slate-600">
-        Você verá o resultado completo na próxima tela e também receberá uma
-        cópia por e-mail.
+        Mandamos seu diagnóstico completo por e-mail — com seu perfil, pontos
+        de atenção e os próximos passos certos pra você. Antes, só mais{" "}
+        <span className="font-medium text-sky-900">
+          4 perguntas rápidas de contexto
+        </span>{" "}
+        pra personalizar.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -108,30 +125,28 @@ export function LeadCaptureScreen({
             autoComplete="email"
             inputMode="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              if (emailSuggestion) setEmailSuggestion(null);
+            }}
+            onBlur={handleEmailBlur}
             required
             className="mt-1 block w-full rounded-md border-0 bg-white px-3 py-2.5 text-base text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-cyan-600"
             placeholder="seu@email.com"
           />
-        </div>
-
-        <div>
-          <label
-            htmlFor="diag-phone"
-            className="block text-sm font-medium text-slate-700"
-          >
-            WhatsApp <span className="font-normal text-slate-400">(opcional)</span>
-          </label>
-          <input
-            id="diag-phone"
-            type="tel"
-            autoComplete="tel"
-            inputMode="tel"
-            value={phone}
-            onChange={(e) => setPhone(e.target.value)}
-            className="mt-1 block w-full rounded-md border-0 bg-white px-3 py-2.5 text-base text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-cyan-600"
-            placeholder="(11) 9 9999-9999"
-          />
+          {emailSuggestion ? (
+            <p className="mt-1.5 text-sm text-amber-800">
+              Quis dizer{" "}
+              <button
+                type="button"
+                onClick={acceptSuggestion}
+                className="cursor-pointer font-semibold underline underline-offset-2 hover:text-amber-900"
+              >
+                {emailSuggestion}
+              </button>
+              ?
+            </p>
+          ) : null}
         </div>
 
         <label className="flex items-start gap-3 text-sm text-slate-600">
@@ -167,9 +182,9 @@ export function LeadCaptureScreen({
         <button
           type="submit"
           disabled={submitting}
-          className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex w-full cursor-pointer items-center justify-center gap-2 rounded-md bg-cyan-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Enviando..." : "Ver meu diagnóstico"}
+          {submitting ? "Enviando..." : "Continuar"}
           {submitting ? null : (
             <ArrowRightIcon aria-hidden="true" className="size-5" />
           )}
@@ -181,4 +196,57 @@ export function LeadCaptureScreen({
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+const COMMON_EMAIL_DOMAINS = [
+  "gmail.com",
+  "hotmail.com",
+  "outlook.com",
+  "yahoo.com",
+  "yahoo.com.br",
+  "icloud.com",
+  "live.com",
+  "bol.com.br",
+  "uol.com.br",
+  "terra.com.br",
+];
+
+function suggestEmailFix(email: string): string | null {
+  const at = email.lastIndexOf("@");
+  if (at === -1) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1).toLowerCase();
+  if (!domain || !local) return null;
+  for (const candidate of COMMON_EMAIL_DOMAINS) {
+    if (domain === candidate) return null;
+    const dist = levenshtein(domain, candidate);
+    if (dist > 0 && dist <= 2) {
+      return `${local}@${candidate}`;
+    }
+  }
+  return null;
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (a.length === 0) return b.length;
+  if (b.length === 0) return a.length;
+  const m = a.length;
+  const n = b.length;
+  let prev = new Array(n + 1);
+  let curr = new Array(n + 1);
+  for (let j = 0; j <= n; j++) prev[j] = j;
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = a.charCodeAt(i - 1) === b.charCodeAt(j - 1) ? 0 : 1;
+      curr[j] = Math.min(
+        curr[j - 1] + 1,
+        prev[j] + 1,
+        prev[j - 1] + cost,
+      );
+    }
+    [prev, curr] = [curr, prev];
+  }
+  return prev[n];
 }

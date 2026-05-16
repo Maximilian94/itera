@@ -45,3 +45,51 @@ body {
 .float1 { animation: floatA 6s ease-in-out infinite; }
 .float2 { animation: floatB 7s ease-in-out infinite; }
 .float3 { animation: floatC 5.5s ease-in-out infinite; }
+
+@keyframes fadeUp {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.95; transform: scale(1.06); }
+}
+@keyframes revealUp {
+  0% { opacity: 0; transform: translateY(16px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+@keyframes pop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+@keyframes progressFill {
+  0% { width: 0%; }
+  100% { width: var(--progress-target, 50%); }
+}
+
+.anim-fade-up { animation: fadeUp 480ms ease-out both; }
+.anim-glow-pulse { animation: glowPulse 2.8s ease-in-out infinite; }
+.anim-reveal-up { animation: revealUp 700ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+.anim-shimmer { animation: shimmer 2.2s ease-in-out infinite; }
+.anim-pop { animation: pop 700ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.anim-progress-fill { animation: progressFill 1200ms cubic-bezier(0.22, 1, 0.36, 1) both; animation-delay: 200ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .float1, .float2, .float3,
+  .anim-fade-up, .anim-glow-pulse, .anim-reveal-up, .anim-shimmer,
+  .anim-pop, .anim-progress-fill {
+    animation: none !important;
+  }
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
