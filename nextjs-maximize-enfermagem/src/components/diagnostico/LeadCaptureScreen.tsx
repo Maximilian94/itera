@@ -71,8 +71,12 @@ export function LeadCaptureScreen({
         Pra onde devemos enviar seu diagnóstico?
       </h2>
       <p className="mt-3 text-base leading-relaxed text-slate-600">
-        Você verá o resultado completo na próxima tela e também receberá uma
-        cópia por e-mail.
+        Mandamos seu diagnóstico completo por e-mail — com seu perfil, pontos
+        de atenção e os próximos passos certos pra você. Antes, só mais{" "}
+        <span className="font-medium text-sky-900">
+          4 perguntas rápidas de contexto
+        </span>{" "}
+        pra personalizar.
       </p>
 
       <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -128,9 +132,10 @@ export function LeadCaptureScreen({
             autoComplete="tel"
             inputMode="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatBrazilPhone(e.target.value))}
             className="mt-1 block w-full rounded-md border-0 bg-white px-3 py-2.5 text-base text-slate-900 ring-1 ring-inset ring-slate-300 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-cyan-600"
             placeholder="(11) 9 9999-9999"
+            maxLength={16}
           />
         </div>
 
@@ -169,7 +174,7 @@ export function LeadCaptureScreen({
           disabled={submitting}
           className="inline-flex w-full items-center justify-center gap-2 rounded-md bg-cyan-600 px-6 py-3.5 text-base font-semibold text-white shadow-sm transition-colors hover:bg-cyan-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Enviando..." : "Ver meu diagnóstico"}
+          {submitting ? "Enviando..." : "Continuar"}
           {submitting ? null : (
             <ArrowRightIcon aria-hidden="true" className="size-5" />
           )}
@@ -181,4 +186,15 @@ export function LeadCaptureScreen({
 
 function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function formatBrazilPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${digits}`;
+  if (digits.length === 3) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 7) {
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3)}`;
+  }
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 3)} ${digits.slice(3, 7)}-${digits.slice(7)}`;
 }

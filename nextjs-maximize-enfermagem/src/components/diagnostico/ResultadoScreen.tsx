@@ -1,12 +1,15 @@
 "use client";
 
 import { CheckCircleIcon, EnvelopeIcon } from "@heroicons/react/24/outline";
+import { ArrowRightIcon } from "@heroicons/react/20/solid";
 import type { DiagnosticoResultado } from "@/lib/diagnostico/types";
 
 interface ResultadoScreenProps {
   resultado: DiagnosticoResultado;
   email: string;
 }
+
+const METODO_CTA_URL = "https://app.maximizeenfermagem.com.br";
 
 export function ResultadoScreen({ resultado, email }: ResultadoScreenProps) {
   return (
@@ -73,6 +76,20 @@ export function ResultadoScreen({ resultado, email }: ResultadoScreenProps) {
       >
         Não chegou em alguns minutos? Verifique a caixa de spam ou promoções.
       </p>
+
+      <div
+        className="anim-reveal-up mt-10 w-full border-t border-slate-200 pt-6 text-center"
+        style={{ animationDelay: "800ms" }}
+      >
+        <p className="text-sm text-slate-500">Enquanto o e-mail chega...</p>
+        <a
+          href={METODO_CTA_URL}
+          className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700 hover:text-cyan-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-cyan-600"
+        >
+          Conhecer o método Maximize
+          <ArrowRightIcon aria-hidden="true" className="size-4" />
+        </a>
+      </div>
     </div>
   );
 }

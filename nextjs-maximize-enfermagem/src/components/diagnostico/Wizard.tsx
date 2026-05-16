@@ -54,6 +54,7 @@ interface State {
 type Action =
   | { type: "iniciar" }
   | { type: "responder_pergunta"; perguntaId: string; alt: Alternativa }
+  | { type: "voltar_pergunta" }
   | { type: "analise_concluida" }
   | { type: "lead_submit_inicio" }
   | { type: "lead_submit_sucesso"; leadId: string; email: string }
@@ -63,6 +64,7 @@ type Action =
       field: QualificacaoFieldKey;
       value: QualificacaoValue;
     }
+  | { type: "voltar_qualificacao" }
   | { type: "qualificacao_submit_inicio" }
   | { type: "qualificacao_concluida" };
 
@@ -103,6 +105,26 @@ function reducer(state: State, action: Action): State {
         currentIndex >= lastIndex ? computeResultado(respostas) : state.resultado;
 
       return { ...state, respostas, resultado, step: nextStep };
+    }
+
+    case "voltar_pergunta": {
+      if (state.step.kind !== "pergunta" || state.step.index === 0) {
+        return state;
+      }
+      return {
+        ...state,
+        step: { kind: "pergunta", index: state.step.index - 1 },
+      };
+    }
+
+    case "voltar_qualificacao": {
+      if (state.step.kind !== "qualificacao" || state.step.index === 0) {
+        return state;
+      }
+      return {
+        ...state,
+        step: { kind: "qualificacao", index: state.step.index - 1 },
+      };
     }
 
     case "analise_concluida":
@@ -237,6 +259,14 @@ export function Wizard() {
     [],
   );
 
+  const handleVoltarPergunta = useCallback(() => {
+    dispatch({ type: "voltar_pergunta" });
+  }, []);
+
+  const handleVoltarQualificacao = useCallback(() => {
+    dispatch({ type: "voltar_qualificacao" });
+  }, []);
+
   // Quando entra em submitting_qualificacao, dispara PATCH e avança.
   // Guard com ref garante uma única chamada mesmo em StrictMode (double-mount).
   const qualificacaoRequestedRef = useRef(false);
@@ -292,12 +322,12 @@ export function Wizard() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-slate-50">
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+      <div className="flex flex-col gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-6 sm:px-6">
         <span className="text-sm font-semibold text-cyan-700">
           Maximize Enfermagem
         </span>
         {progress ? (
-          <div className="ml-6 max-w-xs flex-1">
+          <div className="w-full sm:ml-auto sm:max-w-xs">
             <ProgressBar
               current={progress.current}
               total={progress.total}
@@ -314,6 +344,8 @@ export function Wizard() {
           onAnalyzingDone: handleAnalyzingDone,
           onLeadSubmit: handleLeadSubmit,
           onQualificacao: handleQualificacao,
+          onVoltarPergunta: handleVoltarPergunta,
+          onVoltarQualificacao: handleVoltarQualificacao,
         })}
       </main>
     </div>
@@ -329,6 +361,8 @@ interface Handlers {
     field: QualificacaoFieldKey,
     value: QualificacaoValue,
   ) => void;
+  onVoltarPergunta: () => void;
+  onVoltarQualificacao: () => void;
 }
 
 function renderStep(
@@ -344,9 +378,11 @@ function renderStep(
       const pergunta = perguntas[state.step.index];
       return (
         <PerguntaScreen
+          key={pergunta.id}
           pergunta={pergunta}
           selecionada={state.respostas[pergunta.id]}
           onResponder={(alt) => h.onResponder(pergunta.id, pergunta.ordem, alt)}
+          onVoltar={state.step.index > 0 ? h.onVoltarPergunta : undefined}
         />
       );
     }
@@ -373,10 +409,14 @@ function renderStep(
       const pergunta = PERGUNTAS_QUALIFICACAO[state.step.index];
       return (
         <QualificacaoScreen
+          key={pergunta.field}
           pergunta={pergunta}
           ordemTotal={PERGUNTAS_QUALIFICACAO.length}
           selecionada={state.qualificacao[pergunta.field]}
           onResponder={(value) => h.onQualificacao(pergunta.field, value)}
+          onVoltar={
+            state.step.index > 0 ? h.onVoltarQualificacao : undefined
+          }
         />
       );
     }

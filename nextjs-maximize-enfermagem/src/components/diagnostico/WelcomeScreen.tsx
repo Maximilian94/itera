@@ -19,9 +19,9 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
       </h1>
 
       <p className="mt-5 text-lg leading-relaxed text-slate-600">
-        Em ~3 minutos respondendo 10 perguntas, você recebe um diagnóstico
-        personalizado: como está sua rotina, seu método e o que mudar primeiro
-        pra render mais.
+        Em ~4 minutos respondendo 10 perguntas rápidas, você recebe no e-mail
+        um diagnóstico personalizado: como está sua rotina, seu método e o
+        que mudar primeiro pra render mais.
       </p>
 
       <button
@@ -36,11 +36,11 @@ export function WelcomeScreen({ onStart }: WelcomeScreenProps) {
       <ul role="list" className="mt-8 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-slate-500">
         <li className="flex items-center gap-2">
           <ClockIcon aria-hidden="true" className="size-4 text-cyan-500" />
-          ~3 minutos
+          ~4 minutos
         </li>
         <li className="flex items-center gap-2">
           <ChatBubbleLeftRightIcon aria-hidden="true" className="size-4 text-cyan-500" />
-          10 perguntas objetivas
+          10 perguntas + perfil rápido
         </li>
       </ul>
     </div>
