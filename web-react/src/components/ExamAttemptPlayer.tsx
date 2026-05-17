@@ -63,6 +63,7 @@ import {
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
   useGenerateExplanationsMutation,
+  useGenerateSingleExplanationMutation,
   useGenerateMetadataMutation,
   useGenerateSubjectMutation,
   useReviewQuestionMutation,
@@ -253,6 +254,7 @@ export function ExamAttemptPlayer({
   const [newAltKey, setNewAltKey] = useState('')
   const [newAltText, setNewAltText] = useState('')
   const [editExplanationById, setEditExplanationById] = useState<Record<string, string>>({})
+  const [generatingSingleExplanationKey, setGeneratingSingleExplanationKey] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadImageError, setUploadImageError] = useState<string | null>(null)
   const [statementImageLoadError, setStatementImageLoadError] = useState(false)
@@ -309,6 +311,7 @@ export function ExamAttemptPlayer({
   const generateMetadataMutation = useGenerateMetadataMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateSubjectMutation = useGenerateSubjectMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const generateSingleExplanationMutation = useGenerateSingleExplanationMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Review mutations
   const reviewQuestionMutation = useReviewQuestionMutation(examBaseId ?? '')
@@ -400,6 +403,30 @@ export function ExamAttemptPlayer({
       setSnackbarOpen(true)
     }
   }, [editExplanationById, updateAlternativeMutation])
+
+  const handleGenerateSingleExplanation = useCallback(async (altId: string, altKey: string, altText: string) => {
+    if (!currentQuestion || !examBaseId) return
+    setGeneratingSingleExplanationKey(altKey)
+    try {
+      const result = await generateSingleExplanationMutation.mutateAsync(altKey)
+      await updateAlternativeMutation.mutateAsync({
+        alternativeId: altId,
+        input: { text: altText, explanation: result.explanation },
+      })
+      setEditExplanationById((prev) => {
+        const next = { ...prev }
+        delete next[altId]
+        return next
+      })
+      setSnackbarMessage('Explicação gerada e salva!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    } finally {
+      setGeneratingSingleExplanationKey(null)
+    }
+  }, [currentQuestion, examBaseId, generateSingleExplanationMutation, updateAlternativeMutation])
 
   const handleAddAlternative = useCallback(async () => {
     if (!newAltKey.trim() || !newAltText.trim()) {
@@ -801,6 +828,7 @@ export function ExamAttemptPlayer({
     setEditingReferenceText(false)
     setEditAlternativeById({})
     setEditExplanationById({})
+    setGeneratingSingleExplanationKey(null)
     setGenerateMetadataError(null)
     setGenerateExplainError(null)
     setDisagreementWarning(null)
@@ -2482,14 +2510,25 @@ export function ExamAttemptPlayer({
                                 <div className="flex items-center justify-between mb-2">
                                   <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Explicação</span>
                                   {canInlineEdit && !isEditingExplanation && (
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditExplanationById((prev) => ({ ...prev, [alt.id]: alt.explanation ?? '' }))}
-                                      className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-white/60 hover:text-slate-800 transition-colors"
-                                    >
-                                      <PencilSquareIcon className="w-3.5 h-3.5" />
-                                      Editar
-                                    </button>
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleGenerateSingleExplanation(alt.id, alt.key, alt.text)}
+                                        disabled={generatingSingleExplanationKey !== null || !currentQuestion.correctAlternative}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-violet-600 hover:bg-violet-50 hover:text-violet-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <AutoAwesomeIcon sx={{ fontSize: 14 }} />
+                                        {generatingSingleExplanationKey === alt.key ? 'Gerando…' : 'IA'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditExplanationById((prev) => ({ ...prev, [alt.id]: alt.explanation ?? '' }))}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-white/60 hover:text-slate-800 transition-colors"
+                                      >
+                                        <PencilSquareIcon className="w-3.5 h-3.5" />
+                                        Editar
+                                      </button>
+                                    </div>
                                   )}
                                 </div>
                                 {isEditingExplanation ? (

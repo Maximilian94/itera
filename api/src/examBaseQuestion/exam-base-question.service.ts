@@ -1117,6 +1117,181 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     return normalizeGenerateExplanationsResponse(parsed);
   }
 
+  async generateSingleExplanation(
+    examBaseId: string,
+    questionId: string,
+    alternativeKey: string,
+  ): Promise<{ explanation: string }> {
+    await assertQuestionBelongsToExamBase(
+      this.prisma,
+      examBaseId,
+      questionId,
+    );
+
+    const question = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: {
+        subject: true,
+        statement: true,
+        statementImageUrl: true,
+        referenceText: true,
+        correctAlternative: true,
+        alternatives: {
+          orderBy: { key: 'asc' },
+          select: { key: true, text: true },
+        },
+        examBase: { select: { name: true, institution: true } },
+      },
+    });
+    if (!question) throw new NotFoundException('question not found');
+
+    const targetAlt = question.alternatives.find(
+      (a) => a.key === alternativeKey,
+    );
+    if (!targetAlt)
+      throw new NotFoundException(
+        `alternative "${alternativeKey}" not found in this question`,
+      );
+
+    const correctAlt = question.correctAlternative?.trim();
+    if (!correctAlt) {
+      throw new BadRequestException(
+        'A alternativa correta deve estar marcada para gerar explicações.',
+      );
+    }
+
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI explanations.',
+      );
+    }
+
+    const isCorrect = alternativeKey === correctAlt;
+    const examLabel = [question.examBase.name, question.examBase.institution]
+      .filter(Boolean)
+      .join(' — ');
+    const alternativesText = question.alternatives
+      .map((a) => `${a.key}) ${a.text}`)
+      .join('\n\n');
+    const subjectInfo = question.subject
+      ? `**Matéria:** ${question.subject}\n\n`
+      : '';
+    const referenceSection = question.referenceText?.trim()
+      ? `**Texto de referência:**\n${question.referenceText}\n\n`
+      : '';
+
+    const systemPrompt = `Você é um professor de enfermagem experiente que ajuda futuros enfermeiros a se prepararem para concursos públicos no Brasil. Você ama ensinar, tem interesse real em fazer a pessoa aprender de verdade, e escreve de forma próxima — como um professor que explica no quadro, não como um livro-texto.
+
+Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no formato: { "explanation": "..." }
+
+SEU TOM E ESTILO:
+- Linguagem acessível e acolhedora, mas sem perder a precisão técnica.
+- Use "você" e fale diretamente com o estudante. Ex: "Perceba que…", "Aqui o pulo do gato é…", "Cuidado com essa pegadinha…"
+- Termos técnicos de enfermagem devem estar presentes e corretos, mas sempre acompanhados de contexto que facilite o entendimento.
+
+ESTRUTURA DA EXPLICAÇÃO (use Markdown dentro da string JSON, com \\n para quebras de linha):
+- Explique por que a alternativa está ${isCorrect ? 'correta' : 'incorreta'}, com **raciocínio clínico/lógico**.
+- Use **negrito** para termos-chave e conceitos importantes.
+- Use listas quando comparar conceitos ou enumerar critérios.
+- Quando relevante, cite a fonte: legislação, portarias do MS, protocolos, resoluções COFEN.
+${!isCorrect ? '- Explique o que o conceito da alternativa realmente significa ou onde ele se aplica — transforme o erro em aprendizado.\n' : ''}- Se houver uma "pegadinha" comum em provas, destaque para o estudante.
+- IMPORTANTE: NUNCA mencione a letra da alternativa. Use "Esta alternativa" apenas.
+
+Regras para o JSON:
+- Escape aspas duplas dentro de strings com \\".
+- Use \\n para quebras de linha.`;
+
+    const userPromptText = `Gere a explicação para a alternativa "${alternativeKey}" da questão abaixo.
+
+**Prova:** ${examLabel || 'Não informada'}
+${subjectInfo}${referenceSection}**Enunciado:** ${question.statement}
+
+**Alternativas (para contexto):**
+${alternativesText}
+
+**A alternativa correta é: ${correctAlt}.**
+
+**Gere a explicação APENAS para a alternativa ${alternativeKey}: "${targetAlt.text}"**
+Esta alternativa está ${isCorrect ? 'CORRETA' : 'INCORRETA'}.
+
+Retorne: { "explanation": "..." }`;
+
+    let userContent: { role: 'user'; content: string | object[] } = {
+      role: 'user',
+      content: userPromptText,
+    };
+    if (question.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(question.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'o3-mini',
+        max_completion_tokens: 4096,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          userContent,
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(
+        `OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`,
+      );
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content)
+      throw new BadRequestException('AI returned empty response.');
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsed: { explanation?: string };
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (parseErr) {
+        const msg =
+          parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(`AI returned invalid JSON. (${msg})`);
+      }
+    }
+
+    return {
+      explanation:
+        typeof parsed.explanation === 'string' ? parsed.explanation : '',
+    };
+  }
+
   list(examBaseId: string) {
     return this.prisma.examBaseQuestion.findMany({
       where: { examBaseId },

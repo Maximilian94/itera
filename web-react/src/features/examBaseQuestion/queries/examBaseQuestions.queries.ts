@@ -165,6 +165,20 @@ export function useGenerateExplanationsMutation(
   })
 }
 
+export function useGenerateSingleExplanationMutation(
+  examBaseId: string,
+  questionId: string,
+) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (alternativeKey: string) =>
+      examBaseQuestionsService.generateSingleExplanation(examBaseId, questionId, alternativeKey),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
+    },
+  })
+}
+
 export type { ParsedQuestionItem, ParsedQuestionFromPdf, ParsedQuestionStructure, GenerateExplanationsResponse, GenerateMetadataResponse }
 
 export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: string) {
