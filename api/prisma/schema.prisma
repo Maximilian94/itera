@@ -46,6 +46,13 @@ enum ProcessingPhase {
   CONCLUIDO
 }
 
+enum PciEntryStatus {
+  PENDING
+  PROMOTED
+  SKIPPED
+  UNAVAILABLE
+}
+
 model User {
   id               String    @id @default(uuid()) @db.Uuid
   email            String    @unique
@@ -191,8 +198,28 @@ model ExamBoard {
 
   exams      Exam[]
   examBases  ExamBase[]
+  concursos  Concurso[]
 
   @@map("exam_boards")
+}
+
+model Concurso {
+  id              String          @id @default(uuid()) @db.Uuid
+  institution     String
+  year            Int
+  governmentScope GovernmentScope
+  state           String?
+  city            String?
+  createdAt       DateTime        @default(now())
+
+  examBoardId     String?         @db.Uuid
+  examBoard       ExamBoard?      @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
+
+  examBases       ExamBase[]
+
+  @@unique([institution, year, examBoardId])
+  @@index([year])
+  @@map("concursos")
 }
 
 model ExamBase {
@@ -227,11 +254,15 @@ model ExamBase {
   examBoardId String?    @db.Uuid
   examBoard   ExamBoard? @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
 
+  concursoId  String?    @db.Uuid
+  concurso    Concurso?  @relation(fields: [concursoId], references: [id], onDelete: SetNull)
+
   questions         ExamBaseQuestion[]
   attempts          ExamBaseAttempt[]
   trainingSessions  TrainingSession[]
 
   @@index([examBoardId])
+  @@index([concursoId])
   @@map("exam_bases")
 }
 
@@ -793,4 +824,57 @@ model DiagnosticoResposta {
 
   @@index([leadId])
   @@map("diagnostico_respostas")
+}
+
+// ---- PCI Scraper ----
+
+model PciExamEntry {
+  id              String           @id @default(uuid()) @db.Uuid
+  downloadUrl     String           @unique
+  examName        String
+  year            Int
+  institution     String
+  examBoardRaw    String
+  cargoSlug       String
+  cargoRaw        String?
+
+  governmentScope GovernmentScope?
+  state           String?
+  city            String?
+
+  priorityScore   Float            @default(0)
+
+  status          PciEntryStatus   @default(PENDING)
+  promotedToId    String?          @db.Uuid
+
+  scraperRunId    String?          @db.Uuid
+  scraperRun      ScraperRun?      @relation(fields: [scraperRunId], references: [id], onDelete: SetNull)
+
+  scrapedAt       DateTime         @default(now())
+  pageUrl         String
+
+  @@index([status, priorityScore(sort: Desc)])
+  @@index([year])
+  @@index([examBoardRaw])
+  @@index([cargoSlug])
+  @@index([scraperRunId])
+  @@map("pci_exam_entries")
+}
+
+model ScraperRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  cargoSlugs     String[]
+  totalPages     Int       @default(0)
+  totalEntries   Int       @default(0)
+  newEntries     Int       @default(0)
+  lastCargoSlug  String?
+  lastPage       Int?
+  status         String    @default("running")
+  errorLog       String?
+
+  entries        PciExamEntry[]
+
+  @@map("scraper_runs")
 }
