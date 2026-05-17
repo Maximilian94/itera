@@ -404,21 +404,13 @@ export function ExamAttemptPlayer({
     }
   }, [editExplanationById, updateAlternativeMutation])
 
-  const handleGenerateSingleExplanation = useCallback(async (altId: string, altKey: string, altText: string) => {
+  const handleGenerateSingleExplanation = useCallback(async (altId: string, altKey: string) => {
     if (!currentQuestion || !examBaseId) return
     setGeneratingSingleExplanationKey(altKey)
     try {
       const result = await generateSingleExplanationMutation.mutateAsync(altKey)
-      await updateAlternativeMutation.mutateAsync({
-        alternativeId: altId,
-        input: { text: altText, explanation: result.explanation },
-      })
-      setEditExplanationById((prev) => {
-        const next = { ...prev }
-        delete next[altId]
-        return next
-      })
-      setSnackbarMessage('Explicação gerada e salva!')
+      setEditExplanationById((prev) => ({ ...prev, [altId]: result.explanation }))
+      setSnackbarMessage('Explicação gerada — revise e salve.')
       setSnackbarOpen(true)
     } catch (err) {
       setSnackbarMessage(getApiMessage(err))
@@ -426,7 +418,7 @@ export function ExamAttemptPlayer({
     } finally {
       setGeneratingSingleExplanationKey(null)
     }
-  }, [currentQuestion, examBaseId, generateSingleExplanationMutation, updateAlternativeMutation])
+  }, [currentQuestion, examBaseId, generateSingleExplanationMutation])
 
   const handleAddAlternative = useCallback(async () => {
     if (!newAltKey.trim() || !newAltText.trim()) {
@@ -2513,7 +2505,7 @@ export function ExamAttemptPlayer({
                                     <div className="flex items-center gap-1">
                                       <button
                                         type="button"
-                                        onClick={() => handleGenerateSingleExplanation(alt.id, alt.key, alt.text)}
+                                        onClick={() => handleGenerateSingleExplanation(alt.id, alt.key)}
                                         disabled={generatingSingleExplanationKey !== null || !currentQuestion.correctAlternative}
                                         className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-violet-600 hover:bg-violet-50 hover:text-violet-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
