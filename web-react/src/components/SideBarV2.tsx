@@ -8,11 +8,12 @@ import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as ExamBoardsRoute } from '@/routes/_authenticated/exam-boards'
 import { Route as AdminUsersRoute } from '@/routes/_authenticated/admin/users'
+import { Route as AdminPciScraperRoute } from '@/routes/_authenticated/admin/pci-scraper'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { useQuery } from '@tanstack/react-query'
 import { authService } from '@/features/auth/services/auth.service'
-import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, BuildingLibraryIcon, UsersIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, UsersIcon as UsersIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, BuildingLibraryIcon, UsersIcon, MagnifyingGlassCircleIcon } from '@heroicons/react/24/solid'
+import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import { Link, useMatchRoute, useNavigate, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
 import { Menu, MenuItem } from '@mui/material'
 
@@ -102,6 +103,12 @@ export const SideBarV2 = () => {
             href: AdminUsersRoute.to,
             icon: UsersIconOutline,
             activeIcon: UsersIcon,
+        },
+        {
+            label: 'PCI Scraper',
+            href: AdminPciScraperRoute.to,
+            icon: MagnifyingGlassCircleIconOutline,
+            activeIcon: MagnifyingGlassCircleIcon,
         },
     ]
 
