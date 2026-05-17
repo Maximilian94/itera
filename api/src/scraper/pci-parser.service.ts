@@ -39,13 +39,17 @@ export class PciParserService {
   private parseTable($: cheerio.CheerioAPI, pageUrl: string): PciRawEntry[] {
     const entries: PciRawEntry[] = [];
 
-    $('table.provas tr').each((_i, row) => {
-      const cells = $(row).find('td');
+    $('#lista_provas tbody tr.lk_link').each((_i, row) => {
+      const $row = $(row);
+      const cells = $row.find('td');
       if (cells.length < 4) return;
 
       const linkEl = $(cells[0]).find('a');
+      const iconEl = linkEl.find('i');
+      iconEl.remove();
       const examName = linkEl.text().trim();
-      let downloadUrl = linkEl.attr('href') ?? '';
+      let downloadUrl =
+        $row.attr('data-url') ?? linkEl.attr('href') ?? '';
 
       if (!examName || !downloadUrl) return;
 
@@ -76,26 +80,18 @@ export class PciParserService {
   }
 
   private detectTotalPages($: cheerio.CheerioAPI): number {
-    let max = 1;
-    $('a.proxima, a[href*="/provas/"]').each((_i, el) => {
-      const href = $(el).attr('href') ?? '';
-      const match = href.match(/\/provas\/[^/]+\/(\d+)/);
-      if (match) {
-        const pageNum = parseInt(match[1], 10);
-        if (pageNum > max) max = pageNum;
-      }
-    });
-
-    const paginationText = $('div.paginacao, nav.pagination, .pagination')
-      .text()
-      .trim();
-    const pageNumbers = paginationText.match(/\d+/g);
-    if (pageNumbers) {
-      for (const n of pageNumbers) {
-        const num = parseInt(n, 10);
-        if (num > max && num <= 99) max = num;
-      }
+    const infoText = $('div.provas-info-pagina').text();
+    const infoMatch = infoText.match(/de\s+(\d+)/);
+    if (infoMatch) {
+      return parseInt(infoMatch[1], 10);
     }
+
+    let max = 1;
+    $('.provas-paginacao .page-link').each((_i, el) => {
+      const text = $(el).text().trim();
+      const num = parseInt(text, 10);
+      if (!isNaN(num) && num > max) max = num;
+    });
 
     return max;
   }

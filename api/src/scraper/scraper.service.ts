@@ -100,6 +100,21 @@ export class ScraperService {
       throw new BadRequestException('Entry already promoted');
     }
 
+    let examBoardId: string | null = null;
+    if (entry.examBoardRaw) {
+      const raw = entry.examBoardRaw.toUpperCase().trim();
+      const board = await this.prisma.examBoard.findFirst({
+        where: {
+          OR: [
+            { name: { equals: raw, mode: 'insensitive' } },
+            { alias: { equals: raw, mode: 'insensitive' } },
+          ],
+        },
+        select: { id: true },
+      });
+      examBoardId = board?.id ?? null;
+    }
+
     const examBase = await this.prisma.examBase.create({
       data: {
         name: entry.examName,
@@ -110,6 +125,7 @@ export class ScraperService {
         state: entry.state,
         city: entry.city,
         examDate: new Date(entry.year, 0, 1),
+        examBoardId,
       },
     });
 

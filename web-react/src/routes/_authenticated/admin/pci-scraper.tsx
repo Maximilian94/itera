@@ -1,5 +1,5 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import { useCallback, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   Button,
@@ -11,6 +11,7 @@ import {
   MenuItem,
   Select,
   TextField,
+  Tooltip,
 } from '@mui/material'
 import {
   ChevronUpIcon,
@@ -20,6 +21,7 @@ import {
 } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
 import { authService } from '@/features/auth/services/auth.service'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   useScraperEntriesQuery,
   useScraperRunsQuery,
@@ -27,6 +29,7 @@ import {
   useTriggerRunMutation,
   useUpdateEntryStatusMutation,
   usePromoteEntryMutation,
+  scraperKeys,
 } from '@/features/scraper/scraper.queries'
 
 export const Route = createFileRoute('/_authenticated/admin/pci-scraper')({
@@ -82,6 +85,16 @@ function PciScraperPage() {
     activeRunId,
     isRunning || activeRunId !== null,
   )
+
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    if (activeRun && activeRun.status !== 'running') {
+      setActiveRunId(null)
+      queryClient.invalidateQueries({ queryKey: scraperKeys.runs() })
+      queryClient.invalidateQueries({ queryKey: scraperKeys.entries() })
+    }
+  }, [activeRun, queryClient])
 
   const triggerMutation = useTriggerRunMutation()
   const updateStatusMutation = useUpdateEntryStatusMutation()
@@ -534,30 +547,44 @@ function PciScraperPage() {
                   <div className="px-3 py-2 w-[160px] flex items-center gap-1">
                     {entry.status === 'PENDING' && (
                       <>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          sx={{ minWidth: 0, px: 1, fontSize: 11, height: 24 }}
-                          disabled={promoteMutation.isPending}
-                          onClick={() => promoteMutation.mutate(entry.id)}
-                        >
-                          Promover
-                        </Button>
-                        <Button
-                          size="small"
-                          color="warning"
-                          sx={{ minWidth: 0, px: 1, fontSize: 11, height: 24 }}
-                          disabled={updateStatusMutation.isPending}
-                          onClick={() =>
-                            updateStatusMutation.mutate({
-                              id: entry.id,
-                              status: 'SKIPPED',
-                            })
-                          }
-                        >
-                          Ignorar
-                        </Button>
+                        <Tooltip title="Cria um ExamBase no sistema de producao com os dados desta prova" arrow>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            sx={{ minWidth: 0, px: 1, fontSize: 11, height: 24 }}
+                            disabled={promoteMutation.isPending}
+                            onClick={() => promoteMutation.mutate(entry.id)}
+                          >
+                            Promover
+                          </Button>
+                        </Tooltip>
+                        <Tooltip title="Marca como ignorada — nao sera promovida" arrow>
+                          <Button
+                            size="small"
+                            color="warning"
+                            sx={{ minWidth: 0, px: 1, fontSize: 11, height: 24 }}
+                            disabled={updateStatusMutation.isPending}
+                            onClick={() =>
+                              updateStatusMutation.mutate({
+                                id: entry.id,
+                                status: 'SKIPPED',
+                              })
+                            }
+                          >
+                            Ignorar
+                          </Button>
+                        </Tooltip>
                       </>
+                    )}
+                    {entry.status === 'PROMOTED' && entry.promotedToId && (
+                      <Tooltip title="Abrir ExamBase criado a partir desta entrada" arrow>
+                        <a
+                          href={`/exams/editar/${entry.promotedToId}`}
+                          className="text-xs text-emerald-600 hover:underline font-medium"
+                        >
+                          Ver exame
+                        </a>
+                      </Tooltip>
                     )}
                     <a
                       href={entry.downloadUrl}
