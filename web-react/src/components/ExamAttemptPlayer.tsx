@@ -2501,6 +2501,7 @@ export function ExamAttemptPlayer({
                                       minHeight={140}
                                       placeholder="Escreva a explicação desta alternativa…"
                                       changed={editExplanationValue !== (alt.explanation ?? '')}
+                                      preview="edit"
                                     />
                                     <div className="flex gap-2">
                                       <Button
