@@ -63,6 +63,7 @@ import {
   useUpdateAlternativeMutation,
   useDeleteAlternativeMutation,
   useGenerateExplanationsMutation,
+  useGenerateSingleExplanationMutation,
   useGenerateMetadataMutation,
   useGenerateSubjectMutation,
   useReviewQuestionMutation,
@@ -252,6 +253,8 @@ export function ExamAttemptPlayer({
   const [showAddAlternative, setShowAddAlternative] = useState(false)
   const [newAltKey, setNewAltKey] = useState('')
   const [newAltText, setNewAltText] = useState('')
+  const [editExplanationById, setEditExplanationById] = useState<Record<string, string>>({})
+  const [generatingSingleExplanationKey, setGeneratingSingleExplanationKey] = useState<string | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
   const [uploadImageError, setUploadImageError] = useState<string | null>(null)
   const [statementImageLoadError, setStatementImageLoadError] = useState(false)
@@ -308,6 +311,7 @@ export function ExamAttemptPlayer({
   const generateMetadataMutation = useGenerateMetadataMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateSubjectMutation = useGenerateSubjectMutation(examBaseId ?? '', currentQuestion?.id ?? '')
   const generateExplanationsMutation = useGenerateExplanationsMutation(examBaseId ?? '', currentQuestion?.id ?? '')
+  const generateSingleExplanationMutation = useGenerateSingleExplanationMutation(examBaseId ?? '', currentQuestion?.id ?? '')
 
   // Review mutations
   const reviewQuestionMutation = useReviewQuestionMutation(examBaseId ?? '')
@@ -378,6 +382,43 @@ export function ExamAttemptPlayer({
       setSnackbarOpen(true)
     }
   }, [editAlternativeById, updateAlternativeMutation])
+
+  const handleSaveExplanation = useCallback(async (altId: string, altText: string) => {
+    const explanation = editExplanationById[altId]
+    if (explanation === undefined) return
+    try {
+      await updateAlternativeMutation.mutateAsync({
+        alternativeId: altId,
+        input: { text: altText, explanation: explanation.trim() },
+      })
+      setEditExplanationById((prev) => {
+        const next = { ...prev }
+        delete next[altId]
+        return next
+      })
+      setSnackbarMessage('Explicação salva com sucesso!')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    }
+  }, [editExplanationById, updateAlternativeMutation])
+
+  const handleGenerateSingleExplanation = useCallback(async (altId: string, altKey: string) => {
+    if (!currentQuestion || !examBaseId) return
+    setGeneratingSingleExplanationKey(altKey)
+    try {
+      const result = await generateSingleExplanationMutation.mutateAsync(altKey)
+      setEditExplanationById((prev) => ({ ...prev, [altId]: result.explanation }))
+      setSnackbarMessage('Explicação gerada — revise e salve.')
+      setSnackbarOpen(true)
+    } catch (err) {
+      setSnackbarMessage(getApiMessage(err))
+      setSnackbarOpen(true)
+    } finally {
+      setGeneratingSingleExplanationKey(null)
+    }
+  }, [currentQuestion, examBaseId, generateSingleExplanationMutation])
 
   const handleAddAlternative = useCallback(async () => {
     if (!newAltKey.trim() || !newAltText.trim()) {
@@ -778,6 +819,8 @@ export function ExamAttemptPlayer({
     setEditingStatement(false)
     setEditingReferenceText(false)
     setEditAlternativeById({})
+    setEditExplanationById({})
+    setGeneratingSingleExplanationKey(null)
     setGenerateMetadataError(null)
     setGenerateExplainError(null)
     setDisagreementWarning(null)
@@ -841,7 +884,7 @@ export function ExamAttemptPlayer({
   }
 
   const handleChange = (_event: React.SyntheticEvent, newValue: number) => {
-    if (newValue === 1 && !isFinished) return
+    if (newValue === 1 && !isFinished && !canInlineEdit) return
     setValue(newValue)
   }
 
@@ -952,7 +995,7 @@ export function ExamAttemptPlayer({
   const comingSoonTooltip = 'Em breve disponível. Estamos trabalhando nisso.'
   const tabButtons = [
     { value: 0, label: 'Questão', icon: PlayIcon },
-    { value: 1, label: 'Explicação', icon: BookOpenIcon, disabled: !isFinished },
+    { value: 1, label: 'Explicação', icon: BookOpenIcon, disabled: !isFinished && !canInlineEdit },
     { value: 2, label: 'Estatísticas', icon: ChartBarIcon, comingSoon: true },
     { value: 3, label: 'Comentários', icon: ChatBubbleLeftRightIcon, comingSoon: true },
     { value: 4, label: 'Histórico', icon: ClockIcon, comingSoon: true },
@@ -2386,9 +2429,42 @@ export function ExamAttemptPlayer({
 
               <CustomTabPanel value={value} hidden={value !== 1}>
                 <div className="flex flex-col gap-6">
-                  {!isFinished && <span className="text-sm text-slate-500">As explicações ficam disponíveis após você finalizar a prova.</span>}
-                  {isFinished && currentQuestion && (
+                  {!isFinished && !canInlineEdit && <span className="text-sm text-slate-500">As explicações ficam disponíveis após você finalizar a prova.</span>}
+                  {(isFinished || canInlineEdit) && currentQuestion && (
                     <>
+                      {canInlineEdit && (
+                        <div className="flex flex-col gap-3">
+                          <button
+                            type="button"
+                            onClick={handleGenerateExplanations}
+                            disabled={
+                              generateExplanationsMutation.isPending ||
+                              generateMetadataMutation.isPending ||
+                              currentQuestion.alternatives.length === 0 ||
+                              !currentQuestion.correctAlternative
+                            }
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+                          >
+                            <AutoAwesomeIcon fontSize="small" />
+                            {generateExplanationsMutation.isPending ? 'Gerando explicações…' : 'Gerar explicações com IA'}
+                          </button>
+                          {!currentQuestion.correctAlternative && (
+                            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-center">
+                              Marque a resposta correta na aba "Questão" para gerar explicações com IA.
+                            </p>
+                          )}
+                          {generateExplainError && (
+                            <Alert severity="error" onClose={() => setGenerateExplainError(null)} sx={{ py: 0 }}>
+                              {generateExplainError}
+                            </Alert>
+                          )}
+                          {disagreementWarning && (
+                            <Alert severity="warning" onClose={() => setDisagreementWarning(null)} sx={{ py: 0, '& .MuiAlert-message': { fontWeight: 600 } }}>
+                              {disagreementWarning}
+                            </Alert>
+                          )}
+                        </div>
+                      )}
                       <p className="text-sm font-semibold text-slate-700">Resposta correta: {currentQuestion.correctAlternative ?? '—'}</p>
                       <div className="flex flex-col gap-5">
                         {currentQuestion.alternatives.map((alt, idx) => {
@@ -2410,6 +2486,8 @@ export function ExamAttemptPlayer({
                             wrong: 'border-t border-rose-300 bg-rose-50/70',
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
+                          const isEditingExplanation = alt.id in editExplanationById
+                          const editExplanationValue = editExplanationById[alt.id] ?? ''
                           return (
                             <div key={alt.id} ref={(el) => { explanationRefsMap.current[alt.id] = el }} className={cardStyles[variant]}>
                               <div className="p-4">
@@ -2421,8 +2499,68 @@ export function ExamAttemptPlayer({
                                 <div className={`text-sm ${headerTextStyles[variant]}`}><Markdown>{alt.text}</Markdown></div>
                               </div>
                               <div className={`p-4 ${explanationWrapStyles[variant]}`}>
-                                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide block mb-2">Explicação</span>
-                                {alt.explanation ? <div className="text-sm text-slate-700"><Markdown>{alt.explanation}</Markdown></div> : <span className="text-sm text-slate-500 italic">Sem explicação cadastrada.</span>}
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">Explicação</span>
+                                  {canInlineEdit && !isEditingExplanation && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleGenerateSingleExplanation(alt.id, alt.key)}
+                                        disabled={generatingSingleExplanationKey !== null || !currentQuestion.correctAlternative}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-violet-600 hover:bg-violet-50 hover:text-violet-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                      >
+                                        <AutoAwesomeIcon sx={{ fontSize: 14 }} />
+                                        {generatingSingleExplanationKey === alt.key ? 'Gerando…' : 'IA'}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setEditExplanationById((prev) => ({ ...prev, [alt.id]: alt.explanation ?? '' }))}
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-slate-600 hover:bg-white/60 hover:text-slate-800 transition-colors"
+                                      >
+                                        <PencilSquareIcon className="w-3.5 h-3.5" />
+                                        Editar
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                                {isEditingExplanation ? (
+                                  <div className="flex flex-col gap-2">
+                                    <MarkdownEditor
+                                      label="Explicação"
+                                      value={editExplanationValue}
+                                      onChange={(val) => setEditExplanationById((prev) => ({ ...prev, [alt.id]: val }))}
+                                      minHeight={140}
+                                      placeholder="Escreva a explicação desta alternativa…"
+                                      changed={editExplanationValue !== (alt.explanation ?? '')}
+                                      preview="edit"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button
+                                        variant="contained"
+                                        size="small"
+                                        onClick={() => handleSaveExplanation(alt.id, alt.text)}
+                                        disabled={updateAlternativeMutation.isPending || editExplanationValue === (alt.explanation ?? '')}
+                                      >
+                                        {updateAlternativeMutation.isPending ? 'Salvando…' : 'Salvar'}
+                                      </Button>
+                                      <Button
+                                        variant="outlined"
+                                        size="small"
+                                        onClick={() => setEditExplanationById((prev) => {
+                                          const next = { ...prev }
+                                          delete next[alt.id]
+                                          return next
+                                        })}
+                                      >
+                                        Cancelar
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  alt.explanation
+                                    ? <div className="text-sm text-slate-700"><Markdown>{alt.explanation}</Markdown></div>
+                                    : <span className="text-sm text-slate-500 italic">Sem explicação cadastrada.</span>
+                                )}
                               </div>
                             </div>
                           )

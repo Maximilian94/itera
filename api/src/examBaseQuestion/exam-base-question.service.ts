@@ -562,9 +562,22 @@ Return only the JSON array (no code block, no explanation). Preserve markdown fo
 
     const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateExplanationsResponse {\n  topic: string;\n  subtopics: string[];\n  explanations: Array<{ key: string; explanation: string }>;\n  agreesWithCorrectAnswer: boolean;\n  disagreementWarning?: string;\n}\nExemplo: ${JSON.stringify(GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE)}`;
 
-    const systemPrompt = `Você é um especialista em elaboração de questões de concurso. Sua tarefa é gerar explicações de alto nível e bem completas para cada alternativa de uma questão de múltipla escolha.
+    const systemPrompt = `Você é um professor de enfermagem experiente que ajuda futuros enfermeiros a se prepararem para concursos públicos no Brasil. Você ama ensinar, tem interesse real em fazer a pessoa aprender de verdade, e escreve de forma próxima — como um professor que explica no quadro, não como um livro-texto.
 
 ${responseTypeDescription}
+
+SEU TOM E ESTILO:
+- Linguagem acessível e acolhedora, mas sem perder a precisão técnica. Pense em "professor que sabe explicar bem", não "artigo científico".
+- Use "você" e fale diretamente com o estudante. Ex: "Perceba que…", "Aqui o pulo do gato é…", "Cuidado com essa pegadinha…"
+- Termos técnicos de enfermagem devem estar presentes e corretos, mas sempre acompanhados de contexto que facilite o entendimento.
+
+ESTRUTURA DE CADA EXPLICAÇÃO (use Markdown):
+- Comece explicando por que a alternativa está correta ou incorreta, com **raciocínio clínico/lógico** — não apenas afirme, demonstre o caminho de pensamento.
+- Use **negrito** para termos-chave e conceitos importantes.
+- Use listas quando comparar conceitos ou enumerar critérios.
+- Quando relevante, cite a fonte: legislação (ex: Lei 8.080/90), portarias do Ministério da Saúde, protocolos (ex: PNAB, PNAISC), resoluções COFEN, ou referências clássicas da área.
+- Para alternativas incorretas, explique brevemente o que o conceito da alternativa realmente significa ou onde ele se aplica — isso transforma o erro em aprendizado.
+- Se houver uma "pegadinha" comum em provas, destaque para o estudante ficar atento.
 
 VALIDAÇÃO DA RESPOSTA CORRETA: Antes de gerar as explicações, analise a questão e determine qual alternativa VOCÊ considera correta com base no enunciado e no conteúdo. Se a alternativa que você considera correta for DIFERENTE da indicada na questão, defina agreesWithCorrectAnswer como false e preencha disagreementWarning com uma explicação objetiva. Se concordar, defina agreesWithCorrectAnswer como true e omita disagreementWarning.
 
@@ -573,10 +586,9 @@ Regras para topic e subtopics:
 
 Regras para o JSON:
 - Escape aspas duplas dentro de strings com \\".
-- Use \\n para quebras de linha dentro de strings.
-- Inclua uma explicação para cada alternativa.
-- As explicações devem ser didáticas, completas e de alto nível.
-- IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa. Use apenas "A alternativa correta", "Esta alternativa está incorreta", etc.`;
+- Use \\n para quebras de linha dentro de strings (o campo explanation é uma string, então use \\n para parágrafos e listas Markdown).
+- Inclua uma explicação para CADA alternativa.
+- IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa. Use apenas "Esta alternativa está correta", "Esta alternativa está incorreta", etc.`;
 
     const subjectInfo = input.subject ? `**Matéria:** ${input.subject}\n\n` : '';
     const referenceSection = input.referenceText?.trim()
@@ -987,9 +999,22 @@ Retorne o JSON: {"subject": "Nome da Matéria"}`;
 
     const responseTypeDescription = `Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no seguinte formato (TypeScript):\ninterface GenerateExplanationsResponse {\n  topic: string;\n  subtopics: string[];\n  explanations: Array<{ key: string; explanation: string }>;\n  agreesWithCorrectAnswer: boolean;  // true se você concorda com a alternativa marcada como correta; false se discorda\n  disagreementWarning?: string;     // obrigatório quando agreesWithCorrectAnswer é false: breve justificativa da discordância\n}\nExemplo: ${JSON.stringify(GENERATE_EXPLANATIONS_RESPONSE_EXAMPLE)}`;
 
-    const systemPrompt = `Você é um especialista em elaboração de questões de concurso. Sua tarefa é gerar explicações de alto nível e bem completas para cada alternativa de uma questão de múltipla escolha.
+    const systemPrompt = `Você é um professor de enfermagem experiente que ajuda futuros enfermeiros a se prepararem para concursos públicos no Brasil. Você ama ensinar, tem interesse real em fazer a pessoa aprender de verdade, e escreve de forma próxima — como um professor que explica no quadro, não como um livro-texto.
 
 ${responseTypeDescription}
+
+SEU TOM E ESTILO:
+- Linguagem acessível e acolhedora, mas sem perder a precisão técnica. Pense em "professor que sabe explicar bem", não "artigo científico".
+- Use "você" e fale diretamente com o estudante. Ex: "Perceba que…", "Aqui o pulo do gato é…", "Cuidado com essa pegadinha…"
+- Termos técnicos de enfermagem devem estar presentes e corretos, mas sempre acompanhados de contexto que facilite o entendimento.
+
+ESTRUTURA DE CADA EXPLICAÇÃO (use Markdown):
+- Comece explicando por que a alternativa está correta ou incorreta, com **raciocínio clínico/lógico** — não apenas afirme, demonstre o caminho de pensamento.
+- Use **negrito** para termos-chave e conceitos importantes.
+- Use listas quando comparar conceitos ou enumerar critérios.
+- Quando relevante, cite a fonte: legislação (ex: Lei 8.080/90), portarias do Ministério da Saúde, protocolos (ex: PNAB, PNAISC), resoluções COFEN, ou referências clássicas da área.
+- Para alternativas incorretas, explique brevemente o que o conceito da alternativa realmente significa ou onde ele se aplica — isso transforma o erro em aprendizado.
+- Se houver uma "pegadinha" comum em provas, destaque para o estudante ficar atento.
 
 VALIDAÇÃO DA RESPOSTA CORRETA: Antes de gerar as explicações, analise a questão e determine qual alternativa VOCÊ considera correta com base no enunciado e no conteúdo. Se a alternativa que você considera correta for DIFERENTE da indicada na questão, defina agreesWithCorrectAnswer como false e preencha disagreementWarning com uma explicação objetiva (ex.: "A alternativa X parece mais adequada porque..."). Se concordar, defina agreesWithCorrectAnswer como true e omita disagreementWarning.
 
@@ -998,10 +1023,9 @@ Regras para topic e subtopics:
 
 Regras para o JSON:
 - Escape aspas duplas dentro de strings com \\".
-- Use \\n para quebras de linha dentro de strings.
-- Inclua uma explicação para cada alternativa (todas as keys presentes na questão).
-- As explicações devem ser didáticas, completas e de alto nível: por que a alternativa está correta ou incorreta, com base na prova e no conteúdo.
-- IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa (ex: "A alternativa A está correta"). Use apenas "A alternativa correta", "Esta alternativa está incorreta", "Correta porque...", "Incorreta porque...", etc. A ordem das alternativas pode ser alterada no futuro.`;
+- Use \\n para quebras de linha dentro de strings (o campo explanation é uma string, então use \\n para parágrafos e listas Markdown).
+- Inclua uma explicação para CADA alternativa (todas as keys presentes na questão).
+- IMPORTANTE: Nas explicações, NUNCA mencione a letra da alternativa (ex: "A alternativa A está correta"). Use apenas "Esta alternativa está correta", "Esta alternativa está incorreta", etc. A ordem das alternativas pode ser alterada no futuro.`;
 
     const subjectInfo = question.subject
       ? `**Matéria:** ${question.subject}\n\n`
@@ -1091,6 +1115,181 @@ Retorne o objeto JSON no formato GenerateExplanationsResponse (topic, subtopics,
     }
 
     return normalizeGenerateExplanationsResponse(parsed);
+  }
+
+  async generateSingleExplanation(
+    examBaseId: string,
+    questionId: string,
+    alternativeKey: string,
+  ): Promise<{ explanation: string }> {
+    await assertQuestionBelongsToExamBase(
+      this.prisma,
+      examBaseId,
+      questionId,
+    );
+
+    const question = await this.prisma.examBaseQuestion.findUnique({
+      where: { id: questionId },
+      select: {
+        subject: true,
+        statement: true,
+        statementImageUrl: true,
+        referenceText: true,
+        correctAlternative: true,
+        alternatives: {
+          orderBy: { key: 'asc' },
+          select: { key: true, text: true },
+        },
+        examBase: { select: { name: true, institution: true } },
+      },
+    });
+    if (!question) throw new NotFoundException('question not found');
+
+    const targetAlt = question.alternatives.find(
+      (a) => a.key === alternativeKey,
+    );
+    if (!targetAlt)
+      throw new NotFoundException(
+        `alternative "${alternativeKey}" not found in this question`,
+      );
+
+    const correctAlt = question.correctAlternative?.trim();
+    if (!correctAlt) {
+      throw new BadRequestException(
+        'A alternativa correta deve estar marcada para gerar explicações.',
+      );
+    }
+
+    const apiKey = this.config.get<string>('OPENAI_API_KEY');
+    if (!apiKey) {
+      throw new BadRequestException(
+        'OPENAI_API_KEY is not configured. Set it in .env to use AI explanations.',
+      );
+    }
+
+    const isCorrect = alternativeKey === correctAlt;
+    const examLabel = [question.examBase.name, question.examBase.institution]
+      .filter(Boolean)
+      .join(' — ');
+    const alternativesText = question.alternatives
+      .map((a) => `${a.key}) ${a.text}`)
+      .join('\n\n');
+    const subjectInfo = question.subject
+      ? `**Matéria:** ${question.subject}\n\n`
+      : '';
+    const referenceSection = question.referenceText?.trim()
+      ? `**Texto de referência:**\n${question.referenceText}\n\n`
+      : '';
+
+    const systemPrompt = `Você é um professor de enfermagem experiente que ajuda futuros enfermeiros a se prepararem para concursos públicos no Brasil. Você ama ensinar, tem interesse real em fazer a pessoa aprender de verdade, e escreve de forma próxima — como um professor que explica no quadro, não como um livro-texto.
+
+Responda APENAS com um objeto JSON válido, sem markdown nem texto extra, no formato: { "explanation": "..." }
+
+SEU TOM E ESTILO:
+- Linguagem acessível e acolhedora, mas sem perder a precisão técnica.
+- Use "você" e fale diretamente com o estudante. Ex: "Perceba que…", "Aqui o pulo do gato é…", "Cuidado com essa pegadinha…"
+- Termos técnicos de enfermagem devem estar presentes e corretos, mas sempre acompanhados de contexto que facilite o entendimento.
+
+ESTRUTURA DA EXPLICAÇÃO (use Markdown dentro da string JSON, com \\n para quebras de linha):
+- Explique por que a alternativa está ${isCorrect ? 'correta' : 'incorreta'}, com **raciocínio clínico/lógico**.
+- Use **negrito** para termos-chave e conceitos importantes.
+- Use listas quando comparar conceitos ou enumerar critérios.
+- Quando relevante, cite a fonte: legislação, portarias do MS, protocolos, resoluções COFEN.
+${!isCorrect ? '- Explique o que o conceito da alternativa realmente significa ou onde ele se aplica — transforme o erro em aprendizado.\n' : ''}- Se houver uma "pegadinha" comum em provas, destaque para o estudante.
+- IMPORTANTE: NUNCA mencione a letra da alternativa. Use "Esta alternativa" apenas.
+
+Regras para o JSON:
+- Escape aspas duplas dentro de strings com \\".
+- Use \\n para quebras de linha.`;
+
+    const userPromptText = `Gere a explicação para a alternativa "${alternativeKey}" da questão abaixo.
+
+**Prova:** ${examLabel || 'Não informada'}
+${subjectInfo}${referenceSection}**Enunciado:** ${question.statement}
+
+**Alternativas (para contexto):**
+${alternativesText}
+
+**A alternativa correta é: ${correctAlt}.**
+
+**Gere a explicação APENAS para a alternativa ${alternativeKey}: "${targetAlt.text}"**
+Esta alternativa está ${isCorrect ? 'CORRETA' : 'INCORRETA'}.
+
+Retorne: { "explanation": "..." }`;
+
+    let userContent: { role: 'user'; content: string | object[] } = {
+      role: 'user',
+      content: userPromptText,
+    };
+    if (question.statementImageUrl?.trim()) {
+      const dataUrl = await toBase64DataUrl(question.statementImageUrl);
+      userContent = {
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'high' } },
+          { type: 'text', text: userPromptText },
+        ],
+      };
+    }
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'o3-mini',
+        max_completion_tokens: 4096,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          userContent,
+        ],
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      throw new BadRequestException(
+        `OpenAI API error (${res.status}): ${errBody.slice(0, 500)}`,
+      );
+    }
+
+    const data = (await res.json()) as {
+      choices?: { message?: { content?: string } }[];
+    };
+    const content = data.choices?.[0]?.message?.content?.trim() ?? '';
+    if (!content)
+      throw new BadRequestException('AI returned empty response.');
+
+    let jsonStr = content
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/m, '')
+      .trim();
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1);
+    }
+
+    let parsed: { explanation?: string };
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch {
+      try {
+        parsed = JSON.parse(jsonrepair(jsonStr));
+      } catch (parseErr) {
+        const msg =
+          parseErr instanceof Error ? parseErr.message : 'Invalid JSON';
+        throw new BadRequestException(`AI returned invalid JSON. (${msg})`);
+      }
+    }
+
+    return {
+      explanation:
+        typeof parsed.explanation === 'string' ? parsed.explanation : '',
+    };
   }
 
   list(examBaseId: string) {

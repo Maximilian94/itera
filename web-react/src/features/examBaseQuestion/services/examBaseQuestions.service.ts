@@ -263,6 +263,21 @@ export const examBaseQuestionsService = {
     )
   },
 
+  generateSingleExplanation(
+    examBaseId: string,
+    questionId: string,
+    alternativeKey: string,
+  ): Promise<{ explanation: string }> {
+    return apiFetch<{ explanation: string }>(
+      `${basePath(examBaseId)}/${questionId}/generate-single-explanation`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ alternativeKey }),
+      },
+    )
+  },
+
   parseFromMarkdownAndGabarito(
     examBaseId: string,
     markdown: string,

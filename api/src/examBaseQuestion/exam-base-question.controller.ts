@@ -405,6 +405,21 @@ export class ExamBaseQuestionController {
     return this.service.generateExplanations(examBaseId, questionId);
   }
 
+  /** Gera explicação para UMA alternativa via IA. Apenas ADMIN. */
+  @Post(':questionId/generate-single-explanation')
+  @Roles('ADMIN')
+  generateSingleExplanation(
+    @Param('examBaseId') examBaseId: string,
+    @Param('questionId') questionId: string,
+    @Body('alternativeKey') alternativeKey: string,
+  ) {
+    return this.service.generateSingleExplanation(
+      examBaseId,
+      questionId,
+      alternativeKey,
+    );
+  }
+
   /** Marca questão como revisada pelo ADMIN logado. */
   @Post(':questionId/review')
   @Roles('ADMIN')

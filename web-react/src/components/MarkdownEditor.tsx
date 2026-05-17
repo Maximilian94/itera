@@ -11,6 +11,8 @@ export interface MarkdownEditorProps {
   error?: string
   /** When true, shows amber/yellow border to indicate unsaved changes */
   changed?: boolean
+  /** Editor preview mode: 'live' (split), 'edit' (write only), 'preview' (read only). Default: 'live' */
+  preview?: 'live' | 'edit' | 'preview'
 }
 
 export function MarkdownEditor({
@@ -21,6 +23,7 @@ export function MarkdownEditor({
   minHeight = 400,
   error,
   changed,
+  preview = 'live',
 }: MarkdownEditorProps) {
   return (
     <Box
@@ -62,7 +65,7 @@ export function MarkdownEditor({
           onChange={(val) => onChange(val ?? '')}
           height={minHeight}
           visibleDragbar={false}
-          preview="live"
+          preview={preview}
           textareaProps={{ placeholder }}
         />
       </div>
