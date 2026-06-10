@@ -43,6 +43,17 @@ Ao finalizar uma tarefa, avalie se este CLAUDE.md precisa ser atualizado. Se a t
 - Autenticação via Clerk no `web-react/`; a API valida tokens Clerk.
 - Logs de sessões de vibe-coding ficam em `vibe-coding/YYYY-MM-<slug>.md`.
 
+## Design Context (impeccable)
+
+Trabalho de design do `web-react/` é guiado por dois arquivos na raiz (criados pelo skill `/impeccable`):
+
+- **`PRODUCT.md`** — register (`product`), usuários, propósito, personalidade de marca, anti-referências e princípios estratégicos. Responde "quem/o quê/por quê".
+- **`DESIGN.md`** — sistema visual no formato Google Stitch (tokens em frontmatter + 6 seções). Cores, tipografia, elevação, componentes. Responde "como parece". Sidecar em `.impeccable/design.json`.
+
+Resumo: register **product**; North Star **"The Training Ground"** (motivador e profissional, nunca infantil); acento único **Momentum Cyan** (`#0891b2`) sobre neutros slate; tipografia única **Manrope**; verde/vermelho reservados para feedback de resposta (acerto/erro). Leia `DESIGN.md` antes de mexer em UI; `PRODUCT.md` vence em voz/estratégia, `DESIGN.md` vence em decisões visuais.
+
+Live mode (`/impeccable live`) já configurado em `.impeccable/live/config.json`.
+
 ## Testes
 
 ```bash

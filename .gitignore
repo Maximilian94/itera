@@ -37,3 +37,7 @@ api/secret/*
 !.idea/runConfigurations/
 
 
+
+# Local AI tooling (impeccable / cursor skill installs, local settings)
+.claude/
+.cursor/
