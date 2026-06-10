@@ -1,4 +1,4 @@
-import { IsArray, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsBoolean, IsOptional, IsString } from 'class-validator';
 
 export class CreateTrainingDto {
   /**
@@ -9,4 +9,12 @@ export class CreateTrainingDto {
   @IsArray()
   @IsString({ each: true })
   subjectFilter?: string[];
+
+  /**
+   * When true (default), the prova phase reveals correct/wrong + explanation
+   * right after each answer. When false, feedback is shown only after finishing.
+   */
+  @IsOptional()
+  @IsBoolean()
+  immediateFeedback?: boolean;
 }

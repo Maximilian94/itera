@@ -412,6 +412,8 @@ enum TrainingStage {
 model TrainingSession {
   id                    String         @id @default(uuid()) @db.Uuid
   currentStage          TrainingStage  @default(EXAM)
+  /// When true, the prova phase reveals correct/wrong + explanation right after each answer. Chosen by the user when starting the training.
+  immediateFeedback     Boolean        @default(true)
   finalScorePercentage  Decimal?       @db.Decimal(5, 2)
   finalFeedback         String?
   createdAt             DateTime       @default(now())

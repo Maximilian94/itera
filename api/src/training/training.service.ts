@@ -341,7 +341,7 @@ export class TrainingService {
   async create(
     examBaseId: string,
     userId: string,
-    dto?: { subjectFilter?: string[] },
+    dto?: { subjectFilter?: string[]; immediateFeedback?: boolean },
   ) {
     // ---- Plan & limit enforcement ----
     const user = await this.prisma.user.findUnique({
@@ -406,6 +406,7 @@ export class TrainingService {
       dto?.subjectFilter && dto.subjectFilter.length > 0
         ? dto.subjectFilter
         : [];
+    const immediateFeedback = dto?.immediateFeedback ?? true;
 
     const attempt = await this.prisma.examBaseAttempt.create({
       data: { examBaseId, userId, subjectFilter },
@@ -418,6 +419,7 @@ export class TrainingService {
         examBaseAttemptId: attempt.id,
         examBaseId: attempt.examBaseId,
         currentStage: 'EXAM',
+        immediateFeedback,
       },
       select: { id: true },
     });
@@ -430,6 +432,7 @@ export class TrainingService {
         attemptId: attempt.id,
         examBaseId,
         subjectFilter,
+        immediateFeedback,
       },
     });
     this.analytics.capture({
@@ -503,6 +506,7 @@ export class TrainingService {
     const base = {
       trainingId: session.id,
       currentStage: session.currentStage,
+      immediateFeedback: session.immediateFeedback,
       attemptId,
       examBaseId,
       examBoardId: session.examBase.examBoardId ?? null,

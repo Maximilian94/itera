@@ -58,10 +58,13 @@ function OnboardingPage() {
     setStartDialogOpen(true)
   }
 
-  const handleStartFreeTraining = (subjectFilter: string[]) => {
+  const handleStartFreeTraining = (
+    subjectFilter: string[],
+    immediateFeedback: boolean,
+  ) => {
     if (!examToUse?.id) return
     createMutation.mutate(
-      { examBaseId: examToUse.id, subjectFilter },
+      { examBaseId: examToUse.id, subjectFilter, immediateFeedback },
       {
         onSuccess: (res) => {
           analytics.capture('onboarding_completed', {
@@ -202,6 +205,7 @@ function OnboardingPage() {
           isSubmitting={createMutation.isPending}
           title="Como deseja fazer o treino?"
           confirmLabel="Iniciar treino"
+          showImmediateFeedbackToggle
         />
 
         <Link to="/planos" className="no-underline">

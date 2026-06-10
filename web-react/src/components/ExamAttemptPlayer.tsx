@@ -39,7 +39,7 @@ import {
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
-import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid, CheckCircleIcon } from '@heroicons/react/24/solid'
+import { ChevronLeftIcon, ChevronRightIcon, BookOpenIcon as BookOpenIconSolid, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import {
   useExamBaseAttemptQuery,
   useUpsertExamBaseAttemptAnswerMutation,
@@ -124,6 +124,85 @@ function QuestionSlide({
   )
 }
 
+/**
+ * Immediate feedback shown right after the user answers a question in the
+ * training prova phase (trainingProvaMode). Reveals correct/wrong + the
+ * explanation of the correct alternative and a CTA to advance — giving the
+ * reward loop early instead of only after finishing the whole exam.
+ */
+function ImmediateFeedbackPanel({
+  question,
+  selectedAltId,
+  isLastQuestion,
+  onNext,
+}: {
+  question: PlayerQuestion
+  selectedAltId: string | null
+  isLastQuestion: boolean
+  onNext: () => void
+}) {
+  const correctIndex = question.alternatives.findIndex(
+    (a) => a.key === question.correctAlternative,
+  )
+  const correctAlt = correctIndex >= 0 ? question.alternatives[correctIndex] : null
+  const correctKeyLabel =
+    correctIndex >= 0 ? QUESTION_ALTERNATIVE_KEYS[correctIndex] : '—'
+  const selectedAlt =
+    question.alternatives.find((a) => a.id === selectedAltId) ?? null
+  const isCorrect =
+    selectedAlt != null && selectedAlt.key === question.correctAlternative
+
+  return (
+    <div
+      className={`flex flex-col gap-3 rounded-2xl border-2 p-4 ${
+        isCorrect ? 'border-emerald-300 bg-emerald-50' : 'border-red-300 bg-red-50'
+      }`}
+      style={{ animation: 'fade-in-up 0.3s ease-out both' }}
+    >
+      <div className="flex items-center gap-2">
+        {isCorrect ? (
+          <CheckCircleIcon className="w-6 h-6 text-emerald-600 shrink-0" />
+        ) : (
+          <XCircleIcon className="w-6 h-6 text-red-600 shrink-0" />
+        )}
+        <p
+          className={`text-sm font-bold ${
+            isCorrect ? 'text-emerald-800' : 'text-red-800'
+          }`}
+        >
+          {isCorrect ? 'Você acertou!' : `Resposta correta: ${correctKeyLabel}`}
+        </p>
+      </div>
+      {correctAlt?.explanation ? (
+        <div className="rounded-xl bg-white/70 p-3">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Explicação
+          </p>
+          <div className="text-sm text-slate-700">
+            <Markdown>{correctAlt.explanation}</Markdown>
+          </div>
+        </div>
+      ) : null}
+      {isLastQuestion ? (
+        <p className="text-xs text-slate-500">
+          Você respondeu a última questão. Clique em <strong>Finalizar</strong>{' '}
+          para ver seu diagnóstico.
+        </p>
+      ) : (
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={onNext}
+          endIcon={<ChevronRightIcon className="w-5 h-5" />}
+          sx={{ alignSelf: 'flex-end', textTransform: 'none', fontWeight: 700 }}
+        >
+          Próxima questão
+        </Button>
+      )}
+    </div>
+  )
+}
+
 export interface ExamAttemptPlayerProps {
   /** Normal exam mode: attempt from exam flow */
   examBaseId?: string
@@ -132,6 +211,8 @@ export interface ExamAttemptPlayerProps {
   trainingId?: string
   /** Training prova phase: simplified UI (no tabs, no sidebar finalize, blue nav, nav below alternatives). */
   trainingProvaMode?: boolean
+  /** When in trainingProvaMode, reveal correct/wrong + explanation right after each answer. Default true. */
+  immediateFeedback?: boolean
   /** For "Ver feedback" link (attempt mode when finished). If not provided, button is hidden when finished. */
   feedbackLink?: { examBoard: string; examId: string; attemptId: string }
   /** For error/empty state back button. If not provided, no back button. */
@@ -168,6 +249,7 @@ export function ExamAttemptPlayer({
   attemptId,
   trainingId,
   trainingProvaMode = false,
+  immediateFeedback = true,
   feedbackLink,
   onBack,
   onFinished,
@@ -865,6 +947,15 @@ export function ExamAttemptPlayer({
       }
 
       if (isFinished || !currentQuestion) return
+      // In training prova mode with immediate feedback, lock the answer once revealed.
+      if (
+        trainingProvaMode &&
+        immediateFeedback &&
+        answers[currentQuestion.id] != null &&
+        answers[currentQuestion.id] !== ''
+      ) {
+        return
+      }
 
       // Map a letter (A, B, …) or digit (1, 2, …) to the alternative at that position.
       let altIndex = -1
@@ -892,6 +983,9 @@ export function ExamAttemptPlayer({
     eliminatedByQuestion,
     goToQuestion,
     handleOptionSelected,
+    trainingProvaMode,
+    immediateFeedback,
+    answers,
   ])
 
   function getQuestionStatus(index: number) {
@@ -1067,6 +1161,15 @@ export function ExamAttemptPlayer({
   const isFirstQuestion = currentQuestionIndex === 0
   const isLastQuestion = currentQuestionIndex === questionCount - 1
 
+  // Immediate feedback (training prova phase): once the user answers the current
+  // question, reveal correct/wrong styling + explanation before finishing the exam.
+  // Gated by the per-training immediateFeedback preference.
+  const currentProvaReveal =
+    trainingProvaMode &&
+    immediateFeedback &&
+    !isFinished &&
+    selectedAlternativeId != null
+
   const comingSoonTooltip = 'Em breve disponível. Estamos trabalhando nisso.'
   const tabButtons = [
     { value: 0, label: 'Questão', icon: PlayIcon },
@@ -1171,6 +1274,9 @@ export function ExamAttemptPlayer({
     const renderMobilePane = (q: PlayerQuestion) => {
       const paneSelectedAltId = answers[q.id] ?? null
       const paneEliminatedSet = eliminatedByQuestion[q.id] ?? new Set<string>()
+      // Training prova phase: reveal feedback as soon as this question is answered.
+      const paneReveal =
+        trainingProvaMode && immediateFeedback && !isFinished && paneSelectedAltId != null
       return value === 0 ? (
         <div className="px-2">
           <MobileCard className="space-y-5">
@@ -1226,21 +1332,19 @@ export function ExamAttemptPlayer({
                 const isEliminated = paneEliminatedSet.has(alt.id)
                 const isSelected = paneSelectedAltId === alt.id
                 const isCorrect = q.correctAlternative === alt.key
-                const isWrong = isFinished && isSelected && !isCorrect
+                const revealed = isFinished || paneReveal
+                const isWrong = revealed && isSelected && !isCorrect
                 const keyLabel = QUESTION_ALTERNATIVE_KEYS[index] ?? alt.key
-                const showCorrectStyling = isCorrect && isFinished
-                const optionBg = isFinished
+                const optionBg = revealed
                   ? isCorrect
                     ? 'bg-emerald-50 border-emerald-400'
                     : isWrong
                       ? 'bg-red-50 border-red-400'
                       : 'bg-white border-slate-200'
-                  : showCorrectStyling
-                    ? 'bg-emerald-50 border-emerald-400'
-                    : isSelected
-                      ? 'bg-cyan-50 border-cyan-400'
-                      : 'bg-white border-slate-200'
-                const keyBadge = isFinished
+                  : isSelected
+                    ? 'bg-cyan-50 border-cyan-400'
+                    : 'bg-white border-slate-200'
+                const keyBadge = revealed
                   ? isCorrect
                     ? 'bg-emerald-600 text-white'
                     : isWrong
@@ -1257,7 +1361,7 @@ export function ExamAttemptPlayer({
                   }
                 }
                 const handlePointerDown = (e: React.PointerEvent<HTMLButtonElement>) => {
-                  if (isFinished) return
+                  if (isFinished || paneReveal) return
                   longPressTriggeredRef.current = false
                   longPressOriginRef.current = { x: e.clientX, y: e.clientY }
                   clearLongPress()
@@ -1281,7 +1385,7 @@ export function ExamAttemptPlayer({
                     longPressTriggeredRef.current = false
                     return
                   }
-                  if (isFinished || isEliminated) return
+                  if (isFinished || paneReveal || isEliminated) return
                   handleOptionSelected(q.id, alt.id, isEliminated)
                 }
 
@@ -1296,7 +1400,7 @@ export function ExamAttemptPlayer({
                       onPointerCancel={clearLongPress}
                       onContextMenu={(e) => e.preventDefault()}
                       onClick={handleClick}
-                      disabled={isFinished}
+                      disabled={isFinished || paneReveal}
                       aria-label={
                         isEliminated
                           ? `Alternativa ${keyLabel} eliminada. Pressione e segure para desfazer.`
@@ -1333,11 +1437,19 @@ export function ExamAttemptPlayer({
                 )
               })}
             </div>
-            {!isFinished ? (
+            {!isFinished && !paneReveal ? (
               <p className="flex items-center gap-1.5 text-xs text-slate-600">
                 <ScissorsIcon className="h-3.5 w-3.5" />
                 Pressione e segure uma alternativa para eliminá-la.
               </p>
+            ) : null}
+            {paneReveal ? (
+              <ImmediateFeedbackPanel
+                question={q}
+                selectedAltId={paneSelectedAltId}
+                isLastQuestion={isLastQuestion}
+                onNext={handleNextQuestion}
+              />
             ) : null}
           </MobileCard>
         </div>
@@ -2246,13 +2358,14 @@ export function ExamAttemptPlayer({
                           const isEliminated = eliminatedSet.has(alt.id)
                           const isSelected = selectedAlternativeId === alt.id
                           const isCorrect = currentQuestion.correctAlternative === alt.key
-                          const isWrong = isFinished && isSelected && !isCorrect
+                          const revealed = isFinished || currentProvaReveal
+                          const isWrong = revealed && isSelected && !isCorrect
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[currentQuestion.alternatives.findIndex((a) => a.id === alt.id)] ?? alt.key
-                          const showCorrectStyling = isCorrect && (isFinished || canInlineEdit)
-                          const optionBg = isFinished
+                          const showCorrectStyling = isCorrect && (revealed || canInlineEdit)
+                          const optionBg = revealed
                             ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
                             : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-cyan-50 border-cyan-400' : 'bg-white border-slate-300 hover:bg-slate-50'
-                          const keyBadge = isFinished
+                          const keyBadge = revealed
                             ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-200 text-slate-700'
                           const isEditingThis = alt.id in editAlternativeById
@@ -2261,7 +2374,7 @@ export function ExamAttemptPlayer({
                           const isAltExplanationChanged = editValues.explanation !== (alt.explanation ?? '')
                           return (
                             <div key={alt.id} className={`group relative flex items-center gap-2 rounded-lg transition-colors ${canInlineEdit && !isEditingThis ? 'hover:bg-slate-100 p-1.5' : ''}`}>
-                              {!isFinished && !canInlineEdit && (
+                              {!isFinished && !canInlineEdit && !currentProvaReveal && (
                                 <Tooltip title={isEliminated ? 'Desfazer eliminação' : 'Eliminar alternativa'}>
                                   <button
                                     type="button"
@@ -2404,9 +2517,9 @@ export function ExamAttemptPlayer({
                               ) : (
                                 <button
                                   type="button"
-                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cyan-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode ? 'cursor-default' : ''}`}
+                                  className={`flex gap-3 items-center justify-start w-full p-2 shadow-sm hover:shadow-xs active:shadow-none rounded-lg text-left border transition-colors outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-cyan-400 ${isEliminated ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} ${optionBg} ${isFinished || isManagementMode || currentProvaReveal ? 'cursor-default' : ''}`}
                                   onClick={() => handleOptionSelected(currentQuestion.id, alt.id, isEliminated)}
-                                  disabled={isEliminated || isFinished || isManagementMode}
+                                  disabled={isEliminated || isFinished || isManagementMode || currentProvaReveal}
                                 >
                                   <span className={`flex shrink-0 items-center justify-center min-w-8 h-8 rounded-md text-sm font-semibold ${keyBadge}`}>{keyLabel}</span>
                                   <span className="text-sm text-slate-800 flex-1"><Markdown>{alt.text}</Markdown></span>
@@ -2474,6 +2587,14 @@ export function ExamAttemptPlayer({
                           </div>
                         )}
                       </div>
+                      {currentProvaReveal && (
+                        <ImmediateFeedbackPanel
+                          question={currentQuestion}
+                          selectedAltId={selectedAlternativeId}
+                          isLastQuestion={isLastQuestion}
+                          onNext={handleNextQuestion}
+                        />
+                      )}
                       {trainingProvaMode && (
                         <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 mt-2">
                           <Button
