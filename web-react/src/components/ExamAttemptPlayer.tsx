@@ -236,6 +236,9 @@ export interface ExamAttemptPlayerProps {
   }) => void
   /** Optional primary action rendered in the mobile header for training mode. */
   mobileHeaderAction?: React.ReactNode
+  /** Optional primary action (Finalizar/Diagnóstico) rendered inside the Questão
+   *  tab on desktop training prova mode, next to the Anterior/Próxima nav. */
+  provaPrimaryAction?: React.ReactNode
   /** @deprecated Editing is only available via management mode (managementMode). Kept for backward compatibility. */
   enableEditMode?: boolean
   /** Enable management mode. Shows questions from examBase without attempt. */
@@ -258,6 +261,7 @@ export function ExamAttemptPlayer({
   finishRef,
   onTrainingProvaStateChange,
   mobileHeaderAction,
+  provaPrimaryAction,
   enableEditMode: _enableEditMode = false,
   managementMode = false,
   onAddQuestion,
@@ -2595,28 +2599,6 @@ export function ExamAttemptPlayer({
                           onNext={handleNextQuestion}
                         />
                       )}
-                      {trainingProvaMode && (
-                        <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 mt-2">
-                          <Button
-                            variant="outlined"
-                            color="primary"
-                            onClick={handlePrevQuestion}
-                            disabled={currentQuestionIndex === 0}
-                            startIcon={<ChevronLeftIcon className="w-5 h-5" />}
-                          >
-                            Anterior
-                          </Button>
-                          <Button
-                            variant="outlined"
-                            color="primary"
-                            onClick={handleNextQuestion}
-                            disabled={currentQuestionIndex === questionCount - 1}
-                            endIcon={<ChevronRightIcon className="w-5 h-5" />}
-                          >
-                            Próxima
-                          </Button>
-                        </div>
-                      )}
                     </div>
                     )
                   })()}
@@ -2785,6 +2767,9 @@ export function ExamAttemptPlayer({
         </div>
 
         <div className="flex flex-col gap-3 w-56 shrink-0 min-h-0 overflow-hidden">
+          {trainingProvaMode && provaPrimaryAction && (
+            <div className="shrink-0">{provaPrimaryAction}</div>
+          )}
           {!trainingProvaMode && (
           <div className="shrink-0">
             {isManagementMode ? (
