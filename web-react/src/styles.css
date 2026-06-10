@@ -91,6 +91,13 @@
   .question-swipe-out-to-right {
     animation: none !important;
   }
+
+  /* Tailwind's animate-pulse (skeletons) isn't gated by default; settle it to a
+     steady mid-opacity so loading states stay legible without motion. */
+  .animate-pulse {
+    animation: none !important;
+    opacity: 0.7;
+  }
 }
 
 html,

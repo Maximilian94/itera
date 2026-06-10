@@ -123,14 +123,14 @@ export function QuestionWithFeedbackDisplay({
                 const isWrong =
                   selectedAlternativeId === alt.id && !isCorrect
                 const optionBg = isCorrect
-                  ? 'bg-green-50 border-green-400'
+                  ? 'bg-emerald-50 border-emerald-400'
                   : isWrong
-                    ? 'bg-rose-50 border-rose-400'
+                    ? 'bg-red-50 border-red-400'
                     : 'bg-slate-50 border-slate-300'
                 const keyBadge = isCorrect
-                  ? 'bg-green-600 text-white'
+                  ? 'bg-emerald-600 text-white'
                   : isWrong
-                    ? 'bg-rose-600 text-white'
+                    ? 'bg-red-600 text-white'
                     : 'bg-slate-200 text-slate-700'
                 return (
                   <div
@@ -171,25 +171,25 @@ export function QuestionWithFeedbackDisplay({
                     : 'neutral'
                 const cardStyles = {
                   correct:
-                    'border-2 border-green-400 bg-green-100 overflow-hidden rounded-lg',
+                    'border-2 border-emerald-400 bg-emerald-100 overflow-hidden rounded-lg',
                   wrong:
-                    'border-2 border-rose-400 bg-rose-100 overflow-hidden rounded-lg',
+                    'border-2 border-red-400 bg-red-100 overflow-hidden rounded-lg',
                   neutral:
                     'border border-slate-300 bg-slate-50 overflow-hidden rounded-lg',
                 }
                 const headerTextStyles = {
-                  correct: 'text-green-800',
-                  wrong: 'text-rose-800',
+                  correct: 'text-emerald-800',
+                  wrong: 'text-red-800',
                   neutral: 'text-slate-700',
                 }
                 const badgeCorrect =
-                  'text-xs font-semibold text-green-700 bg-green-200/80 px-2 py-0.5 rounded'
+                  'text-xs font-semibold text-emerald-700 bg-emerald-200/80 px-2 py-0.5 rounded'
                 const badgeWrong =
-                  'text-xs font-semibold text-rose-700 bg-rose-200/80 px-2 py-0.5 rounded'
+                  'text-xs font-semibold text-red-700 bg-red-200/80 px-2 py-0.5 rounded'
                 const explanationWrapStyles = {
                   correct:
-                    'border-t border-green-300 bg-green-50/70',
-                  wrong: 'border-t border-rose-300 bg-rose-50/70',
+                    'border-t border-emerald-300 bg-emerald-50/70',
+                  wrong: 'border-t border-red-300 bg-red-50/70',
                   neutral: 'border-t border-slate-200 bg-slate-100/70',
                 }
                 return (
