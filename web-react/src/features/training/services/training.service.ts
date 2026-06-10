@@ -16,12 +16,19 @@ export const trainingService = {
   create(
     examBaseId: string,
     subjectFilter?: string[],
+    immediateFeedback?: boolean,
   ): Promise<CreateTrainingResponse> {
+    const body: { subjectFilter?: Array<string>; immediateFeedback?: boolean } =
+      {}
+    if (subjectFilter && subjectFilter.length > 0) {
+      body.subjectFilter = subjectFilter
+    }
+    if (immediateFeedback != null) {
+      body.immediateFeedback = immediateFeedback
+    }
     return apiFetch(`/training/exam-bases/${examBaseId}`, {
       method: 'POST',
-      body: JSON.stringify(
-        subjectFilter && subjectFilter.length > 0 ? { subjectFilter } : {},
-      ),
+      body: JSON.stringify(body),
     })
   },
 

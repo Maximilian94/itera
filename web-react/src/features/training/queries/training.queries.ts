@@ -43,10 +43,12 @@ export function useCreateTrainingMutation() {
     mutationFn: ({
       examBaseId,
       subjectFilter,
+      immediateFeedback,
     }: {
       examBaseId: string
       subjectFilter?: string[]
-    }) => trainingService.create(examBaseId, subjectFilter),
+      immediateFeedback?: boolean
+    }) => trainingService.create(examBaseId, subjectFilter, immediateFeedback),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
       queryClient.invalidateQueries({ queryKey: ['training'] })

@@ -35,10 +35,10 @@ function ProvaPage() {
     setStartDialogOpen(true)
   }
 
-  const handleStart = (subjectFilter: string[]) => {
+  const handleStart = (subjectFilter: string[], immediateFeedback: boolean) => {
     if (!selectedExamBaseId) return
     createMutation.mutate(
-      { examBaseId: selectedExamBaseId, subjectFilter },
+      { examBaseId: selectedExamBaseId, subjectFilter, immediateFeedback },
       {
         onSuccess: (res) => {
           setStartDialogOpen(false)
@@ -111,6 +111,7 @@ function ProvaPage() {
         isSubmitting={createMutation.isPending}
         title="Como deseja fazer o treino?"
         confirmLabel="Iniciar treino"
+        showImmediateFeedbackToggle
       />
 
       <div className="flex flex-wrap gap-3 justify-between">

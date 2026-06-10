@@ -311,10 +311,13 @@ function NovoPage() {
     setStartDialogOpen(true)
   }
 
-  const handleCreateAndContinue = (subjectFilter: string[]) => {
+  const handleCreateAndContinue = (
+    subjectFilter: string[],
+    immediateFeedback: boolean,
+  ) => {
     if (!selectedExamBaseId) return
     createMutation.mutate(
-      { examBaseId: selectedExamBaseId, subjectFilter },
+      { examBaseId: selectedExamBaseId, subjectFilter, immediateFeedback },
       {
         onSuccess: (res) => {
           setStartDialogOpen(false)
@@ -528,6 +531,7 @@ function NovoPage() {
         isSubmitting={createMutation.isPending}
         title="Como deseja fazer o treino?"
         confirmLabel="Criar e avançar"
+        showImmediateFeedbackToggle
       />
     </div>
   )

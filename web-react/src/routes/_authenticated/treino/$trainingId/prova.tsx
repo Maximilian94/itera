@@ -90,6 +90,7 @@ function ProvaPage() {
               examBaseId={training.examBaseId}
               attemptId={training.attemptId}
               trainingProvaMode
+              immediateFeedback={training.immediateFeedback}
               mobileHeaderAction={
                 provaState ? (
                   provaState.isFinished ? (

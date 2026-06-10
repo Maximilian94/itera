@@ -30,6 +30,8 @@ export type TrainingStage =
 export interface TrainingState {
   trainingId: string
   currentStage: TrainingStage
+  /** When true, the prova phase reveals correct/wrong + explanation right after each answer. */
+  immediateFeedback: boolean
   attemptId: string
   examBaseId: string
   examBoardId: string | null
