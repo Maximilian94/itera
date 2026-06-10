@@ -29,16 +29,13 @@ function TreinoLayout() {
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 p-1">
-      {examTitle && trainingId != null && trainingId !== 'novo' && (
-        <div className="shrink-0 flex items-center px-4 py-2.5 rounded-lg bg-slate-100 border border-slate-200">
-          <p className="text-sm font-semibold text-sky-900 truncate" title={examTitle}>
-            {examTitle}
-          </p>
-        </div>
-      )}
       {trainingId != null && (
         <div className="shrink-0">
-          <TreinoStepper trainingId={trainingId} currentStage={currentStage} />
+          <TreinoStepper
+            trainingId={trainingId}
+            currentStage={currentStage}
+            examTitle={trainingId !== 'novo' ? examTitle : null}
+          />
         </div>
       )}
 

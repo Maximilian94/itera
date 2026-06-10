@@ -21,10 +21,13 @@ const TRAINING_STAGE_PATHS: Record<TreinoStageSlug, `/treino/$trainingId/${Trein
 export function TreinoStepper({
   trainingId,
   currentStage,
+  examTitle,
 }: {
   trainingId?: string
   /** From API: current stage of the training. Used to disable stages ahead. */
   currentStage?: TrainingStage
+  /** Concurso label shown as a caption above the steps (same context card). */
+  examTitle?: string | null
 }) {
   const router = useRouterState()
   const pathname = router.location.pathname
@@ -42,10 +45,19 @@ export function TreinoStepper({
   })()
 
   return (
-    <nav
-      className="flex flex-wrap items-center gap-2 sm:gap-0 sm:flex-nowrap border border-slate-300 rounded-lg bg-slate-50 p-2"
-      aria-label="Etapas do treino"
-    >
+    <div className="border border-slate-300 rounded-lg bg-slate-50">
+      {examTitle ? (
+        <p
+          className="border-b border-slate-200 px-3 py-2 text-[13px] font-semibold text-sky-900 truncate"
+          title={examTitle}
+        >
+          {examTitle}
+        </p>
+      ) : null}
+      <nav
+        className="flex flex-wrap items-center gap-2 sm:gap-0 sm:flex-nowrap p-2"
+        aria-label="Etapas do treino"
+      >
       {trainingId === 'novo' ? (
         <Link
           to="/treino/novo"
@@ -144,6 +156,7 @@ export function TreinoStepper({
           </Fragment>
         )
       })}
-    </nav>
+      </nav>
+    </div>
   )
 }
