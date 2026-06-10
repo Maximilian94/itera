@@ -36,7 +36,6 @@ import {
   PlayIcon,
   PlusCircleIcon,
   ScissorsIcon,
-  Squares2X2Icon,
   TrashIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
@@ -833,6 +832,68 @@ export function ExamAttemptPlayer({
     setSkillsStr(arrayToStringList(currentQuestion?.skills ?? []))
   }, [currentQuestion?.id, currentQuestion?.statementImageUrl, currentQuestion?.subject, currentQuestion?.topic, currentQuestion?.subtopics, currentQuestion?.skills])
 
+  // Keyboard navigation: answer with A–E / 1–5, move with ArrowLeft / ArrowRight.
+  // Skipped in management (edit) mode and while the user is typing in a field.
+  useEffect(() => {
+    if (canInlineEdit) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.defaultPrevented || e.metaKey || e.ctrlKey || e.altKey) return
+      const target = e.target as HTMLElement | null
+      if (
+        target &&
+        (target.isContentEditable ||
+          target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT')
+      ) {
+        return
+      }
+
+      if (e.key === 'ArrowRight') {
+        if (currentQuestionIndex < questionCount - 1) {
+          e.preventDefault()
+          goToQuestion(currentQuestionIndex + 1)
+        }
+        return
+      }
+      if (e.key === 'ArrowLeft') {
+        if (currentQuestionIndex > 0) {
+          e.preventDefault()
+          goToQuestion(currentQuestionIndex - 1)
+        }
+        return
+      }
+
+      if (isFinished || !currentQuestion) return
+
+      // Map a letter (A, B, …) or digit (1, 2, …) to the alternative at that position.
+      let altIndex = -1
+      if (/^[a-zA-Z]$/.test(e.key)) {
+        altIndex = e.key.toUpperCase().charCodeAt(0) - 65
+      } else if (/^[1-9]$/.test(e.key)) {
+        altIndex = Number(e.key) - 1
+      }
+      if (altIndex < 0 || altIndex >= currentQuestion.alternatives.length) return
+
+      const alt = currentQuestion.alternatives[altIndex]
+      const isEliminated = (eliminatedByQuestion[currentQuestion.id] ?? new Set<string>()).has(alt.id)
+      if (isEliminated) return
+      e.preventDefault()
+      handleOptionSelected(currentQuestion.id, alt.id, isEliminated)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [
+    canInlineEdit,
+    isFinished,
+    currentQuestion,
+    currentQuestionIndex,
+    questionCount,
+    eliminatedByQuestion,
+    goToQuestion,
+    handleOptionSelected,
+  ])
+
   function getQuestionStatus(index: number) {
     const isCurrent = currentQuestionIndex === index
     const q = questions[index]
@@ -872,12 +933,12 @@ export function ExamAttemptPlayer({
             : status === 'correct'
               ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
               : status === 'wrong'
-                ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                ? 'bg-red-100 text-red-700 border border-red-200'
             : 'bg-slate-200 text-slate-700 border border-slate-300'
       }`
     }
     if (status === 'correct') return `${base} bg-emerald-100 text-emerald-700 border border-emerald-200 hover:bg-emerald-200`
-    if (status === 'wrong') return `${base} bg-rose-100 text-rose-700 border border-rose-200 hover:bg-rose-200`
+    if (status === 'wrong') return `${base} bg-red-100 text-red-700 border border-red-200 hover:bg-red-200`
     if (status === 'answered') return `${base} bg-cyan-100 text-cyan-700 border border-cyan-200 hover:bg-cyan-200`
     if (status === 'incomplete') return `${base} bg-amber-100 text-amber-700 border border-amber-300 hover:bg-amber-200`
     return `${base} border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100`
@@ -920,9 +981,23 @@ export function ExamAttemptPlayer({
 
   if (isLoading) {
     return (
-      <div className="flex flex-col gap-4">
-        <Card noElevation className="p-4">
-          <span className="text-sm text-slate-500">Carregando prova…</span>
+      <div className="flex flex-col gap-4" role="status" aria-label="Carregando prova">
+        <Card noElevation className="flex flex-col gap-5 p-4">
+          <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+          <div className="flex flex-col gap-2">
+            <div className="h-3 w-full animate-pulse rounded bg-slate-200" />
+            <div className="h-3 w-11/12 animate-pulse rounded bg-slate-200" />
+            <div className="h-3 w-4/5 animate-pulse rounded bg-slate-200" />
+          </div>
+          <div className="flex flex-col gap-3">
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-3">
+                <div className="h-9 w-9 shrink-0 animate-pulse rounded-lg bg-slate-200" />
+                <div className="h-9 flex-1 animate-pulse rounded-lg bg-slate-100" />
+              </div>
+            ))}
+          </div>
+          <span className="sr-only">Carregando prova…</span>
         </Card>
       </div>
     )
@@ -1105,7 +1180,7 @@ export function ExamAttemptPlayer({
               return (
                 <div className="rounded-2xl bg-slate-50 p-4">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Texto de referência
                     </p>
                     {isLong ? (
@@ -1158,7 +1233,7 @@ export function ExamAttemptPlayer({
                   ? isCorrect
                     ? 'bg-emerald-50 border-emerald-400'
                     : isWrong
-                      ? 'bg-rose-50 border-rose-400'
+                      ? 'bg-red-50 border-red-400'
                       : 'bg-white border-slate-200'
                   : showCorrectStyling
                     ? 'bg-emerald-50 border-emerald-400'
@@ -1169,7 +1244,7 @@ export function ExamAttemptPlayer({
                   ? isCorrect
                     ? 'bg-emerald-600 text-white'
                     : isWrong
-                      ? 'bg-rose-600 text-white'
+                      ? 'bg-red-600 text-white'
                       : 'bg-slate-200 text-slate-700'
                   : isSelected
                     ? 'bg-cyan-500 text-white'
@@ -1247,7 +1322,7 @@ export function ExamAttemptPlayer({
                       <span
                         className={`flex min-h-9 flex-1 items-center text-sm leading-6 ${
                           isEliminated
-                            ? 'text-slate-400 line-through'
+                            ? 'text-slate-500 line-through'
                             : 'text-slate-800'
                         }`}
                       >
@@ -1259,8 +1334,8 @@ export function ExamAttemptPlayer({
               })}
             </div>
             {!isFinished ? (
-              <p className="flex items-center gap-1.5 text-[11px] text-slate-400">
-                <ScissorsIcon className="h-3 w-3" />
+              <p className="flex items-center gap-1.5 text-xs text-slate-600">
+                <ScissorsIcon className="h-3.5 w-3.5" />
                 Pressione e segure uma alternativa para eliminá-la.
               </p>
             ) : null}
@@ -1291,17 +1366,17 @@ export function ExamAttemptPlayer({
                         : 'neutral'
                     const cardStyles = {
                       correct: 'rounded-2xl overflow-hidden border-2 border-emerald-400 bg-emerald-100',
-                      wrong: 'rounded-2xl overflow-hidden border-2 border-rose-400 bg-rose-100',
+                      wrong: 'rounded-2xl overflow-hidden border-2 border-red-400 bg-red-100',
                       neutral: 'rounded-2xl overflow-hidden border border-slate-200 bg-slate-50',
                     }
                     const headerTextStyles = {
                       correct: 'text-emerald-800',
-                      wrong: 'text-rose-800',
+                      wrong: 'text-red-800',
                       neutral: 'text-slate-700',
                     }
                     const explanationWrapStyles = {
                       correct: 'border-t border-emerald-300 bg-emerald-50/70',
-                      wrong: 'border-t border-rose-300 bg-rose-50/70',
+                      wrong: 'border-t border-red-300 bg-red-50/70',
                       neutral: 'border-t border-slate-200 bg-slate-100/70',
                     }
 
@@ -1318,7 +1393,7 @@ export function ExamAttemptPlayer({
                               </span>
                             ) : null}
                             {isWrong ? (
-                              <span className="rounded bg-rose-200/80 px-2 py-0.5 text-xs font-semibold text-rose-700">
+                              <span className="rounded bg-red-200/80 px-2 py-0.5 text-xs font-semibold text-red-700">
                                 Sua resposta
                               </span>
                             ) : null}
@@ -1328,7 +1403,7 @@ export function ExamAttemptPlayer({
                           </div>
                         </div>
                         <div className={`p-4 ${explanationWrapStyles[variant]}`}>
-                          <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                             Explicação
                           </p>
                           {alt.explanation ? (
@@ -1501,7 +1576,7 @@ export function ExamAttemptPlayer({
                   Respondida
                 </div>
                 <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
-                  <span className="h-3 w-3 rounded-full bg-rose-400" />
+                  <span className="h-3 w-3 rounded-full bg-red-400" />
                   Errada
                 </div>
                 <div className="flex items-center gap-2 rounded-2xl bg-slate-50 px-3 py-2">
@@ -1635,7 +1710,7 @@ export function ExamAttemptPlayer({
                     onClick={() => setDeleteQuestionDialogOpen(true)}
                     disabled={deleteQuestionMutation.isPending}
                     aria-label="Remover questão"
-                    className="p-2 rounded-lg text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition-colors"
+                    className="p-2 rounded-lg text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors"
                   >
                     <TrashIcon className="w-5 h-5" />
                   </button>
@@ -1764,15 +1839,15 @@ export function ExamAttemptPlayer({
                         return (
                           <div className={`flex items-center gap-3 px-4 py-2.5 rounded-xl border ${
                             reviewCount > 0
-                              ? 'bg-green-50 border-green-200'
+                              ? 'bg-emerald-50 border-emerald-200'
                               : 'bg-amber-50 border-amber-200'
                           }`}>
                             {reviewCount > 0 ? (
-                              <CheckCircleIcon className="w-5 h-5 text-green-600 shrink-0" />
+                              <CheckCircleIcon className="w-5 h-5 text-emerald-600 shrink-0" />
                             ) : (
                               <span className="w-5 h-5 rounded-full border-2 border-amber-400 shrink-0" />
                             )}
-                            <span className={`text-sm flex-1 ${reviewCount > 0 ? 'text-green-700' : 'text-amber-700'}`}>
+                            <span className={`text-sm flex-1 ${reviewCount > 0 ? 'text-emerald-700' : 'text-amber-700'}`}>
                               {myReview
                                 ? 'Você revisou esta questão'
                                 : reviewCount > 0
@@ -2077,7 +2152,7 @@ export function ExamAttemptPlayer({
                                     type="button"
                                     onClick={handleRemoveStatementImage}
                                     disabled={updateQuestionMutation.isPending}
-                                    className="p-2 rounded-lg text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 shadow-sm"
+                                    className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
                                   >
                                     <TrashIcon className="w-4 h-4" />
                                   </button>
@@ -2175,10 +2250,10 @@ export function ExamAttemptPlayer({
                           const keyLabel = QUESTION_ALTERNATIVE_KEYS[currentQuestion.alternatives.findIndex((a) => a.id === alt.id)] ?? alt.key
                           const showCorrectStyling = isCorrect && (isFinished || canInlineEdit)
                           const optionBg = isFinished
-                            ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-rose-50 border-rose-400' : 'bg-slate-50 border-slate-300'
+                            ? isCorrect ? 'bg-emerald-50 border-emerald-400' : isWrong ? 'bg-red-50 border-red-400' : 'bg-slate-50 border-slate-300'
                             : showCorrectStyling ? 'bg-emerald-50 border-emerald-400' : isSelected ? 'bg-cyan-50 border-cyan-400' : 'bg-white border-slate-300 hover:bg-slate-50'
                           const keyBadge = isFinished
-                            ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-rose-600 text-white' : 'bg-slate-200 text-slate-700'
+                            ? isCorrect ? 'bg-emerald-600 text-white' : isWrong ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-700'
                             : showCorrectStyling ? 'bg-emerald-600 text-white' : isSelected ? 'bg-cyan-500 text-white' : 'bg-slate-200 text-slate-700'
                           const isEditingThis = alt.id in editAlternativeById
                           const editValues = editAlternativeById[alt.id] ?? { text: alt.text, explanation: alt.explanation ?? '' }
@@ -2259,7 +2334,7 @@ export function ExamAttemptPlayer({
                                         e.stopPropagation()
                                         handleDeleteAlternative(alt.id)
                                       }}
-                                      className="p-2 rounded-lg text-rose-600 bg-white border border-rose-200 hover:bg-rose-50 hover:border-rose-300 shadow-sm"
+                                      className="p-2 rounded-lg text-red-600 bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm"
                                     >
                                       <XMarkIcon className="w-4 h-4" />
                                     </button>
@@ -2358,7 +2433,7 @@ export function ExamAttemptPlayer({
                           </Button>
                         )}
                         {canInlineEdit && showAddAlternative && (
-                          <div className="flex flex-col gap-2 p-3 border-2 border-violet-300 rounded-lg bg-violet-50/30">
+                          <div className="flex flex-col gap-2 p-3 border-2 border-cyan-300 rounded-lg bg-cyan-50/30">
                             <div className="flex gap-2">
                               <input
                                 type="text"
@@ -2366,13 +2441,13 @@ export function ExamAttemptPlayer({
                                 onChange={(e) => setNewAltKey(e.target.value.toUpperCase())}
                                 placeholder="Letra (ex: A)"
                                 maxLength={1}
-                                className="w-16 p-2 text-center text-sm font-semibold border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-500"
+                                className="w-16 p-2 text-center text-sm font-semibold border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500"
                               />
                               <textarea
                                 value={newAltText}
                                 onChange={(e) => setNewAltText(e.target.value)}
                                 placeholder="Texto da alternativa..."
-                                className="flex-1 p-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-violet-500 min-h-[60px] resize-y"
+                                className="flex-1 p-2 text-sm border border-slate-300 rounded focus:outline-none focus:ring-2 focus:ring-cyan-500 min-h-[60px] resize-y"
                               />
                             </div>
                             <div className="flex gap-2">
@@ -2443,7 +2518,7 @@ export function ExamAttemptPlayer({
                               currentQuestion.alternatives.length === 0 ||
                               !currentQuestion.correctAlternative
                             }
-                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
+                            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white bg-cyan-600 hover:bg-cyan-700 shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-md"
                           >
                             <AutoAwesomeIcon fontSize="small" />
                             {generateExplanationsMutation.isPending ? 'Gerando explicações…' : 'Gerar explicações com IA'}
@@ -2475,15 +2550,15 @@ export function ExamAttemptPlayer({
                           const variant = isCorrect ? 'correct' : isWrong ? 'wrong' : 'neutral'
                           const cardStyles = {
                             correct: 'border-2 border-emerald-400 bg-emerald-100 overflow-hidden rounded-lg',
-                            wrong: 'border-2 border-rose-400 bg-rose-100 overflow-hidden rounded-lg',
+                            wrong: 'border-2 border-red-400 bg-red-100 overflow-hidden rounded-lg',
                             neutral: 'border border-slate-300 bg-slate-50 overflow-hidden rounded-lg',
                           }
-                          const headerTextStyles = { correct: 'text-emerald-800', wrong: 'text-rose-800', neutral: 'text-slate-700' }
+                          const headerTextStyles = { correct: 'text-emerald-800', wrong: 'text-red-800', neutral: 'text-slate-700' }
                           const badgeCorrect = 'text-xs font-semibold text-emerald-700 bg-emerald-200/80 px-2 py-0.5 rounded'
-                          const badgeWrong = 'text-xs font-semibold text-rose-700 bg-rose-200/80 px-2 py-0.5 rounded'
+                          const badgeWrong = 'text-xs font-semibold text-red-700 bg-red-200/80 px-2 py-0.5 rounded'
                           const explanationWrapStyles = {
                             correct: 'border-t border-emerald-300 bg-emerald-50/70',
-                            wrong: 'border-t border-rose-300 bg-rose-50/70',
+                            wrong: 'border-t border-red-300 bg-red-50/70',
                             neutral: 'border-t border-slate-200 bg-slate-100/70',
                           }
                           const isEditingExplanation = alt.id in editExplanationById
@@ -2507,7 +2582,7 @@ export function ExamAttemptPlayer({
                                         type="button"
                                         onClick={() => handleGenerateSingleExplanation(alt.id, alt.key)}
                                         disabled={generatingSingleExplanationKey !== null || !currentQuestion.correctAlternative}
-                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-violet-600 hover:bg-violet-50 hover:text-violet-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                        className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium text-cyan-700 hover:bg-cyan-50 hover:text-cyan-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                                       >
                                         <AutoAwesomeIcon sx={{ fontSize: 14 }} />
                                         {generatingSingleExplanationKey === alt.key ? 'Gerando…' : 'IA'}
@@ -2642,13 +2717,13 @@ export function ExamAttemptPlayer({
                 <div className="mb-2 shrink-0">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-slate-500">Revisão</span>
-                    <span className={`text-xs font-semibold ${reviewed === total && total > 0 ? 'text-green-600' : 'text-slate-500'}`}>
+                    <span className={`text-xs font-semibold ${reviewed === total && total > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
                       {reviewed}/{total}
                     </span>
                   </div>
                   <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
                     <div
-                      className={`h-full rounded-full transition-all ${reviewed === total && total > 0 ? 'bg-green-500' : 'bg-amber-400'}`}
+                      className={`h-full rounded-full transition-all ${reviewed === total && total > 0 ? 'bg-emerald-500' : 'bg-amber-400'}`}
                       style={{ width: total > 0 ? `${(reviewed / total) * 100}%` : '0%' }}
                     />
                   </div>
@@ -2670,7 +2745,7 @@ export function ExamAttemptPlayer({
                   >
                     {index + 1}
                     {canInlineEdit && (
-                      <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${hasReview ? 'bg-green-500' : 'bg-amber-400'}`} />
+                      <span className={`absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full ${hasReview ? 'bg-emerald-500' : 'bg-amber-400'}`} />
                     )}
                   </button>
                   )

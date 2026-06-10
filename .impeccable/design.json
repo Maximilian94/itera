@@ -1,0 +1,147 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-31T00:00:00.000Z",
+  "title": "Design System: Maximize Enfermagem (web-react)",
+  "extensions": {
+    "colorMeta": {
+      "primary": {
+        "role": "primary",
+        "displayName": "Momentum Cyan",
+        "canonical": "#0891b2",
+        "tonalRamp": ["#164e63", "#155e75", "#0e7490", "#0891b2", "#06b6d4", "#22d3ee", "#67e8f9", "#cffafe"]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Slate Ink",
+        "canonical": "#0f172a",
+        "tonalRamp": ["#0f172a", "#1e293b", "#334155", "#475569", "#64748b", "#94a3b8", "#cbd5e1", "#f1f5f9"]
+      },
+      "success": {
+        "role": "tertiary",
+        "displayName": "Correct Emerald",
+        "canonical": "#047857",
+        "tonalRamp": ["#064e3b", "#065f46", "#047857", "#059669", "#10b981", "#34d399", "#a7f3d0", "#ecfdf5"]
+      },
+      "error": {
+        "role": "tertiary",
+        "displayName": "Incorrect Red",
+        "canonical": "#dc2626",
+        "tonalRamp": ["#7f1d1d", "#991b1b", "#b91c1c", "#dc2626", "#ef4444", "#f87171", "#fecaca", "#fef2f2"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Dashboard and result-screen page titles. Fixed rem, not fluid." },
+      "body": { "displayName": "Body", "purpose": "Enunciados and explanations. Cap prose at 65-75ch." },
+      "label": { "displayName": "Label", "purpose": "Nav labels, chips, buttons, metadata." }
+    },
+    "shadows": [
+      { "name": "ambient-rest", "value": "0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.06)", "purpose": "Soft layered resting lift on cards and panels." },
+      { "name": "raised", "value": "0 6px 16px -4px rgba(15,23,42,0.12)", "purpose": "Cards/interactive surfaces lift a touch on hover." },
+      { "name": "overlay", "value": "0 12px 32px -8px rgba(15,23,42,0.18)", "purpose": "Dialogs, drawers, menus, popovers." },
+      { "name": "pressed", "value": "none", "purpose": "Active state collapses flat." }
+    ],
+    "motion": [
+      { "name": "ease-question", "value": "cubic-bezier(0.2, 0.8, 0.2, 1)", "purpose": "280ms swipe for question transitions in the player." },
+      { "name": "ease-standard", "value": "ease-in-out", "purpose": "150-250ms default for state transitions (hover, focus, card lift)." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" },
+      { "name": "xl", "value": "1280px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Primary action: start exam, submit answer, advance.",
+      "html": "<button class=\"ds-btn-primary\">Iniciar prova</button>",
+      "css": ".ds-btn-primary { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; color: #ffffff; background: #0891b2; border: none; border-radius: 8px; padding: 8px 22px; cursor: pointer; transition: background 0.15s ease-in-out, box-shadow 0.15s ease-in-out; } .ds-btn-primary:hover { background: #0e7490; } .ds-btn-primary:focus-visible { outline: 2px solid #0891b2; outline-offset: 2px; } .ds-btn-primary:active { background: #155e75; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Secondary action sharing the primary's shape and rhythm.",
+      "html": "<button class=\"ds-btn-secondary\">Cancelar</button>",
+      "css": ".ds-btn-secondary { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; color: #334155; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 22px; cursor: pointer; transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out; } .ds-btn-secondary:hover { background: #f1f5f9; } .ds-btn-secondary:focus-visible { outline: 2px solid #0891b2; outline-offset: 2px; }"
+    },
+    {
+      "name": "Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Resting surface defined by border; lifts on hover.",
+      "html": "<div class=\"ds-card\"><h3 class=\"ds-card-title\">Cardiologia</h3><p class=\"ds-card-body\">142 questões · 78% de acerto</p></div>",
+      "css": ".ds-card { background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(15,23,42,0.08), 0 1px 2px rgba(15,23,42,0.06); transition: background 0.2s ease-in-out, box-shadow 0.2s ease-in-out; } .ds-card:hover { background: #f1f5f9; box-shadow: 0 6px 16px -4px rgba(15,23,42,0.12); } .ds-card:active { box-shadow: none; } .ds-card-title { margin: 0 0 4px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 1.125rem; color: #0f172a; } .ds-card-body { margin: 0; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 1rem; color: #334155; }"
+    },
+    {
+      "name": "Text Input",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Outlined field; border shifts to Momentum Cyan on focus.",
+      "html": "<input class=\"ds-input\" type=\"text\" placeholder=\"Buscar questões\" />",
+      "css": ".ds-input { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 1rem; color: #0f172a; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out; } .ds-input::placeholder { color: #64748b; } .ds-input:focus { outline: none; border-color: #0891b2; box-shadow: 0 0 0 3px rgba(8,145,178,0.15); }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Pill filter; selected state uses the cyan tint, never green/red.",
+      "html": "<button class=\"ds-chip\">Pediatria</button><button class=\"ds-chip ds-chip--selected\">SUS</button>",
+      "css": ".ds-chip { font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; color: #334155; background: #f1f5f9; border: 1px solid transparent; border-radius: 9999px; padding: 4px 12px; cursor: pointer; transition: background 0.15s ease-in-out; } .ds-chip:hover { background: #e2e8f0; } .ds-chip--selected { color: #0e7490; background: #ecfeff; border-color: #0891b2; }"
+    },
+    {
+      "name": "Sidebar Nav Link",
+      "kind": "nav",
+      "refersTo": "nav-link-active",
+      "description": "Icon + label row; active uses Momentum Cyan on cyan tint.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-nav-link ds-nav-link--active\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M3 9.5 12 3l9 6.5\"/><path d=\"M5 10v10h14V10\"/></svg>Painel</a><a class=\"ds-nav-link\" href=\"#\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 19V5h16v14z\"/><path d=\"M8 9h8M8 13h5\"/></svg>Provas</a></nav>",
+      "css": ".ds-nav { display: flex; flex-direction: column; gap: 4px; width: 220px; } .ds-nav-link { display: flex; align-items: center; gap: 12px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-weight: 600; font-size: 0.875rem; color: #334155; text-decoration: none; padding: 10px 12px; border-radius: 8px; transition: background 0.15s ease-in-out, color 0.15s ease-in-out; } .ds-nav-link:hover { background: #f1f5f9; } .ds-nav-link--active { color: #0891b2; background: #ecfeff; }"
+    },
+    {
+      "name": "Answer Alternative (feedback)",
+      "kind": "custom",
+      "refersTo": "answer-alternative",
+      "description": "Quiz alternative row; locks to emerald (correct) or red (incorrect) after answering.",
+      "html": "<div class=\"ds-alt ds-alt--correct\"><span class=\"ds-alt-key\">A</span><span class=\"ds-alt-text\">Administrar o medicamento conforme prescrição.</span></div><div class=\"ds-alt ds-alt--wrong\"><span class=\"ds-alt-key\">B</span><span class=\"ds-alt-text\">Suspender a medicação sem comunicar a equipe.</span></div>",
+      "css": ".ds-alt { display: flex; align-items: flex-start; gap: 12px; font-family: Manrope, ui-sans-serif, system-ui, sans-serif; font-size: 1rem; color: #334155; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; transition: background 0.15s ease-in-out, border-color 0.15s ease-in-out; } .ds-alt:hover { background: #f1f5f9; } .ds-alt-key { flex: none; width: 24px; height: 24px; display: grid; place-items: center; border-radius: 9999px; font-weight: 700; font-size: 0.8125rem; color: #475569; background: #f1f5f9; } .ds-alt--correct { color: #047857; background: #ecfdf5; border-color: #10b981; } .ds-alt--correct .ds-alt-key { color: #ecfdf5; background: #10b981; } .ds-alt--wrong { color: #b91c1c; background: #fef2f2; border-color: #ef4444; } .ds-alt--wrong .ds-alt-key { color: #fef2f2; background: #ef4444; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Training Ground",
+    "overview": "This is a serious athlete's gym for the mind, not a playground. The interface exists so a working nurse can show up, do the reps (questions, simulados, review), and watch their numbers climb. Energy comes from visible progress and a clean, purposeful space, never from decoration. The app is the coach: it pushes, it tracks, it celebrates real milestones. It is never the mascot. The language is one confident accent (Momentum Cyan) over a disciplined slate-and-white field, set in one typeface (Manrope). Surfaces are calm and tactile: soft layered shadows give a gentle app-like depth, with hairline slate borders for definition.",
+    "keyCharacteristics": [
+      "One accent (Momentum Cyan), one typeface (Manrope), a slate neutral spine.",
+      "Soft, layered shadows for calm app-like depth; hairline slate borders define.",
+      "Progress is always legible; that visibility is the motivation engine.",
+      "Built for the marathon: high legibility, low fatigue, long sessions.",
+      "Energetic, never cute. A coach for an adult professional under pressure."
+    ],
+    "rules": [
+      { "name": "The One Accent Rule", "body": "Momentum Cyan is the only brand color on a screen, used for action, current state, and progress, on roughly <=10% of the surface. Emerald and red are semantic, earned only by answer feedback and metric deltas.", "section": "colors" },
+      { "name": "The Feedback-Only Color Rule", "body": "Green and red never decorate. They mean correct and incorrect (or up/down on a metric). A green button or a red divider used for flavor is forbidden.", "section": "colors" },
+      { "name": "The One Voice Rule", "body": "Manrope carries every role. No display serif, no second sans. Reach for weight and size before another family.", "section": "typography" },
+      { "name": "The Soft Layering Rule", "body": "Depth comes from low-opacity slate shadows (never pure black, never a hard 2014-era drop shadow). If a shadow looks like a dark box under the card, the opacity is too high and the blur too small. Keep it ambient. A hairline slate-300 border rides under it for definition.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep Momentum Cyan (#0891b2) as the single accent for action, active state, and progress, on <=10% of any screen.",
+      "Do reserve emerald and red strictly for answer feedback and metric deltas.",
+      "Do give surfaces soft layered ambient shadows (low-opacity slate) with a 1px slate-300 hairline border under them; deepen on hover, flatten on press.",
+      "Do set everything in Manrope, using weight (400->800) and the fixed rem scale for hierarchy.",
+      "Do make progress visible on every relevant screen; that visibility is the motivation, in place of cartoon rewards.",
+      "Do keep prefers-reduced-motion alternatives for every animation.",
+      "Do hold body text to >=4.5:1 contrast; slate-500 is the lightest allowed for real text, slate-700 for long reading."
+    ],
+    "donts": [
+      "Don't ship childish gamification: no Duolingo-style mascots, confetti on every tap, or cartoon badges.",
+      "Don't build the cluttered cram-site look: dense text walls, ad-stuffed panels, zero breathing room.",
+      "Don't fall into the generic SaaS dashboard: identical KPI card grids or the giant hero-metric template.",
+      "Don't use green or red as decoration; they mean correct/incorrect only.",
+      "Don't introduce a second typeface, a second accent hue, or clamp-scaled hero type.",
+      "Don't use hard, dark drop shadows (the 2014 look); keep them low-opacity slate and ambient. And never nest a card inside a card.",
+      "Don't use border-left/border-right >1px as a colored accent stripe."
+    ]
+  }
+}
