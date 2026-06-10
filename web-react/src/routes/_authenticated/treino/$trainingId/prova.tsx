@@ -1,7 +1,7 @@
 import { Card } from '@/components/Card'
 import { Button, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle } from '@mui/material'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { ArrowLeftIcon, ChartBarIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { ChartBarIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
 import { getStagePath } from '../-stages.config'
 import { useTrainingQuery } from '@/features/training/queries/training.queries'
 import { ExamAttemptPlayer } from '@/components/ExamAttemptPlayer'
@@ -9,14 +9,12 @@ import { ExamAnalysisOverlay } from '@/components/ExamAnalysisOverlay'
 import { useQueryClient } from '@tanstack/react-query'
 import { trainingKeys } from '@/features/training/queries/training.queries'
 import { useCallback, useState } from 'react'
-import { useIsMobile } from '@/lib/useIsMobile'
 
 export const Route = createFileRoute('/_authenticated/treino/$trainingId/prova')({
   component: ProvaPage,
 })
 
 function ProvaPage() {
-  const isMobile = useIsMobile()
   const { trainingId } = Route.useParams()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -148,52 +146,43 @@ function ProvaPage() {
                 examId: training.examBaseId,
                 attemptId: training.attemptId,
               }}
+              provaPrimaryAction={
+                provaState ? (
+                  provaState.isFinished ? (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      fullWidth
+                      endIcon={<ChartBarIcon className="w-5 h-5" />}
+                      onClick={() => navigate({ to: getStagePath('diagnostico', trainingId) })}
+                    >
+                      Ver diagnóstico
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      fullWidth
+                      onClick={() => {
+                        if (provaState.hasUnansweredQuestions) {
+                          setUnansweredModalOpen(true)
+                        } else {
+                          triggerFinishWithOverlay()
+                        }
+                      }}
+                      disabled={provaState.isFinishPending || showAnalysisOverlay}
+                    >
+                      {provaState.isFinishPending ? 'Finalizando…' : 'Finalizar prova'}
+                    </Button>
+                  )
+                ) : null
+              }
               onBack={() => navigate({ to: '/treino' })}
               onFinished={handleExamFinished}
               onFinishError={handleFinishError}
               onTrainingProvaStateChange={setProvaState}
             />
           </div>
-        </div>
-      )}
-
-      {!isMobile && canOpenExam && training && (
-        <div className="flex flex-wrap gap-3 justify-between mt-4 shrink-0">
-          <Button
-            variant="outlined"
-            startIcon={<ArrowLeftIcon className="w-5 h-5" />}
-            component={Link}
-            to="/treino"
-          >
-            Voltar ao início
-          </Button>
-          {provaState ? (
-            provaState.isFinished ? (
-              <Button
-                variant="contained"
-                color="primary"
-                endIcon={<ChartBarIcon className="w-5 h-5" />}
-                onClick={() => navigate({ to: getStagePath('diagnostico', trainingId) })}
-              >
-                Ver diagnóstico 📊
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                color="primary"
-                onClick={() => {
-                  if (provaState.hasUnansweredQuestions) {
-                    setUnansweredModalOpen(true)
-                  } else {
-                    triggerFinishWithOverlay()
-                  }
-                }}
-                disabled={provaState.isFinishPending || showAnalysisOverlay}
-              >
-                Finalizar prova
-              </Button>
-            )
-          ) : null}
         </div>
       )}
 
