@@ -68,6 +68,8 @@ cd api && npm run test:e2e      # Jest (e2e)
 cd web-react && npm test        # Vitest
 ```
 
+No `web-react/`, testes de **página/rota** usam o harness `src/features/concurso/__tests__/page-test-utils.tsx`: as rotas de arquivo são re-parentadas num root de teste via `Route.update({ getParentRoute })` (mesma técnica do `routeTree.gen.ts`, pulando o layout `_authenticated`/Clerk) + `createMemoryHistory`; a rede é mockada no `fetch` global por pathname (todos os services passam por `apiFetch`). Acessibilidade: `expectNoSeriousAxeViolations()` (axe-core em jsdom, sem `color-contrast`) + teste de contraste dos tokens em `contrast.test.ts` (culori). Testes de página NUNCA dentro de `src/routes/` (o gerador do router escaneia o diretório).
+
 E2E da API roda contra um Postgres **dedicado** `itera_test` (mesma instância do docker compose; override via `TEST_DATABASE_URL` — o nome do banco precisa conter "test", pois a suíte trunca tabelas). Infra em `api/test/`: `e2e-env.ts` (aponta o `DATABASE_URL`), `global-setup.ts` (`prisma migrate deploy`), `create-app.ts` (app Nest enxuto + `TestAuthGuard` que simula o Clerk via header `x-test-user-id`, preservando a semântica de `@Public`/`@OptionalAuth`/401) e `factories.ts` (seed por helpers, sem SQL solto). Exemplo completo: `api/test/concurso.e2e-spec.ts`.
 
 ## Banco de dados

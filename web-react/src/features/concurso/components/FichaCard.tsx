@@ -18,7 +18,7 @@ export type FichaFact = {
 export function FichaCard(props: {
   title: string
   hero: FichaFact
-  rows: FichaFact[]
+  rows: Array<FichaFact>
   editalUrl: string | null
   enterIdx: number
 }) {
@@ -35,7 +35,9 @@ export function FichaCard(props: {
             <props.hero.icon className="h-5 w-5" />
           </span>
           <div className="min-w-0">
-            <p className="text-xs font-medium text-slate-500">{props.hero.label}</p>
+            <p className="text-xs font-medium text-slate-500">
+              {props.hero.label}
+            </p>
             <p className="text-lg font-extrabold tabular-nums tracking-tight text-slate-900">
               {props.hero.value}
             </p>
@@ -45,17 +47,22 @@ export function FichaCard(props: {
 
       {rows.length > 0 && (
         <dl className="mt-4 flex flex-col gap-3.5">
+          {/* Grupos dl>div só podem conter dt/dd (WCAG/axe definition-list);
+              o ícone vive dentro do dt, posicionado na coluna do padding. */}
           {rows.map((r) => (
-            <div key={r.label} className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200/60">
-                <r.icon className="h-4 w-4" />
-              </span>
-              <div className="min-w-0">
-                <dt className="text-xs font-medium text-slate-500">{r.label}</dt>
-                <dd className="mt-px text-sm font-semibold leading-snug text-slate-800">
-                  {r.value}
-                </dd>
-              </div>
+            <div key={r.label} className="relative pl-11">
+              <dt className="text-xs font-medium text-slate-500">
+                <span
+                  aria-hidden
+                  className="absolute left-0 top-0.5 flex h-8 w-8 items-center justify-center rounded-lg bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200/60"
+                >
+                  <r.icon className="h-4 w-4" />
+                </span>
+                {r.label}
+              </dt>
+              <dd className="mt-px text-sm font-semibold leading-snug text-slate-800">
+                {r.value}
+              </dd>
             </div>
           ))}
         </dl>
