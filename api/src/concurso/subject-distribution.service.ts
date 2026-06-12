@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { deriveConcursoStatus } from './concurso-status';
+import { previousEditionsWhere } from './previous-editions';
 
 /**
  * Mínimo de respostas do usuário numa matéria para o acerto dela ser
@@ -104,7 +105,8 @@ export class SubjectDistributionService {
     const mode: SubjectDistributionMode = isPast ? 'actual' : 'historical';
 
     // Provas-fonte: a própria prova (actual) ou as edições anteriores do
-    // mesmo cargo/banca/instituição (historical), como em getCargoDetail.
+    // mesmo cargo/banca/instituição (historical, helper comum com
+    // getCargoDetail e a concorrência histórica do MAX-18).
     // Sem institution não há como agrupar edições com honestidade → vazio.
     let sourceExams: { id: string; examDate: Date }[];
     if (mode === 'actual') {
@@ -112,18 +114,14 @@ export class SubjectDistributionService {
     } else if (!exam.institution) {
       sourceExams = [];
     } else {
-      const yearStart = new Date(
-        Date.UTC(exam.examDate.getUTCFullYear(), 0, 1),
-      );
       sourceExams = await this.prisma.examBase.findMany({
-        where: {
+        where: previousEditionsWhere({
           institution: exam.institution,
           examBoardId: exam.examBoardId,
           role: exam.role,
-          examDate: { lt: yearStart },
-          isNursingRelevant: true,
-          ...(showUnpublished ? {} : { published: true }),
-        },
+          examYear: exam.examDate.getUTCFullYear(),
+          showUnpublished,
+        }),
         orderBy: { examDate: 'desc' },
         select: { id: true, examDate: true },
       });

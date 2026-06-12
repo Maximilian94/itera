@@ -6,6 +6,7 @@ import {
   aggregateConcursoTimeline,
   deriveConcursoStatus,
 } from './concurso-status';
+import { previousEditionsWhere } from './previous-editions';
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -661,17 +662,16 @@ export class ConcursoService {
     );
     const status = deriveConcursoStatus(timeline);
 
-    // Edições anteriores do mesmo cargo: institution + banca + role, antes
-    // do ano deste concurso. Alimentam o treino quando a prova é futura.
+    // Edições anteriores do mesmo cargo (helper comum com MAX-17/MAX-18).
+    // Alimentam o treino quando a prova é futura.
     const previousExams = await this.prisma.examBase.findMany({
-      where: {
+      where: previousEditionsWhere({
         institution: concurso.institution,
         examBoardId: concurso.examBoardId,
         role: cargo.role,
-        examDate: { lt: start },
-        isNursingRelevant: true,
-        ...(showUnpublished ? {} : { published: true }),
-      },
+        examYear: concurso.year,
+        showUnpublished,
+      }),
       orderBy: { examDate: 'desc' },
       select: {
         id: true,
