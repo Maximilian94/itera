@@ -19,6 +19,10 @@ const pct = (fraction: number) => Math.round(fraction * 100)
  * ("o que a banca costuma cobrar"). Título/subtítulo carregam o
  * enquadramento; `predictive` só troca os verbos da leitura do treinador,
  * que vem do `insight` calculado pela API.
+ *
+ * Uma linha só vira CTA de treino quando há para onde ir: `onTrainSubject`
+ * definido E a matéria presente em `trainableSubjects` (ex.: "Outros" e
+ * matérias sem questões na prova-alvo ficam como leitura, sem affordance).
  */
 export function SubjectDistribution(props: {
   title: string
@@ -28,8 +32,22 @@ export function SubjectDistribution(props: {
   meters: boolean
   enterIdx: number
   onTrainSubject?: (subject: string) => void
+  /** Matérias com fluxo de treino possível; sem o prop, nenhuma linha é CTA. */
+  trainableSubjects?: ReadonlySet<string>
+  /** Desabilita os CTAs enquanto um treino está sendo criado. */
+  trainDisabled?: boolean
 }) {
-  const { title, subtitle, data, predictive, meters, enterIdx, onTrainSubject } = props
+  const {
+    title,
+    subtitle,
+    data,
+    predictive,
+    meters,
+    enterIdx,
+    onTrainSubject,
+    trainableSubjects,
+    trainDisabled = false,
+  } = props
   const { insight } = data
   const e = enter(enterIdx)
   return (
@@ -41,14 +59,10 @@ export function SubjectDistribution(props: {
         {data.subjects.map((s, i) => {
           const share = pct(s.share)
           const acc = s.userAccuracy != null ? pct(s.userAccuracy) : null
-          return (
-            <button
-              key={s.subject}
-              type="button"
-              aria-label={`Treinar ${s.subject}`}
-              onClick={onTrainSubject ? () => onTrainSubject(s.subject) : undefined}
-              className="group -mx-2.5 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-            >
+          const trainable =
+            onTrainSubject != null && (trainableSubjects?.has(s.subject) ?? false)
+          const row = (
+            <>
               <div className="flex items-center justify-between gap-3">
                 <span className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-sm font-medium text-slate-700 transition-colors group-hover:text-slate-900">
@@ -79,11 +93,32 @@ export function SubjectDistribution(props: {
                     }}
                   />
                 </div>
-                <span className="inline-flex shrink-0 -translate-x-1 items-center gap-1 text-xs font-semibold text-cyan-700 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100">
-                  Treinar
-                  <ArrowRightIcon className="h-3.5 w-3.5" />
-                </span>
+                {trainable && (
+                  <span className="inline-flex shrink-0 -translate-x-1 items-center gap-1 text-xs font-semibold text-cyan-700 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100">
+                    Treinar
+                    <ArrowRightIcon className="h-3.5 w-3.5" />
+                  </span>
+                )}
               </div>
+            </>
+          )
+          if (!trainable) {
+            return (
+              <div key={s.subject} className="-mx-2.5 rounded-xl px-2.5 py-2.5">
+                {row}
+              </div>
+            )
+          }
+          return (
+            <button
+              key={s.subject}
+              type="button"
+              aria-label={`Treinar ${s.subject}`}
+              disabled={trainDisabled}
+              onClick={() => onTrainSubject(s.subject)}
+              className="group -mx-2.5 cursor-pointer rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait"
+            >
+              {row}
             </button>
           )
         })}

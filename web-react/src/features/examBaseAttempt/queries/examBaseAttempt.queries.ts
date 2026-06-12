@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { examBaseAttemptService } from '../services/examBaseAttempt.service'
 import type { UpsertAnswerInput } from '../domain/examBaseAttempt.types'
+import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
 
 export const examBaseAttemptKeys = {
   list: (examBaseId: string) => ['examBaseAttempts', examBaseId] as const,
@@ -52,6 +53,8 @@ export function useCreateExamBaseAttemptMutation(examBaseId: string) {
         })
       }
       queryClient.invalidateQueries({ queryKey: examBaseAttemptKeys.history() })
+      // Páginas de concurso/cargo derivam plano e stats das tentativas.
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }
@@ -118,7 +121,10 @@ export function useFinishExamBaseAttemptMutation(
       queryClient.invalidateQueries({
         queryKey: examBaseAttemptKeys.one(examBaseId, attemptId),
       })
+      queryClient.invalidateQueries({ queryKey: examBaseAttemptKeys.list(examBaseId) })
       queryClient.invalidateQueries({ queryKey: examBaseAttemptKeys.history() })
+      // Ao voltar para concurso/cargo, nota/plano/acurácias refletem o treino.
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }
