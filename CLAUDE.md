@@ -67,6 +67,8 @@ cd api && npm run test:e2e      # Jest (e2e)
 cd web-react && npm test        # Vitest
 ```
 
+E2E da API roda contra um Postgres **dedicado** `itera_test` (mesma instância do docker compose; override via `TEST_DATABASE_URL` — o nome do banco precisa conter "test", pois a suíte trunca tabelas). Infra em `api/test/`: `e2e-env.ts` (aponta o `DATABASE_URL`), `global-setup.ts` (`prisma migrate deploy`), `create-app.ts` (app Nest enxuto + `TestAuthGuard` que simula o Clerk via header `x-test-user-id`, preservando a semântica de `@Public`/`@OptionalAuth`/401) e `factories.ts` (seed por helpers, sem SQL solto). Exemplo completo: `api/test/concurso.e2e-spec.ts`.
+
 ## Banco de dados
 
 ```bash
