@@ -386,6 +386,28 @@ async function main() {
         slug: 'cebraspe-sp-sao-paulo-2026-analista-de-sistemas',
       },
       {
+        // Sibling do mesmo concurso (mesma instituição+banca+ano), mas cargo fora
+        // da enfermagem: exercita o filtro isNursingRelevant da página do concurso.
+        id: randomUUID(),
+        name: 'Prefeitura - Médico Clínico',
+        institution: 'Prefeitura Municipal',
+        role: 'Médico Clínico',
+        governmentScope: GovernmentScope.MUNICIPAL,
+        state: 'SP',
+        city: 'São Paulo',
+        salaryBase: new Prisma.Decimal('12500.00'),
+        examDate: new Date('2026-06-15T00:00:00.000Z'),
+        registrationStart: new Date('2026-03-01T00:00:00.000Z'),
+        registrationEnd: new Date('2026-04-10T23:59:59.000Z'),
+        resultDate: new Date('2026-08-30T00:00:00.000Z'),
+        requirements: 'Superior em Medicina + registro no CRM',
+        editalUrl: 'https://example.com/editais/prefeitura-sp-2026.pdf',
+        examBoardId: cespe.id,
+        published: true,
+        slug: 'cebraspe-sp-sao-paulo-2026-medico-clinico',
+        isNursingRelevant: false,
+      },
+      {
         id: randomUUID(),
         name: 'Secretaria Estadual - Desenvolvedor',
         institution: 'Governo do Estado',

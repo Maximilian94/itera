@@ -22,6 +22,8 @@ export type ExamBase = {
   registrationDate: string | null
   description: string | null
   workload: string | null
+  /** Quando false, o cargo fica fora da página do concurso (ex.: Médico). */
+  isNursingRelevant: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   _count?: { questions: number }
@@ -117,5 +119,6 @@ export type UpdateExamBaseInput = {
   registrationDate?: string | null
   description?: string | null
   workload?: string | null
+  isNursingRelevant?: boolean
 }
 

@@ -195,6 +195,7 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
         published: true,
         minPassingGradeNonQuota: null,
         editalUrl: 'https://example.com/edital-b.pdf',
+        isNursingRelevant: true,
         _count: { questions: 0 },
       },
       {
@@ -208,6 +209,7 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
         published: true,
         minPassingGradeNonQuota: null,
         editalUrl: 'https://example.com/edital-a.pdf',
+        isNursingRelevant: true,
         _count: { questions: 0 },
       },
     ]);
@@ -219,5 +221,106 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
       data: { editalUrl: 'https://example.com/edital-a.pdf' },
     });
     expect(result.concurso?.editalUrl).toBe('https://example.com/edital-a.pdf');
+  });
+
+  describe('filtro de relevância (isNursingRelevant, MAX-13)', () => {
+    function buildProva(overrides: Record<string, unknown> = {}) {
+      return {
+        id: 'eb-x',
+        role: 'Enfermeiro',
+        slug: null,
+        salaryBase: null,
+        vacancyCount: 10,
+        examDate: new Date('2026-06-15T00:00:00.000Z'),
+        examBoardId: 'board-1',
+        published: true,
+        minPassingGradeNonQuota: null,
+        editalUrl: null,
+        isNursingRelevant: true,
+        _count: { questions: 0 },
+        ...overrides,
+      };
+    }
+
+    beforeEach(() => {
+      prisma.concurso.findFirst.mockResolvedValue({
+        id: 'concurso-1',
+        slug: 'prefeitura-de-campinas-2026-cebraspe',
+        institution: 'Prefeitura de Campinas',
+        year: 2026,
+        governmentScope: GovernmentScope.MUNICIPAL,
+        state: 'SP',
+        city: 'Campinas',
+        editalUrl: 'https://example.com/edital.pdf',
+      });
+    });
+
+    it('prova não relevante (Médico) sai do payload, mas ainda é vinculada ao concurso', async () => {
+      prisma.examBase.findMany.mockResolvedValue([
+        buildProva({ id: EXAM_BASE_ID, role: 'Enfermeiro' }),
+        buildProva({
+          id: 'eb-medico',
+          role: 'Médico Clínico',
+          isNursingRelevant: false,
+          vacancyCount: 50,
+        }),
+      ]);
+
+      const result = await service.getConcursoProvas(EXAM_BASE_ID);
+
+      expect(result.provas).toHaveLength(1);
+      expect(result.provas[0].role).toBe('Enfermeiro');
+      // O self-healing link continua cobrindo TODOS os siblings.
+      expect(prisma.examBase.updateMany).toHaveBeenCalledWith({
+        where: {
+          id: { in: [EXAM_BASE_ID, 'eb-medico'] },
+          concursoId: null,
+        },
+        data: { concursoId: 'concurso-1' },
+      });
+    });
+
+    it('stats do usuário só consideram provas relevantes', async () => {
+      prisma.examBase.findMany.mockResolvedValue([
+        buildProva({ id: EXAM_BASE_ID, role: 'Enfermeiro' }),
+        buildProva({
+          id: 'eb-medico',
+          role: 'Médico Clínico',
+          isNursingRelevant: false,
+        }),
+      ]);
+
+      await service.getConcursoProvas(EXAM_BASE_ID, 'user-1');
+
+      expect(prisma.examBaseAttempt.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            examBaseId: { in: [EXAM_BASE_ID] },
+          }) as object,
+        }),
+      );
+    });
+
+    it('concurso onde todas as provas são irrelevantes responde provas: []', async () => {
+      prisma.examBase.findMany.mockResolvedValue([
+        buildProva({
+          id: 'eb-medico',
+          role: 'Médico',
+          isNursingRelevant: false,
+        }),
+        buildProva({
+          id: 'eb-adm',
+          role: 'Assistente Administrativo',
+          isNursingRelevant: false,
+        }),
+      ]);
+
+      const result = await service.getConcursoProvas(EXAM_BASE_ID, 'user-1');
+
+      expect(result.concurso).not.toBeNull();
+      expect(result.provas).toEqual([]);
+      // Sem provas relevantes, não há por que consultar stats.
+      expect(prisma.examBaseAttempt.groupBy).not.toHaveBeenCalled();
+    });
   });
 });

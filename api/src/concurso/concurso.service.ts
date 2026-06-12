@@ -168,6 +168,7 @@ export class ConcursoService {
         published: true,
         minPassingGradeNonQuota: true,
         editalUrl: true,
+        isNursingRelevant: true,
         _count: { select: { questions: true } },
       },
     });
@@ -195,18 +196,23 @@ export class ConcursoService {
       }
     }
 
+    // Product rule (MAX-13): only nursing-relevant cargos surface on the
+    // concurso payload and its aggregates. The link/heal above still runs on
+    // every sibling so the concurso data stays whole.
+    const relevantProvas = provas.filter((p) => p.isNursingRelevant);
+
     // Per-prova stats for the requesting user (finished attempts only).
     const statsByExamBaseId = new Map<
       string,
       { attemptCount: number; bestScore: number | null }
     >();
-    if (userId && provas.length > 0) {
+    if (userId && relevantProvas.length > 0) {
       const grouped = await this.prisma.examBaseAttempt.groupBy({
         by: ['examBaseId'],
         where: {
           userId,
           finishedAt: { not: null },
-          examBaseId: { in: provas.map((p) => p.id) },
+          examBaseId: { in: relevantProvas.map((p) => p.id) },
         },
         _count: { id: true },
         _max: { scorePercentage: true },
@@ -233,7 +239,7 @@ export class ConcursoService {
         city: concurso.city,
         editalUrl: concurso.editalUrl,
       },
-      provas: provas.map((p) => ({
+      provas: relevantProvas.map((p) => ({
         id: p.id,
         role: p.role,
         slug: p.slug,
