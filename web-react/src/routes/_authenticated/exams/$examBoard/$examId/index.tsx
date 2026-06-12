@@ -188,6 +188,10 @@ function RouteComponent() {
     useQuestionsCountBySubjectQuery(examBaseId)
   const { data: concursoData } = useExamConcursoProvasQuery(examBaseId)
   const siblingProvas = (concursoData?.provas ?? []).filter((p) => !p.isCurrent)
+  /* Página do concurso (nível 1, MAX-25): slug canônico ou id como fallback. */
+  const concursoPageParam = concursoData?.concurso
+    ? (concursoData.concurso.slug ?? concursoData.concurso.id)
+    : null
   const { hasAccess, requireAccess } = useRequireAccess()
   const { data: profileData } = useQuery({
     queryKey: ['auth', 'profile'],
@@ -600,12 +604,20 @@ function RouteComponent() {
           </MobileCard>
         ) : null}
 
-        {siblingProvas.length > 0 ? (
+        {siblingProvas.length > 0 && concursoPageParam != null ? (
           <div>
-            <div className="mb-3">
+            <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Outras provas deste concurso
               </h2>
+              <Link
+                to="/concursos/$concursoSlug"
+                params={{ concursoSlug: concursoPageParam }}
+                className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-cyan-700 no-underline"
+              >
+                Ver concurso
+                <ChevronRightIcon className="h-3.5 w-3.5" />
+              </Link>
             </div>
             <div className="flex flex-col gap-3">
               {siblingProvas.map((p) => {
@@ -613,8 +625,8 @@ function RouteComponent() {
                 return (
                   <Link
                     key={p.id}
-                    to="/exams/$examBoard/$examId"
-                    params={{ examBoard, examId: p.id }}
+                    to="/concursos/$concursoSlug/$cargoSlug"
+                    params={{ concursoSlug: concursoPageParam, cargoSlug: p.slug ?? p.id }}
                     className="block no-underline"
                   >
                     <MobileCard>
@@ -897,9 +909,20 @@ function RouteComponent() {
           </li>
           <li className="flex min-w-0 items-center gap-1.5 text-slate-400">
             <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
-            <span className="truncate font-medium text-slate-500" title={concursoTitle}>
-              {concursoTitle}
-            </span>
+            {concursoPageParam != null ? (
+              <Link
+                to="/concursos/$concursoSlug"
+                params={{ concursoSlug: concursoPageParam }}
+                className="truncate font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
+                title={concursoTitle}
+              >
+                {concursoTitle}
+              </Link>
+            ) : (
+              <span className="truncate font-medium text-slate-500" title={concursoTitle}>
+                {concursoTitle}
+              </span>
+            )}
           </li>
           <li className="flex min-w-0 items-center gap-1.5">
             <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
@@ -1468,8 +1491,9 @@ function RouteComponent() {
           </div>
         </section>
 
-        {/* Outras provas deste concurso */}
-        {siblingProvas.length > 0 && (
+        {/* Outras provas deste concurso — itens levam à página do cargo
+            (camada de preparação); o link do header abre o concurso. */}
+        {siblingProvas.length > 0 && concursoPageParam != null && (
           <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -1480,9 +1504,14 @@ function RouteComponent() {
                   Outros cargos do mesmo edital · {concursoTitle}
                 </p>
               </div>
-              <span className="hidden shrink-0 rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600 sm:inline">
-                {siblingProvas.length}
-              </span>
+              <Link
+                to="/concursos/$concursoSlug"
+                params={{ concursoSlug: concursoPageParam }}
+                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm font-semibold text-cyan-700 no-underline transition-colors hover:bg-cyan-50 hover:text-cyan-800"
+              >
+                Ver página do concurso
+                <ArrowRightIcon className="h-4 w-4" />
+              </Link>
             </div>
             <div className="mt-4 flex flex-col gap-2">
               {siblingProvas.map((p) => {
@@ -1490,8 +1519,8 @@ function RouteComponent() {
                 return (
                   <Link
                     key={p.id}
-                    to="/exams/$examBoard/$examId"
-                    params={{ examBoard, examId: p.id }}
+                    to="/concursos/$concursoSlug/$cargoSlug"
+                    params={{ concursoSlug: concursoPageParam, cargoSlug: p.slug ?? p.id }}
                     className="group flex items-center gap-3 rounded-xl border border-slate-200 p-3 no-underline transition-all hover:border-slate-300 hover:bg-slate-50"
                   >
                     <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100">

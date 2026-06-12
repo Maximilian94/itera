@@ -35,6 +35,12 @@ export type ExamBase = {
   isNursingRelevant: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
+  /**
+   * Concurso (edital) vinculado preguiçosamente. Null até alguma leitura
+   * popular o vínculo — nesse caso a navegação usa o id da prova, que
+   * `GET /concursos/:id` também resolve (MAX-25).
+   */
+  concurso?: { id: string; slug: string | null } | null
   /** Conteúdo programático do edital, ordenado. Presente apenas no detalhe (getOne). */
   syllabusGroups?: ExamSyllabusGroup[]
   _count?: { questions: number }

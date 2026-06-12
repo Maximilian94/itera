@@ -301,6 +301,57 @@ describe('Concurso endpoints (e2e)', () => {
     });
   });
 
+  // Entrada 1-clique do /exams (MAX-25): um UUID de prova também resolve a
+  // página do concurso, criando o vínculo lazy na hora se preciso.
+  describe('GET /concursos/:id — fallback por id de prova (MAX-25)', () => {
+    it('UUID de prova com concurso já criado resolve para o mesmo payload do slug', async () => {
+      const res = await request(http)
+        .get(`/concursos/${enf2024.id}`)
+        .expect(200);
+      expect(res.body.concurso.slug).toBe(PAST_SLUG);
+    });
+
+    it('UUID de prova ainda sem concurso cria o vínculo na leitura', async () => {
+      const nova = await createExamBase(prisma, {
+        institution: 'Hospital Alfa',
+        role: 'Enfermeiro',
+        slug: 'hospital-alfa-2024-enfermeiro',
+        examDate: new Date('2024-09-01T00:00:00.000Z'),
+      });
+
+      const res = await request(http)
+        .get(`/concursos/${nova.id}`)
+        .expect(200);
+      expect(res.body.concurso.institution).toBe('Hospital Alfa');
+      expect(
+        res.body.cargos.map((c: { id: string }) => c.id),
+      ).toContain(nova.id);
+
+      const linked = await prisma.examBase.findUniqueOrThrow({
+        where: { id: nova.id },
+        select: { concursoId: true },
+      });
+      expect(linked.concursoId).toBe(res.body.concurso.id);
+    });
+
+    it('prova sem instituição → 404 (não há chave de agrupamento)', async () => {
+      const semInstituicao = await createExamBase(prisma, {
+        role: 'Enfermeiro',
+        slug: 'sem-instituicao-2024-enfermeiro',
+      });
+      await request(http).get(`/concursos/${semInstituicao.id}`).expect(404);
+    });
+
+    it('prova não publicada: 404 anônimo, 200 para ADMIN', async () => {
+      await request(http).get(`/concursos/${aux2024.id}`).expect(404);
+
+      const res = await asAdmin(
+        request(http).get(`/concursos/${aux2024.id}`),
+      ).expect(200);
+      expect(res.body.concurso.slug).toBe(PAST_SLUG);
+    });
+  });
+
   describe('GET /concursos/:slug/cargos/:cargoSlug (nível 2)', () => {
     it('cargo passado: ficha completa, syllabus oculto, previousExams com 1 item', async () => {
       const res = await request(http)
