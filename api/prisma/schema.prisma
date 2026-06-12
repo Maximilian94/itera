@@ -254,6 +254,9 @@ model ExamBase {
   /// Descrição da vaga conforme consta no edital (função, atribuições, etc.)
   description             String?
   workload                String?
+  /// Quando false, o cargo não é relevante para enfermagem (ex.: Médico, Administrativo)
+  /// e fica fora da página do concurso e dos seus agregados. Controlado pelo admin.
+  isNursingRelevant       Boolean          @default(true)
 
   /// When false, exam is only visible to admins. When true, visible to all users.
   published               Boolean          @default(false)

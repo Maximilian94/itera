@@ -32,6 +32,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Collapse,
@@ -80,6 +81,7 @@ type FormState = {
   registrationDate: string
   description: string
   workload: string
+  isNursingRelevant: boolean
 }
 
 const EMPTY_FORM: FormState = {
@@ -100,6 +102,7 @@ const EMPTY_FORM: FormState = {
   registrationDate: '',
   description: '',
   workload: '',
+  isNursingRelevant: true,
 }
 
 const NEW_BOARD_SENTINEL = '__new__'
@@ -123,6 +126,8 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     registrationDate: data.registrationDate ? data.registrationDate.slice(0, 10) : prev.registrationDate,
     description: data.description ?? prev.description,
     workload: data.workload ?? prev.workload,
+    // Decisão de admin, não de IA: a relevância nunca vem da extração.
+    isNursingRelevant: prev.isNursingRelevant,
   }
 }
 
@@ -320,6 +325,7 @@ function MetadataStep({
       registrationDate: examBase.registrationDate ? examBase.registrationDate.slice(0, 10) : '',
       description: examBase.description ?? '',
       workload: examBase.workload ?? '',
+      isNursingRelevant: examBase.isNursingRelevant ?? true,
     })
   }, [examBase])
 
@@ -390,6 +396,7 @@ function MetadataStep({
       registrationDate: form.registrationDate || null,
       description: form.description.trim() || null,
       workload: form.workload.trim() || null,
+      isNursingRelevant: form.isNursingRelevant,
     }
   }
 
@@ -496,6 +503,21 @@ function MetadataStep({
           fullWidth
           size="small"
         />
+        <div>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.isNursingRelevant}
+                onChange={(e) => set('isNursingRelevant', e.target.checked)}
+                size="small"
+              />
+            }
+            label="Cargo relevante para enfermagem"
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: -0.5 }}>
+            Desmarque para cargos fora da área (ex.: Médico). A prova fica fora da página do concurso e dos seus totais.
+          </Typography>
+        </div>
         <TextField
           label="Instituição / Órgão"
           value={form.institution}

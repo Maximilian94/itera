@@ -115,6 +115,7 @@ export class ExamBaseService {
         registrationDate: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -309,6 +310,7 @@ export class ExamBaseService {
         registrationDate: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -454,6 +456,7 @@ export class ExamBaseService {
     minPassingGradeNonQuota?: string | number | null;
     editalUrl?: string | null;
     adminNotes?: string | null;
+    isNursingRelevant?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -475,6 +478,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: input.minPassingGradeNonQuota ?? undefined,
         editalUrl: normalizeOptionalText(input.editalUrl),
         adminNotes: normalizeOptionalText(input.adminNotes),
+        isNursingRelevant: input.isNursingRelevant,
       },
       select: {
         id: true,
@@ -489,6 +493,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         editalUrl: true,
         adminNotes: true,
+        isNursingRelevant: true,
         processingPhase: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -531,6 +536,7 @@ export class ExamBaseService {
       registrationDate?: string | null;
       description?: string | null;
       workload?: string | null;
+      isNursingRelevant?: boolean;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -577,6 +583,7 @@ export class ExamBaseService {
         registrationDate: input.registrationDate === undefined ? undefined : (input.registrationDate ? new Date(input.registrationDate) : null),
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
+        isNursingRelevant: input.isNursingRelevant,
       },
       select: {
         id: true,
@@ -599,6 +606,7 @@ export class ExamBaseService {
         registrationDate: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
