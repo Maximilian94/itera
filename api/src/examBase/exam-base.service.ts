@@ -119,6 +119,10 @@ export class ExamBaseService {
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Lazily-linked concurso (MAX-25): populated once any concurso-aware
+        // read heals the link; the UI falls back to the exam base id
+        // (GET /concursos/:id also accepts it) while still null.
+        concurso: { select: { id: true, slug: true } },
         _count: { select: { questions: true } },
       },
     });

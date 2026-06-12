@@ -312,9 +312,59 @@ export class ConcursoService {
   }
 
   /**
+   * Entry-point resolution for the concurso pages: matches the slug or UUID
+   * against Concurso first; a UUID that matches no concurso is then tried as
+   * an ExamBase id, lazily creating/linking that exam base's concurso (same
+   * find-or-create as getConcursoProvas). This lets list views link straight
+   * to `/concursos/:examBaseId` before any read has healed the link (MAX-25).
+   */
+  private async resolveConcurso(slugOrId: string, showUnpublished: boolean) {
+    const include = {
+      examBoard: { select: { id: true, name: true, alias: true } },
+    } as const;
+    const concurso = await this.prisma.concurso.findFirst({
+      where: UUID_RE.test(slugOrId) ? { id: slugOrId } : { slug: slugOrId },
+      include,
+    });
+    if (concurso || !UUID_RE.test(slugOrId)) return concurso;
+
+    const examBase = await this.prisma.examBase.findFirst({
+      where: {
+        id: slugOrId,
+        ...(showUnpublished ? {} : { published: true }),
+      },
+      select: {
+        institution: true,
+        examDate: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        examBoardId: true,
+        examBoard: { select: { alias: true, name: true } },
+      },
+    });
+    if (!examBase?.institution) return null;
+
+    const created = await this.findOrCreateConcurso({
+      institution: examBase.institution,
+      year: examBase.examDate.getFullYear(),
+      governmentScope: examBase.governmentScope,
+      state: examBase.state,
+      city: examBase.city,
+      examBoardId: examBase.examBoardId,
+      boardLabel: examBase.examBoard?.alias ?? examBase.examBoard?.name ?? null,
+    });
+    return this.prisma.concurso.findFirst({
+      where: { id: created.id },
+      include,
+    });
+  }
+
+  /**
    * Canonical payload for the concurso page (nível 1): concurso identity +
    * derived temporal status + timeline + aggregates, plus one card per cargo
-   * with the requesting user's stats. Accepts the concurso slug or UUID;
+   * with the requesting user's stats. Accepts the concurso slug or UUID
+   * (an ExamBase UUID also resolves, lazily creating the concurso);
    * works anonymously (stats zeroed). Aggregates and cargos only consider
    * nursing-relevant provas (MAX-13), but the self-healing link still covers
    * every sibling.
@@ -322,12 +372,7 @@ export class ConcursoService {
   async getConcursoDetail(slugOrId: string, userId?: string) {
     const showUnpublished = userId ? await this.isAdmin(userId) : false;
 
-    const concurso = await this.prisma.concurso.findFirst({
-      where: UUID_RE.test(slugOrId) ? { id: slugOrId } : { slug: slugOrId },
-      include: {
-        examBoard: { select: { id: true, name: true, alias: true } },
-      },
-    });
+    const concurso = await this.resolveConcurso(slugOrId, showUnpublished);
     if (!concurso) throw new NotFoundException('concurso not found');
 
     // Same grouping key as getConcursoProvas: institution + board + exam year.

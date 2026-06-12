@@ -22,6 +22,8 @@ type BottomNavItem = {
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
+  /** Rotas extras que mantêm o item ativo (sempre fuzzy). */
+  alsoMatch?: Array<'/concursos/$concursoSlug'>
 }
 
 const items: BottomNavItem[] = [
@@ -37,6 +39,8 @@ const items: BottomNavItem[] = [
     icon: DocumentTextIcon,
     activeIcon: DocumentTextIconSolid,
     fuzzy: true,
+    // Concursos vivem sob o guarda-chuva de Provas (decisão MAX-25).
+    alsoMatch: ['/concursos/$concursoSlug'],
   },
   {
     label: 'Treino',
@@ -70,10 +74,15 @@ export function BottomNav() {
     >
       <nav className="mx-auto flex h-[var(--mobile-bottom-nav-height)] max-w-md items-center justify-between px-2">
         {items.map((item) => {
-          const isActive = matchRoute({
-            to: item.to,
-            fuzzy: item.fuzzy ?? false,
-          })
+          const isActive = Boolean(
+            matchRoute({
+              to: item.to,
+              fuzzy: item.fuzzy ?? false,
+            }) ||
+              (item.alsoMatch ?? []).some((to) =>
+                matchRoute({ to, fuzzy: true }),
+              ),
+          )
           const Icon = isActive ? item.activeIcon : item.icon
 
           return (

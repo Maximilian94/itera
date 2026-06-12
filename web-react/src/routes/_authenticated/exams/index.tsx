@@ -19,6 +19,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   ArrowRightIcon,
   BanknotesIcon,
+  BuildingLibraryIcon,
   DocumentTextIcon,
   FunnelIcon,
   MagnifyingGlassIcon,
@@ -214,14 +215,31 @@ function ExamRow({
   const hasAttempts = (exam.userStats?.attemptCount ?? 0) > 0
   const bestScore = exam.userStats?.bestScore
   const canNavigate = Boolean(exam.examBoardId)
+  /* Sem instituição não há concurso para agrupar (regra do lazy-link); com
+   * ela, o próprio id da prova resolve em GET /concursos/:id mesmo antes de
+   * o vínculo popular (MAX-25). */
+  const concursoParam = exam.institution
+    ? (exam.concurso?.slug ?? exam.concurso?.id ?? exam.id)
+    : null
 
-  const content = (
+  /* Stretched link (como no CargoCard): o <Link> absoluto cobre o card
+   * inteiro; elementos interativos ficam acima dele (z-10) e áreas com
+   * Tooltip ficam `relative` para preservar o hover. */
+  return (
     <div
-      className="group flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all duration-200 cursor-pointer"
+      className="group relative flex items-center gap-3 px-4 py-3 bg-white border border-slate-200 rounded-xl hover:border-slate-300 hover:shadow-sm transition-all duration-200"
       style={{ animation: `fade-in-up 0.35s ease-out ${animDelay}ms both` }}
     >
+      {canNavigate && (
+        <Link
+          to="/exams/$examBoard/$examId"
+          params={{ examBoard: exam.examBoardId!, examId: exam.id }}
+          aria-label={`Abrir prova ${formatExamBaseTitle(exam)}`}
+          className="absolute inset-0 cursor-pointer rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+        />
+      )}
       {/* Score badge — most actionable info, visible first */}
-      <div className="w-11 h-11 shrink-0 flex items-center justify-center">
+      <div className="relative w-11 h-11 shrink-0 flex items-center justify-center">
         {hasAttempts && bestScore != null ? (
           <Tooltip title={`Melhor nota · ${exam.userStats!.attemptCount} tentativa${exam.userStats!.attemptCount !== 1 ? 's' : ''}`}>
             <div className={`w-11 h-11 rounded-xl flex flex-col items-center justify-center ${scoreColor(bestScore)}`}>
@@ -279,11 +297,21 @@ function ExamRow({
                 {exam.city ? `${exam.city}/${exam.state}` : exam.state}
               </span>
             )}
+            {concursoParam && (
+              <Link
+                to="/concursos/$concursoSlug"
+                params={{ concursoSlug: concursoParam }}
+                className="relative z-10 inline-flex items-center gap-0.5 text-[0.6rem] font-medium px-1.5 py-px rounded-full bg-slate-100 text-slate-500 no-underline transition-colors hover:bg-cyan-50 hover:text-cyan-700"
+              >
+                <BuildingLibraryIcon className="w-2.5 h-2.5" />
+                Ver concurso
+              </Link>
+            )}
         </div>
       </div>
 
       {/* Right side stats */}
-      <div className="hidden sm:flex items-center gap-4 shrink-0">
+      <div className="relative hidden sm:flex items-center gap-4 shrink-0">
         {/* Questions */}
         <Tooltip title="Questões">
           <div className="flex items-center gap-1 text-xs text-slate-500">
@@ -316,7 +344,7 @@ function ExamRow({
       {/* Admin review progress */}
       {isAdmin && exam.reviewStats && exam.reviewStats.totalCount > 0 && (
         <Tooltip title={`${exam.reviewStats.reviewedCount}/${exam.reviewStats.totalCount} revisadas`}>
-          <div className="hidden md:flex items-center shrink-0 w-14">
+          <div className="relative hidden md:flex items-center shrink-0 w-14">
             <div className="w-full h-1.5 rounded-full bg-slate-200 overflow-hidden">
               <div
                 className={`h-full rounded-full ${exam.reviewStats.reviewedCount === exam.reviewStats.totalCount ? 'bg-green-500' : 'bg-amber-400'}`}
@@ -331,12 +359,8 @@ function ExamRow({
       {isAdmin && onDelete && (
         <button
           type="button"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            onDelete(exam)
-          }}
-          className="p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 shrink-0"
+          onClick={() => onDelete(exam)}
+          className="relative z-10 p-1 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors cursor-pointer opacity-0 group-hover:opacity-100 shrink-0"
           aria-label="Excluir exame"
         >
           <TrashIcon className="w-4 h-4" />
@@ -346,19 +370,6 @@ function ExamRow({
       <ArrowRightIcon className="w-4 h-4 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0" />
     </div>
   )
-
-  if (canNavigate) {
-    return (
-      <Link
-        to="/exams/$examBoard/$examId"
-        params={{ examBoard: exam.examBoardId!, examId: exam.id }}
-        className="block no-underline text-inherit"
-      >
-        {content}
-      </Link>
-    )
-  }
-  return content
 }
 
 function ExamsMobileSummaryCard({
@@ -409,9 +420,23 @@ function ExamCardMobile({
   const hasAttempts = (exam.userStats?.attemptCount ?? 0) > 0
   const bestScore = exam.userStats?.bestScore
   const canNavigate = Boolean(exam.examBoardId)
+  /* Mesmo fallback do ExamRow: id da prova resolve em GET /concursos/:id. */
+  const concursoParam = exam.institution
+    ? (exam.concurso?.slug ?? exam.concurso?.id ?? exam.id)
+    : null
 
-  const content = (
+  /* Stretched link: o <Link> absoluto cobre o card; chip de concurso e botão
+   * de excluir ficam acima dele (z-10). */
+  return (
     <MobileCard className="relative p-0">
+      {canNavigate && (
+        <Link
+          to="/exams/$examBoard/$examId"
+          params={{ examBoard: exam.examBoardId!, examId: exam.id }}
+          aria-label={`Abrir prova ${formatExamBaseTitle(exam)}`}
+          className="absolute inset-0 rounded-3xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+        />
+      )}
       <div className="flex items-start gap-3">
         <div className="flex h-12 w-12 shrink-0 items-center justify-center">
           {hasAttempts && bestScore != null ? (
@@ -449,12 +474,8 @@ function ExamCardMobile({
             {isAdmin && onDelete ? (
               <button
                 type="button"
-                onClick={(event) => {
-                  event.preventDefault()
-                  event.stopPropagation()
-                  onDelete(exam)
-                }}
-                className="rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                onClick={() => onDelete(exam)}
+                className="relative z-10 rounded-xl p-2 text-slate-400 transition-colors hover:bg-rose-50 hover:text-rose-600"
                 aria-label="Excluir exame"
               >
                 <TrashIcon className="h-4 w-4" />
@@ -492,25 +513,21 @@ function ExamCardMobile({
                 {exam.city ? `${exam.city}/${exam.state}` : exam.state}
               </span>
             ) : null}
+            {concursoParam ? (
+              <Link
+                to="/concursos/$concursoSlug"
+                params={{ concursoSlug: concursoParam }}
+                className="relative z-10 inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500 no-underline transition-colors hover:bg-cyan-50 hover:text-cyan-700"
+              >
+                <BuildingLibraryIcon className="h-3 w-3" />
+                Ver concurso
+              </Link>
+            ) : null}
           </div>
         </div>
       </div>
     </MobileCard>
   )
-
-  if (canNavigate) {
-    return (
-      <Link
-        to="/exams/$examBoard/$examId"
-        params={{ examBoard: exam.examBoardId!, examId: exam.id }}
-        className="block no-underline text-inherit"
-      >
-        {content}
-      </Link>
-    )
-  }
-
-  return content
 }
 
 /* ------------------------------------------------------------------ */

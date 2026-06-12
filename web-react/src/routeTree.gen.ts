@@ -35,7 +35,6 @@ import { Route as AuthenticatedTreinoEstudoRouteImport } from './routes/_authent
 import { Route as AuthenticatedTreinoDiagnosticoRouteImport } from './routes/_authenticated/treino/diagnostico'
 import { Route as AuthenticatedTreinoTrainingIdRouteImport } from './routes/_authenticated/treino/$trainingId'
 import { Route as AuthenticatedExamsEditarRouteImport } from './routes/_authenticated/exams/editar'
-import { Route as AuthenticatedConcursosPreviewRouteImport } from './routes/_authenticated/concursos/preview'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminPciScraperRouteImport } from './routes/_authenticated/admin/pci-scraper'
 import { Route as AuthenticatedTreinoTrainingIdIndexRouteImport } from './routes/_authenticated/treino/$trainingId/index'
@@ -198,12 +197,6 @@ const AuthenticatedExamsEditarRoute =
     path: '/editar',
     getParentRoute: () => AuthenticatedExamsRoute,
   } as any)
-const AuthenticatedConcursosPreviewRoute =
-  AuthenticatedConcursosPreviewRouteImport.update({
-    id: '/concursos/preview',
-    path: '/concursos/preview',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   id: '/admin/users',
   path: '/admin/users',
@@ -354,7 +347,6 @@ export interface FileRoutesByFullPath {
   '/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/concursos/preview': typeof AuthenticatedConcursosPreviewRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
@@ -402,7 +394,6 @@ export interface FileRoutesByTo {
   '/planos': typeof AuthenticatedPlanosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/concursos/preview': typeof AuthenticatedConcursosPreviewRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
   '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
@@ -450,7 +441,6 @@ export interface FileRoutesById {
   '/_authenticated/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/_authenticated/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
-  '/_authenticated/concursos/preview': typeof AuthenticatedConcursosPreviewRoute
   '/_authenticated/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/_authenticated/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
   '/_authenticated/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
@@ -502,7 +492,6 @@ export interface FileRouteTypes {
     | '/treino'
     | '/admin/pci-scraper'
     | '/admin/users'
-    | '/concursos/preview'
     | '/exams/editar'
     | '/treino/$trainingId'
     | '/treino/diagnostico'
@@ -550,7 +539,6 @@ export interface FileRouteTypes {
     | '/planos'
     | '/admin/pci-scraper'
     | '/admin/users'
-    | '/concursos/preview'
     | '/exams/editar'
     | '/treino/diagnostico'
     | '/treino/estudo'
@@ -597,7 +585,6 @@ export interface FileRouteTypes {
     | '/_authenticated/treino'
     | '/_authenticated/admin/pci-scraper'
     | '/_authenticated/admin/users'
-    | '/_authenticated/concursos/preview'
     | '/_authenticated/exams/editar'
     | '/_authenticated/treino/$trainingId'
     | '/_authenticated/treino/diagnostico'
@@ -821,13 +808,6 @@ declare module '@tanstack/react-router' {
       fullPath: '/exams/editar'
       preLoaderRoute: typeof AuthenticatedExamsEditarRouteImport
       parentRoute: typeof AuthenticatedExamsRoute
-    }
-    '/_authenticated/concursos/preview': {
-      id: '/_authenticated/concursos/preview'
-      path: '/concursos/preview'
-      fullPath: '/concursos/preview'
-      preLoaderRoute: typeof AuthenticatedConcursosPreviewRouteImport
-      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin/users': {
       id: '/_authenticated/admin/users'
@@ -1152,7 +1132,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedTreinoRoute: typeof AuthenticatedTreinoRouteWithChildren
   AuthenticatedAdminPciScraperRoute: typeof AuthenticatedAdminPciScraperRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
-  AuthenticatedConcursosPreviewRoute: typeof AuthenticatedConcursosPreviewRoute
   AuthenticatedConcursosConcursoSlugCargoSlugRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   AuthenticatedConcursosConcursoSlugIndexRoute: typeof AuthenticatedConcursosConcursoSlugIndexRoute
 }
@@ -1172,7 +1151,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedTreinoRoute: AuthenticatedTreinoRouteWithChildren,
   AuthenticatedAdminPciScraperRoute: AuthenticatedAdminPciScraperRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
-  AuthenticatedConcursosPreviewRoute: AuthenticatedConcursosPreviewRoute,
   AuthenticatedConcursosConcursoSlugCargoSlugRoute:
     AuthenticatedConcursosConcursoSlugCargoSlugRoute,
   AuthenticatedConcursosConcursoSlugIndexRoute:
