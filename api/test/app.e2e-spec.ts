@@ -16,6 +16,12 @@ describe('AppController (e2e)', () => {
     await app.init();
   });
 
+  // Sem o close, as conexões do app (Bull/Redis, Prisma) ficam abertas e o
+  // Jest não encerra ao fim da suíte.
+  afterEach(async () => {
+    await app.close();
+  });
+
   it('/ (GET)', () => {
     return request(app.getHttpServer())
       .get('/')
