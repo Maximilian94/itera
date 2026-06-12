@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AcademicCapIcon, BanknotesIcon } from '@heroicons/react/24/outline'
 import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
@@ -175,15 +175,37 @@ describe('SubjectDistribution', () => {
     },
   }
 
-  it('renderiza shares/chips a partir do payload da API e aria-label nos botões', () => {
+  it('renderiza shares/chips a partir do payload da API; sem handler, nenhuma linha é botão', () => {
     render(
       <SubjectDistribution title="O que caiu" subtitle="x" data={data} predictive={false} meters enterIdx={0} />,
     )
-    expect(screen.getByRole('button', { name: 'Treinar Enfermagem' })).toBeTruthy()
+    // Sem onTrainSubject/trainableSubjects não há CTA de treino nas linhas.
+    expect(screen.queryByRole('button')).toBeNull()
     expect(screen.getByText('você: 74%')).toBeTruthy()
     // SUS sem acurácia → sem chip
     expect(screen.queryByText('você: 30%')).toBeNull()
     expect(screen.getByText('50%')).toBeTruthy()
+  })
+
+  it('só matérias treináveis viram botão, e o clique devolve a matéria', () => {
+    const clicked: Array<string> = []
+    render(
+      <SubjectDistribution
+        title="t"
+        subtitle="s"
+        data={data}
+        predictive={false}
+        meters
+        enterIdx={0}
+        onTrainSubject={(subject) => clicked.push(subject)}
+        trainableSubjects={new Set(['Enfermagem', 'SUS'])}
+      />,
+    )
+    const btn = screen.getByRole('button', { name: 'Treinar Enfermagem' })
+    fireEvent.click(btn)
+    expect(clicked).toEqual(['Enfermagem'])
+    // Português fora do set (ex.: sem questões na prova alvo) → linha sem CTA.
+    expect(screen.queryByRole('button', { name: 'Treinar Português' })).toBeNull()
   })
 
   it('insight: verbo muda com predictive e o ponto fraco vem da API', () => {

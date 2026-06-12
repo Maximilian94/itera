@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import {
   AcademicCapIcon,
   ArrowPathIcon,
@@ -31,6 +31,13 @@ import {
   useCompetitionHistoryQuery,
   useSubjectDistributionQuery,
 } from '@/features/concurso/queries/concurso.queries'
+import {
+  useStartSimuladoMutation,
+  useSubjectTrainTargets,
+} from '@/features/concurso/hooks/useStartSimulado'
+import { useExamBaseAttemptsQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
+import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { CARD } from '@/features/concurso/components/card'
 import { enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
@@ -108,35 +115,49 @@ const toPercent = (decimal: string | null): number | null => {
 /*  CTA primário — destino e rótulo por estado temporal                */
 /* ------------------------------------------------------------------ */
 
-/** Prova alvo do treino: a própria (passada) ou a edição anterior mais
- *  recente (aberta/futura). null → sem prova treinável, treino genérico. */
-type ExamTarget = { examBoardId: string; examBaseId: string; year: number | null }
+/** Prova alvo do treino: a própria (passada, com questões) ou a edição
+ *  anterior mais recente que tem questões. null → sem prova treinável,
+ *  o CTA cai no treino genérico. */
+type ExamTarget = { examBoardId: string; examBaseId: string }
 
 function resolveExamTarget(data: CargoDetail): ExamTarget | null {
   const boardId = data.concurso.examBoard?.id
   if (boardId == null) return null
-  if (data.concurso.status === 'past') {
-    return { examBoardId: boardId, examBaseId: data.cargo.id, year: null }
+  if (data.concurso.status === 'past' && data.cargo.questionCount > 0) {
+    return { examBoardId: boardId, examBaseId: data.cargo.id }
   }
-  const latest = data.previousExams.reduce<CargoPreviousExam | null>(
-    (best, e) => (best == null || e.year > best.year ? e : best),
-    null,
-  )
+  const latest = data.previousExams
+    .filter((e) => e.questionCount > 0)
+    .reduce<CargoPreviousExam | null>(
+      (best, e) => (best == null || e.year > best.year ? e : best),
+      null,
+    )
   return latest != null
-    ? { examBoardId: boardId, examBaseId: latest.examBaseId, year: latest.year }
+    ? { examBoardId: boardId, examBaseId: latest.examBaseId }
     : null
 }
 
-function ctaLabel(data: CargoDetail, target: ExamTarget | null): string {
+/** Rótulo do CTA do cabeçalho (mapa do MAX-24): com tentativas (em andamento
+ *  ou concluídas) → "Continuar treino"; 1ª vez → simulado/prova. */
+function ctaLabel(
+  data: CargoDetail,
+  target: ExamTarget | null,
+  hasInProgress: boolean,
+): string {
   if (target == null) return 'Começar a treinar'
-  if (data.studyPlan.attemptCount === 0) return 'Fazer primeiro simulado'
-  if (data.concurso.status === 'past') return 'Treinar com esta prova'
-  return `Treinar com a prova de ${target.year}`
+  if (hasInProgress || data.studyPlan.attemptCount > 0) return 'Continuar treino'
+  if (data.concurso.status === 'past' && target.examBaseId === data.cargo.id) {
+    return 'Treinar com esta prova'
+  }
+  return 'Fazer primeiro simulado'
 }
 
-/** Link para a prova alvo; sem alvo, cai no treino genérico (até o 2.5). */
-function CtaLink(props: {
+/** CTA de treino: inicia (ou retoma) o simulado da prova alvo. Sem alvo,
+ *  vira link para o fluxo genérico de treino. */
+function CtaButton(props: {
   target: ExamTarget | null
+  onStart: () => void
+  isStarting: boolean
   className: string
   children: React.ReactNode
 }) {
@@ -148,16 +169,14 @@ function CtaLink(props: {
     )
   }
   return (
-    <Link
-      to="/exams/$examBoard/$examId"
-      params={{
-        examBoard: props.target.examBoardId,
-        examId: props.target.examBaseId,
-      }}
-      className={props.className}
+    <button
+      type="button"
+      onClick={props.onStart}
+      disabled={props.isStarting}
+      className={`${props.className} cursor-pointer disabled:cursor-wait disabled:opacity-70`}
     >
       {props.children}
-    </Link>
+    </button>
   )
 }
 
@@ -249,6 +268,7 @@ function Breadcrumb(props: {
 function CargoContent({ data }: { data: CargoDetail }) {
   const { concurso, cargo, syllabusGroups, previousExams, studyPlan } = data
   const meters = useMeters()
+  const navigate = useNavigate()
   const subjectQuery = useSubjectDistributionQuery(cargo.id)
   const competitionQuery = useCompetitionHistoryQuery(cargo.id)
 
@@ -256,7 +276,69 @@ function CargoContent({ data }: { data: CargoDetail }) {
   const examDate = cargo.examDate
   const cut = toPercent(cargo.minPassingGrade)
   const target = resolveExamTarget(data)
-  const cta = ctaLabel(data, target)
+
+  /* Wiring dos CTAs (MAX-24): attempt em andamento → retomar; senão criar
+   * um novo simulado (com filtro de matéria quando o CTA for dirigido). */
+  const { requireAccess } = useRequireAccess()
+  const startSimulado = useStartSimuladoMutation()
+  const attemptsQuery = useExamBaseAttemptsQuery(target?.examBaseId)
+  const inProgressAttempt =
+    (attemptsQuery.data ?? []).find((a) => a.finishedAt == null) ?? null
+  const targetSubjectsQuery = useQuestionsCountBySubjectQuery(target?.examBaseId)
+  const trainTargets = useSubjectTrainTargets(subjectQuery.data, cargo.id)
+
+  const cta = ctaLabel(data, target, inProgressAttempt != null)
+
+  /** CTA do cabeçalho/diagnóstico: retoma o attempt aberto ou cria um novo. */
+  const handleStartOrContinue = () => {
+    if (target == null || !requireAccess()) return
+    if (inProgressAttempt != null) {
+      void navigate({
+        to: '/exams/$examBoard/$examId/$attemptId',
+        params: {
+          examBoard: target.examBoardId,
+          examId: target.examBaseId,
+          attemptId: inProgressAttempt.id,
+        },
+      })
+      return
+    }
+    startSimulado.mutate({
+      examBoardId: target.examBoardId,
+      examBaseId: target.examBaseId,
+    })
+  }
+
+  /** "Treinar pontos fracos": simulado filtrado pelas piores matérias que
+   *  existem na prova alvo. Vazio → o CTA nem aparece. */
+  const weakSubjectsAvailable = (() => {
+    if (target == null) return []
+    const available = new Set(
+      (targetSubjectsQuery.data ?? [])
+        .filter((s) => s.count > 0)
+        .map((s) => s.subject),
+    )
+    return studyPlan.weakSubjects
+      .map((w) => w.subject)
+      .filter((subject) => available.has(subject))
+  })()
+
+  const handleTrainWeakSubjects = () => {
+    if (target == null || weakSubjectsAvailable.length === 0 || !requireAccess()) return
+    startSimulado.mutate({
+      examBoardId: target.examBoardId,
+      examBaseId: target.examBaseId,
+      subjectFilter: weakSubjectsAvailable,
+    })
+  }
+
+  /** "Treinar {matéria}": simulado filtrado na prova que tem a matéria. */
+  const handleTrainSubject = (subject: string) => {
+    const boardId = concurso.examBoard?.id
+    const examBaseId = trainTargets.get(subject)
+    if (boardId == null || examBaseId == null || !requireAccess()) return
+    startSimulado.mutate({ examBoardId: boardId, examBaseId, subjectFilter: [subject] })
+  }
 
   const contextLine = [
     `Concurso ${concurso.institution} ${concurso.year}`,
@@ -313,10 +395,15 @@ function CargoContent({ data }: { data: CargoDetail }) {
               <p className="mt-1 text-sm text-slate-500">{contextLine}</p>
             )}
           </div>
-          <CtaLink target={target} className={`${CTA_PRIMARY} shrink-0`}>
+          <CtaButton
+            target={target}
+            onStart={handleStartOrContinue}
+            isStarting={startSimulado.isPending}
+            className={`${CTA_PRIMARY} shrink-0`}
+          >
             <PlayIcon className="h-5 w-5" />
-            {cta}
-          </CtaLink>
+            {startSimulado.isPending ? 'Iniciando…' : cta}
+          </CtaButton>
         </div>
       </header>
 
@@ -333,6 +420,11 @@ function CargoContent({ data }: { data: CargoDetail }) {
             hasPreviousExams={previousExams.length > 0}
             target={target}
             meters={meters}
+            isStarting={startSimulado.isPending}
+            onStartSimulado={handleStartOrContinue}
+            onTrainWeakSubjects={
+              weakSubjectsAvailable.length > 0 ? handleTrainWeakSubjects : null
+            }
           />
 
           {/* O bloco de matérias muda de natureza com o tempo:
@@ -350,6 +442,9 @@ function CargoContent({ data }: { data: CargoDetail }) {
             examDate={examDate}
             meters={meters}
             enterIdx={3}
+            onTrainSubject={handleTrainSubject}
+            trainableSubjects={new Set(trainTargets.keys())}
+            trainDisabled={startSimulado.isPending}
           />
 
           <CompetitionSection query={competitionQuery} enterIdx={4} />
@@ -383,13 +478,15 @@ function CargoContent({ data }: { data: CargoDetail }) {
             'calc(var(--mobile-bottom-nav-height) + var(--safe-area-inset-bottom) + 0.5rem)',
         }}
       >
-        <CtaLink
+        <CtaButton
           target={target}
+          onStart={handleStartOrContinue}
+          isStarting={startSimulado.isPending}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 text-sm font-semibold text-white no-underline shadow-lg shadow-cyan-900/25 transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
         >
           <PlayIcon className="h-5 w-5" />
-          {cta}
-        </CtaLink>
+          {startSimulado.isPending ? 'Iniciando…' : cta}
+        </CtaButton>
       </div>
     </>
   )
@@ -419,6 +516,11 @@ function StudyPlanSection(props: {
   hasPreviousExams: boolean
   target: ExamTarget | null
   meters: boolean
+  isStarting: boolean
+  /** CTA do Diagnóstico — inicia/retoma o simulado completo da prova alvo. */
+  onStartSimulado: () => void
+  /** CTA do Treino dirigido; null = sem matéria fraca treinável → CTA some. */
+  onTrainWeakSubjects: (() => void) | null
 }) {
   const { studyPlan, status, cut, target, meters } = props
   const score = studyPlan.bestScore != null ? Math.round(studyPlan.bestScore) : null
@@ -440,11 +542,17 @@ function StudyPlanSection(props: {
         ? `Enquanto a prova de ${props.year} não sai, treine com as provas anteriores${props.bancaName != null ? ` da ${props.bancaName}` : ''} para este cargo.`
         : 'Ainda não temos provas anteriores desta banca para este cargo — enquanto isso, treine com simulados gerais de enfermagem.'
 
-  const steps: Array<{ title: string; desc: string; cta: string | null }> = [
+  const steps: Array<{
+    title: string
+    desc: string
+    cta: string | null
+    onCta: (() => void) | null
+  }> = [
     {
       title: 'Diagnóstico',
       desc: 'Faça um simulado completo para medir sua distância da nota de corte.',
       cta: 'Fazer simulado',
+      onCta: props.onStartSimulado,
     },
     {
       title: 'Treino dirigido',
@@ -452,12 +560,16 @@ function StudyPlanSection(props: {
         weakPhrase != null
           ? `Ataque suas matérias mais fracas: ${weakPhrase}.`
           : 'Depois do diagnóstico, treine por matéria começando pelas mais fracas.',
-      cta: 'Treinar pontos fracos',
+      // Sem matéria fraca treinável na prova alvo, o destino é impossível —
+      // o CTA some e fica só a orientação de treinar pelo bloco de matérias.
+      cta: props.onTrainWeakSubjects != null ? 'Treinar pontos fracos' : null,
+      onCta: props.onTrainWeakSubjects,
     },
     {
       title: 'Reta final',
       desc: 'Simulados cronometrados completos até passar do corte com folga.',
       cta: null,
+      onCta: null,
     },
   ]
 
@@ -574,14 +686,16 @@ function StudyPlanSection(props: {
                 >
                   {step.desc}
                 </p>
-                {state === 'current' && step.cta != null && (
-                  <CtaLink
+                {state === 'current' && step.cta != null && step.onCta != null && (
+                  <CtaButton
                     target={target}
+                    onStart={step.onCta}
+                    isStarting={props.isStarting}
                     className="mt-2.5 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
                   >
                     <PlayIcon className="h-4 w-4" />
-                    {step.cta}
-                  </CtaLink>
+                    {props.isStarting ? 'Iniciando…' : step.cta}
+                  </CtaButton>
                 )}
               </div>
             </li>
@@ -642,6 +756,9 @@ function SubjectBlock(props: {
   examDate: string | null
   meters: boolean
   enterIdx: number
+  onTrainSubject: (subject: string) => void
+  trainableSubjects: ReadonlySet<string>
+  trainDisabled: boolean
 }) {
   const { query, status, bancaName, meters, enterIdx } = props
 
@@ -687,6 +804,9 @@ function SubjectBlock(props: {
         meters={meters}
         enterIdx={enterIdx}
         predictive={false}
+        onTrainSubject={props.onTrainSubject}
+        trainableSubjects={props.trainableSubjects}
+        trainDisabled={props.trainDisabled}
       />
     )
   }
@@ -704,6 +824,9 @@ function SubjectBlock(props: {
       meters={meters}
       enterIdx={enterIdx}
       predictive
+      onTrainSubject={props.onTrainSubject}
+      trainableSubjects={props.trainableSubjects}
+      trainDisabled={props.trainDisabled}
     />
   )
 }

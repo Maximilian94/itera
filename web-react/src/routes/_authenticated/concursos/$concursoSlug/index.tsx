@@ -37,6 +37,8 @@ import {
   buildConcursoTimelineSteps,
 } from '@/features/concurso/components/VerticalTimeline'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
+import { useStartSimuladoMutation } from '@/features/concurso/hooks/useStartSimulado'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { ApiError } from '@/lib/api'
 import { formatBRL } from '@/lib/utils'
 
@@ -169,6 +171,20 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
   const meters = useMeters()
   const { status, timeline, summary } = concurso
 
+  /* "Começar" no card inicia o simulado da prova do cargo (MAX-24). Só é
+   * possível quando a prova tem questões e banca — senão o card continua
+   * navegando para o nível 2, onde o CTA resolve a prova alvo. */
+  const { requireAccess } = useRequireAccess()
+  const startSimulado = useStartSimuladoMutation()
+  const boardId = concurso.examBoard?.id ?? null
+  const startingCargoId = startSimulado.isPending
+    ? startSimulado.variables.examBaseId
+    : null
+  const handleStartCargo = (cargo: CargoSummary) => {
+    if (boardId == null || !requireAccess()) return
+    startSimulado.mutate({ examBoardId: boardId, examBaseId: cargo.id })
+  }
+
   const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const location =
     concurso.city != null
@@ -286,6 +302,9 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                   key={cargo.id}
                   cargo={cargo}
                   concursoSlug={concurso.slug ?? concurso.id}
+                  canStart={boardId != null && cargo.questionCount > 0}
+                  isStarting={startingCargoId === cargo.id}
+                  onStart={() => handleStartCargo(cargo)}
                   meters={meters}
                   enterIdx={2 + i}
                 />
@@ -339,10 +358,14 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
 function CargoCard(props: {
   cargo: CargoSummary
   concursoSlug: string
+  /** Prova com questões e banca → "Começar" inicia o simulado direto. */
+  canStart: boolean
+  isStarting: boolean
+  onStart: () => void
   meters: boolean
   enterIdx: number
 }) {
-  const { cargo, concursoSlug, meters, enterIdx } = props
+  const { cargo, concursoSlug, canStart, isStarting, onStart, meters, enterIdx } = props
   const score =
     cargo.userStats.bestScore != null ? Math.round(cargo.userStats.bestScore) : null
   const cut =
@@ -364,13 +387,19 @@ function CargoCard(props: {
     .join(' · ')
 
   const e = enter(enterIdx)
+  /* Stretched link: o <Link> absoluto cobre o card inteiro (nível 2); o botão
+   * "Começar" fica acima dele (z-10) sem aninhar interativo em interativo. */
   return (
-    <Link
-      to="/concursos/$concursoSlug/$cargoSlug"
-      params={{ concursoSlug, cargoSlug: cargo.slug ?? cargo.id }}
+    <article
       style={e.style}
-      className={`${e.className} ${CARD} ${CARD_RAISE} group block p-5 text-left no-underline hover:border-cyan-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 sm:p-6`}
+      className={`${e.className} ${CARD} ${CARD_RAISE} group relative p-5 text-left hover:border-cyan-200 focus-within:ring-2 focus-within:ring-cyan-500 focus-within:ring-offset-2 sm:p-6`}
     >
+      <Link
+        to="/concursos/$concursoSlug/$cargoSlug"
+        params={{ concursoSlug, cargoSlug: cargo.slug ?? cargo.id }}
+        aria-label={`Ver detalhes do cargo ${cargo.role}`}
+        className="absolute inset-0 rounded-2xl focus-visible:outline-none"
+      />
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
           <p className="text-lg font-bold text-slate-900 transition-colors group-hover:text-cyan-700">
@@ -435,14 +464,26 @@ function CargoCard(props: {
             <span className="text-sm text-slate-500">
               Você ainda não treinou para este cargo
             </span>
-            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700">
-              <PlayIcon className="h-4 w-4" />
-              Começar
-            </span>
+            {canStart ? (
+              <button
+                type="button"
+                onClick={onStart}
+                disabled={isStarting}
+                className="relative z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-70"
+              >
+                <PlayIcon className="h-4 w-4" />
+                {isStarting ? 'Iniciando…' : 'Começar'}
+              </button>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700">
+                <PlayIcon className="h-4 w-4" />
+                Começar
+              </span>
+            )}
           </div>
         )}
       </div>
-    </Link>
+    </article>
   )
 }
 
