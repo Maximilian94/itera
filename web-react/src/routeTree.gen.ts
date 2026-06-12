@@ -40,6 +40,7 @@ import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authentic
 import { Route as AuthenticatedAdminPciScraperRouteImport } from './routes/_authenticated/admin/pci-scraper'
 import { Route as AuthenticatedTreinoTrainingIdIndexRouteImport } from './routes/_authenticated/treino/$trainingId/index'
 import { Route as AuthenticatedExamsExamBoardIndexRouteImport } from './routes/_authenticated/exams/$examBoard/index'
+import { Route as AuthenticatedConcursosConcursoSlugIndexRouteImport } from './routes/_authenticated/concursos/$concursoSlug/index'
 import { Route as AuthenticatedTreinoTrainingIdRetentativaRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa'
 import { Route as AuthenticatedTreinoTrainingIdProvaRouteImport } from './routes/_authenticated/treino/$trainingId/prova'
 import { Route as AuthenticatedTreinoTrainingIdFinalRouteImport } from './routes/_authenticated/treino/$trainingId/final'
@@ -47,6 +48,7 @@ import { Route as AuthenticatedTreinoTrainingIdEstudoRouteImport } from './route
 import { Route as AuthenticatedTreinoTrainingIdDiagnosticoRouteImport } from './routes/_authenticated/treino/$trainingId/diagnostico'
 import { Route as AuthenticatedExamsEditarExamBaseIdRouteImport } from './routes/_authenticated/exams/editar/$examBaseId'
 import { Route as AuthenticatedExamsExamBoardExamIdRouteImport } from './routes/_authenticated/exams/$examBoard/$examId'
+import { Route as AuthenticatedConcursosConcursoSlugCargoSlugRouteImport } from './routes/_authenticated/concursos/$concursoSlug/$cargoSlug'
 import { Route as AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa/index'
 import { Route as AuthenticatedTreinoTrainingIdEstudoIndexRouteImport } from './routes/_authenticated/treino/$trainingId/estudo/index'
 import { Route as AuthenticatedExamsExamBoardExamIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/index'
@@ -225,6 +227,12 @@ const AuthenticatedExamsExamBoardIndexRoute =
     path: '/$examBoard/',
     getParentRoute: () => AuthenticatedExamsRoute,
   } as any)
+const AuthenticatedConcursosConcursoSlugIndexRoute =
+  AuthenticatedConcursosConcursoSlugIndexRouteImport.update({
+    id: '/concursos/$concursoSlug/',
+    path: '/concursos/$concursoSlug/',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedTreinoTrainingIdRetentativaRoute =
   AuthenticatedTreinoTrainingIdRetentativaRouteImport.update({
     id: '/retentativa',
@@ -266,6 +274,12 @@ const AuthenticatedExamsExamBoardExamIdRoute =
     id: '/$examBoard/$examId',
     path: '/$examBoard/$examId',
     getParentRoute: () => AuthenticatedExamsRoute,
+  } as any)
+const AuthenticatedConcursosConcursoSlugCargoSlugRoute =
+  AuthenticatedConcursosConcursoSlugCargoSlugRouteImport.update({
+    id: '/concursos/$concursoSlug/$cargoSlug',
+    path: '/concursos/$concursoSlug/$cargoSlug',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedTreinoTrainingIdRetentativaIndexRoute =
   AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport.update({
@@ -351,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/exams/': typeof AuthenticatedExamsIndexRoute
   '/treino/': typeof AuthenticatedTreinoIndexRoute
+  '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
   '/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
@@ -358,6 +373,7 @@ export interface FileRoutesByFullPath {
   '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
   '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
+  '/concursos/$concursoSlug/': typeof AuthenticatedConcursosConcursoSlugIndexRoute
   '/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
   '/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
@@ -396,10 +412,12 @@ export interface FileRoutesByTo {
   '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/exams': typeof AuthenticatedExamsIndexRoute
   '/treino': typeof AuthenticatedTreinoIndexRoute
+  '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
   '/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
   '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
+  '/concursos/$concursoSlug': typeof AuthenticatedConcursosConcursoSlugIndexRoute
   '/exams/$examBoard': typeof AuthenticatedExamsExamBoardIndexRoute
   '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
@@ -443,6 +461,7 @@ export interface FileRoutesById {
   '/_authenticated/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
   '/_authenticated/exams/': typeof AuthenticatedExamsIndexRoute
   '/_authenticated/treino/': typeof AuthenticatedTreinoIndexRoute
+  '/_authenticated/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/_authenticated/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/_authenticated/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
   '/_authenticated/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
@@ -450,6 +469,7 @@ export interface FileRoutesById {
   '/_authenticated/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
   '/_authenticated/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
   '/_authenticated/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
+  '/_authenticated/concursos/$concursoSlug/': typeof AuthenticatedConcursosConcursoSlugIndexRoute
   '/_authenticated/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
   '/_authenticated/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/_authenticated/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
@@ -493,6 +513,7 @@ export interface FileRouteTypes {
     | '/treino/retentativa'
     | '/exams/'
     | '/treino/'
+    | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/$examBoard/$examId'
     | '/exams/editar/$examBaseId'
     | '/treino/$trainingId/diagnostico'
@@ -500,6 +521,7 @@ export interface FileRouteTypes {
     | '/treino/$trainingId/final'
     | '/treino/$trainingId/prova'
     | '/treino/$trainingId/retentativa'
+    | '/concursos/$concursoSlug/'
     | '/exams/$examBoard/'
     | '/treino/$trainingId/'
     | '/exams/$examBoard/$examId/questoes'
@@ -538,10 +560,12 @@ export interface FileRouteTypes {
     | '/treino/retentativa'
     | '/exams'
     | '/treino'
+    | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/editar/$examBaseId'
     | '/treino/$trainingId/diagnostico'
     | '/treino/$trainingId/final'
     | '/treino/$trainingId/prova'
+    | '/concursos/$concursoSlug'
     | '/exams/$examBoard'
     | '/treino/$trainingId'
     | '/exams/$examBoard/$examId/questoes'
@@ -584,6 +608,7 @@ export interface FileRouteTypes {
     | '/_authenticated/treino/retentativa'
     | '/_authenticated/exams/'
     | '/_authenticated/treino/'
+    | '/_authenticated/concursos/$concursoSlug/$cargoSlug'
     | '/_authenticated/exams/$examBoard/$examId'
     | '/_authenticated/exams/editar/$examBaseId'
     | '/_authenticated/treino/$trainingId/diagnostico'
@@ -591,6 +616,7 @@ export interface FileRouteTypes {
     | '/_authenticated/treino/$trainingId/final'
     | '/_authenticated/treino/$trainingId/prova'
     | '/_authenticated/treino/$trainingId/retentativa'
+    | '/_authenticated/concursos/$concursoSlug/'
     | '/_authenticated/exams/$examBoard/'
     | '/_authenticated/treino/$trainingId/'
     | '/_authenticated/exams/$examBoard/$examId/questoes'
@@ -831,6 +857,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedExamsExamBoardIndexRouteImport
       parentRoute: typeof AuthenticatedExamsRoute
     }
+    '/_authenticated/concursos/$concursoSlug/': {
+      id: '/_authenticated/concursos/$concursoSlug/'
+      path: '/concursos/$concursoSlug'
+      fullPath: '/concursos/$concursoSlug/'
+      preLoaderRoute: typeof AuthenticatedConcursosConcursoSlugIndexRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/treino/$trainingId/retentativa': {
       id: '/_authenticated/treino/$trainingId/retentativa'
       path: '/retentativa'
@@ -879,6 +912,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/exams/$examBoard/$examId'
       preLoaderRoute: typeof AuthenticatedExamsExamBoardExamIdRouteImport
       parentRoute: typeof AuthenticatedExamsRoute
+    }
+    '/_authenticated/concursos/$concursoSlug/$cargoSlug': {
+      id: '/_authenticated/concursos/$concursoSlug/$cargoSlug'
+      path: '/concursos/$concursoSlug/$cargoSlug'
+      fullPath: '/concursos/$concursoSlug/$cargoSlug'
+      preLoaderRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/treino/$trainingId/retentativa/': {
       id: '/_authenticated/treino/$trainingId/retentativa/'
@@ -1113,6 +1153,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAdminPciScraperRoute: typeof AuthenticatedAdminPciScraperRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedConcursosPreviewRoute: typeof AuthenticatedConcursosPreviewRoute
+  AuthenticatedConcursosConcursoSlugCargoSlugRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
+  AuthenticatedConcursosConcursoSlugIndexRoute: typeof AuthenticatedConcursosConcursoSlugIndexRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -1131,6 +1173,10 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAdminPciScraperRoute: AuthenticatedAdminPciScraperRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedConcursosPreviewRoute: AuthenticatedConcursosPreviewRoute,
+  AuthenticatedConcursosConcursoSlugCargoSlugRoute:
+    AuthenticatedConcursosConcursoSlugCargoSlugRoute,
+  AuthenticatedConcursosConcursoSlugIndexRoute:
+    AuthenticatedConcursosConcursoSlugIndexRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
