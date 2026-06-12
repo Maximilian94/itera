@@ -6,22 +6,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, ProcessingPhase, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { slugify } from '../common/slugify';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
   return t === '' ? null : (t ?? null);
-}
-
-function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
 }
 
 function assertValidGovernmentScopeLocation(input: {

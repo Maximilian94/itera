@@ -48,11 +48,13 @@ export type ConcursoProva = {
 /** Concurso (edital) identity shared by every prova it contains. */
 export type ConcursoSummary = {
   id: string
+  slug: string | null
   institution: string
   year: number
   governmentScope: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
   state: string | null
   city: string | null
+  editalUrl: string | null
 }
 
 export type ConcursoProvasResponse = {
