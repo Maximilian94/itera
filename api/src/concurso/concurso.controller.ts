@@ -1,6 +1,7 @@
 import { Controller, Get, Param, Req } from '@nestjs/common';
 import { ConcursoService } from './concurso.service';
 import { SubjectDistributionService } from './subject-distribution.service';
+import { CompetitionHistoryService } from './competition-history.service';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
 
 @Controller('exam-bases')
@@ -8,6 +9,7 @@ export class ConcursoController {
   constructor(
     private readonly concursos: ConcursoService,
     private readonly subjectDistribution: SubjectDistributionService,
+    private readonly competitionHistory: CompetitionHistoryService,
   ) {}
 
   /**
@@ -39,5 +41,21 @@ export class ConcursoController {
       id,
       req.user?.userId,
     );
+  }
+
+  /**
+   * Concorrência histórica do cargo (nível 2, MAX-18): edições anteriores do
+   * mesmo cargo/banca/instituição com inscritos, candidatos/vaga e notas.
+   * `minPassingGrade` é a nota MÍNIMA do edital (nunca apresentada como corte
+   * real); `actualCutScore` é o corte real, manual, null até existir o dado.
+   * Auth opcional só para admin enxergar provas não publicadas.
+   */
+  @OptionalAuth()
+  @Get(':id/competition-history')
+  getCompetitionHistory(
+    @Param('id') id: string,
+    @Req() req: { user?: { userId: string } },
+  ) {
+    return this.competitionHistory.getCompetitionHistory(id, req.user?.userId);
   }
 }

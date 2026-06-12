@@ -238,6 +238,10 @@ model ExamBase {
   salaryBase              Decimal?         @db.Decimal(10,2)
   examDate                DateTime
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
+  /// Nota de corte REAL da última vaga (ampla concorrência), preenchida manualmente
+  /// quando o resultado sai. Não confundir com minPassingGradeNonQuota, que é a nota
+  /// MÍNIMA do edital. Decisão MAX-18: nunca apresentar o mínimo como corte real.
+  actualCutScore          Decimal?         @db.Decimal(5,2)
   vacancyCount            Int?
   /// Cadastro de reserva ("20 vagas + CR"). Explícito e controlado pelo admin, como isNursingRelevant.
   hasReserveList          Boolean          @default(false)
