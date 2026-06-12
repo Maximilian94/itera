@@ -631,12 +631,13 @@ function StudyPlanSection(props: {
               className="w-full"
             />
             <div className="mt-2 flex items-center justify-between text-xs">
+              {/* emerald-700: texto pequeno (xs) precisa de ≥4.5:1 (AA). */}
               <span
                 className={`font-semibold ${
                   cut == null
                     ? 'text-slate-500'
                     : passing
-                      ? 'text-emerald-600'
+                      ? 'text-emerald-700'
                       : 'text-rose-600'
                 }`}
               >
@@ -731,7 +732,7 @@ function SyllabusSection(props: {
       <div className="mt-3 flex flex-col divide-y divide-slate-100">
         {groups.map((g) => (
           <details key={g.name} className="group py-1">
-            <summary className="-mx-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 hover:text-cyan-700 [&::-webkit-details-marker]:hidden">
+            <summary className="-mx-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 [&::-webkit-details-marker]:hidden">
               {g.name}
               <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-90" />
             </summary>

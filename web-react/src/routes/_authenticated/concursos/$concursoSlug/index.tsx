@@ -425,12 +425,14 @@ function CargoCard(props: {
       <div className="mt-4 border-t border-slate-100 pt-3.5">
         {score != null ? (
           <div className="flex items-center gap-4">
+            {/* emerald-700: texto pequeno precisa de ≥4.5:1 sobre branco (AA);
+                emerald-600 fica em ~3.7. */}
             <span
               className={`shrink-0 text-sm font-extrabold tabular-nums ${
                 cut == null
                   ? 'text-slate-900'
                   : passing
-                    ? 'text-emerald-600'
+                    ? 'text-emerald-700'
                     : 'text-rose-600'
               }`}
             >
@@ -448,7 +450,7 @@ function CargoCard(props: {
                 cut == null
                   ? 'text-slate-500'
                   : passing
-                    ? 'text-emerald-600'
+                    ? 'text-emerald-700'
                     : 'text-rose-600'
               }`}
             >

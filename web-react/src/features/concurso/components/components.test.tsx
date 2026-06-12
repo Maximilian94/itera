@@ -3,13 +3,16 @@
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AcademicCapIcon, BanknotesIcon } from '@heroicons/react/24/outline'
-import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
 import { FichaCard } from './FichaCard'
 import { institutionInitials } from './InstitutionMark'
 import { ReadinessBar } from './ReadinessBar'
 import { StatusPill } from './StatusPill'
-import { accuracyChipClass, SubjectDistribution } from './SubjectDistribution'
-import { buildConcursoTimelineSteps, VerticalTimeline } from './VerticalTimeline'
+import { SubjectDistribution, accuracyChipClass } from './SubjectDistribution'
+import {
+  VerticalTimeline,
+  buildConcursoTimelineSteps,
+} from './VerticalTimeline'
+import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
 
 afterEach(() => {
   document.body.innerHTML = ''
@@ -33,16 +36,43 @@ describe('institutionInitials', () => {
 
 describe('StatusPill', () => {
   it('mostra o dot pulsante só em open', () => {
-    const { container, rerender } = render(<StatusPill status="open" label="Inscrições abertas" />)
+    const { container, rerender } = render(
+      <StatusPill status="open" label="Inscrições abertas" />,
+    )
     expect(container.querySelector('.animate-ping')).not.toBeNull()
 
     rerender(<StatusPill status="future" label="Prova em 72 dias" />)
     expect(container.querySelector('.animate-ping')).toBeNull()
   })
 
+  it('open e future usam tom cyan com o rótulo vindo de fora', () => {
+    const { rerender } = render(
+      <StatusPill status="open" label="Inscrições abertas" />,
+    )
+    expect(screen.getByText('Inscrições abertas').className).toContain(
+      'bg-cyan-50',
+    )
+
+    rerender(<StatusPill status="future" label="Prova em 72 dias" />)
+    expect(screen.getByText('Prova em 72 dias').className).toContain(
+      'bg-cyan-50',
+    )
+  })
+
   it('usa tom slate para prova passada', () => {
     render(<StatusPill status="past" label="Prova aplicada" />)
-    expect(screen.getByText('Prova aplicada').className).toContain('bg-slate-100')
+    expect(screen.getByText('Prova aplicada').className).toContain(
+      'bg-slate-100',
+    )
+  })
+
+  it('o ping respeita prefers-reduced-motion', () => {
+    const { container } = render(
+      <StatusPill status="open" label="Inscrições abertas" />,
+    )
+    expect(container.querySelector('.animate-ping')?.className).toContain(
+      'motion-reduce:hidden',
+    )
   })
 })
 
@@ -55,7 +85,11 @@ describe('FichaCard', () => {
         title="Ficha do cargo"
         hero={hero}
         rows={[
-          { icon: AcademicCapIcon, label: 'Requisitos', value: 'Superior em Enfermagem' },
+          {
+            icon: AcademicCapIcon,
+            label: 'Requisitos',
+            value: 'Superior em Enfermagem',
+          },
           { icon: AcademicCapIcon, label: 'Jornada', value: null },
         ]}
         editalUrl="https://example.com/edital.pdf"
@@ -69,13 +103,27 @@ describe('FichaCard', () => {
 
   it('esconde o botão de edital quando editalUrl é null', () => {
     const { rerender } = render(
-      <FichaCard title="Ficha" hero={hero} rows={[]} editalUrl="https://example.com/e.pdf" enterIdx={0} />,
+      <FichaCard
+        title="Ficha"
+        hero={hero}
+        rows={[]}
+        editalUrl="https://example.com/e.pdf"
+        enterIdx={0}
+      />,
     )
-    expect(screen.getByText('Ver edital oficial').closest('a')?.getAttribute('href')).toBe(
-      'https://example.com/e.pdf',
-    )
+    expect(
+      screen.getByText('Ver edital oficial').closest('a')?.getAttribute('href'),
+    ).toBe('https://example.com/e.pdf')
 
-    rerender(<FichaCard title="Ficha" hero={hero} rows={[]} editalUrl={null} enterIdx={0} />)
+    rerender(
+      <FichaCard
+        title="Ficha"
+        hero={hero}
+        rows={[]}
+        editalUrl={null}
+        enterIdx={0}
+      />,
+    )
     expect(screen.queryByText('Ver edital oficial')).toBeNull()
   })
 
@@ -128,7 +176,10 @@ describe('buildConcursoTimelineSteps', () => {
   })
 
   it('marca tudo como done para concurso passado', () => {
-    const steps = buildConcursoTimelineSteps({ ...timeline, resultDate: '2026-09-30T00:00:00.000Z' }, 'past')
+    const steps = buildConcursoTimelineSteps(
+      { ...timeline, resultDate: '2026-09-30T00:00:00.000Z' },
+      'past',
+    )
     expect(steps.map((s) => s.state)).toEqual(['done', 'done', 'done'])
   })
 })
@@ -138,6 +189,14 @@ describe('ReadinessBar', () => {
     const { container } = render(<ReadinessBar value={72} cut={60} meters />)
     const track = container.firstElementChild!
     expect(track.querySelector('.bg-emerald-500')).not.toBeNull()
+    expect(track.children).toHaveLength(2) // fill + marcador de corte
+  })
+
+  it('abaixo do corte → barra cyan (sem verde) mas com o marcador do corte', () => {
+    const { container } = render(<ReadinessBar value={40} cut={60} meters />)
+    const track = container.firstElementChild!
+    expect(track.querySelector('.bg-cyan-500')).not.toBeNull()
+    expect(track.querySelector('.bg-emerald-500')).toBeNull()
     expect(track.children).toHaveLength(2) // fill + marcador de corte
   })
 
@@ -155,6 +214,13 @@ describe('accuracyChipClass', () => {
     expect(accuracyChipClass(74)).toContain('emerald')
     expect(accuracyChipClass(66)).toContain('amber')
     expect(accuracyChipClass(48)).toContain('rose')
+  })
+
+  it('vira exatamente nas fronteiras das faixas (70 e 60)', () => {
+    expect(accuracyChipClass(70)).toContain('emerald')
+    expect(accuracyChipClass(69)).toContain('amber')
+    expect(accuracyChipClass(60)).toContain('amber')
+    expect(accuracyChipClass(59)).toContain('rose')
   })
 })
 
@@ -177,7 +243,14 @@ describe('SubjectDistribution', () => {
 
   it('renderiza shares/chips a partir do payload da API; sem handler, nenhuma linha é botão', () => {
     render(
-      <SubjectDistribution title="O que caiu" subtitle="x" data={data} predictive={false} meters enterIdx={0} />,
+      <SubjectDistribution
+        title="O que caiu"
+        subtitle="x"
+        data={data}
+        predictive={false}
+        meters
+        enterIdx={0}
+      />,
     )
     // Sem onTrainSubject/trainableSubjects não há CTA de treino nas linhas.
     expect(screen.queryByRole('button')).toBeNull()
@@ -205,18 +278,58 @@ describe('SubjectDistribution', () => {
     fireEvent.click(btn)
     expect(clicked).toEqual(['Enfermagem'])
     // Português fora do set (ex.: sem questões na prova alvo) → linha sem CTA.
-    expect(screen.queryByRole('button', { name: 'Treinar Português' })).toBeNull()
+    expect(
+      screen.queryByRole('button', { name: 'Treinar Português' }),
+    ).toBeNull()
+  })
+
+  it('sem tentativas o insight degrada: pesos continuam, ponto fraco e chips somem', () => {
+    const semTentativas: SubjectDistributionData = {
+      ...data,
+      subjects: data.subjects.map((s) => ({ ...s, userAccuracy: null })),
+      insight: { ...data.insight, weakestRelevant: null },
+    }
+    render(
+      <SubjectDistribution
+        title="t"
+        subtitle="s"
+        data={semTentativas}
+        predictive={false}
+        meters
+        enterIdx={0}
+      />,
+    )
+    // A leitura de pesos (dado da prova) permanece…
+    expect(screen.getByText('80%')).toBeTruthy()
+    expect(screen.getByText(/da prova\./)).toBeTruthy()
+    // …mas nada personalizado é inventado sem dados do usuário
+    expect(screen.queryByText(/Seu ponto mais fraco/)).toBeNull()
+    expect(screen.queryByText(/você:/)).toBeNull()
   })
 
   it('insight: verbo muda com predictive e o ponto fraco vem da API', () => {
     const { rerender } = render(
-      <SubjectDistribution title="t" subtitle="s" data={data} predictive={false} meters enterIdx={0} />,
+      <SubjectDistribution
+        title="t"
+        subtitle="s"
+        data={data}
+        predictive={false}
+        meters
+        enterIdx={0}
+      />,
     )
     expect(screen.getByText(/da prova\./)).toBeTruthy()
     expect(screen.getByText(/Português \(48%\)/)).toBeTruthy()
 
     rerender(
-      <SubjectDistribution title="t" subtitle="s" data={data} predictive meters enterIdx={0} />,
+      <SubjectDistribution
+        title="t"
+        subtitle="s"
+        data={data}
+        predictive
+        meters
+        enterIdx={0}
+      />,
     )
     expect(screen.getByText(/das últimas provas\./)).toBeTruthy()
   })
