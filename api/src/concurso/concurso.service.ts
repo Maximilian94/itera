@@ -11,6 +11,23 @@ const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
+ * Etapa do plano de estudos do usuário para um cargo (regra simples v1):
+ * - `diagnostico`     → nenhuma tentativa finalizada nas provas-alvo;
+ * - `treino_dirigido` → já tentou, mas o melhor score está abaixo do corte;
+ * - `reta_final`      → melhor score atingiu ou superou o corte.
+ */
+export type StudyPlanStep = 'diagnostico' | 'treino_dirigido' | 'reta_final';
+
+/**
+ * Mínimo de questões respondidas por matéria para ela entrar em
+ * `weakSubjects` — evita que 0/1 respondida vire "0% de acerto".
+ */
+const MIN_ANSWERS_PER_SUBJECT = 5;
+
+/** Corte usado quando a prova não define `minPassingGradeNonQuota` (v1). */
+const DEFAULT_PASSING_GRADE = 60;
+
+/**
  * A "Concurso" (edital) groups one or more "Provas" (ExamBase, one per cargo).
  * The Concurso model exists in the schema but historically every concurso-level
  * fact lived on each ExamBase row. This service wires the relation up for real:
@@ -443,6 +460,303 @@ export class ConcursoService {
           bestScore: null,
         },
       })),
+    };
+  }
+
+  /**
+   * Plano de estudos do usuário sobre um conjunto de provas-alvo (a própria
+   * prova do cargo ou, quando ela é futura/sem questões, as edições
+   * anteriores). Anônimo ou sem tentativa finalizada → `diagnostico` zerado.
+   * `scoreDelta` compara o melhor score com a primeira tentativa;
+   * `weakSubjects` são as 3 piores matérias por acurácia (% inteiro), com no
+   * mínimo MIN_ANSWERS_PER_SUBJECT questões respondidas.
+   */
+  private async getStudyPlan(
+    userId: string | undefined,
+    examBaseIds: string[],
+    passingGrade: number,
+  ): Promise<{
+    currentStep: StudyPlanStep;
+    attemptCount: number;
+    bestScore: number | null;
+    scoreDelta: number | null;
+    weakSubjects: { subject: string; accuracy: number }[];
+  }> {
+    const empty = {
+      currentStep: 'diagnostico' as StudyPlanStep,
+      attemptCount: 0,
+      bestScore: null,
+      scoreDelta: null,
+      weakSubjects: [],
+    };
+    if (!userId || examBaseIds.length === 0) return empty;
+
+    const attempts = await this.prisma.examBaseAttempt.findMany({
+      where: {
+        userId,
+        finishedAt: { not: null },
+        examBaseId: { in: examBaseIds },
+      },
+      orderBy: { finishedAt: 'asc' },
+      select: { scorePercentage: true },
+    });
+    if (attempts.length === 0) return empty;
+
+    const scores = attempts
+      .map((a) =>
+        a.scorePercentage != null ? Number(a.scorePercentage) : null,
+      )
+      .filter((s): s is number => s != null);
+    const bestScore = scores.length ? Math.max(...scores) : null;
+    const firstScore = scores.length ? scores[0] : null;
+    const scoreDelta =
+      bestScore != null && firstScore != null
+        ? Math.round((bestScore - firstScore) * 100) / 100
+        : null;
+    // Regra simples v1: tentou mas não bateu o corte → treino dirigido;
+    // bateu o corte → reta final. Sem score mensurável, continua treinando.
+    const currentStep: StudyPlanStep =
+      bestScore != null && bestScore >= passingGrade
+        ? 'reta_final'
+        : 'treino_dirigido';
+
+    // Acurácia por matéria (ExamBaseQuestion.subject) nas respostas do
+    // usuário; só questões efetivamente respondidas (alternativa marcada).
+    const answers = await this.prisma.examBaseAttemptAnswer.findMany({
+      where: {
+        selectedAlternativeId: { not: null },
+        examBaseAttempt: {
+          userId,
+          finishedAt: { not: null },
+          examBaseId: { in: examBaseIds },
+        },
+      },
+      select: {
+        selectedAlternative: { select: { key: true } },
+        examBaseQuestion: {
+          select: { subject: true, correctAlternative: true },
+        },
+      },
+    });
+    const bySubject = new Map<string, { answered: number; correct: number }>();
+    for (const a of answers) {
+      const { subject, correctAlternative } = a.examBaseQuestion;
+      if (!subject || !correctAlternative) continue;
+      const acc = bySubject.get(subject) ?? { answered: 0, correct: 0 };
+      acc.answered += 1;
+      if (a.selectedAlternative?.key === correctAlternative) acc.correct += 1;
+      bySubject.set(subject, acc);
+    }
+    const weakSubjects = [...bySubject.entries()]
+      .filter(([, s]) => s.answered >= MIN_ANSWERS_PER_SUBJECT)
+      .map(([subject, s]) => ({
+        subject,
+        accuracy: Math.round((s.correct / s.answered) * 100),
+      }))
+      .sort((a, b) => a.accuracy - b.accuracy)
+      .slice(0, 3);
+
+    return {
+      currentStep,
+      attemptCount: attempts.length,
+      bestScore,
+      scoreDelta,
+      weakSubjects,
+    };
+  }
+
+  /**
+   * Payload da página do cargo (nível 2, MAX-16): ficha completa do cargo,
+   * conteúdo programático (vazio para prova passada), edições anteriores do
+   * mesmo cargo/banca/instituição e o plano de estudos do usuário. O
+   * `cargoSlug` é o `ExamBase.slug` (aceita UUID); o cargo precisa pertencer
+   * ao concurso do slug e ser nursing-relevant (404 caso contrário, MAX-13).
+   * Funciona anonimamente (plano zerado em `diagnostico`).
+   */
+  async getCargoDetail(
+    slugOrId: string,
+    cargoSlugOrId: string,
+    userId?: string,
+  ) {
+    const showUnpublished = userId ? await this.isAdmin(userId) : false;
+
+    const concurso = await this.prisma.concurso.findFirst({
+      where: UUID_RE.test(slugOrId) ? { id: slugOrId } : { slug: slugOrId },
+      include: {
+        examBoard: { select: { id: true, name: true, alias: true } },
+      },
+    });
+    if (!concurso) throw new NotFoundException('concurso not found');
+
+    // Same grouping key as the nível-1 payload: institution + board + year.
+    const start = new Date(Date.UTC(concurso.year, 0, 1));
+    const end = new Date(Date.UTC(concurso.year + 1, 0, 1));
+    const concursoKey = {
+      institution: concurso.institution,
+      examBoardId: concurso.examBoardId,
+      examDate: { gte: start, lt: end },
+    };
+
+    const cargo = await this.prisma.examBase.findFirst({
+      where: {
+        ...(UUID_RE.test(cargoSlugOrId)
+          ? { id: cargoSlugOrId }
+          : { slug: cargoSlugOrId }),
+        ...concursoKey,
+        isNursingRelevant: true,
+        ...(showUnpublished ? {} : { published: true }),
+      },
+      select: {
+        id: true,
+        slug: true,
+        role: true,
+        description: true,
+        requirements: true,
+        salaryBase: true,
+        workload: true,
+        vacancyCount: true,
+        hasReserveList: true,
+        registrationFee: true,
+        minPassingGradeNonQuota: true,
+        examDate: true,
+        editalUrl: true,
+        published: true,
+        syllabusGroups: {
+          orderBy: { order: 'asc' },
+          select: { name: true, topics: true, order: true },
+        },
+        _count: { select: { questions: true } },
+      },
+    });
+    if (!cargo) throw new NotFoundException('cargo not found');
+
+    // Status do concurso agregado dos siblings, como no nível 1; a leitura
+    // também aproveita para rodar o self-healing link/edital.
+    const siblings = await this.prisma.examBase.findMany({
+      where: {
+        ...concursoKey,
+        ...(showUnpublished ? {} : { published: true }),
+      },
+      select: {
+        id: true,
+        registrationStart: true,
+        registrationEnd: true,
+        examDate: true,
+        resultDate: true,
+        editalUrl: true,
+        isNursingRelevant: true,
+      },
+    });
+    if (siblings.length > 0) {
+      await this.prisma.examBase.updateMany({
+        where: { id: { in: siblings.map((p) => p.id) }, concursoId: null },
+        data: { concursoId: concurso.id },
+      });
+    }
+    await this.healEditalUrl(concurso, siblings);
+
+    const relevantSiblings = siblings.filter((p) => p.isNursingRelevant);
+    const timeline = aggregateConcursoTimeline(
+      relevantSiblings.length > 0 ? relevantSiblings : siblings,
+    );
+    const status = deriveConcursoStatus(timeline);
+
+    // Edições anteriores do mesmo cargo: institution + banca + role, antes
+    // do ano deste concurso. Alimentam o treino quando a prova é futura.
+    const previousExams = await this.prisma.examBase.findMany({
+      where: {
+        institution: concurso.institution,
+        examBoardId: concurso.examBoardId,
+        role: cargo.role,
+        examDate: { lt: start },
+        isNursingRelevant: true,
+        ...(showUnpublished ? {} : { published: true }),
+      },
+      orderBy: { examDate: 'desc' },
+      select: {
+        id: true,
+        slug: true,
+        examDate: true,
+        _count: { select: { questions: true } },
+      },
+    });
+    const previousStats = await this.getUserStatsByExamBase(
+      userId,
+      previousExams.map((p) => p.id),
+    );
+
+    // Prova futura (sem questões próprias) → plano computado sobre as
+    // edições anteriores; com questões, sobre a própria prova.
+    const planExamBaseIds =
+      cargo._count.questions > 0 ? [cargo.id] : previousExams.map((p) => p.id);
+    const passingGrade =
+      cargo.minPassingGradeNonQuota != null
+        ? Number(cargo.minPassingGradeNonQuota)
+        : DEFAULT_PASSING_GRADE;
+    const studyPlan = await this.getStudyPlan(
+      userId,
+      planExamBaseIds,
+      passingGrade,
+    );
+
+    // Conteúdo programático só faz sentido para prova ainda não aplicada;
+    // para prova passada a página foca nas provas anteriores e no treino.
+    const cargoIsPast =
+      deriveConcursoStatus({
+        registrationStart: null,
+        registrationEnd: null,
+        examDate: cargo.examDate,
+      }) === 'past';
+
+    return {
+      concurso: {
+        id: concurso.id,
+        slug: concurso.slug,
+        institution: concurso.institution,
+        year: concurso.year,
+        status,
+        examBoard: concurso.examBoard
+          ? {
+              id: concurso.examBoard.id,
+              name: concurso.examBoard.name,
+              alias: concurso.examBoard.alias,
+            }
+          : null,
+        examDate: timeline.examDate?.toISOString() ?? null,
+      },
+      cargo: {
+        id: cargo.id,
+        slug: cargo.slug,
+        role: cargo.role,
+        description: cargo.description,
+        requirements: cargo.requirements,
+        salaryBase: cargo.salaryBase != null ? String(cargo.salaryBase) : null,
+        workload: cargo.workload,
+        vacancyCount: cargo.vacancyCount,
+        hasReserveList: cargo.hasReserveList,
+        registrationFee:
+          cargo.registrationFee != null ? String(cargo.registrationFee) : null,
+        minPassingGrade:
+          cargo.minPassingGradeNonQuota != null
+            ? String(cargo.minPassingGradeNonQuota)
+            : null,
+        questionCount: cargo._count.questions,
+        examDate: cargo.examDate.toISOString(),
+        editalUrl: cargo.editalUrl ?? concurso.editalUrl,
+        published: cargo.published,
+      },
+      syllabusGroups: cargoIsPast ? [] : cargo.syllabusGroups,
+      previousExams: previousExams.map((p) => ({
+        examBaseId: p.id,
+        slug: p.slug,
+        year: p.examDate.getUTCFullYear(),
+        questionCount: p._count.questions,
+        userStats: previousStats.get(p.id) ?? {
+          attemptCount: 0,
+          bestScore: null,
+        },
+      })),
+      studyPlan,
     };
   }
 }

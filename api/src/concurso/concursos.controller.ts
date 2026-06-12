@@ -20,4 +20,21 @@ export class ConcursosController {
   ) {
     return this.concursos.getConcursoDetail(slug, req.user?.userId);
   }
+
+  /**
+   * Cargo page payload (nível 2): full cargo sheet, syllabus groups (empty
+   * for past exams), previous editions of the same cargo/board/institution
+   * and the user's study plan. `cargoSlug` is the ExamBase slug (UUID also
+   * accepted). 404 when the cargo doesn't belong to the concurso or isn't
+   * nursing-relevant. Anonymous requests get a zeroed `diagnostico` plan.
+   */
+  @OptionalAuth()
+  @Get(':slug/cargos/:cargoSlug')
+  getCargo(
+    @Param('slug') slug: string,
+    @Param('cargoSlug') cargoSlug: string,
+    @Req() req: { user?: { userId: string } },
+  ) {
+    return this.concursos.getCargoDetail(slug, cargoSlug, req.user?.userId);
+  }
 }
