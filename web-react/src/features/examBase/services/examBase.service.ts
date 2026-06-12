@@ -1,4 +1,5 @@
 import type {
+  ConcursoProvasResponse,
   CreateExamBaseInput,
   ExamBase,
   ExtractedExamMetadata,
@@ -19,6 +20,13 @@ class ExamBaseService {
 
   async getOne(id: string) {
     return await apiFetch<ExamBase>(`${this.urlPath}/${id}`, { method: 'GET' })
+  }
+
+  async getConcursoProvas(id: string) {
+    return await apiFetch<ConcursoProvasResponse>(
+      `${this.urlPath}/${id}/concurso`,
+      { method: 'GET' },
+    )
   }
 
   async create(input: CreateExamBaseInput) {

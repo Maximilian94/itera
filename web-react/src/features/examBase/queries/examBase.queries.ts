@@ -5,6 +5,15 @@ export const examBaseKeys = {
   examBases: ['examBases'] as const,
   list: (examBoardId?: string) => ['examBases', examBoardId ?? 'all'] as const,
   one: (id: string) => ['examBase', id] as const,
+  concurso: (id: string) => ['examBase', id, 'concurso'] as const,
+}
+
+export function useExamConcursoProvasQuery(examBaseId: string | undefined) {
+  return useQuery({
+    queryKey: examBaseKeys.concurso(examBaseId ?? ''),
+    queryFn: () => examBaseService.getConcursoProvas(examBaseId!),
+    enabled: Boolean(examBaseId),
+  })
 }
 
 export function useExamBaseQuery(examBaseId: string | undefined) {

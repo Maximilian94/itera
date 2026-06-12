@@ -40,6 +40,7 @@ Ao finalizar uma tarefa, avalie se este CLAUDE.md precisa ser atualizado. Se a t
 - `domain/` não importa nada de framework — apenas TS puro.
 - Leia `SPEC.md`, `RULES.md`, `API.md` e `CONVENTIONS.md` antes de implementar features no core (api/domain).
 - Endpoints REST usam recursos no plural: `/questions`, `/attempts`, `/skills`.
+- **Concurso (edital) × ExamBase (prova):** um `Concurso` agrupa várias `ExamBase` (uma por cargo) via `ExamBase.concursoId`. O vínculo é populado *preguiçosamente na leitura* por `api/src/concurso` (`GET /exam-bases/:id/concurso` → `{ concurso, provas[] }`); chave de agrupamento = `institution + ano(examDate) + examBoardId` (o `@@unique` do model). Sem `institution` não há agrupamento. No front, a página `/exams/$examBoard/$examId` consome via `useExamConcursoProvasQuery`.
 - Autenticação via Clerk no `web-react/`; a API valida tokens Clerk.
 - Logs de sessões de vibe-coding ficam em `vibe-coding/YYYY-MM-<slug>.md`.
 

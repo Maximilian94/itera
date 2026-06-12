@@ -29,6 +29,37 @@ export type ExamBase = {
   reviewStats?: { reviewedCount: number; totalCount: number }
 }
 
+/** A sibling prova (cargo) inside the same concurso. */
+export type ConcursoProva = {
+  id: string
+  role: string
+  slug: string | null
+  salaryBase: string | null
+  vacancyCount: number | null
+  examDate: string
+  examBoardId: string | null
+  published: boolean
+  minPassingGradeNonQuota: string | null
+  questionCount: number
+  isCurrent: boolean
+  userStats: { attemptCount: number; bestScore: number | null }
+}
+
+/** Concurso (edital) identity shared by every prova it contains. */
+export type ConcursoSummary = {
+  id: string
+  institution: string
+  year: number
+  governmentScope: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  state: string | null
+  city: string | null
+}
+
+export type ConcursoProvasResponse = {
+  concurso: ConcursoSummary | null
+  provas: ConcursoProva[]
+}
+
 export type CreateExamBaseInput = {
   name: string
   role: string
