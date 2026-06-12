@@ -3,12 +3,16 @@ import {
   useExamBoardQueries,
 } from '@/features/examBoard/queries/examBoard.queries'
 import {
+  useCreateSyllabusGroupMutation,
+  useDeleteSyllabusGroupMutation,
   useExamBaseQueries,
   useExamBaseQuery,
   useExtractExamMetadataMutation,
+  useReorderSyllabusGroupsMutation,
   useUpdateExamBaseMutation,
+  useUpdateSyllabusGroupMutation,
 } from '@/features/examBase/queries/examBase.queries'
-import type { ExamBase, ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
+import type { ExamBase, ExamSyllabusGroup, ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
   type ParsedQuestionStructure,
@@ -17,7 +21,10 @@ import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/e
 
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
+import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -417,6 +424,7 @@ function MetadataStep({
   const canExtract = pdfFile != null && !extractMutation.isPending
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Left: AI extraction panel */}
       <div className="flex flex-col gap-4">
@@ -736,6 +744,257 @@ function MetadataStep({
         </div>
       </Stack>
     </div>
+
+    <Box sx={{ mt: 4 }}>
+      <SyllabusGroupsEditor
+        examBaseId={examBaseId}
+        initialGroups={examBase?.syllabusGroups}
+      />
+    </Box>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Conteúdo programático (syllabus groups) — MAX-14
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SyllabusRow = {
+  /** null = rascunho ainda não salvo no backend */
+  id: string | null
+  name: string
+  topics: string
+  dirty: boolean
+}
+
+function SyllabusGroupsEditor({
+  examBaseId,
+  initialGroups,
+}: {
+  examBaseId: string
+  initialGroups: ExamSyllabusGroup[] | undefined
+}) {
+  const createMutation = useCreateSyllabusGroupMutation(examBaseId)
+  const updateMutation = useUpdateSyllabusGroupMutation(examBaseId)
+  const reorderMutation = useReorderSyllabusGroupsMutation(examBaseId)
+  const deleteMutation = useDeleteSyllabusGroupMutation(examBaseId)
+
+  // Estado local é a fonte da verdade durante a sessão; inicializa uma única vez
+  // a partir do payload do exam base para não perder edições a cada refetch.
+  const [rows, setRows] = useState<SyllabusRow[]>([])
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    if (initializedRef.current || initialGroups === undefined) return
+    initializedRef.current = true
+    setRows(
+      initialGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        topics: g.topics,
+        dirty: false,
+      })),
+    )
+  }, [initialGroups])
+
+  const [error, setError] = useState<string | null>(null)
+  const isSaving =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    reorderMutation.isPending ||
+    deleteMutation.isPending
+  const hasDraft = rows.some((r) => r.id === null)
+
+  function setRow(index: number, patch: Partial<SyllabusRow>) {
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, ...patch, dirty: true } : r)),
+    )
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, { id: null, name: '', topics: '', dirty: true }])
+  }
+
+  async function saveRow(index: number) {
+    const row = rows[index]
+    if (!row.name.trim() || !row.topics.trim()) return
+    setError(null)
+    try {
+      const saved = row.id
+        ? await updateMutation.mutateAsync({
+            groupId: row.id,
+            name: row.name.trim(),
+            topics: row.topics.trim(),
+          })
+        : await createMutation.mutateAsync({
+            name: row.name.trim(),
+            topics: row.topics.trim(),
+          })
+      setRows((prev) =>
+        prev.map((r, i) =>
+          i === index
+            ? { id: saved.id, name: saved.name, topics: saved.topics, dirty: false }
+            : r,
+        ),
+      )
+    } catch (err) {
+      setError((err as Error).message ?? 'Erro ao salvar grupo')
+    }
+  }
+
+  async function removeRow(index: number) {
+    const row = rows[index]
+    setError(null)
+    if (row.id) {
+      try {
+        await deleteMutation.mutateAsync(row.id)
+      } catch (err) {
+        setError((err as Error).message ?? 'Erro ao remover grupo')
+        return
+      }
+    }
+    setRows((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function moveRow(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= rows.length) return
+    const next = [...rows]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setRows(next)
+    setError(null)
+    try {
+      await reorderMutation.mutateAsync(next.map((r) => r.id!))
+    } catch (err) {
+      setRows(rows) // desfaz o swap local
+      setError((err as Error).message ?? 'Erro ao reordenar grupos')
+    }
+  }
+
+  return (
+    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+      <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+        Conteúdo programático (edital)
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Grupos de conteúdo conforme o edital (ex.: "Saúde Coletiva e SUS"), com os
+        tópicos em texto corrido. Aparece na página do cargo de prova futura; sem
+        grupos, a seção fica oculta.
+      </Typography>
+
+      {rows.length === 0 && (
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Nenhum grupo cadastrado.
+        </Typography>
+      )}
+
+      <Stack spacing={2}>
+        {rows.map((row, i) => (
+          <Box
+            key={row.id ?? `draft-${i}`}
+            sx={{
+              border: '1px solid',
+              borderColor: row.dirty ? 'warning.light' : 'divider',
+              borderRadius: 2,
+              p: 2,
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <Typography variant="body2" fontWeight={700} sx={{ mt: 1, minWidth: 24 }}>
+                {i + 1}.
+              </Typography>
+              <Stack spacing={1.5} sx={{ flex: 1 }}>
+                <TextField
+                  label="Nome do grupo *"
+                  value={row.name}
+                  onChange={(e) => setRow(i, { name: e.target.value })}
+                  placeholder="Ex: Saúde Coletiva e SUS"
+                  size="small"
+                  fullWidth
+                />
+                <TextField
+                  label="Tópicos *"
+                  value={row.topics}
+                  onChange={(e) => setRow(i, { topics: e.target.value })}
+                  placeholder="Cole os tópicos do grupo como constam no edital"
+                  multiline
+                  minRows={2}
+                  maxRows={10}
+                  size="small"
+                  fullWidth
+                />
+              </Stack>
+              <Stack spacing={0.5} alignItems="center">
+                <Tooltip title={hasDraft ? 'Salve todos os grupos antes de reordenar' : 'Mover para cima'}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={i === 0 || hasDraft || isSaving}
+                      onClick={() => moveRow(i, -1)}
+                    >
+                      <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={hasDraft ? 'Salve todos os grupos antes de reordenar' : 'Mover para baixo'}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={i === rows.length - 1 || hasDraft || isSaving}
+                      onClick={() => moveRow(i, 1)}
+                    >
+                      <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Remover grupo">
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={isSaving}
+                      onClick={() => removeRow(i)}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
+            </div>
+            {row.dirty && (
+              <div className="flex justify-end mt-2">
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                  disabled={!row.name.trim() || !row.topics.trim() || isSaving}
+                  onClick={() => saveRow(i)}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  {row.id ? 'Salvar alterações' : 'Salvar grupo'}
+                </Button>
+              </div>
+            )}
+          </Box>
+        ))}
+      </Stack>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 2, py: 0.5 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Button
+        size="small"
+        variant="outlined"
+        startIcon={<AddIcon />}
+        onClick={addRow}
+        disabled={isSaving}
+        sx={{ mt: 2, borderColor: 'violet.600', color: 'violet.600' }}
+      >
+        Adicionar grupo
+      </Button>
+    </Box>
   )
 }
 

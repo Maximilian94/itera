@@ -77,3 +77,56 @@ export function useUpdateExamBaseMutation(examBaseId: string) {
   })
 }
 
+// ── Conteúdo programático (syllabus groups) ──────────────────────────────────
+
+export function useCreateSyllabusGroupMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: { name: string; topics: string; order?: number }) =>
+      examBaseService.createSyllabusGroup(examBaseId, input),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
+    },
+  })
+}
+
+export function useUpdateSyllabusGroupMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (input: {
+      groupId: string
+      name?: string
+      topics?: string
+      order?: number
+    }) => {
+      const { groupId, ...rest } = input
+      return examBaseService.updateSyllabusGroup(examBaseId, groupId, rest)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
+    },
+  })
+}
+
+export function useReorderSyllabusGroupsMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (ids: string[]) =>
+      examBaseService.reorderSyllabusGroups(examBaseId, ids),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
+    },
+  })
+}
+
+export function useDeleteSyllabusGroupMutation(examBaseId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (groupId: string) =>
+      examBaseService.deleteSyllabusGroup(examBaseId, groupId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
+    },
+  })
+}
+

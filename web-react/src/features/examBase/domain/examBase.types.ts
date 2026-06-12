@@ -1,5 +1,14 @@
 export type ProcessingPhase = 'EDITAL' | 'PROVA' | 'GABARITO' | 'REVISAO' | 'EXPLICACOES' | 'CONCLUIDO'
 
+/** Grupo do conteúdo programático do edital (ex.: "Saúde Coletiva e SUS"). */
+export type ExamSyllabusGroup = {
+  id: string
+  order: number
+  name: string
+  /** Tópicos em texto corrido, como no edital. */
+  topics: string
+}
+
 export type ExamBase = {
   id: string
   name: string
@@ -26,6 +35,8 @@ export type ExamBase = {
   isNursingRelevant: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
+  /** Conteúdo programático do edital, ordenado. Presente apenas no detalhe (getOne). */
+  syllabusGroups?: ExamSyllabusGroup[]
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
   reviewStats?: { reviewedCount: number; totalCount: number }

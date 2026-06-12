@@ -314,6 +314,11 @@ export class ExamBaseService {
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Conteúdo programático do edital (MAX-14). Sem grupos → array vazio.
+        syllabusGroups: {
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, name: true, topics: true },
+        },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');

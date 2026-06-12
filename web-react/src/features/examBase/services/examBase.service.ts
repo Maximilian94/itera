@@ -2,6 +2,7 @@ import type {
   ConcursoProvasResponse,
   CreateExamBaseInput,
   ExamBase,
+  ExamSyllabusGroup,
   ExtractedExamMetadata,
   UpdateExamBaseInput,
 } from '../domain/examBase.types'
@@ -66,6 +67,44 @@ class ExamBaseService {
 
   async remove(id: string) {
     return await apiFetch<{ ok: true }>(`${this.urlPath}/${id}`, { method: 'DELETE' })
+  }
+
+  // ── Conteúdo programático (syllabus groups) ───────────────────────────────
+
+  async createSyllabusGroup(
+    examBaseId: string,
+    input: { name: string; topics: string; order?: number },
+  ) {
+    return await apiFetch<ExamSyllabusGroup>(
+      `${this.urlPath}/${examBaseId}/syllabus-groups`,
+      { method: 'POST', body: JSON.stringify(input) },
+    )
+  }
+
+  async updateSyllabusGroup(
+    examBaseId: string,
+    groupId: string,
+    input: { name?: string; topics?: string; order?: number },
+  ) {
+    return await apiFetch<ExamSyllabusGroup>(
+      `${this.urlPath}/${examBaseId}/syllabus-groups/${groupId}`,
+      { method: 'PATCH', body: JSON.stringify(input) },
+    )
+  }
+
+  /** Reordena todos os grupos: `ids` deve conter todos os grupos da prova, na nova ordem. */
+  async reorderSyllabusGroups(examBaseId: string, ids: string[]) {
+    return await apiFetch<ExamSyllabusGroup[]>(
+      `${this.urlPath}/${examBaseId}/syllabus-groups/order`,
+      { method: 'PATCH', body: JSON.stringify({ ids }) },
+    )
+  }
+
+  async deleteSyllabusGroup(examBaseId: string, groupId: string) {
+    return await apiFetch<{ ok: true }>(
+      `${this.urlPath}/${examBaseId}/syllabus-groups/${groupId}`,
+      { method: 'DELETE' },
+    )
   }
 
   async extractMetadata(input: { url?: string; role?: string; pdfFile?: File }): Promise<ExtractedExamMetadata> {

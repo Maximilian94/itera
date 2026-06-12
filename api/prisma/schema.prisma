@@ -278,10 +278,33 @@ model ExamBase {
   questions         ExamBaseQuestion[]
   attempts          ExamBaseAttempt[]
   trainingSessions  TrainingSession[]
+  syllabusGroups    ExamSyllabusGroup[]
 
   @@index([examBoardId])
   @@index([concursoId])
   @@map("exam_bases")
+}
+
+/// Grupo do conteúdo programático do edital (ex.: "Saúde Coletiva e SUS"),
+/// com os tópicos em texto corrido como constam no edital. Input manual no admin
+/// (fase EDITAL do wizard); usado na página do cargo de prova futura.
+model ExamSyllabusGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examBaseId String   @db.Uuid
+  examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  /// Posição de exibição (0-based) dentro da prova
+  order  Int
+  /// Nome do grupo (ex.: "Saúde Coletiva e SUS")
+  name   String
+  /// Tópicos em texto corrido, como no edital
+  topics String
+
+  @@index([examBaseId])
+  @@map("exam_syllabus_groups")
 }
 
 model ExamBaseQuestion {

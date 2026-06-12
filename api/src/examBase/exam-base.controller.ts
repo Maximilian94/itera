@@ -16,15 +16,22 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
 import { ExtractMetadataDto } from './dto/extract-metadata.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
+import {
+  CreateSyllabusGroupDto,
+  ReorderSyllabusGroupsDto,
+  UpdateSyllabusGroupDto,
+} from './dto/syllabus-group.dto';
 import { UpdateExamBaseDto } from './dto/update-exam-base.dto';
 import { ExamBaseAiService } from './exam-base-ai.service';
 import { ExamBaseService } from './exam-base.service';
+import { ExamSyllabusGroupService } from './exam-syllabus-group.service';
 
 @Controller('exam-bases')
 export class ExamBaseController {
   constructor(
     private readonly examBases: ExamBaseService,
     private readonly examBaseAi: ExamBaseAiService,
+    private readonly syllabusGroups: ExamSyllabusGroupService,
   ) {}
 
   @Get()
@@ -108,5 +115,48 @@ export class ExamBaseController {
   @Roles('ADMIN')
   remove(@Param('id') id: string) {
     return this.examBases.remove(id);
+  }
+
+  // ── Conteúdo programático (syllabus groups) — MAX-14 ──────────────────────
+
+  /** Creates a syllabus group for the exam base. Admin only. */
+  @Post(':id/syllabus-groups')
+  @Roles('ADMIN')
+  createSyllabusGroup(
+    @Param('id') id: string,
+    @Body() dto: CreateSyllabusGroupDto,
+  ) {
+    return this.syllabusGroups.create(id, dto);
+  }
+
+  /** Reorders all syllabus groups of the exam base. Admin only. */
+  @Patch(':id/syllabus-groups/order')
+  @Roles('ADMIN')
+  reorderSyllabusGroups(
+    @Param('id') id: string,
+    @Body() dto: ReorderSyllabusGroupsDto,
+  ) {
+    return this.syllabusGroups.reorder(id, dto.ids);
+  }
+
+  /** Updates a syllabus group. Admin only. */
+  @Patch(':id/syllabus-groups/:groupId')
+  @Roles('ADMIN')
+  updateSyllabusGroup(
+    @Param('id') id: string,
+    @Param('groupId') groupId: string,
+    @Body() dto: UpdateSyllabusGroupDto,
+  ) {
+    return this.syllabusGroups.update(id, groupId, dto);
+  }
+
+  /** Deletes a syllabus group. Admin only. */
+  @Delete(':id/syllabus-groups/:groupId')
+  @Roles('ADMIN')
+  removeSyllabusGroup(
+    @Param('id') id: string,
+    @Param('groupId') groupId: string,
+  ) {
+    return this.syllabusGroups.remove(id, groupId);
   }
 }
