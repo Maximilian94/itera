@@ -239,6 +239,8 @@ model ExamBase {
   examDate                DateTime
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
   vacancyCount            Int?
+  /// Cadastro de reserva ("20 vagas + CR"). Explícito e controlado pelo admin, como isNursingRelevant.
+  hasReserveList          Boolean          @default(false)
   applicantCount          Int?
   registrationFee         Decimal?         @db.Decimal(10,2)
   /// @deprecated Substituído pela janela registrationStart/registrationEnd. Coluna mantida até a limpeza final do épico MAX-11.

@@ -41,7 +41,8 @@ Ao finalizar uma tarefa, avalie se este CLAUDE.md precisa ser atualizado. Se a t
 - Leia `SPEC.md`, `RULES.md`, `API.md` e `CONVENTIONS.md` antes de implementar features no core (api/domain).
 - Endpoints REST usam recursos no plural: `/questions`, `/attempts`, `/skills`.
 - **Concurso (edital) × ExamBase (prova):** um `Concurso` agrupa várias `ExamBase` (uma por cargo) via `ExamBase.concursoId`. O vínculo é populado *preguiçosamente na leitura* por `api/src/concurso` (`GET /exam-bases/:id/concurso` → `{ concurso, provas[] }`); chave de agrupamento = `institution + ano(examDate) + examBoardId` (o `@@unique` do model). Sem `institution` não há agrupamento. No front, a página `/exams/$examBoard/$examId` consome via `useExamConcursoProvasQuery`.
-- Autenticação via Clerk no `web-react/`; a API valida tokens Clerk.
+- **Página do concurso (nível 1):** `GET /concursos/:slug` (aceita UUID) é o payload canônico — status temporal (`open/future/past`) derivado no backend (`api/src/concurso/concurso-status.ts`), timeline agregada das provas, agregados/cargos só de provas `isNursingRelevant`, ordenados por salário desc.
+- Autenticação via Clerk no `web-react/`; a API valida tokens Clerk. Rotas com payload público enriquecido para logados usam `@OptionalAuth()` (`api/src/common/decorators/optional-auth.decorator.ts`): sem token válido a rota responde anônima em vez de 401.
 - Logs de sessões de vibe-coding ficam em `vibe-coding/YYYY-MM-<slug>.md`.
 
 ## Design Context (impeccable)
