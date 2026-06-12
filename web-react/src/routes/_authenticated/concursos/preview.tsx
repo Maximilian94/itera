@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
   AcademicCapIcon,
@@ -21,6 +21,21 @@ import {
   TicketIcon,
   UsersIcon,
 } from '@heroicons/react/24/outline'
+import { CARD, CARD_RAISE } from '../../../features/concurso/components/card'
+import { enter, useMeters } from '../../../features/concurso/components/motion'
+import { StatusPill } from '../../../features/concurso/components/StatusPill'
+import { InstitutionMark } from '../../../features/concurso/components/InstitutionMark'
+import {
+  FichaCard,
+  type FichaFact,
+} from '../../../features/concurso/components/FichaCard'
+import { SubjectDistribution } from '../../../features/concurso/components/SubjectDistribution'
+import {
+  VerticalTimeline,
+  type TimelineStep,
+} from '../../../features/concurso/components/VerticalTimeline'
+import { ReadinessBar } from '../../../features/concurso/components/ReadinessBar'
+import type { SubjectDistribution as SubjectDistributionData } from '../../../features/concurso/domain/concurso.types'
 
 export const Route = createFileRoute('/_authenticated/concursos/preview')({
   component: ConcursoPreviewPage,
@@ -33,6 +48,9 @@ export const Route = createFileRoute('/_authenticated/concursos/preview')({
 /*  Fake data + preview controls. Click a cargo to drill down.         */
 /*  Only nursing-relevant cargos are shown — the platform filters      */
 /*  out everything else upstream.                                      */
+/*                                                                     */
+/*  Os blocos compartilhados vivem em features/concurso/components     */
+/*  (MAX-21) — este mockup os consome com dados fake.                  */
 /* ------------------------------------------------------------------ */
 
 type TemporalState = 'open' | 'future' | 'past'
@@ -83,104 +101,30 @@ const SUBJECTS: Array<{ name: string; count: number; userScore: number }> = [
   { name: 'Raciocínio Lógico', count: 10, userScore: 66 },
 ]
 
-/** Faixas de acerto: verde/vermelho só como feedback de desempenho. */
-function accuracyChipClass(v: number) {
-  if (v >= 70) return 'bg-emerald-50 text-emerald-700'
-  if (v >= 60) return 'bg-amber-50 text-amber-700'
-  return 'bg-rose-50 text-rose-700'
-}
+const SUBJECT_TOTAL = SUBJECTS.reduce((sum, s) => sum + s.count, 0)
 
-/**
- * Distribuição de matérias. A mesma anatomia serve dois papéis temporais:
- * prova passada → fato ("o que caiu"); prova futura → padrão histórico
- * ("o que a banca costuma cobrar"). Título/subtítulo carregam o enquadramento.
- */
-function SubjectDistribution(props: {
-  title: string
-  subtitle: string
-  score: number | null
-  meters: boolean
-  enterIdx: number
-  predictive: boolean
-}) {
-  const { title, subtitle, score, meters, enterIdx, predictive } = props
-  const total = SUBJECTS.reduce((sum, s) => sum + s.count, 0)
-  const topTwoShare = Math.round(((SUBJECTS[0].count + SUBJECTS[1].count) / total) * 100)
-  const e = enter(enterIdx)
-  return (
-    <section style={e.style} className={`${e.className} ${CARD} p-5 sm:p-6`}>
-      <h2 className="text-base font-bold text-slate-900">{title}</h2>
-      <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
-
-      <div className="mt-3 flex flex-col">
-        {SUBJECTS.map((s, i) => {
-          const share = Math.round((s.count / total) * 100)
-          const acc = score != null ? s.userScore : null
-          return (
-            <button
-              key={s.name}
-              type="button"
-              aria-label={`Treinar ${s.name}`}
-              className="group -mx-2.5 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="flex min-w-0 items-center gap-2">
-                  <span className="truncate text-sm font-medium text-slate-700 transition-colors group-hover:text-slate-900">
-                    {s.name}
-                  </span>
-                  {acc != null && (
-                    <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold tabular-nums ${accuracyChipClass(acc)}`}>
-                      você: {acc}%
-                    </span>
-                  )}
-                </span>
-                <span className="shrink-0 text-sm">
-                  <span className="font-bold tabular-nums text-slate-800">{share}%</span>
-                  <span className="text-slate-400"> · {s.count} questões</span>
-                </span>
-              </div>
-              <div className="mt-1.5 flex items-center gap-3">
-                <div className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <div
-                    className={`${METER_BAR} bg-cyan-500`}
-                    style={{
-                      width: meters ? `${share}%` : '0%',
-                      transitionDelay: `${i * 70}ms`,
-                    }}
-                  />
-                </div>
-                <span className="inline-flex shrink-0 -translate-x-1 items-center gap-1 text-xs font-semibold text-cyan-700 opacity-0 transition-all group-hover:translate-x-0 group-hover:opacity-100">
-                  Treinar
-                  <ArrowRightIcon className="h-3.5 w-3.5" />
-                </span>
-              </div>
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Leitura do treinador: o insight que os números apontam */}
-      <p className="mt-3 border-t border-slate-100 pt-3.5 text-sm leading-6 text-slate-600">
-        <span className="font-semibold text-slate-800">{SUBJECTS[0].name}</span> e{' '}
-        <span className="font-semibold text-slate-800">{SUBJECTS[1].name}</span>{' '}
-        {predictive ? (
-          <>
-            somaram <span className="font-bold text-slate-900">{topTwoShare}%</span> das últimas provas.
-          </>
-        ) : (
-          <>
-            somaram <span className="font-bold text-slate-900">{topTwoShare}%</span> da prova.
-          </>
-        )}
-        {score != null && (
-          <>
-            {' '}Seu ponto mais fraco hoje é <span className="font-semibold text-rose-700">Saúde Coletiva (48%)</span>,
-            justamente a segunda matéria de maior peso: é por ela que vale começar.
-          </>
-        )}
-      </p>
-    </section>
-  )
+/** Monta o payload fake no formato da API de subject-distribution. */
+function buildSubjectData(
+  tState: TemporalState,
+  score: number | null,
+): SubjectDistributionData {
+  return {
+    mode: tState === 'past' ? 'actual' : 'historical',
+    sourceExams: [],
+    totalQuestions: SUBJECT_TOTAL,
+    subjects: SUBJECTS.map((s) => ({
+      subject: s.name,
+      count: s.count,
+      share: s.count / SUBJECT_TOTAL,
+      userAccuracy: score != null ? s.userScore / 100 : null,
+    })),
+    insight: {
+      topSubjects: [SUBJECTS[0].name, SUBJECTS[1].name],
+      topShare: (SUBJECTS[0].count + SUBJECTS[1].count) / SUBJECT_TOTAL,
+      weakestRelevant:
+        score != null ? { subject: 'Saúde Coletiva / SUS', accuracy: 0.48 } : null,
+    },
+  }
 }
 
 /** Escopo oficial do edital — só faz sentido para provas que ainda vão
@@ -215,46 +159,15 @@ const HISTORY: Array<{ year: string; applicants: string; perVacancy: string; cut
   { year: '2019', applicants: '1.214', perVacancy: '29 / vaga', cut: '61%' },
 ]
 
-const STATUS: Record<TemporalState, { label: string; tone: 'cyan' | 'slate'; live: boolean }> = {
-  open: { label: 'Inscrições abertas · encerram em 18 dias', tone: 'cyan', live: true },
-  future: { label: 'Prova em 72 dias', tone: 'cyan', live: false },
-  past: { label: 'Prova aplicada em 23/08/2022', tone: 'slate', live: false },
+const STATUS_LABEL: Record<TemporalState, string> = {
+  open: 'Inscrições abertas · encerram em 18 dias',
+  future: 'Prova em 72 dias',
+  past: 'Prova aplicada em 23/08/2022',
 }
 
 const YEAR: Record<TemporalState, string> = { open: '2026', future: '2026', past: '2022' }
 
-/* ------------------------------------------------------------------ */
-/*  Craft vocabulary (per DESIGN.md)                                   */
-/*  - Soft layered ambient shadows, raised on hover, never hard.       */
-/*  - Entrance: fade-in-up (styles.css keyframe), staggered, gated     */
-/*    by prefers-reduced-motion.                                       */
-/*  - Meters animate from 0 to value on mount.                         */
-/* ------------------------------------------------------------------ */
-
-const CARD =
-  'rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08),0_1px_2px_rgba(15,23,42,0.06)]'
-const CARD_RAISE =
-  'transition-all duration-200 hover:shadow-[0_6px_16px_-4px_rgba(15,23,42,0.12)]'
-
-/** Staggered entrance for top-level sections. */
-function enter(i: number) {
-  return {
-    className: 'animate-[fade-in-up_400ms_cubic-bezier(0.2,0.8,0.2,1)_both] motion-reduce:animate-none',
-    style: { animationDelay: `${i * 70}ms` },
-  }
-}
-
-/** Flips to true on the next frame so width transitions play on mount. */
-function useMeters() {
-  const [on, setOn] = useState(false)
-  useEffect(() => {
-    const id = requestAnimationFrame(() => setOn(true))
-    return () => cancelAnimationFrame(id)
-  }, [])
-  return on
-}
-
-const METER_BAR = 'h-full rounded-full transition-[width] duration-700 ease-out motion-reduce:transition-none'
+const EDITAL_URL = 'https://example.com/edital-01.pdf'
 
 /* ------------------------------------------------------------------ */
 /*  Preview controls (dev-only chrome, not part of the design)         */
@@ -296,91 +209,6 @@ function PreviewControls(props: {
           <button onClick={() => props.setHasAttempts(false)} className={seg(!props.hasAttempts)}>Sem</button>
         </div>
       </div>
-    </div>
-  )
-}
-
-/* ------------------------------------------------------------------ */
-/*  Shared bits                                                        */
-/* ------------------------------------------------------------------ */
-
-function StatusPill({ tState }: { tState: TemporalState }) {
-  const status = STATUS[tState]
-  if (status.tone === 'slate') {
-    return (
-      <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-        {status.label}
-      </span>
-    )
-  }
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full bg-cyan-50 py-1 pl-2.5 pr-3 text-xs font-semibold text-cyan-700 ring-1 ring-inset ring-cyan-600/10">
-      <span className="relative flex h-1.5 w-1.5">
-        {status.live && (
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-500 opacity-60 motion-reduce:hidden" />
-        )}
-        <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-cyan-600" />
-      </span>
-      {status.label}
-    </span>
-  )
-}
-
-type FichaFact = {
-  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>
-  label: string
-  value: string
-}
-
-/**
- * Ficha lateral: um fato-herói no topo (o dado que mais pesa na decisão)
- * e os demais como linhas com ícone + label sobre valor — valores longos
- * quebram alinhados à esquerda em vez de flutuar à direita.
- */
-function FichaCard(props: { title: string; hero: FichaFact; rows: FichaFact[]; enterIdx: number }) {
-  const e = enter(props.enterIdx)
-  return (
-    <section style={e.style} className={`${e.className} ${CARD} p-5`}>
-      <h2 className="text-sm font-bold text-slate-900">{props.title}</h2>
-
-      {/* Fato principal */}
-      <div className="mt-3 flex items-center gap-3 rounded-xl bg-slate-50 p-3.5 ring-1 ring-inset ring-slate-200/60">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.08)] ring-1 ring-inset ring-slate-200/70">
-          <props.hero.icon className="h-5 w-5" />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-medium text-slate-500">{props.hero.label}</p>
-          <p className="text-lg font-extrabold tabular-nums tracking-tight text-slate-900">{props.hero.value}</p>
-        </div>
-      </div>
-
-      <dl className="mt-4 flex flex-col gap-3.5">
-        {props.rows.map((r) => (
-          <div key={r.label} className="flex items-start gap-3">
-            <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-500 ring-1 ring-inset ring-slate-200/60">
-              <r.icon className="h-4 w-4" />
-            </span>
-            <div className="min-w-0">
-              <dt className="text-xs font-medium text-slate-500">{r.label}</dt>
-              <dd className="mt-px text-sm font-semibold leading-snug text-slate-800">{r.value}</dd>
-            </div>
-          </div>
-        ))}
-      </dl>
-
-      <button className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2">
-        <DocumentTextIcon className="h-4 w-4" />
-        Ver edital oficial
-      </button>
-    </section>
-  )
-}
-
-/** Marca da instituição: monograma sóbrio, sem mascote. */
-function InstitutionMark() {
-  return (
-    <div className="flex h-12 w-12 shrink-0 select-none items-center justify-center rounded-2xl bg-slate-900 text-sm font-extrabold tracking-wide text-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.35)] sm:h-14 sm:w-14 sm:text-base">
-      PC
     </div>
   )
 }
@@ -467,7 +295,7 @@ function ConcursoLevel(props: {
     { icon: ScaleIcon, label: 'Reserva de vagas', value: '20% negros · 5% PcD' },
   ]
 
-  const timeline: Array<{ label: string; date: string; state: 'done' | 'current' | 'upcoming' }> = [
+  const timeline: TimelineStep[] = [
     { label: 'Edital publicado', date: `15/05/${year}`, state: 'done' },
     { label: 'Inscrições', date: '02/06 a 30/06', state: tState === 'open' ? 'current' : 'done' },
     {
@@ -484,9 +312,9 @@ function ConcursoLevel(props: {
       <header {...enter(0)}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex min-w-0 items-start gap-4">
-            <InstitutionMark />
+            <InstitutionMark institution="Prefeitura Municipal de Campinas" />
             <div className="min-w-0 max-w-prose">
-              <StatusPill tState={tState} />
+              <StatusPill status={tState} label={STATUS_LABEL[tState]} />
               <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
                 Concurso Prefeitura de Campinas {year}
               </h1>
@@ -558,13 +386,7 @@ function ConcursoLevel(props: {
                         <span className={`shrink-0 text-sm font-extrabold tabular-nums ${passing ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {score}%
                         </span>
-                        <div className="relative h-2 min-w-0 flex-1 rounded-full bg-slate-100">
-                          <div
-                            className={`${METER_BAR} ${passing ? 'bg-emerald-500' : 'bg-cyan-500'}`}
-                            style={{ width: meters ? `${score}%` : '0%' }}
-                          />
-                          <div className="absolute top-1/2 h-3.5 w-0.5 -translate-y-1/2 rounded-full bg-slate-400" style={{ left: `${c.cut}%` }} />
-                        </div>
+                        <ReadinessBar value={score} cut={c.cut} meters={meters} size="sm" className="min-w-0 flex-1" />
                         <span className={`shrink-0 text-xs font-semibold ${passing ? 'text-emerald-600' : 'text-rose-600'}`}>
                           {passing ? 'Acima do corte' : `${c.cut - score} pt para o corte`}
                         </span>
@@ -587,7 +409,7 @@ function ConcursoLevel(props: {
 
         {/* ░░ Sidebar — ficha do concurso + cronograma ░░ */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
-          <FichaCard title="Ficha do concurso" hero={fichaHero} rows={ficha} enterIdx={2} />
+          <FichaCard title="Ficha do concurso" hero={fichaHero} rows={ficha} editalUrl={EDITAL_URL} enterIdx={2} />
 
           <section {...{ style: enter(3).style }} className={`${enter(3).className} ${CARD} p-5`}>
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -598,32 +420,7 @@ function ConcursoLevel(props: {
                 </span>
               )}
             </div>
-            <ol className="mt-4 flex flex-col">
-              {timeline.map((step, i) => (
-                <li key={step.label} className="relative flex gap-3 pb-4 last:pb-0">
-                  {i < timeline.length - 1 && <span className="absolute left-[11px] top-6 h-full w-px bg-slate-200" />}
-                  {step.state === 'done' ? (
-                    <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-white">
-                      <CheckIcon className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    </span>
-                  ) : step.state === 'current' ? (
-                    <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-600 ring-4 ring-cyan-100">
-                      <span className="h-2 w-2 rounded-full bg-white" />
-                    </span>
-                  ) : (
-                    <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white">
-                      <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
-                    </span>
-                  )}
-                  <div className="min-w-0 pt-0.5">
-                    <p className={`text-sm font-semibold ${step.state === 'current' ? 'text-cyan-700' : step.state === 'done' ? 'text-slate-900' : 'text-slate-400'}`}>
-                      {step.label}
-                    </p>
-                    <p className="text-xs text-slate-500">{step.date}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+            <VerticalTimeline steps={timeline} />
           </section>
         </aside>
       </div>
@@ -640,7 +437,7 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
   const year = YEAR[tState]
   const score = hasAttempts && cargo.bestScore > 0 ? cargo.bestScore : null
   const passing = score != null && score >= cargo.cut
-  const subjectTotal = SUBJECTS.reduce((sum, s) => sum + s.count, 0)
+  const subjectData = buildSubjectData(tState, score)
   const meters = useMeters()
 
   const ctaLabel =
@@ -666,7 +463,7 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
       <header {...enter(0)}>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <StatusPill tState={tState} />
+            <StatusPill status={tState} label={STATUS_LABEL[tState]} />
             <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
               {cargo.role}
             </h1>
@@ -708,13 +505,7 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
                   <p className="mt-1.5 text-sm text-slate-500">melhor nota · 6 simulados</p>
                 </div>
                 <div className="min-w-0">
-                  <div className="relative h-2.5 w-full rounded-full bg-slate-200/70">
-                    <div
-                      className={`${METER_BAR} ${passing ? 'bg-emerald-500' : 'bg-cyan-500'}`}
-                      style={{ width: meters ? `${score}%` : '0%' }}
-                    />
-                    <div className="absolute top-1/2 h-4 w-0.5 -translate-y-1/2 rounded-full bg-slate-500" style={{ left: `${cargo.cut}%` }} />
-                  </div>
+                  <ReadinessBar value={score} cut={cargo.cut} meters={meters} size="md" className="w-full" />
                   <div className="mt-2 flex items-center justify-between text-xs">
                     <span className={`font-semibold ${passing ? 'text-emerald-600' : 'text-rose-600'}`}>
                       {passing ? 'Acima do corte' : `${cargo.cut - score} pt para o corte`}
@@ -786,8 +577,8 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
           {tState === 'past' ? (
             <SubjectDistribution
               title="O que caiu na prova"
-              subtitle={`Composição das ${subjectTotal} questões aplicadas em 23/08/2022`}
-              score={score}
+              subtitle={`Composição das ${subjectData.totalQuestions} questões aplicadas em 23/08/2022`}
+              data={subjectData}
               meters={meters}
               enterIdx={2}
               predictive={false}
@@ -813,7 +604,7 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
               <SubjectDistribution
                 title="O que a Cebraspe costuma cobrar"
                 subtitle="Padrão das provas de 2022 e 2019 deste cargo — estimativa, não garantia"
-                score={score}
+                data={subjectData}
                 meters={meters}
                 enterIdx={3}
                 predictive
@@ -855,7 +646,7 @@ function CargoLevel(props: { tState: TemporalState; hasAttempts: boolean; cargo:
 
         {/* ░░ Sidebar — ficha do cargo ░░ */}
         <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
-          <FichaCard title="Ficha do cargo" hero={fichaHero} rows={ficha} enterIdx={2} />
+          <FichaCard title="Ficha do cargo" hero={fichaHero} rows={ficha} editalUrl={EDITAL_URL} enterIdx={2} />
 
           <section {...{ style: enter(3).style }} className={`${enter(3).className} ${CARD} p-5`}>
             <h2 className="text-sm font-bold text-slate-900">Provas anteriores</h2>
