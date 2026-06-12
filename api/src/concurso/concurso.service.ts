@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { GovernmentScope, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { slugify } from '../common/slugify';
 
 /**
  * A "Concurso" (edital) groups one or more "Provas" (ExamBase, one per cargo).
@@ -23,8 +24,37 @@ export class ConcursoService {
   }
 
   /**
+   * Builds the concurso slug (institution + year + board, e.g.
+   * "prefeitura-campinas-2026-cebraspe"), appending a numeric suffix when the
+   * natural slug is already taken by another concurso.
+   */
+  private async generateUniqueSlug(input: {
+    institution: string;
+    year: number;
+    boardLabel: string | null;
+  }): Promise<string> {
+    const base = [
+      slugify(input.institution),
+      String(input.year),
+      input.boardLabel ? slugify(input.boardLabel) : null,
+    ]
+      .filter(Boolean)
+      .join('-');
+    let candidate = base;
+    for (let suffix = 2; ; suffix++) {
+      const clash = await this.prisma.concurso.findUnique({
+        where: { slug: candidate },
+        select: { id: true },
+      });
+      if (!clash) return candidate;
+      candidate = `${base}-${suffix}`;
+    }
+  }
+
+  /**
    * Finds (or creates) the Concurso row matching an exam base's identity.
    * Keyed on institution + year + examBoardId, the model's @@unique tuple.
+   * Rows created before slugs existed are healed with one on read.
    */
   private async findOrCreateConcurso(input: {
     institution: string;
@@ -33,17 +63,30 @@ export class ConcursoService {
     state: string | null;
     city: string | null;
     examBoardId: string | null;
+    boardLabel: string | null;
   }) {
     const where = {
       institution: input.institution,
       year: input.year,
       examBoardId: input.examBoardId,
     };
+    const slugInput = {
+      institution: input.institution,
+      year: input.year,
+      boardLabel: input.boardLabel,
+    };
     const existing = await this.prisma.concurso.findFirst({ where });
-    if (existing) return existing;
+    if (existing) {
+      if (existing.slug) return existing;
+      return this.prisma.concurso.update({
+        where: { id: existing.id },
+        data: { slug: await this.generateUniqueSlug(slugInput) },
+      });
+    }
     try {
       return await this.prisma.concurso.create({
         data: {
+          slug: await this.generateUniqueSlug(slugInput),
           institution: input.institution,
           year: input.year,
           governmentScope: input.governmentScope,
@@ -82,6 +125,7 @@ export class ConcursoService {
         state: true,
         city: true,
         examBoardId: true,
+        examBoard: { select: { alias: true, name: true } },
         concursoId: true,
       },
     });
@@ -99,6 +143,7 @@ export class ConcursoService {
       state: current.state,
       city: current.city,
       examBoardId: current.examBoardId,
+      boardLabel: current.examBoard?.alias ?? current.examBoard?.name ?? null,
     });
 
     const start = new Date(Date.UTC(year, 0, 1));
@@ -122,6 +167,7 @@ export class ConcursoService {
         examBoardId: true,
         published: true,
         minPassingGradeNonQuota: true,
+        editalUrl: true,
         _count: { select: { questions: true } },
       },
     });
@@ -133,6 +179,20 @@ export class ConcursoService {
         where: { id: { in: unlinkedIds }, concursoId: null },
         data: { concursoId: concurso.id },
       });
+    }
+
+    // Self-healing edital URL: promote the earliest prova's editalUrl to the concurso.
+    if (!concurso.editalUrl) {
+      const withEdital = [...provas]
+        .sort((a, b) => a.examDate.getTime() - b.examDate.getTime())
+        .find((p) => p.editalUrl);
+      if (withEdital?.editalUrl) {
+        concurso.editalUrl = withEdital.editalUrl;
+        await this.prisma.concurso.update({
+          where: { id: concurso.id },
+          data: { editalUrl: withEdital.editalUrl },
+        });
+      }
     }
 
     // Per-prova stats for the requesting user (finished attempts only).
@@ -149,9 +209,7 @@ export class ConcursoService {
           examBaseId: { in: provas.map((p) => p.id) },
         },
         _count: { id: true },
-        _max: { scorePercentage: true } as Parameters<
-          typeof this.prisma.examBaseAttempt.groupBy
-        >[0]['_max'],
+        _max: { scorePercentage: true },
       });
       for (const s of grouped) {
         const count = (s._count as { id: number } | undefined)?.id ?? 0;
@@ -167,11 +225,13 @@ export class ConcursoService {
     return {
       concurso: {
         id: concurso.id,
+        slug: concurso.slug,
         institution: concurso.institution,
         year: concurso.year,
         governmentScope: concurso.governmentScope,
         state: concurso.state,
         city: concurso.city,
+        editalUrl: concurso.editalUrl,
       },
       provas: provas.map((p) => ({
         id: p.id,
