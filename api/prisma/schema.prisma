@@ -247,8 +247,6 @@ model ExamBase {
   hasReserveList          Boolean          @default(false)
   applicantCount          Int?
   registrationFee         Decimal?         @db.Decimal(10,2)
-  /// @deprecated Substituído pela janela registrationStart/registrationEnd. Coluna mantida até a limpeza final do épico MAX-11.
-  registrationDate        DateTime?
   /// Início da janela de inscrições
   registrationStart       DateTime?
   /// Fim da janela de inscrições

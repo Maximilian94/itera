@@ -112,7 +112,8 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
         isNursingRelevant: true,
@@ -311,7 +312,8 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
         isNursingRelevant: true,
@@ -542,7 +544,8 @@ export class ExamBaseService {
       vacancyCount?: number | null;
       applicantCount?: number | null;
       registrationFee?: string | number | null;
-      registrationDate?: string | null;
+      registrationStart?: string | null;
+      registrationEnd?: string | null;
       description?: string | null;
       workload?: string | null;
       isNursingRelevant?: boolean;
@@ -589,7 +592,18 @@ export class ExamBaseService {
         vacancyCount: input.vacancyCount === undefined ? undefined : input.vacancyCount,
         applicantCount: input.applicantCount === undefined ? undefined : input.applicantCount,
         registrationFee: input.registrationFee === undefined ? undefined : input.registrationFee,
-        registrationDate: input.registrationDate === undefined ? undefined : (input.registrationDate ? new Date(input.registrationDate) : null),
+        registrationStart:
+          input.registrationStart === undefined
+            ? undefined
+            : input.registrationStart
+              ? new Date(input.registrationStart)
+              : null,
+        registrationEnd:
+          input.registrationEnd === undefined
+            ? undefined
+            : input.registrationEnd
+              ? new Date(input.registrationEnd)
+              : null,
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
         isNursingRelevant: input.isNursingRelevant,
@@ -612,7 +626,8 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
         isNursingRelevant: true,

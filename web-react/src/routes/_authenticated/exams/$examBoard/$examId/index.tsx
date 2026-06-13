@@ -163,7 +163,8 @@ function RouteComponent() {
   const [editVacancyCount, setEditVacancyCount] = useState('')
   const [editApplicantCount, setEditApplicantCount] = useState('')
   const [editRegistrationFee, setEditRegistrationFee] = useState('')
-  const [editRegistrationDate, setEditRegistrationDate] = useState('')
+  const [editRegistrationStart, setEditRegistrationStart] = useState('')
+  const [editRegistrationEnd, setEditRegistrationEnd] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [editWorkload, setEditWorkload] = useState('')
   const [isEditingAdminNotes, setIsEditingAdminNotes] = useState(false)
@@ -265,7 +266,8 @@ function RouteComponent() {
       setEditVacancyCount(examBase.vacancyCount != null ? String(examBase.vacancyCount) : '')
       setEditApplicantCount(examBase.applicantCount != null ? String(examBase.applicantCount) : '')
       setEditRegistrationFee(examBase.registrationFee ?? '')
-      setEditRegistrationDate(examBase.registrationDate ? isoToDateInput(examBase.registrationDate) : '')
+      setEditRegistrationStart(examBase.registrationStart ? isoToDateInput(examBase.registrationStart) : '')
+      setEditRegistrationEnd(examBase.registrationEnd ? isoToDateInput(examBase.registrationEnd) : '')
       setEditDescription(examBase.description ?? '')
       setEditWorkload(examBase.workload ?? '')
       setEditError(null)
@@ -314,7 +316,8 @@ function RouteComponent() {
         vacancyCount: editVacancyCount ? parseInt(editVacancyCount, 10) : null,
         applicantCount: editApplicantCount ? parseInt(editApplicantCount, 10) : null,
         registrationFee: editRegistrationFee.trim() || null,
-        registrationDate: editRegistrationDate.trim() || null,
+        registrationStart: editRegistrationStart.trim() || null,
+        registrationEnd: editRegistrationEnd.trim() || null,
         description: editDescription.trim() || null,
         workload: editWorkload.trim() || null,
       })
@@ -341,7 +344,8 @@ function RouteComponent() {
     if (data.vacancyCount != null) setEditVacancyCount(String(data.vacancyCount))
     if (data.applicantCount != null) setEditApplicantCount(String(data.applicantCount))
     if (data.registrationFee) setEditRegistrationFee(data.registrationFee)
-    if (data.registrationDate) setEditRegistrationDate(data.registrationDate.slice(0, 10))
+    if (data.registrationStart) setEditRegistrationStart(data.registrationStart.slice(0, 10))
+    if (data.registrationEnd) setEditRegistrationEnd(data.registrationEnd.slice(0, 10))
     if (data.description) setEditDescription(data.description)
     if (data.workload) setEditWorkload(data.workload)
   }
@@ -1147,10 +1151,20 @@ function RouteComponent() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <TextField
-                  label="Data da inscrição"
+                  label="Início das inscrições"
                   type="date"
-                  value={editRegistrationDate}
-                  onChange={(e) => setEditRegistrationDate(e.target.value)}
+                  value={editRegistrationStart}
+                  onChange={(e) => setEditRegistrationStart(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  size="small"
+                  fullWidth
+                  sx={{ '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+                />
+                <TextField
+                  label="Fim das inscrições"
+                  type="date"
+                  value={editRegistrationEnd}
+                  onChange={(e) => setEditRegistrationEnd(e.target.value)}
                   InputLabelProps={{ shrink: true }}
                   size="small"
                   fullWidth
@@ -1350,8 +1364,8 @@ function RouteComponent() {
               facts.push({ icon: BanknotesIcon, label: 'Salário', value: formatBRL(examBase.salaryBase) })
             if (examBase.workload)
               facts.push({ icon: ClockIcon, label: 'Carga horária', value: examBase.workload })
-            if (examBase.registrationDate)
-              facts.push({ icon: PencilSquareIcon, label: 'Inscrição até', value: dayjs(examBase.registrationDate).format('DD/MM/YYYY') })
+            if (examBase.registrationEnd)
+              facts.push({ icon: PencilSquareIcon, label: 'Inscrição até', value: dayjs(examBase.registrationEnd).format('DD/MM/YYYY') })
             if (examBase.registrationFee)
               facts.push({ icon: BanknotesIcon, label: 'Taxa', value: formatBRL(examBase.registrationFee) })
             if (facts.length === 0) return null

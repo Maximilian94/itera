@@ -26,7 +26,8 @@ export type ExtractedExamMetadata = {
   vacancyCount?: number | null;
   applicantCount?: number | null;
   registrationFee?: string | null;
-  registrationDate?: string | null;
+  registrationStart?: string | null;
+  registrationEnd?: string | null;
   description?: string | null;
   workload?: string | null;
 };

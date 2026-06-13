@@ -71,7 +71,11 @@ export class CreateExamBaseDto {
 
   @IsOptional()
   @IsDateString()
-  registrationDate?: string | null;
+  registrationStart?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  registrationEnd?: string | null;
 
   @IsOptional()
   @IsString()
