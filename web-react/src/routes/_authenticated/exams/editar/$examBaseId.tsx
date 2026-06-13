@@ -85,7 +85,8 @@ type FormState = {
   vacancyCount: string
   applicantCount: string
   registrationFee: string
-  registrationDate: string
+  registrationStart: string
+  registrationEnd: string
   description: string
   workload: string
   isNursingRelevant: boolean
@@ -106,7 +107,8 @@ const EMPTY_FORM: FormState = {
   vacancyCount: '',
   applicantCount: '',
   registrationFee: '',
-  registrationDate: '',
+  registrationStart: '',
+  registrationEnd: '',
   description: '',
   workload: '',
   isNursingRelevant: true,
@@ -130,7 +132,8 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     vacancyCount: data.vacancyCount != null ? String(data.vacancyCount) : prev.vacancyCount,
     applicantCount: data.applicantCount != null ? String(data.applicantCount) : prev.applicantCount,
     registrationFee: data.registrationFee ?? prev.registrationFee,
-    registrationDate: data.registrationDate ? data.registrationDate.slice(0, 10) : prev.registrationDate,
+    registrationStart: data.registrationStart ? data.registrationStart.slice(0, 10) : prev.registrationStart,
+    registrationEnd: data.registrationEnd ? data.registrationEnd.slice(0, 10) : prev.registrationEnd,
     description: data.description ?? prev.description,
     workload: data.workload ?? prev.workload,
     // Decisão de admin, não de IA: a relevância nunca vem da extração.
@@ -329,7 +332,8 @@ function MetadataStep({
       vacancyCount: examBase.vacancyCount != null ? String(examBase.vacancyCount) : '',
       applicantCount: examBase.applicantCount != null ? String(examBase.applicantCount) : '',
       registrationFee: examBase.registrationFee ?? '',
-      registrationDate: examBase.registrationDate ? examBase.registrationDate.slice(0, 10) : '',
+      registrationStart: examBase.registrationStart ? examBase.registrationStart.slice(0, 10) : '',
+      registrationEnd: examBase.registrationEnd ? examBase.registrationEnd.slice(0, 10) : '',
       description: examBase.description ?? '',
       workload: examBase.workload ?? '',
       isNursingRelevant: examBase.isNursingRelevant ?? true,
@@ -400,7 +404,8 @@ function MetadataStep({
       vacancyCount: form.vacancyCount ? parseInt(form.vacancyCount, 10) : null,
       applicantCount: form.applicantCount ? parseInt(form.applicantCount, 10) : null,
       registrationFee: form.registrationFee || null,
-      registrationDate: form.registrationDate || null,
+      registrationStart: form.registrationStart || null,
+      registrationEnd: form.registrationEnd || null,
       description: form.description.trim() || null,
       workload: form.workload.trim() || null,
       isNursingRelevant: form.isNursingRelevant,
@@ -611,10 +616,19 @@ function MetadataStep({
           size="small"
         />
         <TextField
-          label="Data da inscrição"
+          label="Início das inscrições"
           type="date"
-          value={form.registrationDate}
-          onChange={(e) => set('registrationDate', e.target.value)}
+          value={form.registrationStart}
+          onChange={(e) => set('registrationStart', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Fim das inscrições"
+          type="date"
+          value={form.registrationEnd}
+          onChange={(e) => set('registrationEnd', e.target.value)}
           InputLabelProps={{ shrink: true }}
           fullWidth
           size="small"

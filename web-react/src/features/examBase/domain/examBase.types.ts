@@ -28,7 +28,8 @@ export type ExamBase = {
   vacancyCount: number | null
   applicantCount: number | null
   registrationFee: string | null
-  registrationDate: string | null
+  registrationStart: string | null
+  registrationEnd: string | null
   description: string | null
   workload: string | null
   /** Quando false, o cargo fica fora da página do concurso (ex.: Médico). */
@@ -110,7 +111,8 @@ export type ExtractedExamMetadata = {
   vacancyCount?: number | null
   applicantCount?: number | null
   registrationFee?: string | null
-  registrationDate?: string | null
+  registrationStart?: string | null
+  registrationEnd?: string | null
   description?: string | null
   workload?: string | null
 }
@@ -133,7 +135,8 @@ export type UpdateExamBaseInput = {
   vacancyCount?: number | null
   applicantCount?: number | null
   registrationFee?: string | null
-  registrationDate?: string | null
+  registrationStart?: string | null
+  registrationEnd?: string | null
   description?: string | null
   workload?: string | null
   isNursingRelevant?: boolean
