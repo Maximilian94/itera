@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import type { ConcursoListFilters } from '../domain/concurso.types'
 import { concursoService } from '../services/concurso.service'
 
 /** Dados de edital mudam raramente — 5 min sem refetch. */
@@ -6,6 +7,7 @@ const CONCURSO_STALE_TIME = 5 * 60 * 1000
 
 export const concursoKeys = {
   all: ['concurso'] as const,
+  list: (filters: ConcursoListFilters) => ['concurso', 'list', filters] as const,
   one: (slug: string) => ['concurso', slug] as const,
   cargo: (slug: string, cargoSlug: string) =>
     ['concurso', slug, 'cargo', cargoSlug] as const,
@@ -13,6 +15,15 @@ export const concursoKeys = {
     ['concurso', 'subject-distribution', examBaseId] as const,
   competitionHistory: (examBaseId: string) =>
     ['concurso', 'competition-history', examBaseId] as const,
+}
+
+/** Listagem/descoberta de concursos (nível 0). Filtros vão para o backend. */
+export function useConcursosQuery(filters: ConcursoListFilters = {}) {
+  return useQuery({
+    queryKey: concursoKeys.list(filters),
+    queryFn: () => concursoService.list(filters),
+    staleTime: CONCURSO_STALE_TIME,
+  })
 }
 
 /** Página do concurso (nível 1). */

@@ -5,6 +5,7 @@ import { slugify } from '../common/slugify';
 import {
   aggregateConcursoTimeline,
   deriveConcursoStatus,
+  type ConcursoStatus,
 } from './concurso-status';
 import { previousEditionsWhere } from './previous-editions';
 
@@ -309,6 +310,166 @@ export class ConcursoService {
         },
       })),
     };
+  }
+
+  /**
+   * Discovery listing (MAX-28): one card per concurso, aggregated straight from
+   * ExamBase by the grouping tuple (institution + board + exam year) so it
+   * covers every concurso whether or not the lazy-link has run yet. Only
+   * nursing-relevant provas count (MAX-13); provas without an institution have
+   * no grouping key and are left out. Read-only — it never creates concurso
+   * rows: cards link by the concurso slug when one already exists, else by a
+   * representative ExamBase id (the same lazy fallback the /exams rows use,
+   * resolved on first visit by `resolveConcurso`).
+   */
+  async listConcursos(
+    filters: {
+      q?: string;
+      scope?: GovernmentScope;
+      state?: string;
+      city?: string;
+      examBoardId?: string;
+      status?: ConcursoStatus;
+    } = {},
+    userId?: string,
+  ) {
+    const showUnpublished = userId ? await this.isAdmin(userId) : false;
+
+    const provas = await this.prisma.examBase.findMany({
+      where: {
+        institution: { not: null },
+        isNursingRelevant: true,
+        ...(showUnpublished ? {} : { published: true }),
+        ...(filters.scope ? { governmentScope: filters.scope } : {}),
+        ...(filters.state ? { state: filters.state } : {}),
+        ...(filters.city ? { city: filters.city } : {}),
+        ...(filters.examBoardId ? { examBoardId: filters.examBoardId } : {}),
+      },
+      select: {
+        id: true,
+        institution: true,
+        examDate: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        examBoardId: true,
+        examBoard: { select: { id: true, name: true, alias: true } },
+        salaryBase: true,
+        vacancyCount: true,
+        hasReserveList: true,
+        registrationStart: true,
+        registrationEnd: true,
+        resultDate: true,
+        concurso: { select: { id: true, slug: true } },
+        _count: { select: { questions: true } },
+      },
+    });
+
+    // Group by the schema's @@unique tuple (institution + year + board).
+    const groups = new Map<string, typeof provas>();
+    for (const p of provas) {
+      const key = `${p.institution}|${p.examBoardId ?? ''}|${p.examDate.getUTCFullYear()}`;
+      const bucket = groups.get(key);
+      if (bucket) bucket.push(p);
+      else groups.set(key, [p]);
+    }
+
+    const statsByExamBaseId = await this.getUserStatsByExamBase(
+      userId,
+      provas.map((p) => p.id),
+    );
+
+    const STATUS_ORDER: Record<ConcursoStatus, number> = {
+      open: 0,
+      future: 1,
+      past: 2,
+    };
+
+    let items = [...groups.values()].map((bucket) => {
+      const head = bucket[0];
+      const timeline = aggregateConcursoTimeline(bucket);
+      const status = deriveConcursoStatus(timeline);
+
+      const salaries = bucket
+        .map((p) => p.salaryBase)
+        .filter((s): s is NonNullable<typeof s> => s != null);
+
+      // Prefer an existing concurso (slug + id); else link by a representative
+      // ExamBase id, which `resolveConcurso` turns into a concurso on first view.
+      const linked = bucket.find((p) => p.concurso != null)?.concurso ?? null;
+
+      // Aggregate the user's progress across the concurso's relevant provas.
+      const stats = bucket
+        .map((p) => statsByExamBaseId.get(p.id))
+        .filter((s): s is NonNullable<typeof s> => s != null);
+      const bestScores = stats
+        .map((s) => s.bestScore)
+        .filter((s): s is number => s != null);
+
+      return {
+        id: linked?.id ?? null,
+        slug: linked?.slug ?? head.id,
+        institution: head.institution as string,
+        year: head.examDate.getUTCFullYear(),
+        governmentScope: head.governmentScope,
+        state: head.state,
+        city: head.city,
+        examBoard: head.examBoard
+          ? {
+              id: head.examBoard.id,
+              name: head.examBoard.name,
+              alias: head.examBoard.alias,
+            }
+          : null,
+        status,
+        timeline: {
+          registrationStart: timeline.registrationStart?.toISOString() ?? null,
+          registrationEnd: timeline.registrationEnd?.toISOString() ?? null,
+          examDate: timeline.examDate?.toISOString() ?? null,
+          resultDate: timeline.resultDate?.toISOString() ?? null,
+        },
+        cargoCount: bucket.length,
+        vacancyTotal: bucket.reduce((acc, p) => acc + (p.vacancyCount ?? 0), 0),
+        hasCR: bucket.some((p) => p.hasReserveList),
+        salaryMin: salaries.length
+          ? String(salaries.reduce((a, b) => (Number(b) < Number(a) ? b : a)))
+          : null,
+        salaryMax: salaries.length
+          ? String(salaries.reduce((a, b) => (Number(b) > Number(a) ? b : a)))
+          : null,
+        questionCount: bucket.reduce((acc, p) => acc + p._count.questions, 0),
+        userStats: {
+          attemptedCargos: stats.filter((s) => s.attemptCount > 0).length,
+          bestScore: bestScores.length ? Math.max(...bestScores) : null,
+        },
+      };
+    });
+
+    if (filters.status) {
+      items = items.filter((it) => it.status === filters.status);
+    }
+    if (filters.q?.trim()) {
+      const q = filters.q.trim().toLowerCase();
+      items = items.filter(
+        (it) =>
+          it.institution.toLowerCase().includes(q) ||
+          (it.examBoard?.name ?? '').toLowerCase().includes(q) ||
+          (it.examBoard?.alias ?? '').toLowerCase().includes(q),
+      );
+    }
+
+    // Discovery order: actionable first (open → future → past); inside a bucket
+    // the most time-relevant exam date leads — soonest upcoming, most recent past.
+    items.sort((a, b) => {
+      if (a.status !== b.status) {
+        return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+      }
+      const da = a.timeline.examDate ? Date.parse(a.timeline.examDate) : 0;
+      const db = b.timeline.examDate ? Date.parse(b.timeline.examDate) : 0;
+      return a.status === 'past' ? db - da : da - db;
+    });
+
+    return { concursos: items };
   }
 
   /**

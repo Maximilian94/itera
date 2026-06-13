@@ -22,8 +22,11 @@ import type {
   CargoDetail,
   CargoSummary,
   ConcursoDetail,
+  ConcursoListItem,
+  ConcursoListResponse,
   SubjectDistribution,
 } from '../domain/concurso.types'
+import { Route as ConcursosListRouteImport } from '@/routes/_authenticated/concursos/index'
 import { Route as ConcursoRouteImport } from '@/routes/_authenticated/concursos/$concursoSlug/index'
 import { Route as CargoRouteImport } from '@/routes/_authenticated/concursos/$concursoSlug/$cargoSlug'
 
@@ -33,6 +36,11 @@ import { Route as CargoRouteImport } from '@/routes/_authenticated/concursos/$co
 
 const rootRoute = createRootRoute()
 
+const concursosListRoute = (ConcursosListRouteImport as any).update({
+  id: '/concursos/',
+  path: '/concursos/',
+  getParentRoute: () => rootRoute,
+})
 const concursoRoute = (ConcursoRouteImport as any).update({
   id: '/concursos/$concursoSlug/',
   path: '/concursos/$concursoSlug/',
@@ -49,6 +57,7 @@ const stub = (path: string) =>
   createRoute({ getParentRoute: () => rootRoute, path, component: () => null })
 
 const routeTree = rootRoute.addChildren([
+  concursosListRoute,
   concursoRoute,
   cargoRoute,
   stub('/exams'),
@@ -152,6 +161,69 @@ export function makeCargoSummary(
     published: true,
     userStats: { attemptCount: 2, bestScore: 72 },
     ...overrides,
+  }
+}
+
+export function makeConcursoListItem(
+  overrides: Partial<ConcursoListItem> = {},
+): ConcursoListItem {
+  return {
+    id: 'c1',
+    slug: 'pmc-2026',
+    institution: 'Prefeitura de Campinas',
+    year: 2026,
+    governmentScope: 'MUNICIPAL',
+    state: 'SP',
+    city: 'Campinas',
+    examBoard: { id: 'board-1', name: 'Fundação VUNESP', alias: 'VUNESP' },
+    status: 'open',
+    timeline: {
+      registrationStart: '2026-06-02T00:00:00.000Z',
+      registrationEnd: null,
+      examDate: '2026-08-23T00:00:00.000Z',
+      resultDate: null,
+    },
+    cargoCount: 2,
+    vacancyTotal: 12,
+    hasCR: true,
+    salaryMin: '4800',
+    salaryMax: '8500',
+    questionCount: 80,
+    userStats: { attemptedCargos: 0, bestScore: null },
+    ...overrides,
+  }
+}
+
+export function makeConcursoList(
+  items?: Array<ConcursoListItem>,
+): ConcursoListResponse {
+  return {
+    concursos: items ?? [
+      makeConcursoListItem(),
+      makeConcursoListItem({
+        id: 'c2',
+        slug: 'gov-sp-2023',
+        institution: 'Governo de São Paulo',
+        year: 2023,
+        governmentScope: 'STATE',
+        city: null,
+        examBoard: { id: 'board-2', name: 'FGV', alias: 'FGV' },
+        status: 'past',
+        timeline: {
+          registrationStart: null,
+          registrationEnd: null,
+          examDate: '2023-05-14T00:00:00.000Z',
+          resultDate: null,
+        },
+        cargoCount: 1,
+        vacancyTotal: 0,
+        hasCR: false,
+        salaryMin: '6000',
+        salaryMax: '6000',
+        questionCount: 50,
+        userStats: { attemptedCargos: 1, bestScore: 71 },
+      }),
+    ],
   }
 }
 

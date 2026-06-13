@@ -225,8 +225,7 @@ function Breadcrumb(props: {
       <ol className="flex flex-wrap items-center gap-1.5 text-sm">
         <li>
           <Link
-            to="/exams"
-            search={{ board: undefined }}
+            to="/concursos"
             className="font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
           >
             Concursos
