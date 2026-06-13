@@ -18,12 +18,12 @@ import { PhoneSafeArea } from './PhoneSafeArea'
 
 type BottomNavItem = {
   label: string
-  to: '/dashboard' | '/exams' | '/treino' | '/history' | '/account'
+  to: '/dashboard' | '/concursos' | '/treino' | '/history' | '/account'
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
   /** Rotas extras que mantêm o item ativo (sempre fuzzy). */
-  alsoMatch?: Array<'/concursos/$concursoSlug'>
+  alsoMatch?: Array<'/exams'>
 }
 
 const items: BottomNavItem[] = [
@@ -34,13 +34,13 @@ const items: BottomNavItem[] = [
     activeIcon: HomeIconSolid,
   },
   {
-    label: 'Exams',
-    to: '/exams',
+    label: 'Concursos',
+    to: '/concursos',
     icon: DocumentTextIcon,
     activeIcon: DocumentTextIconSolid,
     fuzzy: true,
-    // Concursos vivem sob o guarda-chuva de Provas (decisão MAX-25).
-    alsoMatch: ['/concursos/$concursoSlug'],
+    // Concursos é a porta de entrada (MAX-28); /exams mantém o item ativo.
+    alsoMatch: ['/exams'],
   },
   {
     label: 'Treino',

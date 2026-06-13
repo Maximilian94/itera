@@ -66,7 +66,7 @@ describe('página do concurso (nível 1)', () => {
     ).toBeTruthy()
   })
 
-  it('404 → estado de não encontrado com volta para /exams', async () => {
+  it('404 → estado de não encontrado com volta para /concursos', async () => {
     installFetchMock({ [API]: { status: 404, body: { message: 'Not found' } } })
     renderPage(CONCURSO_PATH)
 
@@ -81,7 +81,7 @@ describe('página do concurso (nível 1)', () => {
       screen
         .getByRole('link', { name: 'Ver todos os concursos' })
         .getAttribute('href'),
-    ).toBe('/exams')
+    ).toBe('/concursos')
   })
 
   it('erro de rede → estado de falha com retry', async () => {

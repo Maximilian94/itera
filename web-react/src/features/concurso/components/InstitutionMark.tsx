@@ -17,12 +17,23 @@ export function institutionInitials(institution: string): string {
   return (words[0][0] + words[words.length - 1][0]).toLocaleUpperCase('pt-BR')
 }
 
-/** Marca da instituição: monograma sóbrio, sem mascote. */
-export function InstitutionMark({ institution }: { institution: string }) {
+/** Marca da instituição: monograma sóbrio, sem mascote.
+ *  `md` (padrão) = cabeçalho do nível 1; `sm` = list-rows compactos. */
+export function InstitutionMark({
+  institution,
+  size = 'md',
+}: {
+  institution: string
+  size?: 'sm' | 'md'
+}) {
+  const sizing =
+    size === 'sm'
+      ? 'h-10 w-10 rounded-xl text-sm'
+      : 'h-12 w-12 rounded-2xl text-sm sm:h-14 sm:w-14 sm:text-base'
   return (
     <div
       aria-hidden
-      className="flex h-12 w-12 shrink-0 select-none items-center justify-center rounded-2xl bg-slate-900 text-sm font-extrabold tracking-wide text-white shadow-[0_2px_8px_-2px_rgba(15,23,42,0.35)] sm:h-14 sm:w-14 sm:text-base"
+      className={`flex shrink-0 select-none items-center justify-center bg-slate-100 font-extrabold tracking-wide text-slate-600 ring-1 ring-inset ring-slate-200/80 ${sizing}`}
     >
       {institutionInitials(institution)}
     </div>

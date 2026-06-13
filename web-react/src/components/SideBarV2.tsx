@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { useClerkAuth } from '@/auth/clerk'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
-import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
+import { Route as ConcursosRoute } from '@/routes/_authenticated/concursos/index'
 import { Route as TreinoRoute } from '@/routes/_authenticated/treino'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
@@ -70,14 +70,14 @@ export const SideBarV2 = () => {
             activeIcon: HomeIcon,
         },
         {
-            label: 'Exams',
-            href: ExamsRoute.to,
+            label: 'Concursos',
+            href: ConcursosRoute.to,
             icon: DocumentTextIconOutline,
             activeIcon: DocumentTextIcon,
             fuzzy: true,
-            // Concursos vivem sob o guarda-chuva de Provas (decisão MAX-25):
-            // as páginas /concursos/* mantêm este item ativo.
-            alsoMatch: ['/concursos/$concursoSlug'],
+            // Concursos é a porta de entrada (MAX-28); /exams vira a camada de
+            // provas/admin e mantém este item ativo.
+            alsoMatch: ['/exams'],
         },
         {
             label: 'Bancas',

@@ -301,6 +301,74 @@ describe('Concurso endpoints (e2e)', () => {
     });
   });
 
+  // Listagem/descoberta (MAX-28): agrega ExamBase por instituição+banca+ano.
+  // Roda antes do describe de fallback, então só existe o seed do beforeAll:
+  // 3 concursos da Prefeitura de Itera (futuro/open, 2024/past, 2021/past).
+  describe('GET /concursos (listagem MAX-28)', () => {
+    it('anônimo: um card por concurso, ordenados open→past, sem Médico/Auxiliar', async () => {
+      const res = await request(http).get('/concursos').expect(200);
+
+      // Médico (irrelevante) e Auxiliar (não publicado) não contam nos cargos.
+      expect(res.body.concursos.map((c: { status: string }) => c.status)).toEqual(
+        ['open', 'past', 'past'],
+      );
+      // Dentro de past, examDate desc: 2024 antes de 2021.
+      const years = res.body.concursos.map((c: { year: number }) => c.year);
+      expect(years[1]).toBe(2024);
+      expect(years[2]).toBe(2021);
+
+      const c2024 = res.body.concursos.find(
+        (c: { year: number }) => c.year === 2024,
+      );
+      expect(c2024).toMatchObject({
+        slug: PAST_SLUG,
+        institution: INSTITUTION,
+        cargoCount: 2, // Enfermeiro + Técnico
+        vacancyTotal: 70,
+        salaryMin: '8500',
+        salaryMax: '8500',
+        userStats: { attemptedCargos: 0, bestScore: null },
+      });
+
+      const open = res.body.concursos.find(
+        (c: { status: string }) => c.status === 'open',
+      );
+      expect(open).toMatchObject({ slug: futureSlug, cargoCount: 1 });
+    });
+
+    it('ADMIN enxerga a prova não publicada no cargoCount', async () => {
+      const res = await asAdmin(request(http).get('/concursos')).expect(200);
+      const c2024 = res.body.concursos.find(
+        (c: { year: number }) => c.year === 2024,
+      );
+      expect(c2024.cargoCount).toBe(3); // + Auxiliar não publicado
+    });
+
+    it('usuário logado: userStats agregado do concurso (tentativa de 2024)', async () => {
+      const res = await asUser(request(http).get('/concursos')).expect(200);
+      const c2024 = res.body.concursos.find(
+        (c: { year: number }) => c.year === 2024,
+      );
+      expect(c2024.userStats).toEqual({ attemptedCargos: 1, bestScore: 40 });
+    });
+
+    it('filtro status=open retorna só o concurso futuro', async () => {
+      const res = await request(http).get('/concursos?status=open').expect(200);
+      expect(res.body.concursos).toHaveLength(1);
+      expect(res.body.concursos[0].slug).toBe(futureSlug);
+    });
+
+    it('busca q filtra por instituição (e zera sem match)', async () => {
+      const hit = await request(http).get('/concursos?q=itera').expect(200);
+      expect(hit.body.concursos.length).toBeGreaterThanOrEqual(3);
+
+      const miss = await request(http)
+        .get('/concursos?q=instituicao-inexistente')
+        .expect(200);
+      expect(miss.body.concursos).toHaveLength(0);
+    });
+  });
+
   // Entrada 1-clique do /exams (MAX-25): um UUID de prova também resolve a
   // página do concurso, criando o vínculo lazy na hora se preciso.
   describe('GET /concursos/:id — fallback por id de prova (MAX-25)', () => {

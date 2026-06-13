@@ -1,5 +1,6 @@
 /**
- * Tipos espelhando 1:1 os payloads da API de concurso (MAX-11):
+ * Tipos espelhando 1:1 os payloads da API de concurso (MAX-11/MAX-28):
+ * - GET /concursos                            → ConcursoListResponse
  * - GET /concursos/:slug                      → ConcursoDetail
  * - GET /concursos/:slug/cargos/:cargoSlug    → CargoDetail
  * - GET /exam-bases/:id/subject-distribution  → SubjectDistribution
@@ -13,6 +14,48 @@
 export type ConcursoStatus = 'open' | 'future' | 'past'
 
 export type GovernmentScope = 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+
+// ── Listagem/descoberta (nível 0, MAX-28) ────────────────────────────────────
+
+/** Card de concurso na listagem; `slug` aceita UUID de prova (fallback lazy). */
+export type ConcursoListItem = {
+  /** Id do Concurso já vinculado; null até o lazy-link rodar. */
+  id: string | null
+  /** Alvo de navegação: slug do concurso ou id de prova representante. */
+  slug: string
+  institution: string
+  year: number
+  governmentScope: GovernmentScope
+  state: string | null
+  city: string | null
+  examBoard: ExamBoardRef | null
+  status: ConcursoStatus
+  timeline: ConcursoTimeline
+  cargoCount: number
+  vacancyTotal: number
+  hasCR: boolean
+  salaryMin: string | null
+  salaryMax: string | null
+  questionCount: number
+  userStats: {
+    /** Quantos cargos do concurso o usuário já tentou (0 para anônimo). */
+    attemptedCargos: number
+    /** Melhor nota entre os cargos; null sem tentativa. */
+    bestScore: number | null
+  }
+}
+
+export type ConcursoListResponse = { concursos: Array<ConcursoListItem> }
+
+/** Filtros server-side da listagem; espelham os antigos filtros de /exams. */
+export type ConcursoListFilters = {
+  q?: string
+  scope?: GovernmentScope
+  state?: string
+  city?: string
+  examBoardId?: string
+  status?: ConcursoStatus
+}
 
 export type ExamBoardRef = {
   id: string

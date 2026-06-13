@@ -139,8 +139,7 @@ function Breadcrumb({ current }: { current: string | null }) {
       <ol className="flex flex-wrap items-center gap-1.5 text-sm">
         <li>
           <Link
-            to="/exams"
-            search={{ board: undefined }}
+            to="/concursos"
             className="font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
           >
             Concursos
@@ -514,8 +513,7 @@ function EmptyCargos() {
         </p>
       </div>
       <Link
-        to="/exams"
-        search={{ board: undefined }}
+        to="/concursos"
         className="mt-1 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white no-underline transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
       >
         Ver outros concursos
@@ -590,8 +588,7 @@ function ConcursoErrorState(props: { error: unknown; onRetry: () => void }) {
           </button>
         )}
         <Link
-          to="/exams"
-          search={{ board: undefined }}
+          to="/concursos"
           className={`inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${
             notFound
               ? 'bg-cyan-600 text-white hover:bg-cyan-700'

@@ -1,10 +1,55 @@
-import { Controller, Get, Param, Req } from '@nestjs/common';
+import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import { GovernmentScope } from '@prisma/client';
 import { ConcursoService } from './concurso.service';
+import type { ConcursoStatus } from './concurso-status';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
+
+const SCOPES = new Set<GovernmentScope>([
+  GovernmentScope.MUNICIPAL,
+  GovernmentScope.STATE,
+  GovernmentScope.FEDERAL,
+]);
+const STATUSES = new Set<ConcursoStatus>(['open', 'future', 'past']);
 
 @Controller('concursos')
 export class ConcursosController {
   constructor(private readonly concursos: ConcursoService) {}
+
+  /**
+   * Discovery listing (MAX-28, nova porta de entrada): one card per concurso,
+   * aggregated from ExamBase by institution + board + exam year. Server-side
+   * filters (q, scope, state, city, examBoardId, status) match the old /exams
+   * filters. Auth is optional: logged users get aggregate per-concurso stats.
+   */
+  @OptionalAuth()
+  @Get()
+  listConcursos(
+    @Req() req: { user?: { userId: string } },
+    @Query('q') q?: string,
+    @Query('scope') scope?: string,
+    @Query('state') state?: string,
+    @Query('city') city?: string,
+    @Query('examBoardId') examBoardId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.concursos.listConcursos(
+      {
+        q,
+        scope:
+          scope && SCOPES.has(scope as GovernmentScope)
+            ? (scope as GovernmentScope)
+            : undefined,
+        state,
+        city,
+        examBoardId,
+        status:
+          status && STATUSES.has(status as ConcursoStatus)
+            ? (status as ConcursoStatus)
+            : undefined,
+      },
+      req.user?.userId,
+    );
+  }
 
   /**
    * Canonical concurso page payload (nível 1): identity, derived temporal
