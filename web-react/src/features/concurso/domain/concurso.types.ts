@@ -154,6 +154,36 @@ export type CargoPreviousExam = {
   userStats: UserExamStats
 }
 
+/** Uma prova (tipo) do cargo. Cargo de prova única → array de 1. */
+export type CargoProva = {
+  examBaseId: string
+  slug: string | null
+  /** Rótulo da prova ("Tipo 1", "Amarela"); null quando o cargo tem 1 prova. */
+  label: string | null
+  isPrimary: boolean
+  examDate: string
+  questionCount: number
+  userStats: UserExamStats
+  /** Plano de estudos específico desta prova (o seletor re-escopa o plano). */
+  studyPlan: StudyPlan
+}
+
+/** Prova recomendada para treinar (mesmo cargo, fora deste edital). tier 1 =
+ *  mesma banca; tier 2 = mesmo cargo, outra banca. */
+export type RelatedProva = {
+  examBaseId: string
+  slug: string | null
+  institution: string | null
+  year: number
+  /** Banca da própria prova (pode diferir da do concurso no tier 2). */
+  examBoardId: string | null
+  examBoardAlias: string | null
+  tier: 1 | 2
+  questionCount: number
+  userStats: UserExamStats
+  studyPlan: StudyPlan
+}
+
 /** Payload da página do cargo (nível 2). */
 export type CargoDetail = {
   concurso: {
@@ -183,6 +213,10 @@ export type CargoDetail = {
     published: boolean
   }
   syllabusGroups: Array<CargoSyllabusGroup>
+  /** Provas (tipos) do cargo. ≥2 → o cargo tem várias provas a escolher. */
+  provas: Array<CargoProva>
+  /** Provas recomendadas p/ treinar (mesmo cargo). Vazio quando não há acervo. */
+  relatedProvas: Array<RelatedProva>
   previousExams: Array<CargoPreviousExam>
   studyPlan: StudyPlan
 }

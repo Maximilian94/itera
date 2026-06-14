@@ -90,6 +90,9 @@ type FormState = {
   description: string
   workload: string
   isNursingRelevant: boolean
+  cargoGroupId: string
+  provaLabel: string
+  isPrimaryProva: boolean
 }
 
 const EMPTY_FORM: FormState = {
@@ -112,6 +115,9 @@ const EMPTY_FORM: FormState = {
   description: '',
   workload: '',
   isNursingRelevant: true,
+  cargoGroupId: '',
+  provaLabel: '',
+  isPrimaryProva: true,
 }
 
 const NEW_BOARD_SENTINEL = '__new__'
@@ -138,6 +144,10 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     workload: data.workload ?? prev.workload,
     // Decisão de admin, não de IA: a relevância nunca vem da extração.
     isNursingRelevant: prev.isNursingRelevant,
+    // Agrupamento de cargo é decisão de admin, nunca da extração.
+    cargoGroupId: prev.cargoGroupId,
+    provaLabel: prev.provaLabel,
+    isPrimaryProva: prev.isPrimaryProva,
   }
 }
 
@@ -337,6 +347,9 @@ function MetadataStep({
       description: examBase.description ?? '',
       workload: examBase.workload ?? '',
       isNursingRelevant: examBase.isNursingRelevant ?? true,
+      cargoGroupId: examBase.cargoGroupId ?? '',
+      provaLabel: examBase.provaLabel ?? '',
+      isPrimaryProva: examBase.isPrimaryProva ?? true,
     })
   }, [examBase])
 
@@ -409,6 +422,9 @@ function MetadataStep({
       description: form.description.trim() || null,
       workload: form.workload.trim() || null,
       isNursingRelevant: form.isNursingRelevant,
+      cargoGroupId: form.cargoGroupId.trim() || null,
+      provaLabel: form.provaLabel.trim() || null,
+      isPrimaryProva: form.isPrimaryProva,
     }
   }
 
@@ -531,6 +547,53 @@ function MetadataStep({
             Desmarque para cargos fora da área (ex.: Médico). A prova fica fora da página do concurso e dos seus totais.
           </Typography>
         </div>
+        {/* Agrupamento de provas sob o mesmo cargo (ex.: provas "Tipo 1"/"Tipo 2"
+            com bancos de questões diferentes). Vazio = cargo standalone. */}
+        <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+          <legend style={{ fontSize: 12, color: '#64748b', padding: '0 4px' }}>
+            Cargo com múltiplas provas (opcional)
+          </legend>
+          <TextField
+            label="Rótulo desta prova"
+            value={form.provaLabel}
+            onChange={(e) => set('provaLabel', e.target.value)}
+            placeholder='Ex.: "Tipo 1", "Amarela"'
+            fullWidth
+            size="small"
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
+            <TextField
+              label="ID do grupo de cargo (cargoGroupId)"
+              value={form.cargoGroupId}
+              onChange={(e) => set('cargoGroupId', e.target.value)}
+              placeholder="Cole o mesmo ID nas provas do mesmo cargo"
+              fullWidth
+              size="small"
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{ mt: 0.25, whiteSpace: 'nowrap' }}
+              onClick={() => set('cargoGroupId', crypto.randomUUID())}
+            >
+              Gerar
+            </Button>
+          </div>
+          <FormControlLabel
+            sx={{ mt: 0.5 }}
+            control={
+              <Checkbox
+                checked={form.isPrimaryProva}
+                onChange={(e) => set('isPrimaryProva', e.target.checked)}
+                size="small"
+              />
+            }
+            label="Prova principal do cargo (carrega ficha, edital e conteúdo programático)"
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: -0.5 }}>
+            Deixe em branco para cargo de prova única. Para agrupar, gere um ID na prova principal e cole-o nas demais provas do mesmo cargo.
+          </Typography>
+        </fieldset>
         <TextField
           label="Instituição / Órgão"
           value={form.institution}

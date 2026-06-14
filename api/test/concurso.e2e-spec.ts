@@ -1,4 +1,5 @@
 import { INestApplication } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
@@ -645,5 +646,222 @@ describe('Concurso endpoints (e2e)', () => {
         .expect(200);
       expect(res.body).toEqual({ editions: [] });
     });
+  });
+});
+
+/**
+ * Cargo com múltiplas provas (tipos) sob o mesmo cargoGroupId: cada prova é um
+ * ExamBase com banco próprio. Describe isolado (app/seed próprios) para não
+ * interferir nas contagens exatas do seed compartilhado acima.
+ */
+describe('Cargo com múltiplas provas (e2e)', () => {
+  let app: INestApplication<App>;
+  let http: App;
+  let prisma: PrismaService;
+  let user: { id: string };
+  let primaria: { id: string; slug: string | null };
+  let secundaria: { id: string; slug: string | null };
+  let secQuestions: SeededQuestion[];
+  let tier1Related: { id: string };
+  let tier2Related: { id: string };
+  let futura: { id: string };
+
+  beforeAll(async () => {
+    app = await createTestApp();
+    http = app.getHttpServer();
+    prisma = app.get(PrismaService);
+    await truncateAll(prisma);
+
+    const board = await createExamBoard(prisma);
+    const otherBoard = await createExamBoard(prisma, {
+      name: 'Outra Banca e2e',
+      alias: 'OUTRA',
+    });
+    user = await createUser(prisma);
+    const groupId = randomUUID();
+    const shared = {
+      institution: 'Prefeitura Multi e2e',
+      examBoardId: board.id,
+      role: 'Enfermeiro',
+      salaryBase: 8000,
+      vacancyCount: 15,
+      examDate: new Date('2024-06-02T00:00:00.000Z'),
+      cargoGroupId: groupId,
+    };
+    primaria = await createExamBase(prisma, {
+      ...shared,
+      slug: 'multi-enfermeiro-tipo-1',
+      provaLabel: 'Tipo 1',
+      isPrimaryProva: true,
+    });
+    secundaria = await createExamBase(prisma, {
+      ...shared,
+      slug: 'multi-enfermeiro-tipo-2',
+      provaLabel: 'Tipo 2',
+      isPrimaryProva: false,
+    });
+    await addQuestions(prisma, primaria.id, [{ subject: 'SUS', count: 5 }]);
+    secQuestions = await addQuestions(prisma, secundaria.id, [
+      { subject: 'SUS', count: 3 },
+    ]);
+
+    // Relacionada tier 1: mesma banca + mesmo cargo, outra instituição/edição.
+    tier1Related = await createExamBase(prisma, {
+      examBoardId: board.id,
+      role: 'Enfermeiro',
+      institution: 'Prefeitura Vizinha e2e',
+      examDate: new Date('2023-05-01T00:00:00.000Z'),
+      slug: 'related-tier1-enfermeiro',
+    });
+    await addQuestions(prisma, tier1Related.id, [{ subject: 'SUS', count: 4 }]);
+    // Relacionada tier 2: mesmo cargo, OUTRA banca.
+    tier2Related = await createExamBase(prisma, {
+      examBoardId: otherBoard.id,
+      role: 'Enfermeiro',
+      institution: 'Prefeitura Distante e2e',
+      examDate: new Date('2022-05-01T00:00:00.000Z'),
+      slug: 'related-tier2-enfermeiro',
+    });
+    await addQuestions(prisma, tier2Related.id, [{ subject: 'SUS', count: 2 }]);
+    // Cargo FUTURO sem questões próprias (deve recomendar só as relacionadas).
+    futura = await createExamBase(prisma, {
+      examBoardId: board.id,
+      role: 'Enfermeiro',
+      institution: 'Prefeitura Futura e2e',
+      examDate: new Date('2099-01-01T00:00:00.000Z'),
+      slug: 'futura-enfermeiro',
+    });
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('GET /concursos: um card por cargo (grupo), questionCount somado, vaga não duplicada', async () => {
+    // Fallback por id de prova resolve/cria o concurso na leitura.
+    const res = await request(http).get(`/concursos/${primaria.id}`).expect(200);
+
+    expect(res.body.cargos).toHaveLength(1);
+    expect(res.body.cargos[0]).toMatchObject({
+      role: 'Enfermeiro',
+      provaCount: 2,
+      questionCount: 8, // 5 + 3
+    });
+    expect(res.body.concurso.summary).toMatchObject({
+      cargoCount: 1,
+      vacancyTotal: 15, // não conta a vaga uma vez por tipo
+    });
+  });
+
+  it('GET /concursos/:slug/cargos/:cargoSlug: provas[] com os dois tipos (primária primeiro)', async () => {
+    const detail = await request(http)
+      .get(`/concursos/${primaria.id}`)
+      .expect(200);
+    const slug = detail.body.concurso.slug as string;
+    const cargoSlug = detail.body.cargos[0].slug as string;
+
+    const res = await request(http)
+      .get(`/concursos/${slug}/cargos/${cargoSlug}`)
+      .expect(200);
+
+    expect(res.body.provas).toHaveLength(2);
+    expect(res.body.provas[0].isPrimary).toBe(true);
+    expect(res.body.provas.map((p: { label: string }) => p.label)).toEqual([
+      'Tipo 1',
+      'Tipo 2',
+    ]);
+    // Cada prova carrega seu próprio plano de estudos (o seletor re-escopa).
+    expect(res.body.provas[0].studyPlan).toMatchObject({
+      currentStep: 'diagnostico',
+    });
+    expect(res.body.provas[1].studyPlan.currentStep).toBeDefined();
+    expect(
+      res.body.provas
+        .map((p: { questionCount: number }) => p.questionCount)
+        .sort(),
+    ).toEqual([3, 5]);
+  });
+
+  it('provas[] traz userStats por prova: tentativa numa prova não afeta a outra', async () => {
+    // Tentativa finalizada só na prova secundária (80%).
+    await createFinishedAttempt(prisma, {
+      userId: user.id,
+      examBaseId: secundaria.id,
+      scorePercentage: 80,
+      answers: secQuestions.map((question) => ({ question, correct: true })),
+    });
+
+    const detail = await request(http)
+      .get(`/concursos/${primaria.id}`)
+      .expect(200);
+    const slug = detail.body.concurso.slug as string;
+    const cargoSlug = detail.body.cargos[0].slug as string;
+
+    const res = await request(http)
+      .get(`/concursos/${slug}/cargos/${cargoSlug}`)
+      .set(TEST_USER_HEADER, user.id)
+      .expect(200);
+
+    const byLabel = Object.fromEntries(
+      res.body.provas.map((p: { label: string; userStats: unknown }) => [
+        p.label,
+        p.userStats,
+      ]),
+    );
+    expect(byLabel['Tipo 2']).toEqual({ attemptCount: 1, bestScore: 80 });
+    expect(byLabel['Tipo 1']).toEqual({ attemptCount: 0, bestScore: null });
+  });
+
+  it('relatedProvas: mesma banca (tier 1) antes de outra banca (tier 2), sem o próprio grupo', async () => {
+    const detail = await request(http)
+      .get(`/concursos/${primaria.id}`)
+      .expect(200);
+    const slug = detail.body.concurso.slug as string;
+    const cargoSlug = detail.body.cargos[0].slug as string;
+
+    const res = await request(http)
+      .get(`/concursos/${slug}/cargos/${cargoSlug}`)
+      .expect(200);
+
+    const related = res.body.relatedProvas as Array<{
+      examBaseId: string;
+      tier: number;
+      studyPlan: { currentStep: string };
+    }>;
+    const ids = related.map((p) => p.examBaseId);
+    // Inclui as duas relacionadas; NÃO inclui as provas do próprio grupo.
+    expect(ids).toContain(tier1Related.id);
+    expect(ids).toContain(tier2Related.id);
+    expect(ids).not.toContain(primaria.id);
+    expect(ids).not.toContain(secundaria.id);
+    // tier 1 antes de tier 2.
+    expect(related.findIndex((p) => p.examBaseId === tier1Related.id)).toBeLessThan(
+      related.findIndex((p) => p.examBaseId === tier2Related.id),
+    );
+    // Cada relacionada tem seu próprio plano de estudos.
+    expect(related[0].studyPlan.currentStep).toBeDefined();
+  });
+
+  it('cargo futuro sem questões próprias: recomenda só as relacionadas', async () => {
+    const detail = await request(http)
+      .get(`/concursos/${futura.id}`)
+      .expect(200);
+    const slug = detail.body.concurso.slug as string;
+    const cargoSlug = (detail.body.cargos as Array<{ id: string; slug: string }>).find(
+      (c) => c.id === futura.id,
+    )!.slug;
+
+    const res = await request(http)
+      .get(`/concursos/${slug}/cargos/${cargoSlug}`)
+      .expect(200);
+
+    // A própria prova (futura) não tem questões…
+    expect(res.body.provas).toHaveLength(1);
+    expect(res.body.provas[0].questionCount).toBe(0);
+    // …mas há relacionadas (mesma banca/cargo) para treinar.
+    expect(res.body.relatedProvas.length).toBeGreaterThan(0);
+    expect(
+      res.body.relatedProvas.map((p: { examBaseId: string }) => p.examBaseId),
+    ).toContain(tier1Related.id);
   });
 });

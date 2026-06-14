@@ -34,6 +34,12 @@ export type ExamBase = {
   workload: string | null
   /** Quando false, o cargo fica fora da página do concurso (ex.: Médico). */
   isNursingRelevant: boolean
+  /** Agrupa provas do mesmo cargo (ex.: "Tipo 1"/"Tipo 2"). null = standalone. */
+  cargoGroupId?: string | null
+  /** Rótulo desta prova dentro do cargo (ex.: "Tipo 1"). */
+  provaLabel?: string | null
+  /** Prova representante do cargo (ficha/edital/conteúdo + slug canônico). */
+  isPrimaryProva?: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
   /**
@@ -140,5 +146,8 @@ export type UpdateExamBaseInput = {
   description?: string | null
   workload?: string | null
   isNursingRelevant?: boolean
+  cargoGroupId?: string | null
+  provaLabel?: string | null
+  isPrimaryProva?: boolean
 }
 

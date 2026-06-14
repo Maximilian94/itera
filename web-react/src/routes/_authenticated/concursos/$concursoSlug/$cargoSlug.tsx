@@ -23,7 +23,6 @@ import type {
   CompetitionHistory,
   ConcursoStatus,
   StudyPlan,
-  StudyPlanStep,
 } from '@/features/concurso/domain/concurso.types'
 import type { FichaFact } from '@/features/concurso/components/FichaCard'
 import {
@@ -32,11 +31,15 @@ import {
   useSubjectDistributionQuery,
 } from '@/features/concurso/queries/concurso.queries'
 import {
-  useStartSimuladoMutation,
-  useSubjectTrainTargets,
-} from '@/features/concurso/hooks/useStartSimulado'
-import { useExamBaseAttemptsQuery } from '@/features/examBaseAttempt/queries/examBaseAttempt.queries'
-import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
+  useCreateTrainingMutation,
+  useTrainingsQuery,
+} from '@/features/training/queries/training.queries'
+import type { TrainingListItem } from '@/features/training/domain/training.types'
+import {
+  TRAINING_STAGE_ORDER,
+  TREINO_STAGES,
+  getStagePath,
+} from '@/routes/_authenticated/treino/-stages.config'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { CARD } from '@/features/concurso/components/card'
 import { enter, useMeters } from '@/features/concurso/components/motion'
@@ -112,76 +115,54 @@ const toPercent = (decimal: string | null): number | null => {
 }
 
 /* ------------------------------------------------------------------ */
-/*  CTA primário — destino e rótulo por estado temporal                */
+/*  Opções de treino                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Prova alvo do treino: a própria (passada, com questões) ou a edição
- *  anterior mais recente que tem questões. null → sem prova treinável,
- *  o CTA cai no treino genérico. */
-type ExamTarget = { examBoardId: string; examBaseId: string }
-
-function resolveExamTarget(data: CargoDetail): ExamTarget | null {
-  const boardId = data.concurso.examBoard?.id
-  if (boardId == null) return null
-  if (data.concurso.status === 'past' && data.cargo.questionCount > 0) {
-    return { examBoardId: boardId, examBaseId: data.cargo.id }
-  }
-  const latest = data.previousExams
-    .filter((e) => e.questionCount > 0)
-    .reduce<CargoPreviousExam | null>(
-      (best, e) => (best == null || e.year > best.year ? e : best),
-      null,
-    )
-  return latest != null
-    ? { examBoardId: boardId, examBaseId: latest.examBaseId }
-    : null
+/** Uma opção de treino: ou uma prova própria do cargo (com questões, prova
+ *  passada) ou uma prova relacionada recomendada. */
+type TrainingOption = {
+  examBaseId: string
+  /** Banca da própria prova (relacionadas tier 2 são de outra banca). */
+  examBoardId: string | null
+  studyPlan: StudyPlan
+  questionCount: number
+  userStats: { attemptCount: number; bestScore: number | null }
+  kind: 'own' | 'related'
+  /** Linha principal do item (ex.: "Tipo 1" ou "CEBRASPE · 2024"). */
+  label: string
+  /** Linha secundária (ex.: instituição da prova relacionada). */
+  sublabel: string | null
 }
 
-/** Rótulo do CTA do cabeçalho (mapa do MAX-24): com tentativas (em andamento
- *  ou concluídas) → "Continuar treino"; 1ª vez → simulado/prova. */
-function ctaLabel(
-  data: CargoDetail,
-  target: ExamTarget | null,
-  hasInProgress: boolean,
-): string {
-  if (target == null) return 'Começar a treinar'
-  if (hasInProgress || data.studyPlan.attemptCount > 0) return 'Continuar treino'
-  if (data.concurso.status === 'past' && target.examBaseId === data.cargo.id) {
-    return 'Treinar com esta prova'
-  }
-  return 'Fazer primeiro simulado'
+/** Monta as opções de treino: provas próprias COM questões (prova passada)
+ *  primeiro, depois as relacionadas (já ordenadas tier1→tier2 pelo backend).
+ *  Prova futura → próprias sem questões caem fora, sobra só o relacionado. */
+function buildTrainingOptions(data: CargoDetail): TrainingOption[] {
+  const boardId = data.concurso.examBoard?.id ?? null
+  const own: TrainingOption[] = data.provas
+    .filter((p) => p.questionCount > 0)
+    .map((p) => ({
+      examBaseId: p.examBaseId,
+      examBoardId: boardId,
+      studyPlan: p.studyPlan,
+      questionCount: p.questionCount,
+      userStats: p.userStats,
+      kind: 'own',
+      label: p.label ?? 'Esta prova',
+      sublabel: null,
+    }))
+  const related: TrainingOption[] = data.relatedProvas.map((r) => ({
+    examBaseId: r.examBaseId,
+    examBoardId: r.examBoardId,
+    studyPlan: r.studyPlan,
+    questionCount: r.questionCount,
+    userStats: r.userStats,
+    kind: 'related',
+    label: `${r.examBoardAlias ?? 'Banca'} · ${r.year}`,
+    sublabel: r.institution,
+  }))
+  return [...own, ...related]
 }
-
-/** CTA de treino: inicia (ou retoma) o simulado da prova alvo. Sem alvo,
- *  vira link para o fluxo genérico de treino. */
-function CtaButton(props: {
-  target: ExamTarget | null
-  onStart: () => void
-  isStarting: boolean
-  className: string
-  children: React.ReactNode
-}) {
-  if (props.target == null) {
-    return (
-      <Link to="/treino" className={props.className}>
-        {props.children}
-      </Link>
-    )
-  }
-  return (
-    <button
-      type="button"
-      onClick={props.onStart}
-      disabled={props.isStarting}
-      className={`${props.className} cursor-pointer disabled:cursor-wait disabled:opacity-70`}
-    >
-      {props.children}
-    </button>
-  )
-}
-
-const CTA_PRIMARY =
-  'inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white no-underline shadow-[0_4px_12px_-2px_rgba(8,145,178,0.4)] transition-all hover:bg-cyan-700 hover:shadow-[0_6px_16px_-2px_rgba(8,145,178,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
 
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
@@ -192,7 +173,7 @@ function CargoPage() {
   const { data, isPending, error, refetch } = useCargoQuery(concursoSlug, cargoSlug)
 
   return (
-    <div className="flex flex-col gap-4 pb-28 lg:pb-6">
+    <div className="flex flex-col gap-4 pb-6">
       <Breadcrumb
         concursoSlug={concursoSlug}
         concursoLabel={
@@ -265,79 +246,34 @@ function Breadcrumb(props: {
 /* ------------------------------------------------------------------ */
 
 function CargoContent({ data }: { data: CargoDetail }) {
-  const { concurso, cargo, syllabusGroups, previousExams, studyPlan } = data
+  const { concurso, cargo, syllabusGroups, previousExams } = data
   const meters = useMeters()
-  const navigate = useNavigate()
-  const subjectQuery = useSubjectDistributionQuery(cargo.id)
+
+  /* Opções de treino: a(s) prova(s) própria(s) COM questões (prova passada) +
+   * as provas relacionadas (mesma banca/cargo, depois mesmo cargo de outra
+   * banca). Prova futura não tem questões próprias → só relacionadas. CADA
+   * opção vira um programa de treino próprio (ProgramCard), todos visíveis. */
+  const trainingOptions = buildTrainingOptions(data)
+  // Bloco de matérias/concorrência usa a 1ª opção (recomendação principal).
+  const referenceExamBaseId = trainingOptions[0]?.examBaseId ?? cargo.id
+
+  const subjectQuery = useSubjectDistributionQuery(referenceExamBaseId)
   const competitionQuery = useCompetitionHistoryQuery(cargo.id)
+
+  // Treino mais recente por prova: como a lista vem por updatedAt desc, a 1ª
+  // ocorrência de cada examBaseId é a sessão mais recente daquela prova.
+  const trainingsQuery = useTrainingsQuery()
+  const latestTrainingByExamBase = (() => {
+    const map = new Map<string, TrainingListItem>()
+    for (const t of trainingsQuery.data ?? []) {
+      if (!map.has(t.examBaseId)) map.set(t.examBaseId, t)
+    }
+    return map
+  })()
 
   const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const examDate = cargo.examDate
   const cut = toPercent(cargo.minPassingGrade)
-  const target = resolveExamTarget(data)
-
-  /* Wiring dos CTAs (MAX-24): attempt em andamento → retomar; senão criar
-   * um novo simulado (com filtro de matéria quando o CTA for dirigido). */
-  const { requireAccess } = useRequireAccess()
-  const startSimulado = useStartSimuladoMutation()
-  const attemptsQuery = useExamBaseAttemptsQuery(target?.examBaseId)
-  const inProgressAttempt =
-    (attemptsQuery.data ?? []).find((a) => a.finishedAt == null) ?? null
-  const targetSubjectsQuery = useQuestionsCountBySubjectQuery(target?.examBaseId)
-  const trainTargets = useSubjectTrainTargets(subjectQuery.data, cargo.id)
-
-  const cta = ctaLabel(data, target, inProgressAttempt != null)
-
-  /** CTA do cabeçalho/diagnóstico: retoma o attempt aberto ou cria um novo. */
-  const handleStartOrContinue = () => {
-    if (target == null || !requireAccess()) return
-    if (inProgressAttempt != null) {
-      void navigate({
-        to: '/exams/$examBoard/$examId/$attemptId',
-        params: {
-          examBoard: target.examBoardId,
-          examId: target.examBaseId,
-          attemptId: inProgressAttempt.id,
-        },
-      })
-      return
-    }
-    startSimulado.mutate({
-      examBoardId: target.examBoardId,
-      examBaseId: target.examBaseId,
-    })
-  }
-
-  /** "Treinar pontos fracos": simulado filtrado pelas piores matérias que
-   *  existem na prova alvo. Vazio → o CTA nem aparece. */
-  const weakSubjectsAvailable = (() => {
-    if (target == null) return []
-    const available = new Set(
-      (targetSubjectsQuery.data ?? [])
-        .filter((s) => s.count > 0)
-        .map((s) => s.subject),
-    )
-    return studyPlan.weakSubjects
-      .map((w) => w.subject)
-      .filter((subject) => available.has(subject))
-  })()
-
-  const handleTrainWeakSubjects = () => {
-    if (target == null || weakSubjectsAvailable.length === 0 || !requireAccess()) return
-    startSimulado.mutate({
-      examBoardId: target.examBoardId,
-      examBaseId: target.examBaseId,
-      subjectFilter: weakSubjectsAvailable,
-    })
-  }
-
-  /** "Treinar {matéria}": simulado filtrado na prova que tem a matéria. */
-  const handleTrainSubject = (subject: string) => {
-    const boardId = concurso.examBoard?.id
-    const examBaseId = trainTargets.get(subject)
-    if (boardId == null || examBaseId == null || !requireAccess()) return
-    startSimulado.mutate({ examBoardId: boardId, examBaseId, subjectFilter: [subject] })
-  }
 
   const contextLine = [
     `Concurso ${concurso.institution} ${concurso.year}`,
@@ -381,49 +317,29 @@ function CargoContent({ data }: { data: CargoDetail }) {
     <>
       {/* ░░ Cabeçalho do cargo ░░ */}
       <header {...enter(0)}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0 max-w-prose">
-            <StatusPill
-              status={concurso.status}
-              label={statusLabel(concurso.status, examDate)}
-            />
-            <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-              {cargo.role}
-            </h1>
-            {contextLine !== '' && (
-              <p className="mt-1 text-sm text-slate-500">{contextLine}</p>
-            )}
-          </div>
-          <CtaButton
-            target={target}
-            onStart={handleStartOrContinue}
-            isStarting={startSimulado.isPending}
-            className={`${CTA_PRIMARY} shrink-0`}
-          >
-            <PlayIcon className="h-5 w-5" />
-            {startSimulado.isPending ? 'Iniciando…' : cta}
-          </CtaButton>
+        <div className="min-w-0 max-w-prose">
+          <StatusPill
+            status={concurso.status}
+            label={statusLabel(concurso.status, examDate)}
+          />
+          <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+            {cargo.role}
+          </h1>
+          {contextLine !== '' && (
+            <p className="mt-1 text-sm text-slate-500">{contextLine}</p>
+          )}
         </div>
       </header>
 
       <div className="grid items-start gap-4 lg:grid-cols-3">
         {/* ░░ Coluna principal ░░ */}
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <StudyPlanSection
-            studyPlan={studyPlan}
+          <TrainingPrograms
+            options={trainingOptions}
             status={concurso.status}
             cut={cut}
-            questionCount={cargo.questionCount}
-            year={concurso.year}
-            bancaName={bancaName}
-            hasPreviousExams={previousExams.length > 0}
-            target={target}
             meters={meters}
-            isStarting={startSimulado.isPending}
-            onStartSimulado={handleStartOrContinue}
-            onTrainWeakSubjects={
-              weakSubjectsAvailable.length > 0 ? handleTrainWeakSubjects : null
-            }
+            sessionByExamBase={latestTrainingByExamBase}
           />
 
           {/* O bloco de matérias muda de natureza com o tempo:
@@ -441,9 +357,6 @@ function CargoContent({ data }: { data: CargoDetail }) {
             examDate={examDate}
             meters={meters}
             enterIdx={3}
-            onTrainSubject={handleTrainSubject}
-            trainableSubjects={new Set(trainTargets.keys())}
-            trainDisabled={startSimulado.isPending}
           />
 
           <CompetitionSection query={competitionQuery} enterIdx={4} />
@@ -468,25 +381,6 @@ function CargoContent({ data }: { data: CargoDetail }) {
           )}
         </aside>
       </div>
-
-      {/* Barra de ação fixa (mobile), espelhando o CTA do cabeçalho */}
-      <div
-        className="fixed inset-x-0 z-30 px-4 lg:hidden"
-        style={{
-          bottom:
-            'calc(var(--mobile-bottom-nav-height) + var(--safe-area-inset-bottom) + 0.5rem)',
-        }}
-      >
-        <CtaButton
-          target={target}
-          onStart={handleStartOrContinue}
-          isStarting={startSimulado.isPending}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-cyan-600 text-sm font-semibold text-white no-underline shadow-lg shadow-cyan-900/25 transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-        >
-          <PlayIcon className="h-5 w-5" />
-          {startSimulado.isPending ? 'Iniciando…' : cta}
-        </CtaButton>
-      </div>
     </>
   )
 }
@@ -495,96 +389,136 @@ function CargoContent({ data }: { data: CargoDetail }) {
 /*  Seu plano de estudos                                               */
 /* ------------------------------------------------------------------ */
 
-const STEP_ORDER: Array<StudyPlanStep> = ['diagnostico', 'treino_dirigido', 'reta_final']
-
-/** "Saúde Coletiva / SUS (48%) e Ética (55%)" a partir das piores matérias. */
-function weakSubjectsPhrase(weakSubjects: StudyPlan['weakSubjects']): string | null {
-  if (weakSubjects.length === 0) return null
-  const parts = weakSubjects.map((w) => `${w.subject} (${w.accuracy}%)`)
-  if (parts.length === 1) return parts[0]
-  return `${parts.slice(0, -1).join(', ')} e ${parts[parts.length - 1]}`
+/** Texto introdutório do bloco de programas, por estado temporal. */
+function programsIntro(status: ConcursoStatus, hasOwn: boolean): string {
+  if (status === 'past' && hasOwn) {
+    return 'Treine com esta prova e com provas relacionadas — cada uma tem seu próprio programa de treino.'
+  }
+  return 'A prova deste cargo ainda não saiu. Treine com provas relacionadas — cada uma tem seu próprio programa de treino.'
 }
 
-function StudyPlanSection(props: {
-  studyPlan: StudyPlan
+/** Lista os programas de treino: um ProgramCard por opção (prova própria com
+ *  questões + relacionadas). Cada cartão tem seu próprio programa e progresso.
+ *  Sem nenhuma opção treinável → cai no treino genérico. */
+function TrainingPrograms(props: {
+  options: TrainingOption[]
   status: ConcursoStatus
   cut: number | null
-  questionCount: number
-  year: number
-  bancaName: string | null
-  hasPreviousExams: boolean
-  target: ExamTarget | null
   meters: boolean
-  isStarting: boolean
-  /** CTA do Diagnóstico — inicia/retoma o simulado completo da prova alvo. */
-  onStartSimulado: () => void
-  /** CTA do Treino dirigido; null = sem matéria fraca treinável → CTA some. */
-  onTrainWeakSubjects: (() => void) | null
+  sessionByExamBase: Map<string, TrainingListItem>
 }) {
-  const { studyPlan, status, cut, target, meters } = props
+  const e = enter(1)
+  if (props.options.length === 0) {
+    return (
+      <section
+        aria-labelledby="plano-heading"
+        style={e.style}
+        className={`${e.className} ${CARD} p-5 sm:p-6`}
+      >
+        <h2 id="plano-heading" className="text-base font-bold text-slate-900">
+          Seu plano de estudos
+        </h2>
+        <p className="mt-0.5 text-sm text-slate-500">
+          Ainda não temos provas com questões para treinar este cargo. Enquanto
+          isso, treine com simulados gerais de enfermagem.
+        </p>
+        <Link
+          to="/treino"
+          className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-cyan-700"
+        >
+          <PlayIcon className="h-4 w-4" />
+          Ir para o treino
+        </Link>
+      </section>
+    )
+  }
+  const hasOwn = props.options.some((o) => o.kind === 'own')
+  return (
+    <section aria-labelledby="plano-heading" style={e.style} className={e.className}>
+      <h2 id="plano-heading" className="text-base font-bold text-slate-900">
+        Seu plano de estudos
+      </h2>
+      <p className="mt-0.5 text-sm text-slate-500">
+        {programsIntro(props.status, hasOwn)}
+      </p>
+      <div className="mt-3 flex flex-col gap-3">
+        {props.options.map((opt) => (
+          <ProgramCard
+            key={opt.examBaseId}
+            option={opt}
+            cut={props.cut}
+            meters={props.meters}
+            session={props.sessionByExamBase.get(opt.examBaseId) ?? null}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+/** Um programa de treino (TrainingSession) para UMA prova — própria ou
+ *  relacionada. A timeline são os 5 estágios reais do treino; o CTA começa
+ *  (cria) ou continua (retoma no estágio) o treino daquela prova. */
+function ProgramCard(props: {
+  option: TrainingOption
+  cut: number | null
+  meters: boolean
+  session: TrainingListItem | null
+}) {
+  const { option, cut, meters, session } = props
+  const studyPlan = option.studyPlan
+  const navigate = useNavigate()
+  const { requireAccess } = useRequireAccess()
+  const createTraining = useCreateTrainingMutation()
+
+  // Estágio atual no ciclo do treino (índice em TRAINING_STAGE_ORDER); sem
+  // sessão → -1 (nada feito). FINAL = treino concluído.
+  const stageIdx =
+    session != null ? TRAINING_STAGE_ORDER.indexOf(session.currentStage) : -1
+  const isFinished = session?.currentStage === 'FINAL'
+  const inProgress = session != null && !isFinished
+
+  /** Começa um treino novo desta prova (1ª etapa = Prova). */
+  const handleStart = () => {
+    if (!requireAccess()) return
+    createTraining.mutate(
+      { examBaseId: option.examBaseId, immediateFeedback: true },
+      { onSuccess: (res) => void navigate({ to: getStagePath('prova', res.trainingId) }) },
+    )
+  }
+
+  /** Continua o treino em andamento, retomando no estágio atual. */
+  const handleContinue = () => {
+    if (session == null) return
+    const slug =
+      TREINO_STAGES[TRAINING_STAGE_ORDER.indexOf(session.currentStage)]?.slug ?? 'prova'
+    void navigate({ to: getStagePath(slug, session.trainingId) })
+  }
+
   const score = studyPlan.bestScore != null ? Math.round(studyPlan.bestScore) : null
   const hasAttempts = studyPlan.attemptCount > 0 && score != null
   const passing = score != null && cut != null && score >= cut
   const delta = studyPlan.scoreDelta != null ? Math.round(studyPlan.scoreDelta) : null
-  const currentIdx = STEP_ORDER.indexOf(studyPlan.currentStep)
-  const weakPhrase = weakSubjectsPhrase(studyPlan.weakSubjects)
+  const isStarting = createTraining.isPending
 
-  const subtitle =
-    status === 'past'
-      ? [
-          `Prova de ${props.questionCount} questões`,
-          props.bancaName != null ? ` da ${props.bancaName}` : '',
-          cut != null ? `, corte em ${cut}%` : '',
-          '.',
-        ].join('')
-      : props.hasPreviousExams
-        ? `Enquanto a prova de ${props.year} não sai, treine com as provas anteriores${props.bancaName != null ? ` da ${props.bancaName}` : ''} para este cargo.`
-        : 'Ainda não temos provas anteriores desta banca para este cargo — enquanto isso, treine com simulados gerais de enfermagem.'
-
-  const steps: Array<{
-    title: string
-    desc: string
-    cta: string | null
-    onCta: (() => void) | null
-  }> = [
-    {
-      title: 'Diagnóstico',
-      desc: 'Faça um simulado completo para medir sua distância da nota de corte.',
-      cta: 'Fazer simulado',
-      onCta: props.onStartSimulado,
-    },
-    {
-      title: 'Treino dirigido',
-      desc:
-        weakPhrase != null
-          ? `Ataque suas matérias mais fracas: ${weakPhrase}.`
-          : 'Depois do diagnóstico, treine por matéria começando pelas mais fracas.',
-      // Sem matéria fraca treinável na prova alvo, o destino é impossível —
-      // o CTA some e fica só a orientação de treinar pelo bloco de matérias.
-      cta: props.onTrainWeakSubjects != null ? 'Treinar pontos fracos' : null,
-      onCta: props.onTrainWeakSubjects,
-    },
-    {
-      title: 'Reta final',
-      desc: 'Simulados cronometrados completos até passar do corte com folga.',
-      cta: null,
-      onCta: null,
-    },
-  ]
-
-  const e = enter(1)
   return (
-    <section
-      aria-labelledby="plano-heading"
-      style={e.style}
-      className={`${e.className} ${CARD} p-5 sm:p-6`}
-    >
-      <h2 id="plano-heading" className="text-base font-bold text-slate-900">
-        Seu plano de estudos
-      </h2>
-      <p className="mt-0.5 text-sm text-slate-500">{subtitle}</p>
+    <article className={`${CARD} p-5 sm:p-6`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+        <h3 className="text-sm font-bold text-slate-900">
+          {option.label}
+          {option.kind === 'related' && (
+            <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+              relacionada
+            </span>
+          )}
+        </h3>
+        <span className="text-xs text-slate-500">
+          {option.sublabel != null ? `${option.sublabel} · ` : ''}
+          {option.questionCount} questões
+        </span>
+      </div>
 
-      {/* Prontidão (quando há tentativas) */}
+      {/* Prontidão (quando há tentativas nesta prova) */}
       {hasAttempts && (
         <div className="mt-4 grid gap-5 rounded-xl bg-slate-50 p-4 ring-1 ring-inset ring-slate-200/60 sm:grid-cols-[auto_1fr] sm:items-center sm:p-5">
           <div>
@@ -622,15 +556,8 @@ function StudyPlanSection(props: {
             </p>
           </div>
           <div className="min-w-0">
-            <ReadinessBar
-              value={score}
-              cut={cut}
-              meters={meters}
-              size="md"
-              className="w-full"
-            />
+            <ReadinessBar value={score} cut={cut} meters={meters} size="md" className="w-full" />
             <div className="mt-2 flex items-center justify-between text-xs">
-              {/* emerald-700: texto pequeno (xs) precisa de ≥4.5:1 (AA). */}
               <span
                 className={`font-semibold ${
                   cut == null
@@ -652,14 +579,20 @@ function StudyPlanSection(props: {
         </div>
       )}
 
-      {/* Etapas do plano — sequência real, por isso numerada */}
+      {/* Timeline do treino — os 5 estágios reais do TrainingSession */}
       <ol className="mt-5 flex flex-col">
-        {steps.map((step, i) => {
+        {TREINO_STAGES.map((stage, i) => {
           const state: 'done' | 'current' | 'upcoming' =
-            i < currentIdx ? 'done' : i === currentIdx ? 'current' : 'upcoming'
+            stageIdx < 0
+              ? 'upcoming'
+              : isFinished || i < stageIdx
+                ? 'done'
+                : i === stageIdx
+                  ? 'current'
+                  : 'upcoming'
           return (
-            <li key={step.title} className="relative flex gap-4 pb-5 last:pb-0">
-              {i < steps.length - 1 && (
+            <li key={stage.slug} className="relative flex gap-4 pb-5 last:pb-0">
+              {i < TREINO_STAGES.length - 1 && (
                 <span className="absolute left-3 top-7 h-full w-px bg-slate-200" />
               )}
               {state === 'done' ? (
@@ -679,30 +612,64 @@ function StudyPlanSection(props: {
                 <p
                   className={`text-sm font-bold ${state === 'upcoming' ? 'text-slate-400' : 'text-slate-900'}`}
                 >
-                  {step.title}
+                  {stage.title}
                 </p>
                 <p
                   className={`mt-0.5 text-sm leading-6 ${state === 'upcoming' ? 'text-slate-400' : 'text-slate-600'}`}
                 >
-                  {step.desc}
+                  {stage.description}
                 </p>
-                {state === 'current' && step.cta != null && step.onCta != null && (
-                  <CtaButton
-                    target={target}
-                    onStart={step.onCta}
-                    isStarting={props.isStarting}
-                    className="mt-2.5 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-                  >
-                    <PlayIcon className="h-4 w-4" />
-                    {props.isStarting ? 'Iniciando…' : step.cta}
-                  </CtaButton>
-                )}
               </div>
             </li>
           )
         })}
       </ol>
-    </section>
+
+      {/* Ação do programa: começar / continuar treino */}
+      <div className="mt-1 flex flex-wrap items-center gap-3">
+        {inProgress ? (
+          <button
+            type="button"
+            onClick={handleContinue}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+          >
+            <PlayIcon className="h-4 w-4" />
+            Continuar treino
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleStart}
+            disabled={isStarting}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+          >
+            <PlayIcon className="h-4 w-4" />
+            {isStarting
+              ? 'Iniciando…'
+              : isFinished
+                ? 'Começar novo treino'
+                : 'Começar treino'}
+          </button>
+        )}
+        {isFinished && session != null && (
+          <button
+            type="button"
+            onClick={() =>
+              void navigate({ to: getStagePath('final', session.trainingId) })
+            }
+            className="cursor-pointer text-sm font-semibold text-cyan-700 hover:text-cyan-800"
+          >
+            Ver resultado
+          </button>
+        )}
+      </div>
+      {createTraining.isError && (
+        <p className="mt-2 text-sm text-rose-600">
+          Não foi possível começar o treino agora. Verifique seu plano ou tente
+          novamente.
+        </p>
+      )}
+    </article>
   )
 }
 
@@ -756,9 +723,6 @@ function SubjectBlock(props: {
   examDate: string | null
   meters: boolean
   enterIdx: number
-  onTrainSubject: (subject: string) => void
-  trainableSubjects: ReadonlySet<string>
-  trainDisabled: boolean
 }) {
   const { query, status, bancaName, meters, enterIdx } = props
 
@@ -804,9 +768,6 @@ function SubjectBlock(props: {
         meters={meters}
         enterIdx={enterIdx}
         predictive={false}
-        onTrainSubject={props.onTrainSubject}
-        trainableSubjects={props.trainableSubjects}
-        trainDisabled={props.trainDisabled}
       />
     )
   }
@@ -824,9 +785,6 @@ function SubjectBlock(props: {
       meters={meters}
       enterIdx={enterIdx}
       predictive
-      onTrainSubject={props.onTrainSubject}
-      trainableSubjects={props.trainableSubjects}
-      trainDisabled={props.trainDisabled}
     />
   )
 }

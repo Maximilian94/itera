@@ -468,6 +468,9 @@ export class ExamBaseService {
     editalUrl?: string | null;
     adminNotes?: string | null;
     isNursingRelevant?: boolean;
+    cargoGroupId?: string | null;
+    provaLabel?: string | null;
+    isPrimaryProva?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -490,6 +493,9 @@ export class ExamBaseService {
         editalUrl: normalizeOptionalText(input.editalUrl),
         adminNotes: normalizeOptionalText(input.adminNotes),
         isNursingRelevant: input.isNursingRelevant,
+        cargoGroupId: input.cargoGroupId ?? undefined,
+        provaLabel: normalizeOptionalText(input.provaLabel),
+        isPrimaryProva: input.isPrimaryProva,
       },
       select: {
         id: true,
@@ -549,11 +555,20 @@ export class ExamBaseService {
       description?: string | null;
       workload?: string | null;
       isNursingRelevant?: boolean;
+      cargoGroupId?: string | null;
+      provaLabel?: string | null;
+      isPrimaryProva?: boolean;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
-      select: { id: true, governmentScope: true, state: true, city: true },
+      select: {
+        id: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        cargoGroupId: true,
+      },
     });
     if (!exists) throw new NotFoundException('exam base not found');
 
@@ -607,6 +622,12 @@ export class ExamBaseService {
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
         isNursingRelevant: input.isNursingRelevant,
+        cargoGroupId: input.cargoGroupId === undefined ? undefined : input.cargoGroupId,
+        provaLabel:
+          input.provaLabel === undefined
+            ? undefined
+            : normalizeOptionalText(input.provaLabel),
+        isPrimaryProva: input.isPrimaryProva,
       },
       select: {
         id: true,
@@ -635,6 +656,21 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
+    // Invariante: no máximo uma prova primária por cargoGroupId. Se esta virou
+    // primária e pertence a um grupo, as irmãs deixam de ser primárias.
+    const effectiveGroupId =
+      input.cargoGroupId === undefined ? exists.cargoGroupId : input.cargoGroupId;
+    if (input.isPrimaryProva === true && effectiveGroupId != null) {
+      await this.prisma.examBase.updateMany({
+        where: {
+          cargoGroupId: effectiveGroupId,
+          id: { not: examBaseId },
+          isPrimaryProva: true,
+        },
+        data: { isPrimaryProva: false },
+      });
+    }
+
     await this.triggerRevalidate(result.slug);
     return result;
   }
