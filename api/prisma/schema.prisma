@@ -205,11 +205,15 @@ model ExamBoard {
 
 model Concurso {
   id              String          @id @default(uuid()) @db.Uuid
+  /// URL do nível 1 (ex.: prefeitura-campinas-2026-cebraspe). Gerado no lazy-link do ConcursoService.
+  slug            String?         @unique
   institution     String
   year            Int
   governmentScope GovernmentScope
   state           String?
   city            String?
+  /// URL pública do edital no nível do concurso (backfill: copiada da primeira prova com valor)
+  editalUrl       String?
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid
@@ -234,13 +238,29 @@ model ExamBase {
   salaryBase              Decimal?         @db.Decimal(10,2)
   examDate                DateTime
   minPassingGradeNonQuota Decimal?         @db.Decimal(5,2)
+  /// Nota de corte REAL da última vaga (ampla concorrência), preenchida manualmente
+  /// quando o resultado sai. Não confundir com minPassingGradeNonQuota, que é a nota
+  /// MÍNIMA do edital. Decisão MAX-18: nunca apresentar o mínimo como corte real.
+  actualCutScore          Decimal?         @db.Decimal(5,2)
   vacancyCount            Int?
+  /// Cadastro de reserva ("20 vagas + CR"). Explícito e controlado pelo admin, como isNursingRelevant.
+  hasReserveList          Boolean          @default(false)
   applicantCount          Int?
   registrationFee         Decimal?         @db.Decimal(10,2)
-  registrationDate        DateTime?
+  /// Início da janela de inscrições
+  registrationStart       DateTime?
+  /// Fim da janela de inscrições
+  registrationEnd         DateTime?
+  /// Data do resultado final (cronograma)
+  resultDate              DateTime?
+  /// Requisitos do cargo conforme edital (ex.: "Superior em Enfermagem + registro no COREN")
+  requirements            String?
   /// Descrição da vaga conforme consta no edital (função, atribuições, etc.)
   description             String?
   workload                String?
+  /// Quando false, o cargo não é relevante para enfermagem (ex.: Médico, Administrativo)
+  /// e fica fora da página do concurso e dos seus agregados. Controlado pelo admin.
+  isNursingRelevant       Boolean          @default(true)
 
   /// When false, exam is only visible to admins. When true, visible to all users.
   published               Boolean          @default(false)
@@ -257,13 +277,49 @@ model ExamBase {
   concursoId  String?    @db.Uuid
   concurso    Concurso?  @relation(fields: [concursoId], references: [id], onDelete: SetNull)
 
+  /// Agrupa várias provas (ExamBase) sob o MESMO cargo. null = cargo standalone
+  /// (comportamento padrão: 1 prova = 1 cargo). Provas que compartilham este id
+  /// pertencem ao mesmo cargo e aparecem agrupadas (um card no concurso).
+  cargoGroupId   String?  @db.Uuid
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela"). Só faz
+  /// sentido quando o cargo tem mais de uma prova; null/sozinho → não exibido.
+  provaLabel     String?
+  /// A prova "representante" do cargo: carrega os metadados de cargo (salário,
+  /// vagas, requisitos, edital, conteúdo programático, nota de corte) e define
+  /// o slug/URL canônico do cargo. Exatamente uma por cargoGroupId (regra de serviço).
+  isPrimaryProva Boolean  @default(true)
+
   questions         ExamBaseQuestion[]
   attempts          ExamBaseAttempt[]
   trainingSessions  TrainingSession[]
+  syllabusGroups    ExamSyllabusGroup[]
 
   @@index([examBoardId])
   @@index([concursoId])
+  @@index([cargoGroupId])
   @@map("exam_bases")
+}
+
+/// Grupo do conteúdo programático do edital (ex.: "Saúde Coletiva e SUS"),
+/// com os tópicos em texto corrido como constam no edital. Input manual no admin
+/// (fase EDITAL do wizard); usado na página do cargo de prova futura.
+model ExamSyllabusGroup {
+  id        String   @id @default(uuid()) @db.Uuid
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examBaseId String   @db.Uuid
+  examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  /// Posição de exibição (0-based) dentro da prova
+  order  Int
+  /// Nome do grupo (ex.: "Saúde Coletiva e SUS")
+  name   String
+  /// Tópicos em texto corrido, como no edital
+  topics String
+
+  @@index([examBaseId])
+  @@map("exam_syllabus_groups")
 }
 
 model ExamBaseQuestion {

@@ -1,5 +1,15 @@
 import { GovernmentScope } from '@prisma/client';
-import { IsDateString, IsDecimal, IsEnum, IsInt, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsDecimal,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+} from 'class-validator';
 
 export class CreateExamBaseDto {
   @IsString()
@@ -61,7 +71,11 @@ export class CreateExamBaseDto {
 
   @IsOptional()
   @IsDateString()
-  registrationDate?: string | null;
+  registrationStart?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  registrationEnd?: string | null;
 
   @IsOptional()
   @IsString()
@@ -70,5 +84,24 @@ export class CreateExamBaseDto {
   @IsOptional()
   @IsString()
   workload?: string | null;
-}
 
+  /// Quando false, o cargo fica fora da página do concurso (ex.: Médico). Default true.
+  @IsOptional()
+  @IsBoolean()
+  isNursingRelevant?: boolean;
+
+  /// Agrupa esta prova com outras do MESMO cargo. null = cargo standalone.
+  @IsOptional()
+  @IsUUID()
+  cargoGroupId?: string | null;
+
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela").
+  @IsOptional()
+  @IsString()
+  provaLabel?: string | null;
+
+  /// Prova "representante" do cargo. Default true (cargo de 1 prova).
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryProva?: boolean;
+}

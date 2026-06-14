@@ -2,7 +2,7 @@ import { useRef, useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
 import { useClerkAuth } from '@/auth/clerk'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
-import { Route as ExamsRoute } from '@/routes/_authenticated/exams'
+import { Route as ConcursosRoute } from '@/routes/_authenticated/concursos/index'
 import { Route as TreinoRoute } from '@/routes/_authenticated/treino'
 import { Route as HistoryRoute } from '@/routes/_authenticated/history'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { authService } from '@/features/auth/services/auth.service'
 import { HomeIcon, DocumentTextIcon, AcademicCapIcon, ClockIcon, BuildingLibraryIcon, UsersIcon, MagnifyingGlassCircleIcon } from '@heroicons/react/24/solid'
 import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, AcademicCapIcon as AcademicCapIconOutline, ClockIcon as ClockIconOutline, BuildingLibraryIcon as BuildingLibraryIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
-import { Link, useMatchRoute, useNavigate, type RegisteredRouter, type ToPathOption } from '@tanstack/react-router'
+import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import { Menu, MenuItem } from '@mui/material'
 
 const PLAN_NAMES: Record<string, string> = {
@@ -62,7 +62,7 @@ export const SideBarV2 = () => {
         handleClose()
         logout()
     }
-    const pages: Array<{ label: string, href: string, icon: React.ElementType, activeIcon: React.ElementType, fuzzy?: boolean }> = [
+    const pages: Array<{ label: string, href: string, icon: React.ElementType, activeIcon: React.ElementType, fuzzy?: boolean, alsoMatch?: Array<string> }> = [
         {
             label: 'Home',
             href: DashboardRoute.to,
@@ -70,11 +70,14 @@ export const SideBarV2 = () => {
             activeIcon: HomeIcon,
         },
         {
-            label: 'Exams',
-            href: ExamsRoute.to,
+            label: 'Concursos',
+            href: ConcursosRoute.to,
             icon: DocumentTextIconOutline,
             activeIcon: DocumentTextIcon,
             fuzzy: true,
+            // Concursos é a porta de entrada (MAX-28); /exams vira a camada de
+            // provas/admin e mantém este item ativo.
+            alsoMatch: ['/exams'],
         },
         {
             label: 'Bancas',
@@ -83,7 +86,7 @@ export const SideBarV2 = () => {
             activeIcon: BuildingLibraryIcon,
         },
         {
-            label: 'Treino',
+            label: 'Meus treinos',
             href: TreinoRoute.to,
             icon: AcademicCapIconOutline,
             activeIcon: AcademicCapIcon,
@@ -119,7 +122,7 @@ export const SideBarV2 = () => {
             >
                 <div className='flex flex-col items-center justify-center gap-2'>
                     {pages.map((page) => (
-                        <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} />
+                        <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} alsoMatch={page.alsoMatch} />
                     ))}
                     {isAdmin && (
                         <>
@@ -187,9 +190,12 @@ export const SideBarV2 = () => {
     )
 }
 
-const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label, fuzzy }: { href: string, icon: React.ElementType, activeIcon: React.ElementType, label: string, fuzzy?: boolean }) => {
+const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label, fuzzy, alsoMatch }: { href: string, icon: React.ElementType, activeIcon: React.ElementType, label: string, fuzzy?: boolean, alsoMatch?: Array<string> }) => {
     const matchRoute = useMatchRoute()
-    const isActive = matchRoute({ to: href as ToPathOption<RegisteredRouter>, fuzzy: fuzzy ?? false })
+    const isActive = Boolean(
+        matchRoute({ to: href, fuzzy: fuzzy ?? false }) ||
+        (alsoMatch ?? []).some((to) => matchRoute({ to, fuzzy: true })),
+    )
     return (
         <Link to={href}>
             <div className="cursor-pointer flex flex-col items-center justify-center gap-0.5">

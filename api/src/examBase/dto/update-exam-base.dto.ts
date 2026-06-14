@@ -1,5 +1,15 @@
 import { GovernmentScope, ProcessingPhase } from '@prisma/client';
-import { IsDateString, IsDecimal, IsEnum, IsInt, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsDecimal,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+} from 'class-validator';
 
 export class UpdateExamBaseDto {
   @IsOptional()
@@ -72,7 +82,11 @@ export class UpdateExamBaseDto {
 
   @IsOptional()
   @IsDateString()
-  registrationDate?: string | null;
+  registrationStart?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  registrationEnd?: string | null;
 
   @IsOptional()
   @IsString()
@@ -81,5 +95,26 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsString()
   workload?: string | null;
-}
 
+  /// Quando false, o cargo fica fora da página do concurso (ex.: Médico).
+  @IsOptional()
+  @IsBoolean()
+  isNursingRelevant?: boolean;
+
+  /// Agrupa esta prova com outras do MESMO cargo (cargoGroupId compartilhado).
+  /// null/ausente = cargo standalone (1 prova = 1 cargo).
+  @IsOptional()
+  @IsUUID()
+  cargoGroupId?: string | null;
+
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela").
+  @IsOptional()
+  @IsString()
+  provaLabel?: string | null;
+
+  /// Prova "representante" do cargo (carrega ficha/edital/conteúdo e slug).
+  /// Ao marcar true, o service desmarca as irmãs do mesmo cargoGroupId.
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryProva?: boolean;
+}

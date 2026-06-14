@@ -1,5 +1,14 @@
 export type ProcessingPhase = 'EDITAL' | 'PROVA' | 'GABARITO' | 'REVISAO' | 'EXPLICACOES' | 'CONCLUIDO'
 
+/** Grupo do conteúdo programático do edital (ex.: "Saúde Coletiva e SUS"). */
+export type ExamSyllabusGroup = {
+  id: string
+  order: number
+  name: string
+  /** Tópicos em texto corrido, como no edital. */
+  topics: string
+}
+
 export type ExamBase = {
   id: string
   name: string
@@ -19,14 +28,64 @@ export type ExamBase = {
   vacancyCount: number | null
   applicantCount: number | null
   registrationFee: string | null
-  registrationDate: string | null
+  registrationStart: string | null
+  registrationEnd: string | null
   description: string | null
   workload: string | null
+  /** Quando false, o cargo fica fora da página do concurso (ex.: Médico). */
+  isNursingRelevant: boolean
+  /** Agrupa provas do mesmo cargo (ex.: "Tipo 1"/"Tipo 2"). null = standalone. */
+  cargoGroupId?: string | null
+  /** Rótulo desta prova dentro do cargo (ex.: "Tipo 1"). */
+  provaLabel?: string | null
+  /** Prova representante do cargo (ficha/edital/conteúdo + slug canônico). */
+  isPrimaryProva?: boolean
   examBoardId: string | null
   examBoard: { id: string; name: string; alias?: string | null; logoUrl?: string | null; websiteUrl?: string | null } | null
+  /**
+   * Concurso (edital) vinculado preguiçosamente. Null até alguma leitura
+   * popular o vínculo — nesse caso a navegação usa o id da prova, que
+   * `GET /concursos/:id` também resolve (MAX-25).
+   */
+  concurso?: { id: string; slug: string | null } | null
+  /** Conteúdo programático do edital, ordenado. Presente apenas no detalhe (getOne). */
+  syllabusGroups?: ExamSyllabusGroup[]
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
   reviewStats?: { reviewedCount: number; totalCount: number }
+}
+
+/** A sibling prova (cargo) inside the same concurso. */
+export type ConcursoProva = {
+  id: string
+  role: string
+  slug: string | null
+  salaryBase: string | null
+  vacancyCount: number | null
+  examDate: string
+  examBoardId: string | null
+  published: boolean
+  minPassingGradeNonQuota: string | null
+  questionCount: number
+  isCurrent: boolean
+  userStats: { attemptCount: number; bestScore: number | null }
+}
+
+/** Concurso (edital) identity shared by every prova it contains. */
+export type ConcursoSummary = {
+  id: string
+  slug: string | null
+  institution: string
+  year: number
+  governmentScope: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  state: string | null
+  city: string | null
+  editalUrl: string | null
+}
+
+export type ConcursoProvasResponse = {
+  concurso: ConcursoSummary | null
+  provas: ConcursoProva[]
 }
 
 export type CreateExamBaseInput = {
@@ -58,7 +117,8 @@ export type ExtractedExamMetadata = {
   vacancyCount?: number | null
   applicantCount?: number | null
   registrationFee?: string | null
-  registrationDate?: string | null
+  registrationStart?: string | null
+  registrationEnd?: string | null
   description?: string | null
   workload?: string | null
 }
@@ -81,8 +141,13 @@ export type UpdateExamBaseInput = {
   vacancyCount?: number | null
   applicantCount?: number | null
   registrationFee?: string | null
-  registrationDate?: string | null
+  registrationStart?: string | null
+  registrationEnd?: string | null
   description?: string | null
   workload?: string | null
+  isNursingRelevant?: boolean
+  cargoGroupId?: string | null
+  provaLabel?: string | null
+  isPrimaryProva?: boolean
 }
 

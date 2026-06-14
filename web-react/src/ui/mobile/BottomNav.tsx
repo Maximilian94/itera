@@ -18,10 +18,12 @@ import { PhoneSafeArea } from './PhoneSafeArea'
 
 type BottomNavItem = {
   label: string
-  to: '/dashboard' | '/exams' | '/treino' | '/history' | '/account'
+  to: '/dashboard' | '/concursos' | '/treino' | '/history' | '/account'
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
+  /** Rotas extras que mantêm o item ativo (sempre fuzzy). */
+  alsoMatch?: Array<'/exams'>
 }
 
 const items: BottomNavItem[] = [
@@ -32,14 +34,16 @@ const items: BottomNavItem[] = [
     activeIcon: HomeIconSolid,
   },
   {
-    label: 'Exams',
-    to: '/exams',
+    label: 'Concursos',
+    to: '/concursos',
     icon: DocumentTextIcon,
     activeIcon: DocumentTextIconSolid,
     fuzzy: true,
+    // Concursos é a porta de entrada (MAX-28); /exams mantém o item ativo.
+    alsoMatch: ['/exams'],
   },
   {
-    label: 'Treino',
+    label: 'Treinos',
     to: '/treino',
     icon: AcademicCapIcon,
     activeIcon: AcademicCapIconSolid,
@@ -70,10 +74,15 @@ export function BottomNav() {
     >
       <nav className="mx-auto flex h-[var(--mobile-bottom-nav-height)] max-w-md items-center justify-between px-2">
         {items.map((item) => {
-          const isActive = matchRoute({
-            to: item.to,
-            fuzzy: item.fuzzy ?? false,
-          })
+          const isActive = Boolean(
+            matchRoute({
+              to: item.to,
+              fuzzy: item.fuzzy ?? false,
+            }) ||
+              (item.alsoMatch ?? []).some((to) =>
+                matchRoute({ to, fuzzy: true }),
+              ),
+          )
           const Icon = isActive ? item.activeIcon : item.icon
 
           return (

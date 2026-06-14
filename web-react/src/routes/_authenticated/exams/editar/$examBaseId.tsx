@@ -3,12 +3,16 @@ import {
   useExamBoardQueries,
 } from '@/features/examBoard/queries/examBoard.queries'
 import {
+  useCreateSyllabusGroupMutation,
+  useDeleteSyllabusGroupMutation,
   useExamBaseQueries,
   useExamBaseQuery,
   useExtractExamMetadataMutation,
+  useReorderSyllabusGroupsMutation,
   useUpdateExamBaseMutation,
+  useUpdateSyllabusGroupMutation,
 } from '@/features/examBase/queries/examBase.queries'
-import type { ExamBase, ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
+import type { ExamBase, ExamSyllabusGroup, ExtractedExamMetadata, ProcessingPhase } from '@/features/examBase/domain/examBase.types'
 import {
   useCreateBatchQuestionsMutation,
   type ParsedQuestionStructure,
@@ -17,7 +21,10 @@ import { examBaseQuestionsService } from '@/features/examBaseQuestion/services/e
 
 import { StateCitySelect } from '@/components/StateCitySelect'
 import { Markdown } from '@/components/Markdown'
+import AddIcon from '@mui/icons-material/Add'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward'
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward'
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline'
@@ -32,6 +39,7 @@ import {
   Alert,
   Box,
   Button,
+  Checkbox,
   Chip,
   CircularProgress,
   Collapse,
@@ -77,9 +85,14 @@ type FormState = {
   vacancyCount: string
   applicantCount: string
   registrationFee: string
-  registrationDate: string
+  registrationStart: string
+  registrationEnd: string
   description: string
   workload: string
+  isNursingRelevant: boolean
+  cargoGroupId: string
+  provaLabel: string
+  isPrimaryProva: boolean
 }
 
 const EMPTY_FORM: FormState = {
@@ -97,9 +110,14 @@ const EMPTY_FORM: FormState = {
   vacancyCount: '',
   applicantCount: '',
   registrationFee: '',
-  registrationDate: '',
+  registrationStart: '',
+  registrationEnd: '',
   description: '',
   workload: '',
+  isNursingRelevant: true,
+  cargoGroupId: '',
+  provaLabel: '',
+  isPrimaryProva: true,
 }
 
 const NEW_BOARD_SENTINEL = '__new__'
@@ -120,9 +138,16 @@ function applyExtracted(prev: FormState, data: ExtractedExamMetadata): FormState
     vacancyCount: data.vacancyCount != null ? String(data.vacancyCount) : prev.vacancyCount,
     applicantCount: data.applicantCount != null ? String(data.applicantCount) : prev.applicantCount,
     registrationFee: data.registrationFee ?? prev.registrationFee,
-    registrationDate: data.registrationDate ? data.registrationDate.slice(0, 10) : prev.registrationDate,
+    registrationStart: data.registrationStart ? data.registrationStart.slice(0, 10) : prev.registrationStart,
+    registrationEnd: data.registrationEnd ? data.registrationEnd.slice(0, 10) : prev.registrationEnd,
     description: data.description ?? prev.description,
     workload: data.workload ?? prev.workload,
+    // Decisão de admin, não de IA: a relevância nunca vem da extração.
+    isNursingRelevant: prev.isNursingRelevant,
+    // Agrupamento de cargo é decisão de admin, nunca da extração.
+    cargoGroupId: prev.cargoGroupId,
+    provaLabel: prev.provaLabel,
+    isPrimaryProva: prev.isPrimaryProva,
   }
 }
 
@@ -317,9 +342,14 @@ function MetadataStep({
       vacancyCount: examBase.vacancyCount != null ? String(examBase.vacancyCount) : '',
       applicantCount: examBase.applicantCount != null ? String(examBase.applicantCount) : '',
       registrationFee: examBase.registrationFee ?? '',
-      registrationDate: examBase.registrationDate ? examBase.registrationDate.slice(0, 10) : '',
+      registrationStart: examBase.registrationStart ? examBase.registrationStart.slice(0, 10) : '',
+      registrationEnd: examBase.registrationEnd ? examBase.registrationEnd.slice(0, 10) : '',
       description: examBase.description ?? '',
       workload: examBase.workload ?? '',
+      isNursingRelevant: examBase.isNursingRelevant ?? true,
+      cargoGroupId: examBase.cargoGroupId ?? '',
+      provaLabel: examBase.provaLabel ?? '',
+      isPrimaryProva: examBase.isPrimaryProva ?? true,
     })
   }, [examBase])
 
@@ -387,9 +417,14 @@ function MetadataStep({
       vacancyCount: form.vacancyCount ? parseInt(form.vacancyCount, 10) : null,
       applicantCount: form.applicantCount ? parseInt(form.applicantCount, 10) : null,
       registrationFee: form.registrationFee || null,
-      registrationDate: form.registrationDate || null,
+      registrationStart: form.registrationStart || null,
+      registrationEnd: form.registrationEnd || null,
       description: form.description.trim() || null,
       workload: form.workload.trim() || null,
+      isNursingRelevant: form.isNursingRelevant,
+      cargoGroupId: form.cargoGroupId.trim() || null,
+      provaLabel: form.provaLabel.trim() || null,
+      isPrimaryProva: form.isPrimaryProva,
     }
   }
 
@@ -410,6 +445,7 @@ function MetadataStep({
   const canExtract = pdfFile != null && !extractMutation.isPending
 
   return (
+    <>
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Left: AI extraction panel */}
       <div className="flex flex-col gap-4">
@@ -496,6 +532,68 @@ function MetadataStep({
           fullWidth
           size="small"
         />
+        <div>
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={form.isNursingRelevant}
+                onChange={(e) => set('isNursingRelevant', e.target.checked)}
+                size="small"
+              />
+            }
+            label="Cargo relevante para enfermagem"
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: -0.5 }}>
+            Desmarque para cargos fora da área (ex.: Médico). A prova fica fora da página do concurso e dos seus totais.
+          </Typography>
+        </div>
+        {/* Agrupamento de provas sob o mesmo cargo (ex.: provas "Tipo 1"/"Tipo 2"
+            com bancos de questões diferentes). Vazio = cargo standalone. */}
+        <fieldset style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: 12 }}>
+          <legend style={{ fontSize: 12, color: '#64748b', padding: '0 4px' }}>
+            Cargo com múltiplas provas (opcional)
+          </legend>
+          <TextField
+            label="Rótulo desta prova"
+            value={form.provaLabel}
+            onChange={(e) => set('provaLabel', e.target.value)}
+            placeholder='Ex.: "Tipo 1", "Amarela"'
+            fullWidth
+            size="small"
+          />
+          <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 8 }}>
+            <TextField
+              label="ID do grupo de cargo (cargoGroupId)"
+              value={form.cargoGroupId}
+              onChange={(e) => set('cargoGroupId', e.target.value)}
+              placeholder="Cole o mesmo ID nas provas do mesmo cargo"
+              fullWidth
+              size="small"
+            />
+            <Button
+              variant="outlined"
+              size="small"
+              sx={{ mt: 0.25, whiteSpace: 'nowrap' }}
+              onClick={() => set('cargoGroupId', crypto.randomUUID())}
+            >
+              Gerar
+            </Button>
+          </div>
+          <FormControlLabel
+            sx={{ mt: 0.5 }}
+            control={
+              <Checkbox
+                checked={form.isPrimaryProva}
+                onChange={(e) => set('isPrimaryProva', e.target.checked)}
+                size="small"
+              />
+            }
+            label="Prova principal do cargo (carrega ficha, edital e conteúdo programático)"
+          />
+          <Typography variant="caption" color="text.secondary" display="block" sx={{ ml: 4, mt: -0.5 }}>
+            Deixe em branco para cargo de prova única. Para agrupar, gere um ID na prova principal e cole-o nas demais provas do mesmo cargo.
+          </Typography>
+        </fieldset>
         <TextField
           label="Instituição / Órgão"
           value={form.institution}
@@ -581,10 +679,19 @@ function MetadataStep({
           size="small"
         />
         <TextField
-          label="Data da inscrição"
+          label="Início das inscrições"
           type="date"
-          value={form.registrationDate}
-          onChange={(e) => set('registrationDate', e.target.value)}
+          value={form.registrationStart}
+          onChange={(e) => set('registrationStart', e.target.value)}
+          InputLabelProps={{ shrink: true }}
+          fullWidth
+          size="small"
+        />
+        <TextField
+          label="Fim das inscrições"
+          type="date"
+          value={form.registrationEnd}
+          onChange={(e) => set('registrationEnd', e.target.value)}
           InputLabelProps={{ shrink: true }}
           fullWidth
           size="small"
@@ -714,6 +821,257 @@ function MetadataStep({
         </div>
       </Stack>
     </div>
+
+    <Box sx={{ mt: 4 }}>
+      <SyllabusGroupsEditor
+        examBaseId={examBaseId}
+        initialGroups={examBase?.syllabusGroups}
+      />
+    </Box>
+    </>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Conteúdo programático (syllabus groups) — MAX-14
+// ─────────────────────────────────────────────────────────────────────────────
+
+type SyllabusRow = {
+  /** null = rascunho ainda não salvo no backend */
+  id: string | null
+  name: string
+  topics: string
+  dirty: boolean
+}
+
+function SyllabusGroupsEditor({
+  examBaseId,
+  initialGroups,
+}: {
+  examBaseId: string
+  initialGroups: ExamSyllabusGroup[] | undefined
+}) {
+  const createMutation = useCreateSyllabusGroupMutation(examBaseId)
+  const updateMutation = useUpdateSyllabusGroupMutation(examBaseId)
+  const reorderMutation = useReorderSyllabusGroupsMutation(examBaseId)
+  const deleteMutation = useDeleteSyllabusGroupMutation(examBaseId)
+
+  // Estado local é a fonte da verdade durante a sessão; inicializa uma única vez
+  // a partir do payload do exam base para não perder edições a cada refetch.
+  const [rows, setRows] = useState<SyllabusRow[]>([])
+  const initializedRef = useRef(false)
+  useEffect(() => {
+    if (initializedRef.current || initialGroups === undefined) return
+    initializedRef.current = true
+    setRows(
+      initialGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        topics: g.topics,
+        dirty: false,
+      })),
+    )
+  }, [initialGroups])
+
+  const [error, setError] = useState<string | null>(null)
+  const isSaving =
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    reorderMutation.isPending ||
+    deleteMutation.isPending
+  const hasDraft = rows.some((r) => r.id === null)
+
+  function setRow(index: number, patch: Partial<SyllabusRow>) {
+    setRows((prev) =>
+      prev.map((r, i) => (i === index ? { ...r, ...patch, dirty: true } : r)),
+    )
+  }
+
+  function addRow() {
+    setRows((prev) => [...prev, { id: null, name: '', topics: '', dirty: true }])
+  }
+
+  async function saveRow(index: number) {
+    const row = rows[index]
+    if (!row.name.trim() || !row.topics.trim()) return
+    setError(null)
+    try {
+      const saved = row.id
+        ? await updateMutation.mutateAsync({
+            groupId: row.id,
+            name: row.name.trim(),
+            topics: row.topics.trim(),
+          })
+        : await createMutation.mutateAsync({
+            name: row.name.trim(),
+            topics: row.topics.trim(),
+          })
+      setRows((prev) =>
+        prev.map((r, i) =>
+          i === index
+            ? { id: saved.id, name: saved.name, topics: saved.topics, dirty: false }
+            : r,
+        ),
+      )
+    } catch (err) {
+      setError((err as Error).message ?? 'Erro ao salvar grupo')
+    }
+  }
+
+  async function removeRow(index: number) {
+    const row = rows[index]
+    setError(null)
+    if (row.id) {
+      try {
+        await deleteMutation.mutateAsync(row.id)
+      } catch (err) {
+        setError((err as Error).message ?? 'Erro ao remover grupo')
+        return
+      }
+    }
+    setRows((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  async function moveRow(index: number, direction: -1 | 1) {
+    const target = index + direction
+    if (target < 0 || target >= rows.length) return
+    const next = [...rows]
+    ;[next[index], next[target]] = [next[target], next[index]]
+    setRows(next)
+    setError(null)
+    try {
+      await reorderMutation.mutateAsync(next.map((r) => r.id!))
+    } catch (err) {
+      setRows(rows) // desfaz o swap local
+      setError((err as Error).message ?? 'Erro ao reordenar grupos')
+    }
+  }
+
+  return (
+    <Box sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, p: 3 }}>
+      <Typography variant="subtitle1" fontWeight={600} mb={0.5}>
+        Conteúdo programático (edital)
+      </Typography>
+      <Typography variant="body2" color="text.secondary" mb={2}>
+        Grupos de conteúdo conforme o edital (ex.: "Saúde Coletiva e SUS"), com os
+        tópicos em texto corrido. Aparece na página do cargo de prova futura; sem
+        grupos, a seção fica oculta.
+      </Typography>
+
+      {rows.length === 0 && (
+        <Typography variant="body2" color="text.secondary" mb={2}>
+          Nenhum grupo cadastrado.
+        </Typography>
+      )}
+
+      <Stack spacing={2}>
+        {rows.map((row, i) => (
+          <Box
+            key={row.id ?? `draft-${i}`}
+            sx={{
+              border: '1px solid',
+              borderColor: row.dirty ? 'warning.light' : 'divider',
+              borderRadius: 2,
+              p: 2,
+            }}
+          >
+            <div className="flex items-start gap-2">
+              <Typography variant="body2" fontWeight={700} sx={{ mt: 1, minWidth: 24 }}>
+                {i + 1}.
+              </Typography>
+              <Stack spacing={1.5} sx={{ flex: 1 }}>
+                <TextField
+                  label="Nome do grupo *"
+                  value={row.name}
+                  onChange={(e) => setRow(i, { name: e.target.value })}
+                  placeholder="Ex: Saúde Coletiva e SUS"
+                  size="small"
+                  fullWidth
+                />
+                <TextField
+                  label="Tópicos *"
+                  value={row.topics}
+                  onChange={(e) => setRow(i, { topics: e.target.value })}
+                  placeholder="Cole os tópicos do grupo como constam no edital"
+                  multiline
+                  minRows={2}
+                  maxRows={10}
+                  size="small"
+                  fullWidth
+                />
+              </Stack>
+              <Stack spacing={0.5} alignItems="center">
+                <Tooltip title={hasDraft ? 'Salve todos os grupos antes de reordenar' : 'Mover para cima'}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={i === 0 || hasDraft || isSaving}
+                      onClick={() => moveRow(i, -1)}
+                    >
+                      <ArrowUpwardIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title={hasDraft ? 'Salve todos os grupos antes de reordenar' : 'Mover para baixo'}>
+                  <span>
+                    <IconButton
+                      size="small"
+                      disabled={i === rows.length - 1 || hasDraft || isSaving}
+                      onClick={() => moveRow(i, 1)}
+                    >
+                      <ArrowDownwardIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+                <Tooltip title="Remover grupo">
+                  <span>
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={isSaving}
+                      onClick={() => removeRow(i)}
+                    >
+                      <DeleteOutlineIcon sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </span>
+                </Tooltip>
+              </Stack>
+            </div>
+            {row.dirty && (
+              <div className="flex justify-end mt-2">
+                <Button
+                  size="small"
+                  variant="contained"
+                  startIcon={isSaving ? <CircularProgress size={14} color="inherit" /> : <SaveIcon />}
+                  disabled={!row.name.trim() || !row.topics.trim() || isSaving}
+                  onClick={() => saveRow(i)}
+                  sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' } }}
+                >
+                  {row.id ? 'Salvar alterações' : 'Salvar grupo'}
+                </Button>
+              </div>
+            )}
+          </Box>
+        ))}
+      </Stack>
+
+      {error && (
+        <Alert severity="error" sx={{ mt: 2, py: 0.5 }}>
+          {error}
+        </Alert>
+      )}
+
+      <Button
+        size="small"
+        variant="outlined"
+        startIcon={<AddIcon />}
+        onClick={addRow}
+        disabled={isSaving}
+        sx={{ mt: 2, borderColor: 'violet.600', color: 'violet.600' }}
+      >
+        Adicionar grupo
+      </Button>
+    </Box>
   )
 }
 

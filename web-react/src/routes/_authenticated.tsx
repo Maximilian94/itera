@@ -35,7 +35,11 @@ function RouteComponent() {
   return (
     <div className="flex h-full bg-slate-100 p-0 md:p-2 gap-0 md:gap-2">
       {!isMobile && <SideBarV2 />}
+      {/* O scroll do app acontece neste div (não na window); o atributo abaixo
+          faz o scrollRestoration do TanStack Router rastreá-lo e restaurar a
+          posição em back/forward entre os níveis (MAX-25). */}
       <div
+        data-scroll-restoration-id="authenticated-content"
         className={`flex-1 min-h-0 overflow-auto flex flex-col border-0 md:border md:border-solid md:border-slate-300 rounded-none md:rounded-lg bg-slate-50 p-2 ${
           showBottomNav
             ? 'pb-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-inset-bottom)+0.5rem)]'

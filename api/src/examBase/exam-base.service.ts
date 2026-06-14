@@ -6,22 +6,11 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, ProcessingPhase, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { slugify } from '../common/slugify';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
   return t === '' ? null : (t ?? null);
-}
-
-function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
 }
 
 function assertValidGovernmentScopeLocation(input: {
@@ -123,12 +112,18 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Lazily-linked concurso (MAX-25): populated once any concurso-aware
+        // read heals the link; the UI falls back to the exam base id
+        // (GET /concursos/:id also accepts it) while still null.
+        concurso: { select: { id: true, slug: true } },
         _count: { select: { questions: true } },
       },
     });
@@ -317,12 +312,19 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Conteúdo programático do edital (MAX-14). Sem grupos → array vazio.
+        syllabusGroups: {
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, name: true, topics: true },
+        },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
@@ -465,6 +467,10 @@ export class ExamBaseService {
     minPassingGradeNonQuota?: string | number | null;
     editalUrl?: string | null;
     adminNotes?: string | null;
+    isNursingRelevant?: boolean;
+    cargoGroupId?: string | null;
+    provaLabel?: string | null;
+    isPrimaryProva?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -486,6 +492,10 @@ export class ExamBaseService {
         minPassingGradeNonQuota: input.minPassingGradeNonQuota ?? undefined,
         editalUrl: normalizeOptionalText(input.editalUrl),
         adminNotes: normalizeOptionalText(input.adminNotes),
+        isNursingRelevant: input.isNursingRelevant,
+        cargoGroupId: input.cargoGroupId ?? undefined,
+        provaLabel: normalizeOptionalText(input.provaLabel),
+        isPrimaryProva: input.isPrimaryProva,
       },
       select: {
         id: true,
@@ -500,6 +510,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         editalUrl: true,
         adminNotes: true,
+        isNursingRelevant: true,
         processingPhase: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
@@ -539,14 +550,25 @@ export class ExamBaseService {
       vacancyCount?: number | null;
       applicantCount?: number | null;
       registrationFee?: string | number | null;
-      registrationDate?: string | null;
+      registrationStart?: string | null;
+      registrationEnd?: string | null;
       description?: string | null;
       workload?: string | null;
+      isNursingRelevant?: boolean;
+      cargoGroupId?: string | null;
+      provaLabel?: string | null;
+      isPrimaryProva?: boolean;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
-      select: { id: true, governmentScope: true, state: true, city: true },
+      select: {
+        id: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        cargoGroupId: true,
+      },
     });
     if (!exists) throw new NotFoundException('exam base not found');
 
@@ -585,9 +607,27 @@ export class ExamBaseService {
         vacancyCount: input.vacancyCount === undefined ? undefined : input.vacancyCount,
         applicantCount: input.applicantCount === undefined ? undefined : input.applicantCount,
         registrationFee: input.registrationFee === undefined ? undefined : input.registrationFee,
-        registrationDate: input.registrationDate === undefined ? undefined : (input.registrationDate ? new Date(input.registrationDate) : null),
+        registrationStart:
+          input.registrationStart === undefined
+            ? undefined
+            : input.registrationStart
+              ? new Date(input.registrationStart)
+              : null,
+        registrationEnd:
+          input.registrationEnd === undefined
+            ? undefined
+            : input.registrationEnd
+              ? new Date(input.registrationEnd)
+              : null,
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
+        isNursingRelevant: input.isNursingRelevant,
+        cargoGroupId: input.cargoGroupId === undefined ? undefined : input.cargoGroupId,
+        provaLabel:
+          input.provaLabel === undefined
+            ? undefined
+            : normalizeOptionalText(input.provaLabel),
+        isPrimaryProva: input.isPrimaryProva,
       },
       select: {
         id: true,
@@ -607,13 +647,30 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
+    // Invariante: no máximo uma prova primária por cargoGroupId. Se esta virou
+    // primária e pertence a um grupo, as irmãs deixam de ser primárias.
+    const effectiveGroupId =
+      input.cargoGroupId === undefined ? exists.cargoGroupId : input.cargoGroupId;
+    if (input.isPrimaryProva === true && effectiveGroupId != null) {
+      await this.prisma.examBase.updateMany({
+        where: {
+          cargoGroupId: effectiveGroupId,
+          id: { not: examBaseId },
+          isPrimaryProva: true,
+        },
+        data: { isPrimaryProva: false },
+      });
+    }
+
     await this.triggerRevalidate(result.slug);
     return result;
   }

@@ -19,3 +19,5 @@ Criar uma trilha de pão para:
 - [2026-04 — Mobile Redesign](./2026-04-mobile-redesign.md) — plano para tornar o `web-react/` usável em celular: adaptive components, split físico desktop/mobile, rollout por PostHog flags.
 - [2026-05 — Diagnóstico Edital](./2026-05-diagnostico-edital.md) — captura de leads via questionário na LP `/lp/edital` com infra genérica de leads (perfil + tags + events) reusável por LPs futuras.
 - [2026-05 — Scraping PCI Concursos](./2026-05-scraping-pci.md) — scraping do acervo PCI Concursos para catalogar provas de enfermagem, com scoring de prioridade e promoção para o pipeline de processamento existente.
+- [2026-06 — Testes + a11y das páginas de concurso](./2026-06-concurso-testes-a11y.md) — harness de teste de rotas do `web-react/` (router em memória + fetch mockado), passe de axe/contraste/teclado nas páginas de concurso e cargo (MAX-26).
+- [2026-06 — Limpeza e lançamento da página de concurso](./2026-06-pagina-concurso.md) — fechamento do épico MAX-11: remoção do mockup de preview, drop da coluna deprecada `registrationDate` (janela `registrationStart`/`registrationEnd`) e atualização das docs (MAX-27).

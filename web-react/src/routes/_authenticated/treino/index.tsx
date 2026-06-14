@@ -9,7 +9,7 @@ import {
   RocketLaunchIcon,
   TrophyIcon,
 } from '@heroicons/react/24/outline'
-import { AcademicCapIcon, CheckCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
+import { AcademicCapIcon, CheckCircleIcon, ViewfinderCircleIcon, XCircleIcon } from '@heroicons/react/24/solid'
 import { Button } from '@mui/material'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import {
@@ -87,7 +87,7 @@ function ActiveTrainingCard({
             {/* Header */}
             <div className="flex items-start justify-between gap-2 mb-3">
               <p className="text-sm font-semibold text-slate-800 truncate flex-1">
-                {item.examTitle}
+                {item.cargoLabel || item.examTitle}
               </p>
               <ArrowRightIcon className="w-3.5 h-3.5 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-0.5 transition-all shrink-0 mt-0.5" />
             </div>
@@ -174,7 +174,7 @@ function ConcludedTrainingRow({
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-slate-800 truncate">
-                    {item.examTitle}
+                    {item.cargoLabel || item.examTitle}
                   </p>
                   <p className="text-xs text-slate-400">
                     {dayjs(item.updatedAt).format('DD/MM/YYYY')}
@@ -271,6 +271,109 @@ function ConcludedTrainingRow({
         </div>
       </Card>
     </Link>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Group trainings by concurso                                        */
+/* ------------------------------------------------------------------ */
+
+interface ConcursoGroup {
+  key: string
+  title: string
+  slug: string | null
+  active: TrainingListItem[]
+  concluded: TrainingListItem[]
+}
+
+/** Groups trainings by concurso, preserving recency order (input is updatedAt desc). */
+function groupByConcurso(items: TrainingListItem[]): ConcursoGroup[] {
+  const map = new Map<string, ConcursoGroup>()
+  const order: string[] = []
+  for (const item of items) {
+    const key = item.concursoSlug ?? item.concursoTitle
+    let group = map.get(key)
+    if (!group) {
+      group = { key, title: item.concursoTitle, slug: item.concursoSlug, active: [], concluded: [] }
+      map.set(key, group)
+      order.push(key)
+    }
+    if (item.currentStage === 'FINAL') group.concluded.push(item)
+    else group.active.push(item)
+  }
+  return order.map((k) => map.get(k)!)
+}
+
+function ConcursoGroupSection({
+  group,
+  animDelay = 0,
+}: {
+  group: ConcursoGroup
+  animDelay?: number
+}) {
+  const activeCount = group.active.length
+  const concludedCount = group.concluded.length
+  const subtitle = [
+    activeCount > 0 ? `${activeCount} em andamento` : null,
+    concludedCount > 0
+      ? `${concludedCount} concluído${concludedCount > 1 ? 's' : ''}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
+  return (
+    <div
+      style={{ animation: `fade-in-up 0.5s ease-out ${animDelay}ms both` }}
+      className="rounded-2xl border border-slate-200 bg-white p-4 sm:p-5"
+    >
+      {/* Concurso header — the missing "where am I training" context */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-cyan-100 bg-cyan-50">
+          <ViewfinderCircleIcon className="h-5 w-5 text-cyan-600" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold text-slate-900 truncate sm:text-base">
+            {group.title}
+          </h3>
+          {subtitle && <p className="text-xs text-slate-400">{subtitle}</p>}
+        </div>
+        {group.slug && (
+          <Link
+            to="/concursos/$concursoSlug"
+            params={{ concursoSlug: group.slug }}
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium text-cyan-600 hover:text-cyan-700 no-underline"
+          >
+            <span className="hidden sm:inline">Ver concurso</span>
+            <ArrowRightIcon className="w-3 h-3" />
+          </Link>
+        )}
+      </div>
+
+      {activeCount > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-2">
+          {group.active.map((t, idx) => (
+            <ActiveTrainingCard
+              key={t.trainingId}
+              item={t}
+              animDelay={animDelay + 60 + idx * 50}
+            />
+          ))}
+        </div>
+      )}
+
+      {concludedCount > 0 && (
+        <div className="flex flex-col gap-2">
+          {group.concluded.map((t, idx) => (
+            <ConcludedTrainingRow
+              key={t.trainingId}
+              item={t}
+              animDelay={animDelay + 80 + idx * 50}
+            />
+          ))}
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -459,42 +562,21 @@ function TreinoIndexPage() {
         </div>
       </div>
 
-      {/* ═══════════ ACTIVE TRAININGS ═══════════ */}
-      {!isLoading && activeTrainings.length > 0 && (
+      {/* ═══════════ TRAININGS GROUPED BY CONCURSO ═══════════ */}
+      {!isLoading && trainings.length > 0 && (
         <div>
           <h2
-            className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
-            style={{ animation: 'fade-in-up 0.5s ease-out 400ms both' }}
+            className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-4"
+            style={{ animation: 'fade-in-up 0.5s ease-out 380ms both' }}
           >
-            Em andamento ({inProgress})
+            Seus concursos
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {activeTrainings.map((t, idx) => (
-              <ActiveTrainingCard
-                key={t.trainingId}
-                item={t}
-                animDelay={450 + idx * 60}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════ CONCLUDED TRAININGS ═══════════ */}
-      {!isLoading && concludedTrainings.length > 0 && (
-        <div>
-          <h2
-            className="text-sm font-semibold text-slate-500 uppercase tracking-wide mb-3"
-            style={{ animation: 'fade-in-up 0.5s ease-out 500ms both' }}
-          >
-            Concluídos ({concluded})
-          </h2>
-          <div className="flex flex-col gap-2">
-            {concludedTrainings.map((t, idx) => (
-              <ConcludedTrainingRow
-                key={t.trainingId}
-                item={t}
-                animDelay={550 + idx * 50}
+          <div className="flex flex-col gap-6">
+            {groupByConcurso(trainings).map((group, idx) => (
+              <ConcursoGroupSection
+                key={group.key}
+                group={group}
+                animDelay={420 + idx * 80}
               />
             ))}
           </div>
