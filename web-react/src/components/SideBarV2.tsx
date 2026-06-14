@@ -86,7 +86,7 @@ export const SideBarV2 = () => {
             activeIcon: BuildingLibraryIcon,
         },
         {
-            label: 'Treino',
+            label: 'Meus treinos',
             href: TreinoRoute.to,
             icon: AcademicCapIconOutline,
             activeIcon: AcademicCapIcon,

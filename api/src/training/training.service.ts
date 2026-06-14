@@ -293,7 +293,20 @@ export class TrainingService {
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
-        examBase: { select: { id: true, name: true, examBoardId: true, minPassingGradeNonQuota: true } },
+        examBase: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            role: true,
+            institution: true,
+            examDate: true,
+            provaLabel: true,
+            examBoardId: true,
+            minPassingGradeNonQuota: true,
+            concurso: { select: { slug: true, institution: true, year: true } },
+          },
+        },
         examBaseAttempt: { select: { id: true, finishedAt: true, scorePercentage: true } },
       },
     });
@@ -302,6 +315,13 @@ export class TrainingService {
       examBaseId: s.examBaseId,
       examBoardId: s.examBase.examBoardId ?? null,
       examTitle: s.examBase.name,
+      cargoSlug: s.examBase.slug ?? null,
+      cargoLabel: [s.examBase.role, s.examBase.provaLabel].filter(Boolean).join(' · '),
+      concursoSlug: s.examBase.concurso?.slug ?? null,
+      concursoTitle: s.examBase.concurso
+        ? `${s.examBase.concurso.institution} ${s.examBase.concurso.year}`
+        : (s.examBase.institution ??
+          `${s.examBase.name} ${new Date(s.examBase.examDate).getFullYear()}`),
       currentStage: s.currentStage,
       attemptId: s.examBaseAttempt.id,
       createdAt: s.createdAt,

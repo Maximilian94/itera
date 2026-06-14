@@ -43,7 +43,7 @@ const items: BottomNavItem[] = [
     alsoMatch: ['/exams'],
   },
   {
-    label: 'Treino',
+    label: 'Treinos',
     to: '/treino',
     icon: AcademicCapIcon,
     activeIcon: AcademicCapIconSolid,

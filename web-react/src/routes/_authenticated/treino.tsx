@@ -26,6 +26,15 @@ function TreinoLayout() {
   const { data: examBase } = useExamBaseQuery(training?.examBaseId)
   const currentStage = training?.currentStage
   const examTitle = examBase ? formatExamBaseTitle(examBase) : null
+  const concursoSlug = examBase?.concurso?.slug ?? null
+  const cargoSlug = examBase?.slug ?? null
+  // Concurso = contexto (ano/local/instituição + banca); Cargo = o papel (role) com rótulo da prova.
+  const bancaLabel = examBase?.examBoard?.alias ?? examBase?.examBoard?.name ?? null
+  const concursoLabel =
+    examTitle && bancaLabel ? `${examTitle} · ${bancaLabel}` : examTitle
+  const cargoLabel = examBase
+    ? [examBase.role, examBase.provaLabel].filter(Boolean).join(' · ')
+    : null
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 p-1">
@@ -35,6 +44,10 @@ function TreinoLayout() {
             trainingId={trainingId}
             currentStage={currentStage}
             examTitle={trainingId !== 'novo' ? examTitle : null}
+            concursoSlug={trainingId !== 'novo' ? concursoSlug : null}
+            cargoSlug={trainingId !== 'novo' ? cargoSlug : null}
+            concursoLabel={concursoLabel}
+            cargoLabel={cargoLabel}
           />
         </div>
       )}

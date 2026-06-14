@@ -75,6 +75,39 @@ const CARGOS: ReadonlyArray<{ role: string; min: number; max: number }> = [
   { role: 'Enfermeiro do Trabalho', min: 5200, max: 9000 },
 ];
 
+const WORKLOADS = ['30h semanais', '36h semanais', '40h semanais', '24h semanais (plantões 12x36)'] as const;
+
+/** Atribuições (description) + requisitos por cargo, como o edital descreve. */
+const CARGO_DETAILS: Record<string, { description: string; requirements: string }> = {
+  Enfermeiro: {
+    description:
+      'Prestar assistência de enfermagem a pacientes da rede pública de saúde: avaliação e prescrição de cuidados de enfermagem, execução de procedimentos de maior complexidade, supervisão da equipe de técnicos e auxiliares, e participação em ações de educação em saúde e vigilância epidemiológica, conforme os protocolos do SUS.',
+    requirements: 'Curso superior em Enfermagem e registro ativo no COREN da respectiva jurisdição.',
+  },
+  'Técnico de Enfermagem': {
+    description:
+      'Executar ações assistenciais de enfermagem sob supervisão do enfermeiro: administração de medicamentos, curativos, coleta de materiais, aferição de sinais vitais e cuidados de higiene e conforto ao paciente, registrando as atividades no prontuário.',
+    requirements: 'Curso técnico em Enfermagem concluído e registro ativo no COREN.',
+  },
+  'Auxiliar de Enfermagem': {
+    description:
+      'Auxiliar nos cuidados de enfermagem sob supervisão: higiene e conforto do paciente, preparo de materiais e ambientes, observação de sinais vitais e apoio às atividades da equipe assistencial.',
+    requirements: 'Curso de Auxiliar de Enfermagem concluído e registro ativo no COREN.',
+  },
+  'Enfermeiro Obstetra': {
+    description:
+      'Prestar assistência de enfermagem à saúde da mulher no ciclo gravídico-puerperal: pré-natal de baixo risco, assistência ao parto normal, puerpério e cuidados ao recém-nascido, atuando em conjunto com a equipe obstétrica conforme protocolos do SUS.',
+    requirements:
+      'Curso superior em Enfermagem, especialização em Enfermagem Obstétrica e registro ativo no COREN.',
+  },
+  'Enfermeiro do Trabalho': {
+    description:
+      'Planejar e executar ações de saúde ocupacional: avaliação de riscos, exames periódicos, campanhas de prevenção, controle de agravos relacionados ao trabalho e apoio ao programa de saúde do trabalhador da instituição.',
+    requirements:
+      'Curso superior em Enfermagem, especialização em Enfermagem do Trabalho e registro ativo no COREN.',
+  },
+};
+
 type Temporal = 'open' | 'future' | 'past';
 
 /** Datas por estado temporal (date-only em UTC, como o resto do app). */
@@ -152,9 +185,11 @@ async function main() {
 
     for (const cargo of cargos) {
       const hasReserveList = Math.random() < 0.3;
+      const slug = `seed-c${i}-${cargo.role.toLowerCase().replace(/[^a-z]+/g, '-')}`;
+      const details = CARGO_DETAILS[cargo.role];
       rows.push({
         name: `${cargo.role} — ${institution} ${dates.examDate.getUTCFullYear()}`,
-        slug: `seed-c${i}-${cargo.role.toLowerCase().replace(/[^a-z]+/g, '-')}`,
+        slug,
         institution,
         role: cargo.role,
         governmentScope: template.scope,
@@ -164,6 +199,11 @@ async function main() {
         vacancyCount: rand(1, 60),
         hasReserveList,
         minPassingGradeNonQuota: new Prisma.Decimal(60),
+        workload: pick(WORKLOADS),
+        requirements: details?.requirements ?? null,
+        description: details?.description ?? null,
+        registrationFee: new Prisma.Decimal(rand(60, 150)),
+        editalUrl: `https://exemplo.maximize.dev/editais/${slug}.pdf`,
         examDate: dates.examDate,
         registrationStart: dates.registrationStart,
         registrationEnd: dates.registrationEnd,

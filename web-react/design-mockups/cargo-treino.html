@@ -1,0 +1,570 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Mockup · Página do cargo (Detalhes / Treino) — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    --success:#047857; --success-bg:#ecfdf5; --success-solid:#10b981;
+    --error:#dc2626; --error-bg:#fef2f2;
+    --warning:#b45309; --warning-bg:#fffbeb; --warning-solid:#f59e0b;
+    --r-md:6px; --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 6px 16px -4px rgba(15,23,42,.12);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+    color:var(--body); background:var(--surface-muted);
+    line-height:1.6; -webkit-font-smoothing:antialiased;
+  }
+  .shell{max-width:1120px; margin:0 auto; padding:24px 20px 80px}
+  a{color:inherit}
+  h1,h2,h3,h4,p{margin:0}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+
+  /* ── Header ───────────────────────────── */
+  .crumb{font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .crumb a{text-decoration:none;color:var(--muted)}
+  .crumb a:hover{color:var(--primary-deep)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;
+    padding:3px 10px;border-radius:var(--r-full);letter-spacing:.01em}
+  .pill--future{background:var(--primary-tint);color:var(--primary-deep)}
+  .dot{width:7px;height:7px;border-radius:var(--r-full);background:currentColor;display:inline-block}
+  .role{margin-top:10px;font-size:clamp(1.6rem,4vw,2rem);font-weight:800;color:var(--ink);
+    letter-spacing:-.02em;line-height:1.12;text-wrap:balance}
+  .context{margin-top:4px;font-size:.9rem;color:var(--muted)}
+
+  /* ── Tabs ─────────────────────────────── */
+  .tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:1px solid var(--border-soft);position:relative}
+  .tab{appearance:none;background:none;border:0;cursor:pointer;font-family:inherit;
+    font-size:.95rem;font-weight:700;color:var(--muted);padding:11px 16px 13px;
+    border-radius:var(--r-lg) var(--r-lg) 0 0;display:inline-flex;align-items:center;gap:8px;
+    position:relative;transition:color .18s var(--ease),background .18s var(--ease)}
+  .tab:hover{color:var(--ink);background:var(--field)}
+  .tab[aria-selected="true"]{color:var(--primary-deep)}
+  .tab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;
+    height:2.5px;background:var(--primary);border-radius:var(--r-full)}
+  .tab .badge{font-size:.66rem;font-weight:700;background:var(--surface-muted);color:var(--muted);
+    padding:1px 7px;border-radius:var(--r-full)}
+  .tab[aria-selected="true"] .badge{background:var(--primary-tint);color:var(--primary-deep)}
+  .tab:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+
+  .panel[hidden]{display:none}
+  .panel{padding-top:22px;animation:fade .3s var(--ease) both}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+  /* ── Cards / panels ───────────────────── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);
+    box-shadow:var(--sh-rest)}
+  .card-pad{padding:20px}
+  .grid{display:grid;gap:16px;align-items:start}
+  @media(min-width:920px){.grid-2{grid-template-columns:1fr 360px}}
+  .stack{display:flex;flex-direction:column;gap:16px}
+
+  .eyebrow{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .sec-title{font-size:1.05rem;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .muted{color:var(--muted)}
+  .small{font-size:.84rem}
+
+  /* ── Readiness strip ──────────────────── */
+  .readiness{display:flex;flex-wrap:wrap;gap:18px 28px;align-items:center;justify-content:space-between}
+  .readiness .lead{min-width:200px}
+  .ready-num{font-size:1.7rem;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:.78rem;font-weight:700;
+    color:var(--success);background:var(--success-bg);padding:2px 8px;border-radius:var(--r-full)}
+  .track-wrap{flex:1;min-width:240px}
+  .track{position:relative;height:12px;border-radius:var(--r-full);background:var(--surface-muted);overflow:visible}
+  .track .fill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full);background:var(--primary)}
+  .track .cut{position:absolute;top:-5px;bottom:-5px;width:2.5px;background:var(--ink);border-radius:2px}
+  .track .cut::after{content:"corte 70%";position:absolute;top:-19px;left:50%;transform:translateX(-50%);
+    white-space:nowrap;font-size:.66rem;font-weight:700;color:var(--ink)}
+  .track-legend{display:flex;justify-content:space-between;margin-top:14px;font-size:.72rem;color:var(--muted)}
+
+  /* ── Próximo passo (primary action) ───── */
+  .next{background:linear-gradient(0deg,var(--primary-tint),var(--primary-tint));
+    border:1px solid #a5e8f2;border-radius:var(--r-2xl);padding:20px;box-shadow:var(--sh-rest)}
+  .next-row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+  .next-ico{width:46px;height:46px;border-radius:var(--r-xl);background:var(--primary);
+    display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:var(--sh-raised)}
+  .next-ico svg{width:24px;height:24px;color:#fff}
+  .next-body{flex:1;min-width:220px}
+  .next-body h3{font-size:1.15rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin-top:2px}
+  .next-body p{font-size:.86rem;color:var(--primary-deep);margin-top:3px}
+  .btn{appearance:none;font-family:inherit;cursor:pointer;border:0;border-radius:var(--r-lg);
+    font-weight:700;font-size:.92rem;padding:11px 20px;display:inline-flex;align-items:center;gap:8px;
+    text-decoration:none;transition:background .16s var(--ease),transform .16s var(--ease)}
+  .btn svg{width:17px;height:17px}
+  .btn--primary{background:var(--primary);color:#fff}
+  .btn--primary:hover{background:var(--primary-deep)}
+  .btn--ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border)}
+  .btn--ghost:hover{background:var(--field)}
+  .btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  .btn:active{transform:translateY(1px)}
+
+  /* ── Plan steps ───────────────────────── */
+  .panel-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:4px}
+  .progresstiny{font-size:.78rem;font-weight:700;color:var(--primary-deep)}
+  .steps{list-style:none;padding:0;margin:14px 0 0}
+  .step{display:flex;gap:14px;padding:13px 0;border-top:1px solid var(--border-soft)}
+  .step:first-child{border-top:0}
+  .step-mark{position:relative;flex-shrink:0;width:26px;display:flex;justify-content:center}
+  .step-mark .node{width:26px;height:26px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;
+    font-size:.78rem;font-weight:800;z-index:1}
+  .step-mark .line{position:absolute;top:26px;bottom:-13px;width:2px;background:var(--border-soft)}
+  .step:last-child .step-mark .line{display:none}
+  .node--done{background:var(--success-bg);color:var(--success)}
+  .node--current{background:var(--primary);color:#fff;box-shadow:0 0 0 4px var(--primary-tint)}
+  .node--todo{background:var(--surface-muted);color:var(--muted)}
+  .step-body{flex:1;min-width:0}
+  .step-title{font-size:.96rem;font-weight:700;color:var(--ink)}
+  .step-sub{font-size:.82rem;color:var(--muted);margin-top:1px}
+  .step.is-current .step-title{color:var(--primary-deep)}
+  .step .status{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:var(--r-full);white-space:nowrap;align-self:center}
+  .status--done{background:var(--success-bg);color:var(--success)}
+  .status--current{background:var(--primary-tint);color:var(--primary-deep)}
+  .status--todo{background:var(--surface-muted);color:var(--muted)}
+  .step-foot{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap}
+
+  /* ── Subject mastery ──────────────────── */
+  .subj{display:flex;flex-direction:column;gap:0}
+  .subj-row{display:grid;grid-template-columns:1fr;gap:7px;padding:14px 0;border-top:1px solid var(--border-soft)}
+  .subj-row:first-child{border-top:0}
+  .subj-top{display:flex;align-items:center;gap:10px}
+  .lvl{width:9px;height:9px;border-radius:var(--r-full);flex-shrink:0}
+  .lvl--strong{background:var(--success-solid)} .lvl--mid{background:var(--warning-solid)} .lvl--risk{background:var(--error-solid,#ef4444)}
+  .subj-name{font-weight:700;color:var(--ink);font-size:.92rem}
+  .subj-weight{font-size:.74rem;color:var(--muted);margin-left:auto;white-space:nowrap}
+  .subj-pct{font-size:.92rem;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;width:44px;text-align:right}
+  .sbar{position:relative;height:8px;border-radius:var(--r-full);background:var(--surface-muted)}
+  .sbar .sfill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full)}
+  .sfill--strong{background:var(--success-solid)} .sfill--mid{background:var(--warning-solid)} .sfill--risk{background:#ef4444}
+  .subj-flag{font-size:.74rem;font-weight:700;color:var(--warning)}
+  .subj-foot{display:flex;align-items:center;gap:10px}
+  .linklike{background:none;border:0;font-family:inherit;font-size:.78rem;font-weight:700;color:var(--primary-deep);cursor:pointer;padding:0;text-decoration:none}
+  .linklike:hover{text-decoration:underline}
+
+  .legend-dots{display:flex;gap:16px;flex-wrap:wrap;margin-top:14px;font-size:.74rem;color:var(--muted)}
+  .legend-dots span{display:inline-flex;align-items:center;gap:6px}
+
+  /* ── Recommended ──────────────────────── */
+  .rec{display:flex;flex-direction:column}
+  .rec-item{display:flex;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--border-soft)}
+  .rec-item:first-child{border-top:0}
+  .rec-logo{width:38px;height:38px;border-radius:var(--r-lg);background:var(--surface-muted);
+    display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--muted);font-size:.72rem;flex-shrink:0}
+  .rec-main{flex:1;min-width:0}
+  .rec-title{font-weight:700;color:var(--ink);font-size:.9rem;line-height:1.3}
+  .rec-meta{font-size:.76rem;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:2px}
+  .tag{font-size:.64rem;font-weight:700;padding:1px 7px;border-radius:var(--r-full);text-transform:none}
+  .tag--same{background:var(--primary-tint);color:var(--primary-deep)}
+  .tag--rel{background:var(--surface-muted);color:var(--muted)}
+  .iconbtn{flex-shrink:0;width:34px;height:34px;border-radius:var(--r-lg);border:1px solid var(--border);
+    background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--primary-deep);
+    transition:background .16s var(--ease)}
+  .iconbtn:hover{background:var(--field)}
+  .iconbtn svg{width:16px;height:16px}
+
+  /* ── Constância (honest momentum) ─────── */
+  .cons{display:flex;gap:6px;margin-top:12px}
+  .cons .d{flex:1;height:34px;border-radius:var(--r-md);background:var(--surface-muted);position:relative}
+  .cons .d.on{background:var(--primary)}
+  .cons .d.on.soft{background:#7dd3e8}
+  .cons-cap{font-size:.74rem;color:var(--muted);margin-top:8px}
+
+  /* ── Detalhes tab ─────────────────────── */
+  .ficha-hero{display:flex;align-items:center;gap:14px;padding-bottom:16px;border-bottom:1px solid var(--border-soft);margin-bottom:4px}
+  .ficha-hero .big{font-size:1.5rem;font-weight:800;color:var(--ink);letter-spacing:-.02em}
+  .ficha-hero .lbl{font-size:.74rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+  .fact{display:flex;gap:12px;padding:12px 0;border-top:1px solid var(--border-soft)}
+  .fact:first-of-type{border-top:0}
+  .fact svg{width:18px;height:18px;color:var(--muted);flex-shrink:0;margin-top:2px}
+  .fact .k{font-size:.78rem;color:var(--muted)}
+  .fact .v{font-size:.92rem;font-weight:600;color:var(--ink)}
+  .prose p{font-size:.93rem;color:var(--body);max-width:68ch}
+  .syl-group{padding:14px 0;border-top:1px solid var(--border-soft)}
+  .syl-group:first-of-type{border-top:0}
+  .syl-group h4{font-size:.95rem;font-weight:700;color:var(--ink)}
+  .syl-group p{font-size:.86rem;color:var(--body);margin-top:4px}
+  .prev{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--border-soft);text-decoration:none}
+  .prev:first-of-type{border-top:0}
+  .prev:hover .prev-t{color:var(--primary-deep)}
+  .prev-t{font-weight:700;color:var(--ink);font-size:.9rem}
+  .prev .n{width:34px;height:34px;border-radius:var(--r-lg);background:var(--surface-muted);display:flex;align-items:center;justify-content:center;color:var(--muted);flex-shrink:0}
+
+  .note{margin-top:26px;font-size:.78rem;color:var(--muted);text-align:center;background:var(--warning-bg);
+    border:1px solid #fde68a;border-radius:var(--r-lg);padding:9px 14px}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation:none !important;transition:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ░░ Header ░░ -->
+  <nav class="crumb" aria-label="Trilha">
+    <a href="#">Concursos</a><span aria-hidden="true">›</span>
+    <a href="#">Prefeitura de São José dos Campos 2026 · Cebraspe</a>
+  </nav>
+  <header>
+    <div style="margin-top:10px">
+      <span class="pill pill--future"><span class="dot"></span>Prova futura · 14/09/2026</span>
+    </div>
+    <h1 class="role">Enfermeiro</h1>
+    <p class="context">Concurso Prefeitura de São José dos Campos 2026 · Cebraspe · nota de corte 70%</p>
+  </header>
+
+  <!-- ░░ Tabs ░░ -->
+  <div class="tabs" role="tablist" aria-label="Seções do cargo">
+    <button class="tab" role="tab" id="tab-treino" aria-controls="panel-treino" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><path d="M12 1v3M12 20v3M1 12h3M20 12h3"/></svg>
+      Treino <span class="badge">em andamento</span>
+    </button>
+    <button class="tab" role="tab" id="tab-detalhes" aria-controls="panel-detalhes" aria-selected="false" tabindex="-1">
+      Detalhes
+    </button>
+  </div>
+
+  <!-- ════════════ TREINO ════════════ -->
+  <section class="panel" id="panel-treino" role="tabpanel" aria-labelledby="tab-treino">
+
+    <!-- Readiness strip -->
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="readiness">
+        <div class="lead">
+          <p class="eyebrow">Prontidão para aprovar</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <span class="ready-num">64%</span>
+            <span class="delta">▲ +6 desde o diagnóstico</span>
+          </div>
+          <p class="small muted" style="margin-top:4px">Sua melhor nota até agora. Faltam <strong style="color:var(--ink)">6 pts</strong> para o corte.</p>
+        </div>
+        <div class="track-wrap" aria-hidden="true">
+          <div class="track">
+            <div class="fill" style="width:64%"></div>
+            <div class="cut" style="left:70%"></div>
+          </div>
+          <div class="track-legend"><span>0%</span><span>100%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <!-- Main column -->
+      <div class="stack">
+
+        <!-- Próximo passo (primary action) -->
+        <div class="next">
+          <p class="eyebrow" style="color:var(--primary-deep)">Seu próximo passo</p>
+          <div class="next-row" style="margin-top:10px">
+            <div class="next-ico" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            </div>
+            <div class="next-body">
+              <h3>Estudar: Administração em Enfermagem</h3>
+              <p>Sua matéria mais fraca entre as que mais caem (35% de acerto, 16% da prova).</p>
+            </div>
+            <a class="btn btn--primary" href="#" style="align-self:center">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+              Estudar agora
+            </a>
+          </div>
+        </div>
+
+        <!-- Seu plano -->
+        <div class="card card-pad">
+          <div class="panel-head">
+            <h2 class="sec-title">Seu plano de treino</h2>
+            <span class="progresstiny">2 de 5 etapas</span>
+          </div>
+          <p class="small muted">Um ciclo de treino: você faz a prova, recebe o diagnóstico, estuda os pontos fracos, refaz o que errou e mede a evolução.</p>
+          <ol class="steps">
+            <li class="step">
+              <div class="step-mark"><span class="node node--done">✓</span><span class="line"></span></div>
+              <div class="step-body">
+                <div style="display:flex;justify-content:space-between;gap:10px">
+                  <div><div class="step-title">Prova diagnóstica</div><div class="step-sub">58% · 45 questões respondidas</div></div>
+                  <span class="status status--done">Feito</span>
+                </div>
+              </div>
+            </li>
+            <li class="step">
+              <div class="step-mark"><span class="node node--done">✓</span><span class="line"></span></div>
+              <div class="step-body">
+                <div style="display:flex;justify-content:space-between;gap:10px">
+                  <div><div class="step-title">Diagnóstico</div><div class="step-sub">Você viu onde está forte e fraco</div></div>
+                  <span class="status status--done">Visto</span>
+                </div>
+              </div>
+            </li>
+            <li class="step is-current">
+              <div class="step-mark"><span class="node node--current">3</span><span class="line"></span></div>
+              <div class="step-body">
+                <div style="display:flex;justify-content:space-between;gap:10px">
+                  <div><div class="step-title">Estudar pontos fracos</div><div class="step-sub">2 de 4 matérias concluídas · faltam Administração e Farmacologia</div></div>
+                  <span class="status status--current">Você está aqui</span>
+                </div>
+                <div class="step-foot">
+                  <a class="btn btn--primary" href="#" style="padding:8px 16px;font-size:.86rem">Continuar estudando</a>
+                </div>
+              </div>
+            </li>
+            <li class="step">
+              <div class="step-mark"><span class="node node--todo">4</span><span class="line"></span></div>
+              <div class="step-body">
+                <div style="display:flex;justify-content:space-between;gap:10px">
+                  <div><div class="step-title">Re-tentativa</div><div class="step-sub">Refaça só as questões que errou</div></div>
+                  <span class="status status--todo">A seguir</span>
+                </div>
+              </div>
+            </li>
+            <li class="step">
+              <div class="step-mark"><span class="node node--todo">5</span></div>
+              <div class="step-body">
+                <div style="display:flex;justify-content:space-between;gap:10px">
+                  <div><div class="step-title">Simulado final</div><div class="step-sub">Meça quanto evoluiu da nota inicial</div></div>
+                  <span class="status status--todo">A seguir</span>
+                </div>
+              </div>
+            </li>
+          </ol>
+        </div>
+
+        <!-- Domínio por matéria -->
+        <div class="card card-pad">
+          <div class="panel-head">
+            <h2 class="sec-title">Domínio por matéria</h2>
+            <span class="small muted">o que cai nesta prova</span>
+          </div>
+          <p class="small muted">Baseado no seu histórico de acertos. Priorize as matérias em vermelho que pesam mais na prova.</p>
+          <div class="subj" style="margin-top:6px">
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--risk"></span>
+                <span class="subj-name">Administração em Enfermagem</span>
+                <span class="subj-weight">16% da prova</span>
+                <span class="subj-pct">35%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--risk" style="width:35%"></div></div>
+              <div class="subj-foot"><span class="subj-flag">Precisa de atenção</span><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--risk"></span>
+                <span class="subj-name">Farmacologia</span>
+                <span class="subj-weight">14% da prova</span>
+                <span class="subj-pct">48%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--risk" style="width:48%"></div></div>
+              <div class="subj-foot"><span class="subj-flag">Precisa de atenção</span><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--mid"></span>
+                <span class="subj-name">Urgência e Emergência</span>
+                <span class="subj-weight">12% da prova</span>
+                <span class="subj-pct">55%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--mid" style="width:55%"></div></div>
+              <div class="subj-foot"><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--mid"></span>
+                <span class="subj-name">SUS e Saúde Coletiva</span>
+                <span class="subj-weight">20% da prova</span>
+                <span class="subj-pct">62%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--mid" style="width:62%"></div></div>
+              <div class="subj-foot"><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--strong"></span>
+                <span class="subj-name">Saúde da Mulher e Materno-infantil</span>
+                <span class="subj-weight">10% da prova</span>
+                <span class="subj-pct">73%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--strong" style="width:73%"></div></div>
+              <div class="subj-foot"><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+            <div class="subj-row">
+              <div class="subj-top">
+                <span class="lvl lvl--strong"></span>
+                <span class="subj-name">Ética e Legislação</span>
+                <span class="subj-weight">8% da prova</span>
+                <span class="subj-pct">81%</span>
+              </div>
+              <div class="sbar"><div class="sfill sfill--strong" style="width:81%"></div></div>
+              <div class="subj-foot"><button class="linklike">Treinar esta matéria →</button></div>
+            </div>
+
+          </div>
+          <div class="legend-dots">
+            <span><span class="lvl lvl--risk"></span>Precisa de atenção (&lt;50%)</span>
+            <span><span class="lvl lvl--mid"></span>Em construção (50–69%)</span>
+            <span><span class="lvl lvl--strong"></span>Sólido (≥70%)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side rail -->
+      <aside class="stack">
+
+        <!-- Recomendadas -->
+        <div class="card card-pad">
+          <h2 class="sec-title">Treine com outras provas</h2>
+          <p class="small muted">A prova deste cargo ainda não saiu. Estas provas relacionadas têm questões reais para você treinar agora.</p>
+          <div class="rec" style="margin-top:6px">
+            <div class="rec-item">
+              <div class="rec-logo">CEB</div>
+              <div class="rec-main">
+                <div class="rec-title">Prefeitura de Campinas · Enfermeiro</div>
+                <div class="rec-meta">2025 · 50 questões <span class="tag tag--same">mesma banca</span></div>
+              </div>
+              <button class="iconbtn" aria-label="Treinar com esta prova"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+            </div>
+            <div class="rec-item">
+              <div class="rec-logo">IBFC</div>
+              <div class="rec-main">
+                <div class="rec-title">Pref. de Jacareí · Enfermeiro</div>
+                <div class="rec-meta">2024 · 40 questões <span class="tag tag--rel">relacionada</span></div>
+              </div>
+              <button class="iconbtn" aria-label="Treinar com esta prova"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+            </div>
+            <div class="rec-item">
+              <div class="rec-logo">VNSP</div>
+              <div class="rec-main">
+                <div class="rec-title">Pref. de Taubaté · Enfermeiro</div>
+                <div class="rec-meta">2023 · 36 questões <span class="tag tag--rel">relacionada</span></div>
+              </div>
+              <button class="iconbtn" aria-label="Treinar com esta prova"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Constância (honest momentum, no streak gimmick) -->
+        <div class="card card-pad">
+          <h2 class="sec-title">Sua constância</h2>
+          <p class="small muted">Você treinou em 4 dos últimos 7 dias. A maratona se ganha no ritmo.</p>
+          <div class="cons" aria-hidden="true">
+            <span class="d on"></span><span class="d on soft"></span><span class="d"></span>
+            <span class="d on"></span><span class="d"></span><span class="d on"></span><span class="d"></span>
+          </div>
+          <p class="cons-cap">Seg → Dom</p>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ════════════ DETALHES ════════════ -->
+  <section class="panel" id="panel-detalhes" role="tabpanel" aria-labelledby="tab-detalhes" hidden>
+    <div class="grid grid-2">
+      <!-- Main -->
+      <div class="stack">
+        <div class="card card-pad">
+          <h2 class="sec-title">Sobre a vaga</h2>
+          <div class="prose" style="margin-top:8px">
+            <p>Atuação assistencial em unidades da rede municipal de saúde: cuidado direto ao paciente, supervisão da equipe de enfermagem, gestão de processos assistenciais e educação em saúde, conforme protocolos do município e diretrizes do SUS.</p>
+          </div>
+        </div>
+
+        <div class="card card-pad">
+          <div class="panel-head"><h2 class="sec-title">Conteúdo programático</h2><span class="small muted">do edital</span></div>
+          <div style="margin-top:6px">
+            <div class="syl-group">
+              <h4>Saúde Coletiva e SUS</h4>
+              <p>Princípios e diretrizes do SUS; políticas públicas de saúde; vigilância epidemiológica; atenção primária; indicadores de saúde; PNAB.</p>
+            </div>
+            <div class="syl-group">
+              <h4>Fundamentos e Administração em Enfermagem</h4>
+              <p>Processo de enfermagem (SAE); dimensionamento e supervisão de equipe; gestão de materiais; segurança do paciente; protocolos assistenciais.</p>
+            </div>
+            <div class="syl-group">
+              <h4>Farmacologia aplicada</h4>
+              <p>Cálculo e administração de medicamentos; vias de administração; interações e reações adversas; armazenamento e controle.</p>
+            </div>
+            <div class="syl-group">
+              <h4>Ética e Legislação profissional</h4>
+              <p>Código de Ética dos Profissionais de Enfermagem; Lei do Exercício Profissional; COFEN/COREN; responsabilidade civil e profissional.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Side: ficha + provas anteriores -->
+      <aside class="stack">
+        <div class="card card-pad">
+          <h2 class="sec-title" style="margin-bottom:12px">Ficha do cargo</h2>
+          <div class="ficha-hero">
+            <div>
+              <div class="lbl">Salário base</div>
+              <div class="big">R$ 6.842,00</div>
+            </div>
+          </div>
+          <div class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><div><div class="k">Jornada</div><div class="v">36h semanais</div></div></div>
+          <div class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg><div><div class="k">Vagas</div><div class="v">12 + cadastro de reserva</div></div></div>
+          <div class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg><div><div class="k">Requisitos</div><div class="v">Superior em Enfermagem + registro no COREN</div></div></div>
+          <div class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 5h18v6a3 3 0 0 0 0 6v2H3v-2a3 3 0 0 0 0-6z"/></svg><div><div class="k">Taxa de inscrição</div><div class="v">R$ 120,00</div></div></div>
+          <div class="fact"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 22V4a1 1 0 0 1 1-1h11l-2 4 2 4H5"/></svg><div><div class="k">Nota mínima para aprovação</div><div class="v">70%</div></div></div>
+          <a class="btn btn--ghost" href="#" style="margin-top:16px;width:100%;justify-content:center">Ver edital (PDF)</a>
+        </div>
+
+        <div class="card card-pad">
+          <h2 class="sec-title">Provas anteriores</h2>
+          <p class="small muted">Mesma banca, edições anteriores deste cargo.</p>
+          <div style="margin-top:6px">
+            <a class="prev" href="#"><span class="n">24</span><div><div class="prev-t">Enfermeiro · Cebraspe</div><div class="small muted">Edição 2024 · 50 questões</div></div></a>
+            <a class="prev" href="#"><span class="n">22</span><div><div class="prev-t">Enfermeiro · Cebraspe</div><div class="small muted">Edição 2022 · 50 questões</div></div></a>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <p class="note">Mockup estático para validar a direção — dados ilustrativos. Nada aqui está conectado ao app.</p>
+</div>
+
+<script>
+  const tabs = Array.from(document.querySelectorAll('[role="tab"]'));
+  function select(tab){
+    tabs.forEach(t=>{
+      const on = t===tab;
+      t.setAttribute('aria-selected', on?'true':'false');
+      t.tabIndex = on?0:-1;
+      document.getElementById(t.getAttribute('aria-controls')).hidden = !on;
+    });
+  }
+  tabs.forEach((tab,i)=>{
+    tab.addEventListener('click',()=>select(tab));
+    tab.addEventListener('keydown',e=>{
+      if(e.key==='ArrowRight'||e.key==='ArrowLeft'){
+        e.preventDefault();
+        const dir = e.key==='ArrowRight'?1:-1;
+        const next = tabs[(i+dir+tabs.length)%tabs.length];
+        next.focus(); select(next);
+      }
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,10 +1,12 @@
 // @vitest-environment jsdom
 
 /**
- * Página do cargo (nível 2): matriz {past, future} × {com/sem tentativas},
- * plano de estudos guiado por `currentStep` e passe de axe (MAX-26).
+ * Página do cargo (nível 2): duas abas — Treino (cronograma guiado, default) e
+ * Detalhes (ficha + programático + distribuição). Matriz {past, future} ×
+ * {com/sem tentativas}, próximo passo guiado pelo estágio do treino, e passe
+ * de axe nas duas abas (MAX-26 / redesign do cronograma).
  */
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   expectNoSeriousAxeViolations,
@@ -22,6 +24,11 @@ afterEach(() => {
 
 const CARGO_PATH = '/concursos/pmc-2026/enfermeiro'
 const API = '/concursos/pmc-2026/cargos/enfermeiro'
+
+/** Abre a aba Detalhes (a página entra na aba Treino por padrão). */
+function goToDetalhes() {
+  fireEvent.click(screen.getByRole('tab', { name: /Detalhes/ }))
+}
 
 /** Monta o mapa de handlers da página: detail + blocos satélites. */
 function mockCargoApi(opts: {
@@ -48,8 +55,6 @@ function mockCargoApi(opts: {
       body: { editions: [] },
     },
   }
-  // O seletor de prova re-escopa subject-distribution/attempts para a prova
-  // escolhida, então registramos handlers para todas as provas do cargo.
   for (const exam of [
     opts.detail.cargo.id,
     ...opts.detail.provas.map((p) => p.examBaseId),
@@ -106,10 +111,7 @@ function makeFutureDetail(studyPlan?: Partial<CargoDetail['studyPlan']>) {
         examBoardAlias: 'VUNESP',
         tier: 1,
         questionCount: 40,
-        userStats: {
-          attemptCount: plan.attemptCount,
-          bestScore: plan.bestScore,
-        },
+        userStats: { attemptCount: plan.attemptCount, bestScore: plan.bestScore },
         studyPlan: plan,
       },
     ],
@@ -119,10 +121,7 @@ function makeFutureDetail(studyPlan?: Partial<CargoDetail['studyPlan']>) {
         slug: 'enfermeiro-2023',
         year: 2023,
         questionCount: 40,
-        userStats: {
-          attemptCount: plan.attemptCount,
-          bestScore: plan.bestScore,
-        },
+        userStats: { attemptCount: plan.attemptCount, bestScore: plan.bestScore },
       },
     ],
     studyPlan: plan,
@@ -134,8 +133,8 @@ const historicalDistribution = makeDistribution({
   sourceExams: [{ examBaseId: 'exam-prev', year: 2023 }],
 })
 
-describe('página do cargo — prova passada', () => {
-  it('sem tentativas: ficha técnica + diagnóstico como etapa atual', async () => {
+describe('página do cargo — aba Treino (prova passada)', () => {
+  it('sem tentativas: próximo passo é a prova diagnóstica + plano de 5 etapas', async () => {
     mockCargoApi({
       detail: makeCargoDetail(),
       statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
@@ -147,27 +146,43 @@ describe('página do cargo — prova passada', () => {
     ).toBeTruthy()
     expect(screen.getByText('Prova aplicada em 14/05/2023')).toBeTruthy()
 
-    // Sem treino iniciado → CTA "Começar treino"; timeline mostra os estágios.
+    // Próximo passo: sem treino iniciado → começar pela prova diagnóstica.
+    expect(screen.getByText('Seu próximo passo')).toBeTruthy()
+    expect(screen.getByText('Fazer a prova diagnóstica')).toBeTruthy()
     expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
+
+    // Plano de treino com os 5 estágios.
+    expect(
+      screen.getByRole('heading', { name: 'Seu plano de treino' }),
+    ).toBeTruthy()
     expect(screen.getByText('Estudo')).toBeTruthy()
+
+    // Sem tentativas → prontidão convida ao diagnóstico (sem número de nota).
+    expect(screen.getByText(/Faça a prova diagnóstica para medir/)).toBeTruthy()
     // CTAs antigos de simulado avulso não existem mais.
     expect(screen.queryByRole('button', { name: /Fazer simulado/ })).toBeNull()
-    // Sem tentativas → painel de prontidão não aparece
-    expect(screen.queryByText(/melhor nota ·/)).toBeNull()
+  })
 
-    // Bloco de matérias no modo fato (carrega async, depois do detail)
+  it('Detalhes: distribuição real (fato) + sem conteúdo programático', async () => {
+    mockCargoApi({
+      detail: makeCargoDetail(),
+      statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
+    })
+    renderPage(CARGO_PATH)
+
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToDetalhes()
+
     expect(await screen.findByText('O que caiu na prova')).toBeTruthy()
     expect(
       screen.getByText(/Composição das 50 questões aplicadas em 14\/05\/2023/),
     ).toBeTruthy()
-    expect(screen.getByText(/da prova\./)).toBeTruthy()
-    expect(screen.queryByText(/das últimas provas\./)).toBeNull()
-
-    // Prova passada nunca mostra conteúdo programático
+    // Prova passada nunca mostra conteúdo programático.
     expect(screen.queryByText('Conteúdo programático')).toBeNull()
+    expect(screen.queryByText('O que VUNESP costuma cobrar')).toBeNull()
   })
 
-  it('com tentativas: prontidão contra o corte + treino dirigido', async () => {
+  it('com tentativas: prontidão acima do corte (aba Treino) + acurácia (Detalhes)', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         studyPlan: {
@@ -197,28 +212,32 @@ describe('página do cargo — prova passada', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
 
-    // Painel de prontidão: melhor nota, evolução e leitura contra o corte
+    // Prontidão: melhor nota, evolução e leitura contra o corte (aba Treino).
     expect(screen.getByText('72%')).toBeTruthy()
     expect(screen.getByText('+8 pt')).toBeTruthy()
-    expect(screen.getByText('melhor nota · 3 simulados')).toBeTruthy()
-    expect(screen.getByText('Acima do corte')).toBeTruthy()
-    expect(screen.getByText('Corte 60%')).toBeTruthy()
+    expect(screen.getByText(/Acima da nota de corte/)).toBeTruthy()
+    expect(screen.getByText('corte 60%')).toBeTruthy()
 
-    // Programa de treino: sem sessão ainda → "Começar treino"; CTAs antigos
-    // (simulado avulso / treinar pontos fracos) não existem mais.
+    // Próximo passo guiado: sem sessão ainda → "Começar treino".
     expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Fazer simulado/ })).toBeNull()
     expect(
       screen.queryByRole('button', { name: /Treinar pontos fracos/ }),
     ).toBeNull()
 
-    // Acurácia por matéria + insight do ponto fraco vindos da API (async)
+    // Domínio por matéria (aba Treino): acerto por matéria com farol (async).
+    expect(
+      await screen.findByRole('heading', { name: 'Domínio por matéria' }),
+    ).toBeTruthy()
+
+    // Acurácia por matéria + insight do ponto fraco ficam na aba Detalhes.
+    goToDetalhes()
     expect(await screen.findByText('você: 74%')).toBeTruthy()
     expect(screen.getByText('você: 48%')).toBeTruthy()
     expect(screen.getByText(/Seu ponto mais fraco hoje é/)).toBeTruthy()
   })
 
-  it('treino finalizado: "Começar novo treino" + "Ver resultado"', async () => {
+  it('treino finalizado: "Começar novo ciclo" + "Ver resultado"', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         studyPlan: {
@@ -229,7 +248,6 @@ describe('página do cargo — prova passada', () => {
           weakSubjects: [],
         },
       }),
-      // Treino concluído (FINAL) desta prova.
       trainings: [{ trainingId: 't1', examBaseId: 'exam-1', currentStage: 'FINAL' }],
       statsBySubject: { 'exam-1': [] },
     })
@@ -238,14 +256,44 @@ describe('página do cargo — prova passada', () => {
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
     // A sessão de treino chega via GET /training (async).
     expect(
-      await screen.findByRole('button', { name: /Começar novo treino/ }),
+      await screen.findByRole('button', { name: /Começar novo ciclo/ }),
     ).toBeTruthy()
     expect(screen.getByRole('button', { name: /Ver resultado/ })).toBeTruthy()
   })
+
+  it('treino em andamento: aba Treino ganha o selo "em andamento" e o próximo passo retoma', async () => {
+    mockCargoApi({
+      detail: makeCargoDetail(),
+      trainings: [{ trainingId: 't1', examBaseId: 'exam-1', currentStage: 'STUDY' }],
+      distribution: makeDistribution({
+        subjects: [
+          { subject: 'Enfermagem', count: 25, share: 0.5, userAccuracy: 0.8 },
+          { subject: 'Português', count: 25, share: 0.5, userAccuracy: 0.4 },
+        ],
+        insight: {
+          topSubjects: ['Enfermagem'],
+          topShare: 0.5,
+          weakestRelevant: { subject: 'Português', accuracy: 0.4 },
+        },
+      }),
+      statsBySubject: { 'exam-1': [{ subject: 'Português', count: 25 }] },
+    })
+    renderPage(CARGO_PATH)
+
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    // Selo "em andamento" na aba Treino aparece após GET /training resolver.
+    const treinoTab = screen.getByRole('tab', { name: /Treino/ })
+    expect(await within(treinoTab).findByText('em andamento')).toBeTruthy()
+    // Estágio STUDY → próximo passo é estudar a matéria mais fraca.
+    expect(await screen.findByText(/Estudar: Português/)).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /Continuar estudando/ }),
+    ).toBeTruthy()
+  })
 })
 
-describe('página do cargo — prova futura', () => {
-  it('sem tentativas: programático + distribuição preditiva + diagnóstico na edição anterior', async () => {
+describe('página do cargo — aba Treino (prova futura)', () => {
+  it('sem tentativas: treina numa prova relacionada; Detalhes traz programático + distribuição preditiva', async () => {
     mockCargoApi({
       detail: makeFutureDetail(),
       distribution: historicalDistribution,
@@ -260,24 +308,20 @@ describe('página do cargo — prova futura', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
 
-    // 1ª vez numa prova futura → treina numa edição anterior (relacionada)
+    // 1ª vez numa prova futura → o plano usa uma prova relacionada.
     expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
+    expect(screen.getByText(/Plano com base na prova/)).toBeTruthy()
+    expect(screen.getByText(/VUNESP · 2023/)).toBeTruthy()
 
-    // Conteúdo programático aparece (só em prova não-passada) como details/summary
-    expect(screen.getByText('Conteúdo programático')).toBeTruthy()
+    // Detalhes: programático + distribuição preditiva.
+    goToDetalhes()
+    expect(await screen.findByText('Conteúdo programático')).toBeTruthy()
     expect(screen.getByText('Enfermagem em Saúde Pública')).toBeTruthy()
-
-    // Distribuição preditiva: título/verbos de estimativa, nunca de fato
-    expect(await screen.findByText('O que VUNESP costuma cobrar')).toBeTruthy()
+    expect(screen.getByText('O que VUNESP costuma cobrar')).toBeTruthy()
     expect(screen.getByText(/estimativa, não garantia/)).toBeTruthy()
-    expect(screen.getByText(/das últimas provas\./)).toBeTruthy()
     expect(screen.queryByText('O que caiu na prova')).toBeNull()
-    // CTAs de "treinar matéria" foram removidos (o Estudo do treino cobre isso).
-    expect(
-      screen.queryByRole('button', { name: 'Treinar Enfermagem' }),
-    ).toBeNull()
 
-    // Sidebar: prova anterior linkada para o player
+    // Sidebar: prova anterior linkada para o player.
     expect(
       screen.getByRole('link', { name: /Prova 2023/ }).getAttribute('href'),
     ).toBe('/exams/board-1/exam-prev')
@@ -300,15 +344,34 @@ describe('página do cargo — prova futura', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
     expect(screen.getByText('55%')).toBeTruthy()
-    expect(screen.getByText('5 pt para o corte')).toBeTruthy()
+    expect(screen.getByText(/Faltam 5 pts para o corte de 60%/)).toBeTruthy()
     expect(screen.getByText('-3 pt')).toBeTruthy()
   })
 
-  it('sem prova treinável: CTA vira link para o treino genérico', async () => {
+  it('sem prova treinável: aba Treino vira link para o treino genérico', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         concurso: { status: 'future' },
         cargo: { examDate: '2099-01-01T00:00:00.000Z', questionCount: 0 },
+        provas: [
+          {
+            examBaseId: 'exam-1',
+            slug: 'enfermeiro',
+            label: null,
+            isPrimary: true,
+            examDate: '2099-01-01T00:00:00.000Z',
+            questionCount: 0,
+            userStats: { attemptCount: 0, bestScore: null },
+            studyPlan: {
+              currentStep: 'diagnostico',
+              attemptCount: 0,
+              bestScore: null,
+              scoreDelta: null,
+              weakSubjects: [],
+            },
+          },
+        ],
+        relatedProvas: [],
         previousExams: [],
       }),
       distribution: makeDistribution({
@@ -320,13 +383,12 @@ describe('página do cargo — prova futura', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    // Sem provas treináveis (futura sem relacionadas) → treino genérico.
     const cta = screen.getByRole('link', { name: /Ir para o treino/ })
     expect(cta.getAttribute('href')).toBe('/treino')
   })
 })
 
-describe('página do cargo — cargo com múltiplas provas', () => {
+describe('página do cargo — provas em foco vs. outras provas', () => {
   /** Tipo 1 (primária) com tentativas; Tipo 2 sem tentativas. */
   function multiProvaDetail() {
     return makeCargoDetail({
@@ -367,7 +429,7 @@ describe('página do cargo — cargo com múltiplas provas', () => {
     })
   }
 
-  it('cada prova vira um cartão de programa próprio, todos visíveis ao mesmo tempo', async () => {
+  it('múltiplas provas: uma vira o plano em foco, as outras viram opções de treino', async () => {
     mockCargoApi({
       detail: multiProvaDetail(),
       statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
@@ -375,26 +437,26 @@ describe('página do cargo — cargo com múltiplas provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    const card1 = screen
-      .getByRole('heading', { level: 3, name: /Tipo 1/ })
-      .closest('article')!
-    const card2 = screen
-      .getByRole('heading', { level: 3, name: /Tipo 2/ })
-      .closest('article')!
-    // Cada cartão tem seu próprio progresso: Tipo 1 já treinou (prontidão);
-    // Tipo 2 ainda está no diagnóstico, com seu próprio CTA.
-    expect(within(card1).getByText('melhor nota · 3 simulados')).toBeTruthy()
-    expect(within(card2).queryByText(/melhor nota/)).toBeNull()
-    // Cada cartão tem seu próprio CTA de treino (sem sessão → "Começar treino").
-    expect(within(card2).getByRole('button', { name: /Começar treino/ })).toBeTruthy()
+    // Foco na Tipo 1 (primária, com tentativas): prontidão reflete a melhor nota.
+    expect(screen.getByText('70%')).toBeTruthy()
+    expect(screen.getByText(/Plano com base na prova/)).toBeTruthy()
+    expect(screen.getByText('Tipo 1')).toBeTruthy()
+
+    // Tipo 2 aparece como outra prova para treinar, com seu próprio CTA.
+    const others = screen
+      .getByRole('heading', { name: 'Treine com outras provas' })
+      .closest('section')!
+    expect(within(others).getByText('Tipo 2')).toBeTruthy()
+    expect(
+      within(others).getByRole('button', { name: /Treinar: Tipo 2/ }),
+    ).toBeTruthy()
   })
 
-  it('prova futura sem questões próprias: cartões só das provas relacionadas', async () => {
+  it('prova futura sem questões próprias: foco numa relacionada, a outra vira opção', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         concurso: { status: 'future' },
         cargo: { questionCount: 0, examDate: '2099-01-01T00:00:00.000Z' },
-        // Prova futura: a própria não tem questões → fica fora do seletor.
         provas: [
           {
             examBaseId: 'exam-1',
@@ -457,17 +519,16 @@ describe('página do cargo — cargo com múltiplas provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    // Um cartão de programa por prova relacionada (a própria, futura, fica fora).
-    expect(
-      screen.getByRole('heading', { level: 3, name: /CEBRASPE · 2024/ }),
-    ).toBeTruthy()
-    expect(
-      screen.getByRole('heading', { level: 3, name: /FGV · 2023/ }),
-    ).toBeTruthy()
-    expect(screen.getAllByText('relacionada')).toHaveLength(2)
+    // Foco na 1ª relacionada (CEBRASPE · 2024); a 2ª vira opção de treino.
+    expect(screen.getByText(/CEBRASPE · 2024/)).toBeTruthy()
+    const others = screen
+      .getByRole('heading', { name: 'Treine com outras provas' })
+      .closest('section')!
+    expect(within(others).getByText('FGV · 2023')).toBeTruthy()
+    expect(within(others).getByText('relacionada')).toBeTruthy()
   })
 
-  it('cargo de prova única: um único programa, sem relacionadas', async () => {
+  it('cargo de prova única: só o plano em foco, sem seção de outras provas', async () => {
     mockCargoApi({
       detail: makeCargoDetail(),
       statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
@@ -475,9 +536,8 @@ describe('página do cargo — cargo com múltiplas provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    expect(screen.getByRole('heading', { name: 'Seu plano de estudos' })).toBeTruthy()
-    // Própria prova (label null → "Esta prova"); sem provas relacionadas.
-    expect(screen.getByRole('heading', { level: 3, name: /Esta prova/ })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Seu plano de treino' })).toBeTruthy()
+    expect(screen.queryByText('Treine com outras provas')).toBeNull()
     expect(screen.queryByText('relacionada')).toBeNull()
   })
 })
@@ -499,7 +559,7 @@ describe('página do cargo — estados de erro', () => {
 })
 
 describe('página do cargo — acessibilidade (axe)', () => {
-  it('prova passada com tentativas: sem violações sérias/críticas', async () => {
+  it('aba Treino (prova passada com tentativas): sem violações sérias/críticas', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         studyPlan: {
@@ -516,11 +576,11 @@ describe('página do cargo — acessibilidade (axe)', () => {
     const { container } = renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    await screen.findByText('O que caiu na prova')
+    await screen.findByRole('heading', { name: 'Seu plano de treino' })
     await expectNoSeriousAxeViolations(container)
   })
 
-  it('prova futura com programático: sem violações sérias/críticas', async () => {
+  it('aba Detalhes (prova futura com programático): sem violações sérias/críticas', async () => {
     mockCargoApi({
       detail: makeFutureDetail(),
       distribution: historicalDistribution,
@@ -529,6 +589,7 @@ describe('página do cargo — acessibilidade (axe)', () => {
     const { container } = renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToDetalhes()
     await screen.findByText('Conteúdo programático')
     await expectNoSeriousAxeViolations(container)
   })

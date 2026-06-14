@@ -256,9 +256,40 @@ async function main() {
     await seedQuestions(prova.id, spec.bank);
   }
 
+  // Edições PASSADAS do MESMO cargo/banca/instituição do alvo → alimentam a
+  // seção "Provas anteriores" (sidebar da aba Detalhes) e também são treináveis.
+  const previousEditions = [
+    { slug: 'seed-prev-enfermeiro-2022', year: 2022, bank: BANK_A },
+    { slug: 'seed-prev-enfermeiro-2019', year: 2019, bank: BANK_B },
+  ];
+  for (const ed of previousEditions) {
+    const prova = await prisma.examBase.upsert({
+      where: { slug: ed.slug },
+      update: { examBoardId: source.examBoardId, adminNotes: MARKER, published: true },
+      create: {
+        name: `${source.institution} — Enfermeiro ${ed.year}`,
+        slug: ed.slug,
+        role: 'Enfermeiro',
+        governmentScope: source.governmentScope,
+        institution: source.institution,
+        city: source.city,
+        state: source.state,
+        examDate: new Date(`${ed.year}-05-14T00:00:00.000Z`),
+        examBoardId: source.examBoardId,
+        salaryBase: 7200,
+        minPassingGradeNonQuota: 60,
+        isNursingRelevant: true,
+        published: true,
+        adminNotes: MARKER,
+      },
+    });
+    await seedQuestions(prova.id, ed.bank);
+  }
+
   console.log(
-    `✅ Pronto. "${TARGET_SLUG}" (futura) ficou sem questões próprias e agora ` +
-      `recomenda ${RELATED.length} provas relacionadas (2 da mesma banca + 1 de outra).`,
+    `✅ Pronto. "${TARGET_SLUG}" (futura) ficou sem questões próprias; recomenda ` +
+      `${RELATED.length} provas relacionadas (2 da mesma banca + 1 de outra) e tem ` +
+      `${previousEditions.length} edições anteriores do próprio cargo.`,
   );
 }
 
