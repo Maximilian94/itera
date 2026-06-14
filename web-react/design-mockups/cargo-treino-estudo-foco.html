@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Mockup · Item de estudo em modo foco (mesma página) — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    --success:#047857; --success-bg:#ecfdf5; --success-solid:#10b981;
+    --error:#dc2626; --error-bg:#fef2f2; --error-solid:#ef4444;
+    --warning:#b45309; --warning-bg:#fffbeb; --warning-solid:#f59e0b;
+    --violet:#7c3aed; --violet-bg:#f5f3ff;
+    --r-md:6px; --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 6px 16px -4px rgba(15,23,42,.12);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;color:var(--body);
+    background:var(--surface-muted);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .shell{max-width:1120px;margin:0 auto;padding:24px 20px 90px}
+  a{color:inherit}h1,h2,h3,h4,p{margin:0}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+
+  .crumb{font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .crumb a{text-decoration:none;color:var(--muted)}.crumb a:hover{color:var(--primary-deep)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:var(--r-full)}
+  .pill--past{background:var(--surface-muted);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:var(--r-full);background:currentColor}
+  .role{margin-top:10px;font-size:clamp(1.6rem,4vw,2rem);font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.12}
+  .context{margin-top:4px;font-size:.9rem;color:var(--muted)}
+
+  .tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:1px solid var(--border-soft);position:relative}
+  .tab{appearance:none;background:none;border:0;cursor:pointer;font-family:inherit;font-size:.95rem;font-weight:700;
+    color:var(--muted);padding:11px 16px 13px;border-radius:var(--r-lg) var(--r-lg) 0 0;display:inline-flex;align-items:center;gap:8px;position:relative}
+  .tab[aria-selected="true"]{color:var(--primary-deep)}
+  .tab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;background:var(--primary);border-radius:var(--r-full)}
+  .tab .badge{font-size:.66rem;font-weight:700;background:var(--primary-tint);color:var(--primary-deep);padding:1px 7px;border-radius:var(--r-full)}
+  .panel{padding-top:22px}
+
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-rest)}
+  .eyebrow{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .small{font-size:.84rem}.muted{color:var(--muted)}
+
+  /* Readiness (compacto, mantido no topo) */
+  .ready{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:14px 18px}
+  .ready .num{font-size:1.4rem;font-weight:800;color:var(--ink);line-height:1}
+  .ready .track{position:relative;flex:1;min-width:200px;height:10px;border-radius:var(--r-full);background:var(--surface-muted)}
+  .ready .track .fill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full);background:var(--primary);width:64%}
+  .ready .track .cut{position:absolute;top:-4px;bottom:-4px;left:70%;width:2.5px;background:var(--ink);border-radius:2px}
+  .ready .delta{font-size:.74rem;font-weight:700;color:var(--success);background:var(--success-bg);padding:2px 8px;border-radius:var(--r-full)}
+
+  .btn{appearance:none;font-family:inherit;cursor:pointer;border:0;border-radius:var(--r-lg);font-weight:700;font-size:.9rem;
+    padding:10px 18px;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:background .16s var(--ease),transform .16s var(--ease)}
+  .btn svg{width:17px;height:17px}
+  .btn--primary{background:var(--primary);color:#fff}.btn--primary:hover{background:var(--primary-deep)}
+  .btn--ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border)}.btn--ghost:hover{background:var(--field)}
+  .btn--sm{padding:8px 14px;font-size:.84rem}.btn:active{transform:translateY(1px)}
+
+  /* ════════ FOCUS PANEL (o item assume a área) ════════ */
+  .focus{overflow:hidden}
+  /* faixa de contexto: lembra que continua no treino do cargo */
+  .focus-top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:14px 18px;background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff}
+  .focus-top .back{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.88rem;color:#fff;text-decoration:none;
+    padding:7px 12px;border-radius:var(--r-lg);background:rgba(255,255,255,.14)}
+  .focus-top .back:hover{background:rgba(255,255,255,.24)}
+  .focus-top .meta{text-align:right;min-width:0}
+  .focus-top .meta .s{font-size:.66rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.72);font-weight:700}
+  .focus-top .meta .t{font-size:1.02rem;font-weight:800}
+  .focus-top .done{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.86rem;color:var(--primary-deep);
+    background:#fff;padding:8px 14px;border-radius:var(--r-lg);border:0;cursor:pointer}
+
+  /* progresso do estudo (continua visível em modo foco) */
+  .focus-prog{display:flex;align-items:center;gap:10px;padding:10px 18px;background:var(--field);border-bottom:1px solid var(--border-soft);font-size:.78rem;color:var(--muted)}
+  .focus-prog .bar{flex:1;height:7px;border-radius:var(--r-full);background:var(--surface-muted);overflow:hidden}
+  .focus-prog .bar i{display:block;height:100%;width:50%;background:var(--primary);border-radius:var(--r-full)}
+
+  /* abas internas do item */
+  .itabs{display:flex;border-bottom:1px solid var(--border-soft);overflow-x:auto}
+  .itab{appearance:none;background:none;border:0;border-bottom:2px solid transparent;cursor:pointer;font-family:inherit;
+    font-size:.88rem;font-weight:600;color:var(--muted);padding:13px 18px;display:inline-flex;align-items:center;gap:8px;white-space:nowrap}
+  .itab:hover{color:var(--ink);background:var(--field)}
+  .itab[aria-selected="true"]{color:var(--primary-deep);border-bottom-color:var(--primary);background:var(--primary-tint)}
+  .itab svg{width:16px;height:16px}
+  .itab .cnt{font-size:.64rem;font-weight:800;background:var(--surface-muted);color:var(--muted);padding:1px 7px;border-radius:var(--r-full)}
+  .itab[aria-selected="true"] .cnt{background:#fff;color:var(--primary-deep)}
+
+  .itab-body{padding:22px 20px;min-height:280px}
+  .ipanel[hidden]{display:none}
+  .ipanel{animation:fade .25s var(--ease) both}
+  @keyframes fade{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+  .prose p{font-size:.92rem;color:var(--body);max-width:70ch;margin-bottom:12px}
+  .prose h4{font-size:.98rem;font-weight:800;color:var(--ink);margin:18px 0 6px}
+  .prose ul{margin:0 0 12px;padding-left:20px}.prose li{font-size:.92rem;margin-bottom:5px}
+  .prose strong{color:var(--ink)}
+  .cont-cta{margin-top:18px;padding-top:16px;border-top:1px solid var(--border-soft);display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .cont-cta p{font-size:.84rem;color:var(--muted)}
+
+  /* navegador de exercícios */
+  .qnav{display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--field);border-radius:var(--r-xl);padding:9px 14px;margin-bottom:18px}
+  .qnav .arw{appearance:none;border:0;background:none;cursor:pointer;color:var(--muted);padding:6px;border-radius:var(--r-md);display:flex}
+  .qnav .arw:hover{background:var(--surface-muted)}.qnav .arw svg{width:18px;height:18px}
+  .qnav .dots{display:flex;align-items:center;gap:6px}
+  .qnav .d{height:6px;width:6px;border-radius:var(--r-full);background:var(--border)}
+  .qnav .d.on{width:24px;background:var(--primary)}.qnav .d.past{background:#7dd3e8}
+  .qnav .pos{font-size:.76rem;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+
+  .qstmt{font-size:.98rem;color:var(--ink);line-height:1.55;margin-bottom:16px}
+  .alts{display:flex;flex-direction:column;gap:10px}
+  .alt{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;padding:13px;border-radius:var(--r-xl);
+    border:2px solid var(--border-soft);background:var(--surface);cursor:pointer;font-family:inherit;transition:all .16s var(--ease)}
+  .alt:hover{border-color:var(--border);background:var(--field)}
+  .alt .k{flex-shrink:0;width:30px;height:30px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.84rem;background:var(--surface-muted);color:var(--body)}
+  .alt .x{flex:1;font-size:.9rem;color:var(--body);padding-top:3px}
+  .alt.correct{background:var(--success-bg);border-color:var(--success-solid)}
+  .alt.correct .k{background:var(--success-solid);color:#fff}
+  .alt.wrong{background:var(--error-bg);border-color:var(--error-solid)}
+  .alt.wrong .k{background:var(--error-solid);color:#fff}
+  .alt .flag{margin-left:auto;font-size:.72rem;font-weight:800;align-self:center}
+  .alt.correct .flag{color:var(--success)}.alt.wrong .flag{color:var(--error)}
+
+  .note{margin-top:30px;font-size:.78rem;color:var(--muted);background:var(--warning-bg);border:1px solid #fde68a;border-radius:var(--r-lg);padding:11px 16px}
+  .note b{color:var(--warning)}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ░░ Header do cargo (mantido) ░░ -->
+  <nav class="crumb" aria-label="Trilha">
+    <a href="#">Concursos</a><span aria-hidden="true">›</span>
+    <a href="#">Prefeitura de Santos 2026 · IBFC</a>
+  </nav>
+  <header>
+    <div style="margin-top:10px"><span class="pill pill--past"><span class="dot"></span>Prova aplicada em 09/03/2026</span></div>
+    <h1 class="role">Enfermeiro</h1>
+    <p class="context">Concurso Prefeitura de Santos 2026 · IBFC · nota de corte 70%</p>
+  </header>
+
+  <div class="tabs" role="tablist" aria-label="Seções do cargo">
+    <button class="tab" role="tab" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+      Treino <span class="badge">em andamento</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" tabindex="-1">Detalhes</button>
+  </div>
+
+  <section class="panel" role="tabpanel">
+
+    <!-- Prontidão compacta: continua ancorando o objetivo mesmo em foco -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="ready">
+        <div><p class="eyebrow">Prontidão</p><span class="num">64%</span></div>
+        <div class="track" aria-hidden="true"><div class="fill"></div><div class="cut"></div></div>
+        <span class="delta">▲ +6 pt · faltam 6 pts p/ o corte</span>
+      </div>
+    </div>
+
+    <!-- ════════ PAINEL DE FOCO DO ITEM ════════ -->
+    <div class="card focus">
+
+      <!-- topo: voltar ao plano + identidade do item + concluir -->
+      <div class="focus-top">
+        <a class="back" href="#" onclick="return false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="m15 18-6-6 6-6"/></svg>
+          Voltar ao plano
+        </a>
+        <div class="meta">
+          <div class="s">Estudo · Administração em Enfermagem</div>
+          <div class="t">Processo de Enfermagem (SAE)</div>
+        </div>
+        <button class="done">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg>
+          Marcar como concluído
+        </button>
+      </div>
+
+      <!-- progresso do estudo segue à vista -->
+      <div class="focus-prog">
+        <span>Estudo: 2 de 4 recomendações</span>
+        <div class="bar" aria-hidden="true"><i></i></div>
+        <span>50%</span>
+      </div>
+
+      <!-- abas do item -->
+      <div class="itabs" role="tablist" aria-label="Conteúdo do item de estudo">
+        <button class="itab" role="tab" aria-selected="false" data-tab="rec">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+          Recomendação
+        </button>
+        <button class="itab" role="tab" aria-selected="false" data-tab="exp">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          Explicação
+        </button>
+        <button class="itab" role="tab" aria-selected="true" data-tab="exe">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>
+          Exercícios <span class="cnt">4</span>
+        </button>
+        <button class="itab" role="tab" aria-selected="false" data-tab="err">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          Questões que errei <span class="cnt">5</span>
+        </button>
+      </div>
+
+      <div class="itab-body">
+
+        <!-- RECOMENDAÇÃO -->
+        <div class="ipanel prose" data-panel="rec" hidden>
+          <p>A <strong>Sistematização da Assistência de Enfermagem (SAE)</strong> é o ponto que mais derruba sua nota em Administração. Reveja as 5 etapas do Processo de Enfermagem e como a banca IBFC costuma cobrar a sequência correta.</p>
+          <p>Foque em: coleta de dados → diagnóstico → planejamento → implementação → avaliação. A pegadinha clássica é trocar a ordem ou confundir diagnóstico com prescrição.</p>
+          <div class="cont-cta">
+            <p>Aprofunde com a explicação detalhada.</p>
+            <button class="btn btn--primary btn--sm" onclick="pick('exp')">Ir para Explicação →</button>
+          </div>
+        </div>
+
+        <!-- EXPLICAÇÃO -->
+        <div class="ipanel prose" data-panel="exp" hidden>
+          <h4>As 5 etapas do Processo de Enfermagem</h4>
+          <p>O Processo de Enfermagem é a operacionalização da SAE. A Resolução COFEN 358/2009 define cinco etapas inter-relacionadas e deliberadas:</p>
+          <ul>
+            <li><strong>Coleta de dados (histórico)</strong> — levantamento de informações do paciente.</li>
+            <li><strong>Diagnóstico de enfermagem</strong> — interpretação dos dados em problemas/respostas.</li>
+            <li><strong>Planejamento</strong> — definição de resultados esperados e intervenções.</li>
+            <li><strong>Implementação</strong> — execução das ações planejadas.</li>
+            <li><strong>Avaliação</strong> — verificação de resultados e ajuste do plano.</li>
+          </ul>
+          <p>A IBFC valoriza a ordem e a autoria privativa do enfermeiro nas etapas de diagnóstico e prescrição.</p>
+          <div class="cont-cta">
+            <p>Hora de praticar.</p>
+            <button class="btn btn--primary btn--sm" onclick="pick('exe')">Ir para Exercícios →</button>
+          </div>
+        </div>
+
+        <!-- EXERCÍCIOS (default aberto) -->
+        <div class="ipanel" data-panel="exe">
+          <div class="qnav" aria-label="Navegação dos exercícios">
+            <button class="arw" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div class="dots" aria-hidden="true"><span class="d past"></span><span class="d on"></span><span class="d"></span><span class="d"></span></div>
+            <span class="pos">2/4</span>
+            <button class="arw" aria-label="Próxima"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+
+          <p class="qstmt">Segundo a Resolução COFEN nº 358/2009, qual é a sequência correta das etapas do Processo de Enfermagem?</p>
+          <div class="alts">
+            <button class="alt">
+              <span class="k">A</span>
+              <span class="x">Diagnóstico → coleta de dados → planejamento → avaliação → implementação</span>
+            </button>
+            <button class="alt correct">
+              <span class="k">B</span>
+              <span class="x">Coleta de dados → diagnóstico → planejamento → implementação → avaliação</span>
+              <span class="flag">✓ Correta</span>
+            </button>
+            <button class="alt">
+              <span class="k">C</span>
+              <span class="x">Planejamento → coleta de dados → diagnóstico → avaliação → implementação</span>
+            </button>
+            <button class="alt">
+              <span class="k">D</span>
+              <span class="x">Coleta de dados → planejamento → diagnóstico → implementação → avaliação</span>
+            </button>
+          </div>
+          <div class="cont-cta">
+            <p>Você acertou! Avance para a próxima questão ou marque o item como concluído.</p>
+            <button class="btn btn--primary btn--sm">Próxima questão →</button>
+          </div>
+        </div>
+
+        <!-- QUESTÕES QUE ERREI -->
+        <div class="ipanel" data-panel="err" hidden>
+          <div class="qnav" aria-label="Navegação das questões erradas">
+            <button class="arw" aria-label="Anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg></button>
+            <div class="dots" aria-hidden="true"><span class="d on"></span><span class="d"></span><span class="d"></span><span class="d"></span><span class="d"></span></div>
+            <span class="pos">1/5</span>
+            <button class="arw" aria-label="Próxima"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m9 18 6-6-6-6"/></svg></button>
+          </div>
+          <p class="small muted" style="margin-bottom:14px">As questões reais da prova que você errou nesta matéria, com gabarito comentado — pra fechar o ciclo do que estudou.</p>
+          <p class="qstmt">(Prova 2026) A prescrição de enfermagem é etapa privativa do enfermeiro e integra qual fase do Processo de Enfermagem?</p>
+          <div class="alts">
+            <button class="alt wrong"><span class="k">A</span><span class="x">Coleta de dados</span><span class="flag">✗ Você marcou</span></button>
+            <button class="alt correct"><span class="k">B</span><span class="x">Planejamento / implementação</span><span class="flag">✓ Gabarito</span></button>
+            <button class="alt"><span class="k">C</span><span class="x">Avaliação</span></button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <p class="note">
+      <b>Por que modo foco (e não outra página):</b> o aluno continua "dentro" do treino do cargo —
+      breadcrumb, prontidão e progresso do estudo seguem à vista, e <b>Voltar ao plano</b> devolve ele
+      exatamente na fase Estudo. Mas a área do item ganha largura total e silêncio visual pra ler e responder.
+      Na prática é a mesma rota da página do cargo num <i>modo</i> diferente (a antiga <code>/treino/:id/estudo/:item</code>
+      pode redirecionar pra cá, ou virar o deep-link que abre já neste estado).
+    </p>
+
+  </section>
+</div>
+
+<script>
+  function pick(tab){
+    document.querySelectorAll('.itab').forEach(b=>b.setAttribute('aria-selected', b.dataset.tab===tab));
+    document.querySelectorAll('.ipanel').forEach(p=>{ p.hidden = (p.dataset.panel!==tab); });
+  }
+  document.querySelectorAll('.itab').forEach(b=>b.addEventListener('click',()=>pick(b.dataset.tab)));
+</script>
+</body>
+</html>

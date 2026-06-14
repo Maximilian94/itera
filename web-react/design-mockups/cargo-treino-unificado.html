@@ -1,0 +1,465 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Mockup · Treino unificado na página do cargo — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    --success:#047857; --success-bg:#ecfdf5; --success-solid:#10b981;
+    --error:#dc2626; --error-bg:#fef2f2; --error-solid:#ef4444;
+    --warning:#b45309; --warning-bg:#fffbeb; --warning-solid:#f59e0b;
+    --violet:#7c3aed; --violet-bg:#f5f3ff; --violet-solid:#8b5cf6;
+    --r-md:6px; --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 6px 16px -4px rgba(15,23,42,.12);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;
+    color:var(--body);background:var(--surface-muted);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .shell{max-width:1120px;margin:0 auto;padding:24px 20px 90px}
+  a{color:inherit}
+  h1,h2,h3,h4,p{margin:0}
+  .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);border:0}
+
+  /* ── Header ───────────────────────────── */
+  .crumb{font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .crumb a{text-decoration:none;color:var(--muted)}.crumb a:hover{color:var(--primary-deep)}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;
+    padding:3px 10px;border-radius:var(--r-full)}
+  .pill--past{background:var(--surface-muted);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:var(--r-full);background:currentColor}
+  .role{margin-top:10px;font-size:clamp(1.6rem,4vw,2rem);font-weight:800;color:var(--ink);
+    letter-spacing:-.02em;line-height:1.12;text-wrap:balance}
+  .context{margin-top:4px;font-size:.9rem;color:var(--muted)}
+
+  /* ── Tabs ─────────────────────────────── */
+  .tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:1px solid var(--border-soft);position:relative}
+  .tab{appearance:none;background:none;border:0;cursor:pointer;font-family:inherit;font-size:.95rem;
+    font-weight:700;color:var(--muted);padding:11px 16px 13px;border-radius:var(--r-lg) var(--r-lg) 0 0;
+    display:inline-flex;align-items:center;gap:8px;position:relative;transition:color .18s var(--ease),background .18s var(--ease)}
+  .tab:hover{color:var(--ink);background:var(--field)}
+  .tab[aria-selected="true"]{color:var(--primary-deep)}
+  .tab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;background:var(--primary);border-radius:var(--r-full)}
+  .tab .badge{font-size:.66rem;font-weight:700;background:var(--surface-muted);color:var(--muted);padding:1px 7px;border-radius:var(--r-full)}
+  .tab[aria-selected="true"] .badge{background:var(--primary-tint);color:var(--primary-deep)}
+
+  .panel{padding-top:22px}
+
+  /* ── Cards ────────────────────────────── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-rest)}
+  .card-pad{padding:20px}
+  .grid{display:grid;gap:16px;align-items:start}
+  @media(min-width:920px){.grid-2{grid-template-columns:1fr 332px}}
+  .stack{display:flex;flex-direction:column;gap:16px}
+  .eyebrow{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .sec-title{font-size:1.05rem;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .muted{color:var(--muted)}.small{font-size:.84rem}
+
+  /* ── Readiness strip ──────────────────── */
+  .readiness{display:flex;flex-wrap:wrap;gap:18px 28px;align-items:center;justify-content:space-between}
+  .readiness .lead{min-width:200px}
+  .ready-num{font-size:1.7rem;font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1}
+  .delta{display:inline-flex;align-items:center;gap:3px;font-size:.78rem;font-weight:700;color:var(--success);background:var(--success-bg);padding:2px 8px;border-radius:var(--r-full)}
+  .track-wrap{flex:1;min-width:240px}
+  .track{position:relative;height:12px;border-radius:var(--r-full);background:var(--surface-muted)}
+  .track .fill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full);background:var(--primary)}
+  .track .cut{position:absolute;top:-5px;bottom:-5px;width:2.5px;background:var(--ink);border-radius:2px}
+  .track .cut::after{content:"corte 70%";position:absolute;top:-19px;left:50%;transform:translateX(-50%);white-space:nowrap;font-size:.66rem;font-weight:700;color:var(--ink)}
+  .track-legend{display:flex;justify-content:space-between;margin-top:14px;font-size:.72rem;color:var(--muted)}
+
+  /* ── Buttons ──────────────────────────── */
+  .btn{appearance:none;font-family:inherit;cursor:pointer;border:0;border-radius:var(--r-lg);font-weight:700;
+    font-size:.9rem;padding:10px 18px;display:inline-flex;align-items:center;gap:8px;text-decoration:none;
+    transition:background .16s var(--ease),transform .16s var(--ease)}
+  .btn svg{width:17px;height:17px}
+  .btn--primary{background:var(--primary);color:#fff}.btn--primary:hover{background:var(--primary-deep)}
+  .btn--ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border)}.btn--ghost:hover{background:var(--field)}
+  .btn:active{transform:translateY(1px)}
+  .btn--sm{padding:8px 14px;font-size:.84rem}
+
+  /* ════════════════════════════════════════
+     UNIFIED PLAN — phases as expandable rows
+     ════════════════════════════════════════ */
+  .plan-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:2px}
+  .progresstiny{font-size:.78rem;font-weight:700;color:var(--primary-deep)}
+  .phases{margin-top:16px;display:flex;flex-direction:column;gap:0}
+
+  .phase{position:relative;border-top:1px solid var(--border-soft)}
+  .phase:first-child{border-top:0}
+  /* connector rail */
+  .ph-sum{list-style:none;display:flex;gap:14px;align-items:center;padding:16px 2px;cursor:pointer;position:relative}
+  .ph-sum::-webkit-details-marker{display:none}
+  .ph-node{position:relative;flex-shrink:0;width:30px;height:30px;border-radius:var(--r-full);
+    display:flex;align-items:center;justify-content:center;font-size:.82rem;font-weight:800;z-index:1}
+  .ph-node--done{background:var(--success-bg);color:var(--success)}
+  .ph-node--current{background:var(--primary);color:#fff;box-shadow:0 0 0 4px var(--primary-tint)}
+  .ph-node--todo{background:var(--surface-muted);color:var(--muted)}
+  /* vertical rail behind nodes */
+  .phase:not(:last-child) .ph-node::after{content:"";position:absolute;left:50%;top:30px;transform:translateX(-50%);
+    width:2px;height:calc(100% + 34px);background:var(--border-soft);z-index:-1}
+  .ph-main{flex:1;min-width:0}
+  .ph-title{font-size:1rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .phase[open] .ph-title{color:var(--primary-deep)}
+  .ph-sub{font-size:.83rem;color:var(--muted);margin-top:1px}
+  .ph-status{font-size:.72rem;font-weight:700;padding:2px 9px;border-radius:var(--r-full);white-space:nowrap;flex-shrink:0}
+  .ph-status--done{background:var(--success-bg);color:var(--success)}
+  .ph-status--current{background:var(--primary-tint);color:var(--primary-deep)}
+  .ph-status--todo{background:var(--surface-muted);color:var(--muted)}
+  .ph-chev{flex-shrink:0;color:var(--muted);transition:transform .2s var(--ease)}
+  .phase[open] .ph-chev{transform:rotate(90deg)}
+  .ph-locked .ph-sum{cursor:not-allowed;opacity:.85}
+
+  /* expanded body, indented to align with the rail */
+  .ph-body{padding:2px 2px 22px 44px}
+  @media(max-width:560px){.ph-body{padding-left:8px}}
+
+  /* ── Diagnóstico embedded ─────────────── */
+  .diag-banner{border-radius:var(--r-xl);padding:18px 20px;display:flex;flex-wrap:wrap;gap:16px;
+    align-items:center;justify-content:space-between;background:linear-gradient(135deg,#e11d48,#f43f5e,#ec4899);color:#fff}
+  .diag-banner.pass{background:linear-gradient(135deg,#059669,#10b981,#14b8a6)}
+  .diag-banner .lbl{font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;color:rgba(255,255,255,.7);font-weight:700}
+  .diag-banner .big{font-size:1.5rem;font-weight:800;line-height:1;font-variant-numeric:tabular-nums}
+  .diag-stats{display:flex;gap:16px;align-items:center}
+  .diag-sep{width:1px;height:34px;background:rgba(255,255,255,.25)}
+  .ring{width:74px;height:74px;flex-shrink:0;position:relative}
+  .ring svg{transform:rotate(-90deg)}
+  .ring .val{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;color:#fff}
+
+  .subj{margin-top:16px}
+  .subj-row{padding:11px 0;border-top:1px solid var(--border-soft)}
+  .subj-row:first-child{border-top:0}
+  .subj-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+  .subj-name{font-weight:700;color:var(--ink);font-size:.9rem}
+  .subj-badge{font-size:.72rem;font-weight:700;padding:1px 8px;border-radius:var(--r-full);font-variant-numeric:tabular-nums}
+  .b-strong{background:var(--success-bg);color:var(--success)} .b-mid{background:var(--warning-bg);color:var(--warning)} .b-risk{background:var(--error-bg);color:var(--error)}
+  .sbar{position:relative;height:8px;border-radius:var(--r-full);background:var(--surface-muted);overflow:hidden}
+  .sbar .sfill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full)}
+  .f-strong{background:var(--success-solid)} .f-mid{background:var(--warning-solid)} .f-risk{background:var(--error-solid)}
+  .sbar .cutmark{position:absolute;top:-2px;bottom:-2px;width:1px;background:rgba(15,23,42,.35);z-index:2}
+
+  .ai{margin-top:18px;border-left:3px solid var(--warning-solid);background:var(--warning-bg);border-radius:0 var(--r-lg) var(--r-lg) 0;padding:14px 16px}
+  .ai .ai-h{display:flex;align-items:center;gap:8px;font-size:.78rem;font-weight:800;color:var(--warning);text-transform:uppercase;letter-spacing:.04em}
+  .ai p{font-size:.88rem;color:var(--body);margin-top:6px}
+
+  /* ── Estudo embedded ──────────────────── */
+  .study-prog{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .study-prog .bar{flex:1;height:9px;border-radius:var(--r-full);background:var(--surface-muted);overflow:hidden}
+  .study-prog .bar i{display:block;height:100%;background:var(--primary);border-radius:var(--r-full)}
+  .study-prog .pct{font-size:.84rem;font-weight:700;color:var(--body);width:38px;text-align:right;font-variant-numeric:tabular-nums}
+  .subj-group{font-size:.74rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px}
+  .item{display:flex;align-items:center;gap:12px;padding:11px 12px;border:1px solid var(--border-soft);
+    border-radius:var(--r-lg);margin-bottom:8px;text-decoration:none;transition:border-color .16s,background .16s}
+  .item:hover{border-color:var(--primary);background:var(--primary-tint)}
+  .item.done{background:var(--success-bg);border-color:#a7f3d0}
+  .item .ico{width:34px;height:34px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .item .ico--todo{background:var(--surface-muted);color:var(--muted)} .item .ico--done{background:#a7f3d0;color:var(--success)}
+  .item .t{flex:1;min-width:0}
+  .item .t b{font-size:.9rem;font-weight:700;color:var(--ink);display:block}
+  .item .t span{font-size:.76rem;color:var(--muted)}
+  .item .st{font-size:.7rem;font-weight:700;padding:2px 9px;border-radius:var(--r-full);flex-shrink:0}
+  .st--done{background:#a7f3d0;color:var(--success)} .st--todo{background:var(--surface-muted);color:var(--muted)}
+
+  /* ── Retentativa / Final teaser ───────── */
+  .teaser{display:flex;gap:14px;align-items:flex-start;background:var(--field);border:1px dashed var(--border);border-radius:var(--r-xl);padding:16px}
+  .teaser .ti{width:38px;height:38px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .ti--violet{background:var(--violet-bg);color:var(--violet)} .ti--rose{background:#ffe4e6;color:#e11d48}
+  .teaser b{font-size:.92rem;color:var(--ink)} .teaser p{font-size:.84rem;color:var(--muted);margin-top:2px}
+
+  /* ── Sidebar: outras provas ───────────── */
+  .rec-item{display:flex;gap:12px;align-items:center;padding:13px 0;border-top:1px solid var(--border-soft)}
+  .rec-item:first-of-type{border-top:0}
+  .rec-logo{width:38px;height:38px;border-radius:var(--r-lg);background:var(--surface-muted);display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--muted);font-size:.7rem;flex-shrink:0}
+  .rec-main{flex:1;min-width:0}.rec-title{font-weight:700;color:var(--ink);font-size:.88rem}
+  .rec-meta{font-size:.75rem;color:var(--muted);margin-top:2px}
+  .tag{font-size:.62rem;font-weight:700;padding:1px 7px;border-radius:var(--r-full)}
+  .tag--rel{background:var(--surface-muted);color:var(--muted)}
+  .iconbtn{flex-shrink:0;width:34px;height:34px;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--surface);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--primary-deep)}
+  .iconbtn:hover{background:var(--field)}.iconbtn svg{width:16px;height:16px}
+
+  .note{margin-top:30px;font-size:.78rem;color:var(--muted);background:var(--warning-bg);border:1px solid #fde68a;border-radius:var(--r-lg);padding:11px 16px}
+  .note b{color:var(--warning)}
+
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ░░ Header ░░ -->
+  <nav class="crumb" aria-label="Trilha">
+    <a href="#">Concursos</a><span aria-hidden="true">›</span>
+    <a href="#">Prefeitura de Santos 2026 · IBFC</a>
+  </nav>
+  <header>
+    <div style="margin-top:10px">
+      <span class="pill pill--past"><span class="dot"></span>Prova aplicada em 09/03/2026</span>
+    </div>
+    <h1 class="role">Enfermeiro</h1>
+    <p class="context">Concurso Prefeitura de Santos 2026 · IBFC · nota de corte 70%</p>
+  </header>
+
+  <!-- ░░ Tabs ░░ -->
+  <div class="tabs" role="tablist" aria-label="Seções do cargo">
+    <button class="tab" role="tab" aria-selected="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/></svg>
+      Treino <span class="badge">em andamento</span>
+    </button>
+    <button class="tab" role="tab" aria-selected="false" tabindex="-1">Detalhes</button>
+  </div>
+
+  <!-- ════════════ TREINO (unificado) ════════════ -->
+  <section class="panel" role="tabpanel">
+
+    <!-- Readiness strip (mantido) -->
+    <div class="card card-pad" style="margin-bottom:16px">
+      <div class="readiness">
+        <div class="lead">
+          <p class="eyebrow">Prontidão para aprovar</p>
+          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+            <span class="ready-num">64%</span>
+            <span class="delta">▲ +6 pt desde o diagnóstico</span>
+          </div>
+          <p class="small muted" style="margin-top:4px">Sua melhor nota até agora. Faltam <strong style="color:var(--ink)">6 pts</strong> para o corte.</p>
+        </div>
+        <div class="track-wrap" aria-hidden="true">
+          <div class="track"><div class="fill" style="width:64%"></div><div class="cut" style="left:70%"></div></div>
+          <div class="track-legend"><span>0%</span><span>100%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <!-- ░░ Coluna principal: o PLANO vira a superfície do treino ░░ -->
+      <div class="stack">
+        <div class="card card-pad">
+          <div class="plan-head">
+            <h2 class="sec-title">Seu treino, do começo ao fim</h2>
+            <span class="progresstiny">2 de 5 etapas</span>
+          </div>
+          <p class="small muted">Cada etapa abre aqui mesmo — você faz a prova, lê o diagnóstico, estuda, refaz o que errou e mede a evolução, sem sair desta página.</p>
+
+          <div class="phases">
+
+            <!-- 1 · PROVA (concluída, recolhida) -->
+            <details class="phase">
+              <summary class="ph-sum">
+                <span class="ph-node ph-node--done">✓</span>
+                <span class="ph-main">
+                  <span class="ph-title">Prova diagnóstica</span>
+                  <span class="ph-sub">58% · 45 de 45 questões respondidas</span>
+                </span>
+                <span class="ph-status ph-status--done">Feito</span>
+                <svg class="ph-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </summary>
+              <div class="ph-body">
+                <p class="small muted" style="margin-bottom:12px">Você respondeu a prova real deste cargo no formato de simulado. Pode revisar questão a questão quando quiser.</p>
+                <a class="btn btn--ghost btn--sm" href="#">Revisar a prova</a>
+              </div>
+            </details>
+
+            <!-- 2 · DIAGNÓSTICO (concluído, ABERTO p/ mostrar conteúdo embarcado) -->
+            <details class="phase" open>
+              <summary class="ph-sum">
+                <span class="ph-node ph-node--done">✓</span>
+                <span class="ph-main">
+                  <span class="ph-title">Diagnóstico</span>
+                  <span class="ph-sub">Onde você está forte e onde precisa focar</span>
+                </span>
+                <span class="ph-status ph-status--done">Visto</span>
+                <svg class="ph-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </summary>
+              <div class="ph-body">
+
+                <!-- banner de resultado -->
+                <div class="diag-banner">
+                  <div>
+                    <span class="lbl">Resultado da prova</span>
+                    <div class="diag-stats" style="margin-top:6px">
+                      <div><div class="big">26/45</div><span class="lbl">Questões certas</span></div>
+                      <span class="diag-sep"></span>
+                      <div><div class="big">70%</div><span class="lbl">Nota de corte</span></div>
+                    </div>
+                  </div>
+                  <div class="ring">
+                    <svg width="74" height="74" viewBox="0 0 74 74">
+                      <circle cx="37" cy="37" r="32" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="7"/>
+                      <circle cx="37" cy="37" r="32" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"
+                        stroke-dasharray="201" stroke-dashoffset="86"/>
+                    </svg>
+                    <span class="val">58%</span>
+                  </div>
+                </div>
+
+                <!-- desempenho por matéria -->
+                <div class="subj">
+                  <p class="eyebrow" style="margin-bottom:4px">Desempenho por matéria · linha = corte 70%</p>
+                  <div class="subj-row">
+                    <div class="subj-top"><span class="subj-name">Saúde Pública / SUS</span><span class="subj-badge b-strong">82%</span></div>
+                    <div class="sbar"><div class="cutmark" style="left:70%"></div><div class="sfill f-strong" style="width:82%"></div></div>
+                  </div>
+                  <div class="subj-row">
+                    <div class="subj-top"><span class="subj-name">Saúde do Adulto</span><span class="subj-badge b-mid">63%</span></div>
+                    <div class="sbar"><div class="cutmark" style="left:70%"></div><div class="sfill f-mid" style="width:63%"></div></div>
+                  </div>
+                  <div class="subj-row">
+                    <div class="subj-top"><span class="subj-name">Farmacologia</span><span class="subj-badge b-risk">41%</span></div>
+                    <div class="sbar"><div class="cutmark" style="left:70%"></div><div class="sfill f-risk" style="width:41%"></div></div>
+                  </div>
+                  <div class="subj-row">
+                    <div class="subj-top"><span class="subj-name">Administração em Enfermagem</span><span class="subj-badge b-risk">35%</span></div>
+                    <div class="sbar"><div class="cutmark" style="left:70%"></div><div class="sfill f-risk" style="width:35%"></div></div>
+                  </div>
+                </div>
+
+                <!-- feedback IA (resumido) -->
+                <div class="ai">
+                  <div class="ai-h">
+                    <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15" aria-hidden="true"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg>
+                    Feedback da IA
+                  </div>
+                  <p>Seu ponto crítico é <strong>Administração em Enfermagem</strong> — matéria que pesa 16% da prova e onde você acertou só 35%. Comece por Processo de Enfermagem (SAE) e dimensionamento de pessoal. Em Farmacologia, foque cálculo de dosagem.</p>
+                </div>
+              </div>
+            </details>
+
+            <!-- 3 · ESTUDO (atual, ABERTO com a lista real) -->
+            <details class="phase" open>
+              <summary class="ph-sum">
+                <span class="ph-node ph-node--current">3</span>
+                <span class="ph-main">
+                  <span class="ph-title">Estudar pontos fracos</span>
+                  <span class="ph-sub">2 de 4 recomendações concluídas</span>
+                </span>
+                <span class="ph-status ph-status--current">Você está aqui</span>
+                <svg class="ph-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </summary>
+              <div class="ph-body">
+                <div class="study-prog">
+                  <div class="bar"><i style="width:50%"></i></div>
+                  <span class="pct">50%</span>
+                </div>
+
+                <p class="subj-group">Administração em Enfermagem</p>
+                <a class="item done" href="#">
+                  <span class="ico ico--done"><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></span>
+                  <span class="t"><b>Processo de Enfermagem (SAE)</b><span>3 exercícios</span></span>
+                  <span class="st st--done">Concluído</span>
+                </a>
+                <a class="item" href="#">
+                  <span class="ico ico--todo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+                  <span class="t"><b>Dimensionamento de pessoal</b><span>4 exercícios</span></span>
+                  <span class="st st--todo">Pendente</span>
+                </a>
+
+                <p class="subj-group">Farmacologia</p>
+                <a class="item done" href="#">
+                  <span class="ico ico--done"><svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18"><path d="M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z"/></svg></span>
+                  <span class="t"><b>Cálculo de dosagem e gotejamento</b><span>5 exercícios</span></span>
+                  <span class="st st--done">Concluído</span>
+                </a>
+                <a class="item" href="#">
+                  <span class="ico ico--todo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>
+                  <span class="t"><b>Interações medicamentosas</b><span>3 exercícios</span></span>
+                  <span class="st st--todo">Pendente</span>
+                </a>
+
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+                  <a class="btn btn--primary btn--sm" href="#">
+                    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                    Continuar estudando
+                  </a>
+                  <a class="btn btn--ghost btn--sm" href="#">Pular para a re-tentativa</a>
+                </div>
+              </div>
+            </details>
+
+            <!-- 4 · RE-TENTATIVA (bloqueada) -->
+            <details class="phase ph-locked">
+              <summary class="ph-sum">
+                <span class="ph-node ph-node--todo">4</span>
+                <span class="ph-main">
+                  <span class="ph-title">Re-tentativa</span>
+                  <span class="ph-sub">Refaça só as 19 questões que você errou</span>
+                </span>
+                <span class="ph-status ph-status--todo">Conclua o estudo</span>
+                <svg class="ph-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </summary>
+              <div class="ph-body">
+                <div class="teaser">
+                  <span class="ti ti--violet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.4 2.6L3 8"/><path d="M3 3v5h5"/></svg></span>
+                  <div><b>Segunda chance sem ver o que marcou antes</b><p>Depois de estudar, você refaz as questões erradas para fixar o aprendizado. Libera ao avançar do estudo.</p></div>
+                </div>
+              </div>
+            </details>
+
+            <!-- 5 · FINAL (bloqueada) -->
+            <details class="phase ph-locked">
+              <summary class="ph-sum">
+                <span class="ph-node ph-node--todo">5</span>
+                <span class="ph-main">
+                  <span class="ph-title">Resultado final</span>
+                  <span class="ph-sub">Compare nota inicial → final e veja sua evolução</span>
+                </span>
+                <span class="ph-status ph-status--todo">A seguir</span>
+                <svg class="ph-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+              </summary>
+              <div class="ph-body">
+                <div class="teaser">
+                  <span class="ti ti--rose"><svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><path d="M12 2l2.4 7.2L22 12l-7.6 2.8L12 22l-2.4-7.2L2 12l7.6-2.8z"/></svg></span>
+                  <div><b>Sua linha de progresso</b><p>Nota da prova → nota antes do estudo → nota final. O ganho conquistado, em números.</p></div>
+                </div>
+              </div>
+            </details>
+
+          </div>
+        </div>
+      </div>
+
+      <!-- ░░ Sidebar: outras provas (mantida) ░░ -->
+      <aside class="stack">
+        <div class="card card-pad">
+          <h2 class="sec-title" style="font-size:.95rem">Treine com outras provas</h2>
+          <p class="small muted" style="margin-top:4px">Cada prova tem seu próprio ciclo e questões reais.</p>
+          <div style="margin-top:12px">
+            <div class="rec-item">
+              <span class="rec-logo">2024</span>
+              <div class="rec-main">
+                <div class="rec-title">IBFC · 2024</div>
+                <div class="rec-meta">Pref. de Cubatão · 40 questões</div>
+              </div>
+              <button class="iconbtn" aria-label="Treinar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+            </div>
+            <div class="rec-item">
+              <span class="rec-logo">VUNE</span>
+              <div class="rec-main">
+                <div class="rec-title">VUNESP · 2023 <span class="tag tag--rel">relacionada</span></div>
+                <div class="rec-meta">Pref. de São Vicente · 50 questões</div>
+              </div>
+              <button class="iconbtn" aria-label="Treinar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <p class="note">
+      <b>Mudança vs. hoje:</b> o cronograma deixa de ser só leitura + um botão que leva para <code>/treino/:id/…</code>.
+      Cada fase expande <strong>aqui mesmo</strong> e mostra seu conteúdo real (diagnóstico, lista de estudo, re-tentativa, resultado).
+      A rota <code>/treino</code> pode virar o modo foco "tela cheia" da fase atual, mas a página do cargo passa a ser o lar do treino.
+    </p>
+
+  </section>
+</div>
+</body>
+</html>

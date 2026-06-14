@@ -30,6 +30,12 @@ function goToDetalhes() {
   fireEvent.click(screen.getByRole('tab', { name: /Detalhes/ }))
 }
 
+/** A aba Treino abre num quadro de provas; clicar "Treinar" numa prova entra
+ *  na vista de treino daquela prova (dentro do concurso). */
+async function enterTraining(name: RegExp | string = 'Treinar') {
+  fireEvent.click(await screen.findByRole('button', { name }))
+}
+
 /** Monta o mapa de handlers da página: detail + blocos satélites. */
 function mockCargoApi(opts: {
   detail: CargoDetail
@@ -146,6 +152,12 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     ).toBeTruthy()
     expect(screen.getByText('Prova aplicada em 14/05/2023')).toBeTruthy()
 
+    // Quadro de provas: a prova oficial do concurso é a âncora.
+    expect(screen.getByText('Prova do concurso')).toBeTruthy()
+
+    // Treinar a prova oficial → entra na vista de treino daquela prova.
+    await enterTraining('Treinar')
+
     // Próximo passo: sem treino iniciado → começar pela prova diagnóstica.
     expect(screen.getByText('Seu próximo passo')).toBeTruthy()
     expect(screen.getByText('Fazer a prova diagnóstica')).toBeTruthy()
@@ -153,7 +165,7 @@ describe('página do cargo — aba Treino (prova passada)', () => {
 
     // Plano de treino com os 5 estágios.
     expect(
-      screen.getByRole('heading', { name: 'Seu plano de treino' }),
+      screen.getByRole('heading', { name: 'Seu treino, do começo ao fim' }),
     ).toBeTruthy()
     expect(screen.getByText('Estudo')).toBeTruthy()
 
@@ -212,8 +224,13 @@ describe('página do cargo — aba Treino (prova passada)', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
 
-    // Prontidão: melhor nota, evolução e leitura contra o corte (aba Treino).
+    // No quadro, a prova oficial já mostra a prontidão (melhor nota).
     expect(screen.getByText('72%')).toBeTruthy()
+
+    // Entra no treino da prova oficial.
+    await enterTraining('Treinar')
+
+    // Prontidão: melhor nota, evolução e leitura contra o corte (vista de treino).
     expect(screen.getByText('+8 pt')).toBeTruthy()
     expect(screen.getByText(/Acima da nota de corte/)).toBeTruthy()
     expect(screen.getByText('corte 60%')).toBeTruthy()
@@ -225,7 +242,7 @@ describe('página do cargo — aba Treino (prova passada)', () => {
       screen.queryByRole('button', { name: /Treinar pontos fracos/ }),
     ).toBeNull()
 
-    // Domínio por matéria (aba Treino): acerto por matéria com farol (async).
+    // Domínio por matéria (vista de treino): acerto por matéria com farol (async).
     expect(
       await screen.findByRole('heading', { name: 'Domínio por matéria' }),
     ).toBeTruthy()
@@ -254,7 +271,9 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    // A sessão de treino chega via GET /training (async).
+    // A sessão (FINAL) chega via GET /training → a oficial vira "Treinar novamente".
+    await enterTraining(/Treinar novamente/)
+    // Na vista de treino, ciclo concluído → novo ciclo + ver resultado.
     expect(
       await screen.findByRole('button', { name: /Começar novo ciclo/ }),
     ).toBeTruthy()
@@ -284,6 +303,8 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     // Selo "em andamento" na aba Treino aparece após GET /training resolver.
     const treinoTab = screen.getByRole('tab', { name: /Treino/ })
     expect(await within(treinoTab).findByText('em andamento')).toBeTruthy()
+    // A prova oficial está em andamento → "Continuar" entra na vista de treino.
+    await enterTraining('Continuar')
     // Estágio STUDY → próximo passo é estudar a matéria mais fraca.
     expect(await screen.findByText(/Estudar: Português/)).toBeTruthy()
     expect(
@@ -308,10 +329,12 @@ describe('página do cargo — aba Treino (prova futura)', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
 
-    // 1ª vez numa prova futura → o plano usa uma prova relacionada.
-    expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
-    expect(screen.getByText(/Plano com base na prova/)).toBeTruthy()
+    // Prova oficial futura: explica que ainda não tem questões próprias.
+    expect(screen.getByText(/Esta prova ainda não foi aplicada/)).toBeTruthy()
+    // Recomenda treinar numa prova equivalente.
     expect(screen.getByText(/VUNESP · 2023/)).toBeTruthy()
+    await enterTraining(/Treinar com prova equivalente/)
+    expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
 
     // Detalhes: programático + distribuição preditiva.
     goToDetalhes()
@@ -343,6 +366,8 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    // A oficial é futura (sem questões) → treina na equivalente.
+    await enterTraining(/Treinar com prova equivalente/)
     expect(screen.getByText('55%')).toBeTruthy()
     expect(screen.getByText(/Faltam 5 pts para o corte de 60%/)).toBeTruthy()
     expect(screen.getByText('-3 pt')).toBeTruthy()
@@ -437,19 +462,16 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    // Foco na Tipo 1 (primária, com tentativas): prontidão reflete a melhor nota.
+    // A primária (Tipo 1, com tentativas) é a prova oficial: prontidão 70%.
+    expect(screen.getByText('Prova do concurso')).toBeTruthy()
     expect(screen.getByText('70%')).toBeTruthy()
-    expect(screen.getByText(/Plano com base na prova/)).toBeTruthy()
-    expect(screen.getByText('Tipo 1')).toBeTruthy()
 
-    // Tipo 2 aparece como outra prova para treinar, com seu próprio CTA.
-    const others = screen
-      .getByRole('heading', { name: 'Treine com outras provas' })
+    // Tipo 2 aparece como prova recomendada para treinar, com CTA próprio.
+    const rec = screen
+      .getByRole('heading', { name: 'Provas recomendadas para treinar' })
       .closest('section')!
-    expect(within(others).getByText('Tipo 2')).toBeTruthy()
-    expect(
-      within(others).getByRole('button', { name: /Treinar: Tipo 2/ }),
-    ).toBeTruthy()
+    expect(within(rec).getByText('Tipo 2')).toBeTruthy()
+    expect(within(rec).getByRole('button', { name: 'Treinar' })).toBeTruthy()
   })
 
   it('prova futura sem questões próprias: foco numa relacionada, a outra vira opção', async () => {
@@ -519,13 +541,13 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    // Foco na 1ª relacionada (CEBRASPE · 2024); a 2ª vira opção de treino.
-    expect(screen.getByText(/CEBRASPE · 2024/)).toBeTruthy()
-    const others = screen
-      .getByRole('heading', { name: 'Treine com outras provas' })
+    // Oficial futura sem questões → as relacionadas viram provas recomendadas.
+    const rec = screen
+      .getByRole('heading', { name: 'Provas recomendadas para treinar' })
       .closest('section')!
-    expect(within(others).getByText('FGV · 2023')).toBeTruthy()
-    expect(within(others).getByText('relacionada')).toBeTruthy()
+    expect(within(rec).getByText(/CEBRASPE · 2024/)).toBeTruthy()
+    expect(within(rec).getByText('FGV · 2023')).toBeTruthy()
+    expect(within(rec).getAllByText('relacionada').length).toBeGreaterThan(0)
   })
 
   it('cargo de prova única: só o plano em foco, sem seção de outras provas', async () => {
@@ -536,9 +558,15 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    expect(screen.getByRole('heading', { name: 'Seu plano de treino' })).toBeTruthy()
-    expect(screen.queryByText('Treine com outras provas')).toBeNull()
+    // Quadro: só a prova oficial, sem seção de provas recomendadas.
+    expect(screen.getByText('Prova do concurso')).toBeTruthy()
+    expect(screen.queryByText('Provas recomendadas para treinar')).toBeNull()
     expect(screen.queryByText('relacionada')).toBeNull()
+    // Ao treinar a oficial, aparece o plano de treino.
+    await enterTraining('Treinar')
+    expect(
+      screen.getByRole('heading', { name: 'Seu treino, do começo ao fim' }),
+    ).toBeTruthy()
   })
 })
 
@@ -576,7 +604,8 @@ describe('página do cargo — acessibilidade (axe)', () => {
     const { container } = renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
-    await screen.findByRole('heading', { name: 'Seu plano de treino' })
+    await enterTraining('Treinar')
+    await screen.findByRole('heading', { name: 'Seu treino, do começo ao fim' })
     await expectNoSeriousAxeViolations(container)
   })
 

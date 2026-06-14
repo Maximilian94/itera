@@ -8,7 +8,7 @@ import {
   ArrowTrendingUpIcon,
   BanknotesIcon,
   ChartBarIcon,
-  CheckIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
   DocumentTextIcon,
@@ -27,22 +27,22 @@ import type {
   StudyPlan,
 } from '@/features/concurso/domain/concurso.types'
 import type { FichaFact } from '@/features/concurso/components/FichaCard'
+import type { TrainingListItem } from '@/features/training/domain/training.types'
+import type {ProvaTrainOption} from '@/features/concurso/components/treino/ProvasBoard';
 import {
   useCargoQuery,
   useCompetitionHistoryQuery,
   useSubjectDistributionQuery,
 } from '@/features/concurso/queries/concurso.queries'
+import { useTrainingsQuery } from '@/features/training/queries/training.queries'
+import { getStagePath } from '@/routes/_authenticated/treino/-stages.config'
+import { useProgramActions } from '@/features/concurso/components/treino/useProgramActions'
+import { PlanPhases } from '@/features/concurso/components/treino/PlanPhases'
 import {
-  useCreateTrainingMutation,
-  useTrainingsQuery,
-} from '@/features/training/queries/training.queries'
-import type { TrainingListItem } from '@/features/training/domain/training.types'
-import {
-  TRAINING_STAGE_ORDER,
-  TREINO_STAGES,
-  getStagePath,
-} from '@/routes/_authenticated/treino/-stages.config'
-import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
+  
+  ProvasBoard
+} from '@/features/concurso/components/treino/ProvasBoard'
+import { CollapsibleCard } from '@/features/concurso/components/CollapsibleCard'
 import { CARD } from '@/features/concurso/components/card'
 import { METER_BAR, enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
@@ -139,9 +139,9 @@ type TrainingOption = {
 /** Monta as opções de treino: provas próprias COM questões (prova passada)
  *  primeiro, depois as relacionadas (já ordenadas tier1→tier2 pelo backend).
  *  Prova futura → próprias sem questões caem fora, sobra só o relacionado. */
-function buildTrainingOptions(data: CargoDetail): TrainingOption[] {
+function buildTrainingOptions(data: CargoDetail): Array<TrainingOption> {
   const boardId = data.concurso.examBoard?.id ?? null
-  const own: TrainingOption[] = data.provas
+  const own: Array<TrainingOption> = data.provas
     .filter((p) => p.questionCount > 0)
     .map((p) => ({
       examBaseId: p.examBaseId,
@@ -153,7 +153,7 @@ function buildTrainingOptions(data: CargoDetail): TrainingOption[] {
       label: p.label ?? 'Esta prova',
       sublabel: null,
     }))
-  const related: TrainingOption[] = data.relatedProvas.map((r) => ({
+  const related: Array<TrainingOption> = data.relatedProvas.map((r) => ({
     examBaseId: r.examBaseId,
     examBoardId: r.examBoardId,
     studyPlan: r.studyPlan,
@@ -273,22 +273,14 @@ function CargoContent({ data }: { data: CargoDetail }) {
     return map
   })()
 
-  // Treino em andamento (não concluído) de alguma prova deste cargo, mais recente
-  // primeiro (lista vem updatedAt desc).
-  const optionExamBaseIds = new Set(trainingOptions.map((o) => o.examBaseId))
+  // Treino em andamento (não concluído) de alguma prova deste cargo → selo na aba.
+  const cargoExamBaseIds = new Set([
+    ...data.provas.map((p) => p.examBaseId),
+    ...data.relatedProvas.map((r) => r.examBaseId),
+  ])
   const activeTraining = (trainingsQuery.data ?? []).find(
-    (t) => optionExamBaseIds.has(t.examBaseId) && t.currentStage !== 'FINAL',
+    (t) => cargoExamBaseIds.has(t.examBaseId) && t.currentStage !== 'FINAL',
   )
-
-  // Prova "em foco" no cronograma: a do treino ativo; senão a 1ª opção
-  // recomendada. Conduz o próximo passo + a timeline do plano.
-  const featuredOption =
-    (activeTraining != null
-      ? trainingOptions.find((o) => o.examBaseId === activeTraining.examBaseId)
-      : undefined) ?? trainingOptions[0] ?? null
-  const featuredSession = featuredOption
-    ? (latestTrainingByExamBase.get(featuredOption.examBaseId) ?? null)
-    : null
 
   // Aba ativa: Treino é a porta de entrada (ação principal); Detalhes é a ficha.
   const [tab, setTab] = useState<'treino' | 'detalhes'>('treino')
@@ -362,12 +354,8 @@ function CargoContent({ data }: { data: CargoDetail }) {
 
       {tab === 'treino' ? (
         <TreinoTab
-          options={trainingOptions}
-          featuredOption={featuredOption}
-          featuredSession={featuredSession}
+          data={data}
           sessionByExamBase={latestTrainingByExamBase}
-          subjectQuery={subjectQuery}
-          status={concurso.status}
           cut={cut}
           meters={meters}
         />
@@ -498,54 +486,83 @@ function CargoTabs(props: {
 
 type WeakSubject = { subject: string; accuracyPct: number }
 
-/** Ações compartilhadas de um programa: começar (cria) ou continuar (retoma). */
-function useProgramActions(
-  examBaseId: string,
-  session: TrainingListItem | null,
-) {
-  const navigate = useNavigate()
-  const { requireAccess } = useRequireAccess()
-  const createTraining = useCreateTrainingMutation()
-  const isFinished = session?.currentStage === 'FINAL'
-  const inProgress = session != null && !isFinished
-
-  const start = () => {
-    if (!requireAccess()) return
-    createTraining.mutate(
-      { examBaseId, immediateFeedback: true },
-      { onSuccess: (res) => void navigate({ to: getStagePath('prova', res.trainingId) }) },
-    )
-  }
-  const resume = () => {
-    if (session == null) return
-    const slug =
-      TREINO_STAGES[TRAINING_STAGE_ORDER.indexOf(session.currentStage)]?.slug ?? 'prova'
-    void navigate({ to: getStagePath(slug, session.trainingId) })
-  }
-  return {
-    isFinished,
-    inProgress,
-    start,
-    resume,
-    isStarting: createTraining.isPending,
-    isError: createTraining.isError,
-  }
+/** Ano (UTC) de uma data ISO date-only; null se inválida. */
+function yearOf(iso: string | null): string {
+  if (iso == null) return ''
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '' : String(d.getUTCFullYear())
 }
 
-/** Orquestra a aba: prontidão + próximo passo + plano + matérias + outras provas. */
+/**
+ * Aba Treino como um quadro de provas: a prova oficial do concurso é a âncora
+ * fixa; ao clicar em "Treinar" numa prova, a aba troca para a experiência de
+ * treino daquela prova — sem sair do concurso (breadcrumb/contexto preservados).
+ */
 function TreinoTab(props: {
-  options: TrainingOption[]
-  featuredOption: TrainingOption | null
-  featuredSession: TrainingListItem | null
+  data: CargoDetail
   sessionByExamBase: Map<string, TrainingListItem>
-  subjectQuery: ReturnType<typeof useSubjectDistributionQuery>
-  status: ConcursoStatus
   cut: number | null
   meters: boolean
 }) {
-  const { featuredOption, featuredSession, subjectQuery, cut, meters } = props
+  const { data, sessionByExamBase, cut, meters } = props
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  if (featuredOption == null) {
+  const bancaLabel =
+    data.concurso.examBoard?.alias ?? data.concurso.examBoard?.name ?? 'Banca'
+  const boardId = data.concurso.examBoard?.id ?? null
+
+  // Prova oficial = a primária do cargo (mesmo futura, sem questões próprias).
+  const primary =
+    data.provas.length > 0
+      ? (data.provas.find((p) => p.isPrimary) ?? data.provas[0])
+      : null
+  const official: ProvaTrainOption | null = primary
+    ? {
+        examBaseId: primary.examBaseId,
+        examBoardId: boardId,
+        studyPlan: primary.studyPlan,
+        questionCount: primary.questionCount,
+        kind: 'official',
+        title: data.cargo.role,
+        subtitle: `${data.cargo.role} · ${bancaLabel} · ${data.concurso.institution} ${data.concurso.year}`,
+        logoTop: bancaLabel,
+        logoBottom: yearOf(primary.examDate),
+      }
+    : null
+
+  // Recomendadas = outras provas próprias com questões + provas relacionadas.
+  const ownExtra: Array<ProvaTrainOption> = data.provas
+    .filter((p) => !p.isPrimary && p.questionCount > 0)
+    .map((p) => ({
+      examBaseId: p.examBaseId,
+      examBoardId: boardId,
+      studyPlan: p.studyPlan,
+      questionCount: p.questionCount,
+      kind: 'own',
+      title: p.label ?? 'Outra prova',
+      subtitle: `${data.concurso.institution} ${data.concurso.year}`,
+      logoTop: bancaLabel,
+      logoBottom: yearOf(p.examDate),
+    }))
+  const related: Array<ProvaTrainOption> = data.relatedProvas.map((r) => ({
+    examBaseId: r.examBaseId,
+    examBoardId: r.examBoardId,
+    studyPlan: r.studyPlan,
+    questionCount: r.questionCount,
+    kind: 'related',
+    title: `${r.examBoardAlias ?? 'Banca'} · ${r.year}`,
+    subtitle: r.institution,
+    logoTop: r.examBoardAlias ?? 'Banca',
+    logoBottom: String(r.year),
+  }))
+  const recommended = [...ownExtra, ...related]
+
+  const allOptions = official != null ? [official, ...recommended] : recommended
+  const selected = allOptions.find((o) => o.examBaseId === selectedId) ?? null
+
+  // Sem prova oficial treinável e sem recomendadas → empty state.
+  const officialTrainable = official != null && official.questionCount > 0
+  if (!officialTrainable && recommended.length === 0) {
     return (
       <section className={`${CARD} p-6 sm:p-8 text-center`}>
         <h2 className="text-base font-bold text-slate-900">
@@ -566,8 +583,44 @@ function TreinoTab(props: {
     )
   }
 
-  // Prontidão e ponto fraco refletem a prova em foco (a do treino/recomendada).
-  const plan = featuredOption.studyPlan
+  if (selected != null) {
+    return (
+      <TrainingView
+        option={selected}
+        session={sessionByExamBase.get(selected.examBaseId) ?? null}
+        cut={cut}
+        meters={meters}
+        onBack={() => setSelectedId(null)}
+      />
+    )
+  }
+
+  return (
+    <ProvasBoard
+      official={official}
+      recommended={recommended}
+      sessionByExamBase={sessionByExamBase}
+      cut={cut}
+      meters={meters}
+      onTrain={setSelectedId}
+    />
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Vista de TREINO (uma prova selecionada, dentro do concurso)        */
+/* ------------------------------------------------------------------ */
+
+function TrainingView(props: {
+  option: ProvaTrainOption
+  session: TrainingListItem | null
+  cut: number | null
+  meters: boolean
+  onBack: () => void
+}) {
+  const { option, session, cut, meters, onBack } = props
+  const subjectQuery = useSubjectDistributionQuery(option.examBaseId)
+  const plan = option.studyPlan
 
   // Matéria mais fraca ponderada pelo peso na prova → guia o próximo passo.
   const w = subjectQuery.data?.insight.weakestRelevant ?? null
@@ -580,39 +633,46 @@ function TreinoTab(props: {
         }
       : null
 
-  const others = props.options.filter((o) => o.examBaseId !== featuredOption.examBaseId)
-
   return (
     <div className="flex flex-col gap-4">
-      <ReadinessStrip studyPlan={plan} cut={cut} meters={meters} />
-
-      {(featuredOption.kind === 'related' || others.length > 0) && (
-        <p className="-mt-1 px-1 text-xs text-slate-500">
-          Plano com base na prova{' '}
-          <span className="font-semibold text-slate-700">{featuredOption.label}</span>
-          {featuredOption.kind === 'related' ? ' (relacionada)' : ''}.
-        </p>
-      )}
-
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        <div className="flex flex-col gap-4 lg:col-span-2">
-          <NextStepCard
-            option={featuredOption}
-            session={featuredSession}
-            weakest={weakest}
-          />
-          <PlanTimeline session={featuredSession} />
-          <SubjectMastery query={subjectQuery} meters={meters} />
+      {/* Barra de contexto: lembra que o treino é dentro do concurso. */}
+      <div
+        {...enter(0)}
+        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 px-4 shadow-sm"
+      >
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-cyan-50 leading-none text-cyan-700">
+            <span className="text-[0.66rem] font-extrabold">{option.logoTop}</span>
+            <span className="text-[0.56rem] font-bold opacity-80">{option.logoBottom}</span>
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-extrabold text-slate-900">
+              Treinando: {option.kind === 'official' ? 'Prova oficial' : option.title}
+            </p>
+            <p className="truncate text-xs text-slate-500">
+              {option.kind === 'official'
+                ? 'Prova oficial do concurso'
+                : option.kind === 'related'
+                  ? 'Prova relacionada'
+                  : 'Prova equivalente'}{' '}
+              · dentro deste concurso
+            </p>
+          </div>
         </div>
-
-        <aside className="flex flex-col gap-4 lg:sticky lg:top-4">
-          <OtherProvasList
-            options={others}
-            sessionByExamBase={props.sessionByExamBase}
-            status={props.status}
-          />
-        </aside>
+        <button
+          type="button"
+          onClick={onBack}
+          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+          Voltar às provas
+        </button>
       </div>
+
+      <ReadinessStrip studyPlan={plan} cut={cut} meters={meters} />
+      <NextStepCard examBaseId={option.examBaseId} session={session} weakest={weakest} />
+      <PlanPhases examBaseId={option.examBaseId} session={session} cut={cut} />
+      <SubjectMastery query={subjectQuery} meters={meters} />
     </div>
   )
 }
@@ -689,14 +749,14 @@ function ReadinessStrip(props: { studyPlan: StudyPlan; cut: number | null; meter
 
 /** Próximo passo: UMA ação em destaque, derivada do estágio do treino em foco. */
 function NextStepCard(props: {
-  option: TrainingOption
+  examBaseId: string
   session: TrainingListItem | null
   weakest: WeakSubject | null
 }) {
-  const { option, session, weakest } = props
+  const { examBaseId, session, weakest } = props
   const navigate = useNavigate()
   const { inProgress, isFinished, start, resume, isStarting, isError } = useProgramActions(
-    option.examBaseId,
+    examBaseId,
     session,
   )
 
@@ -790,85 +850,6 @@ function NextStepCard(props: {
   )
 }
 
-/** Timeline read-only dos 5 estágios do ciclo de treino em foco. */
-function PlanTimeline(props: { session: TrainingListItem | null }) {
-  const { session } = props
-  const stageIdx = session != null ? TRAINING_STAGE_ORDER.indexOf(session.currentStage) : -1
-  const isFinished = session?.currentStage === 'FINAL'
-  const doneCount = isFinished ? TREINO_STAGES.length : Math.max(0, stageIdx)
-
-  return (
-    <section {...enter(2)} className={`${CARD} p-5 sm:p-6`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-base font-bold text-slate-900">Seu plano de treino</h2>
-        <span className="text-xs font-semibold text-cyan-700">
-          {doneCount} de {TREINO_STAGES.length} etapas
-        </span>
-      </div>
-      <p className="mt-0.5 text-sm text-slate-500">
-        Um ciclo: faça a prova, receba o diagnóstico, estude os pontos fracos,
-        refaça o que errou e meça a evolução.
-      </p>
-      <ol className="mt-5 flex flex-col">
-        {TREINO_STAGES.map((stage, i) => {
-          const state: 'done' | 'current' | 'upcoming' =
-            stageIdx < 0
-              ? 'upcoming'
-              : isFinished || i < stageIdx
-                ? 'done'
-                : i === stageIdx
-                  ? 'current'
-                  : 'upcoming'
-          return (
-            <li key={stage.slug} className="relative flex gap-4 pb-5 last:pb-0">
-              {i < TREINO_STAGES.length - 1 && (
-                <span className="absolute left-3 top-7 h-full w-px bg-slate-200" />
-              )}
-              {state === 'done' ? (
-                <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
-                  <CheckIcon className="h-4 w-4" strokeWidth={2.5} />
-                </span>
-              ) : state === 'current' ? (
-                <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-600 text-xs font-bold text-white ring-4 ring-cyan-100">
-                  {i + 1}
-                </span>
-              ) : (
-                <span className="z-10 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 border-slate-200 bg-white text-xs font-bold text-slate-400">
-                  {i + 1}
-                </span>
-              )}
-              <div className="min-w-0 pt-0.5">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p
-                    className={`text-sm font-bold ${
-                      state === 'upcoming'
-                        ? 'text-slate-400'
-                        : state === 'current'
-                          ? 'text-cyan-700'
-                          : 'text-slate-900'
-                    }`}
-                  >
-                    {stage.title}
-                  </p>
-                  {state === 'current' && (
-                    <span className="rounded-full bg-cyan-100 px-2 py-0.5 text-[0.62rem] font-bold text-cyan-700">
-                      Você está aqui
-                    </span>
-                  )}
-                </div>
-                <p
-                  className={`mt-0.5 text-sm leading-6 ${state === 'upcoming' ? 'text-slate-400' : 'text-slate-600'}`}
-                >
-                  {stage.description}
-                </p>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
-    </section>
-  )
-}
 
 const MASTERY = {
   strong: { dot: 'bg-emerald-500', bar: 'bg-emerald-500', label: 'Sólido' },
@@ -913,15 +894,13 @@ function SubjectMastery(props: {
   })
 
   return (
-    <section {...enter(3)} className={`${CARD} p-5 sm:p-6`}>
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-base font-bold text-slate-900">Domínio por matéria</h2>
-        <span className="text-xs text-slate-500">o que cai nesta prova</span>
-      </div>
-      <p className="mt-0.5 text-sm text-slate-500">
-        Seu acerto por matéria. Priorize as vermelhas que mais pesam na prova.
-      </p>
-      <div className="mt-4">
+    <CollapsibleCard
+      title="Domínio por matéria"
+      subtitle="Seu acerto por matéria. Priorize as vermelhas que mais pesam na prova."
+      enterIdx={3}
+      aside={<span className="text-xs text-slate-500">o que cai nesta prova</span>}
+    >
+      <div className="mt-1">
         {rows.map((s) => {
           const weight = Math.round((s.count / total) * 100)
           const acc = s.userAccuracy
@@ -972,74 +951,7 @@ function SubjectMastery(props: {
           <span className="h-2 w-2 rounded-full bg-emerald-500" />Sólido
         </span>
       </div>
-    </section>
-  )
-}
-
-/** Outras provas para treinar (própria(s) restante(s) + relacionadas). */
-function OtherProvasList(props: {
-  options: TrainingOption[]
-  sessionByExamBase: Map<string, TrainingListItem>
-  status: ConcursoStatus
-}) {
-  if (props.options.length === 0) return null
-  return (
-    <section {...enter(2)} className={`${CARD} p-5`}>
-      <h2 className="text-sm font-bold text-slate-900">Treine com outras provas</h2>
-      <p className="mt-1 text-sm leading-6 text-slate-500">
-        Cada prova tem seu próprio ciclo de treino e questões reais.
-      </p>
-      <div className="mt-3 flex flex-col">
-        {props.options.map((opt) => (
-          <OtherProvaRow
-            key={opt.examBaseId}
-            option={opt}
-            session={props.sessionByExamBase.get(opt.examBaseId) ?? null}
-          />
-        ))}
-      </div>
-    </section>
-  )
-}
-
-function OtherProvaRow(props: { option: TrainingOption; session: TrainingListItem | null }) {
-  const { option, session } = props
-  const { inProgress, isFinished, start, resume, isStarting } = useProgramActions(
-    option.examBaseId,
-    session,
-  )
-  const onClick = inProgress ? resume : start
-  const stateLabel = inProgress ? 'Em andamento' : isFinished ? 'Concluído' : null
-
-  return (
-    <div className="flex items-center gap-3 border-t border-slate-100 py-3 first:border-t-0">
-      <div className="min-w-0 flex-1">
-        <p className="flex items-center gap-1.5 text-sm font-bold text-slate-900">
-          <span className="truncate">{option.label}</span>
-          {option.kind === 'related' && (
-            <span className="shrink-0 rounded-full bg-slate-100 px-1.5 py-0.5 text-[0.62rem] font-semibold text-slate-500">
-              relacionada
-            </span>
-          )}
-        </p>
-        <p className="mt-0.5 truncate text-xs text-slate-400">
-          {option.sublabel != null ? `${option.sublabel} · ` : ''}
-          {option.questionCount} questões
-          {stateLabel != null && (
-            <span className="font-semibold text-cyan-700"> · {stateLabel}</span>
-          )}
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={isStarting}
-        aria-label={inProgress ? `Continuar treino: ${option.label}` : `Treinar: ${option.label}`}
-        className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-wait disabled:opacity-60"
-      >
-        <PlayIcon className="h-4 w-4" />
-      </button>
-    </div>
+    </CollapsibleCard>
   )
 }
 
