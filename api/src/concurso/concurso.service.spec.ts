@@ -592,6 +592,9 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       examDate: new Date('2026-07-12T00:00:00.000Z'),
       editalUrl: null,
       published: true,
+      cargoGroupId: null,
+      provaLabel: null,
+      isPrimaryProva: true,
       syllabusGroups: [
         { name: 'SUS', topics: 'Lei 8.080; Lei 8.142', order: 0 },
       ],
@@ -623,14 +626,24 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     };
   }
 
-  /** findMany é chamado para siblings (status) e previousExams (where.role). */
+  /**
+   * findMany é chamado três vezes no getCargoDetail:
+   * - provas do cargo (grupo), filtrado por `id`/`cargoGroupId` → cargoSelect;
+   * - siblings (só a chave do concurso) → status/timeline;
+   * - previousExams (`where.role`) → edições anteriores.
+   */
   function mockExamBaseLists({
+    group = [buildCargo()] as Record<string, unknown>[],
     siblings = [buildSibling()],
     previous = [] as Record<string, unknown>[],
   } = {}) {
     prisma.examBase.findMany.mockImplementation(
-      (args: { where: { role?: string } }) =>
-        Promise.resolve(args.where.role ? previous : siblings),
+      (args: { where: { role?: string; id?: string; cargoGroupId?: string } }) => {
+        if (args.where.role) return Promise.resolve(previous);
+        if (args.where.id != null || args.where.cargoGroupId != null)
+          return Promise.resolve(group);
+        return Promise.resolve(siblings);
+      },
     );
   }
 
@@ -820,10 +833,10 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('prova com questões próprias: studyPlan usa a própria prova', async () => {
-    prisma.examBase.findFirst.mockResolvedValue(
-      buildCargo({ _count: { questions: 120 } }),
-    );
-    mockExamBaseLists({ previous: [buildPreviousExam()] });
+    mockExamBaseLists({
+      group: [buildCargo({ _count: { questions: 120 } })],
+      previous: [buildPreviousExam()],
+    });
 
     await service.getCargoDetail(
       CONCURSO.slug,
@@ -841,9 +854,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('currentStep: sem tentativa → diagnostico; abaixo do corte → treino_dirigido; no corte → reta_final', async () => {
-    prisma.examBase.findFirst.mockResolvedValue(
-      buildCargo({ _count: { questions: 120 } }),
-    );
+    mockExamBaseLists({ group: [buildCargo({ _count: { questions: 120 } })] });
 
     let result = await service.getCargoDetail(
       CONCURSO.slug,
@@ -881,9 +892,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('weakSubjects: top 3 piores matérias, exigindo mínimo de respostas por matéria', async () => {
-    prisma.examBase.findFirst.mockResolvedValue(
-      buildCargo({ _count: { questions: 120 } }),
-    );
+    mockExamBaseLists({ group: [buildCargo({ _count: { questions: 120 } })] });
     prisma.examBaseAttempt.findMany.mockResolvedValue([
       { scorePercentage: '40' },
     ]);

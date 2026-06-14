@@ -100,4 +100,21 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsBoolean()
   isNursingRelevant?: boolean;
+
+  /// Agrupa esta prova com outras do MESMO cargo (cargoGroupId compartilhado).
+  /// null/ausente = cargo standalone (1 prova = 1 cargo).
+  @IsOptional()
+  @IsUUID()
+  cargoGroupId?: string | null;
+
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela").
+  @IsOptional()
+  @IsString()
+  provaLabel?: string | null;
+
+  /// Prova "representante" do cargo (carrega ficha/edital/conteúdo e slug).
+  /// Ao marcar true, o service desmarca as irmãs do mesmo cargoGroupId.
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryProva?: boolean;
 }

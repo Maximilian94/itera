@@ -277,6 +277,18 @@ model ExamBase {
   concursoId  String?    @db.Uuid
   concurso    Concurso?  @relation(fields: [concursoId], references: [id], onDelete: SetNull)
 
+  /// Agrupa várias provas (ExamBase) sob o MESMO cargo. null = cargo standalone
+  /// (comportamento padrão: 1 prova = 1 cargo). Provas que compartilham este id
+  /// pertencem ao mesmo cargo e aparecem agrupadas (um card no concurso).
+  cargoGroupId   String?  @db.Uuid
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela"). Só faz
+  /// sentido quando o cargo tem mais de uma prova; null/sozinho → não exibido.
+  provaLabel     String?
+  /// A prova "representante" do cargo: carrega os metadados de cargo (salário,
+  /// vagas, requisitos, edital, conteúdo programático, nota de corte) e define
+  /// o slug/URL canônico do cargo. Exatamente uma por cargoGroupId (regra de serviço).
+  isPrimaryProva Boolean  @default(true)
+
   questions         ExamBaseQuestion[]
   attempts          ExamBaseAttempt[]
   trainingSessions  TrainingSession[]
@@ -284,6 +296,7 @@ model ExamBase {
 
   @@index([examBoardId])
   @@index([concursoId])
+  @@index([cargoGroupId])
   @@map("exam_bases")
 }
 

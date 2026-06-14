@@ -89,4 +89,19 @@ export class CreateExamBaseDto {
   @IsOptional()
   @IsBoolean()
   isNursingRelevant?: boolean;
+
+  /// Agrupa esta prova com outras do MESMO cargo. null = cargo standalone.
+  @IsOptional()
+  @IsUUID()
+  cargoGroupId?: string | null;
+
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela").
+  @IsOptional()
+  @IsString()
+  provaLabel?: string | null;
+
+  /// Prova "representante" do cargo. Default true (cargo de 1 prova).
+  @IsOptional()
+  @IsBoolean()
+  isPrimaryProva?: boolean;
 }

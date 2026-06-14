@@ -278,9 +278,37 @@ export function makeCargoDetail(overrides?: {
   concurso?: Partial<CargoDetail['concurso']>
   cargo?: Partial<CargoDetail['cargo']>
   syllabusGroups?: CargoDetail['syllabusGroups']
+  provas?: CargoDetail['provas']
+  relatedProvas?: CargoDetail['relatedProvas']
   previousExams?: CargoDetail['previousExams']
   studyPlan?: Partial<CargoDetail['studyPlan']>
 }): CargoDetail {
+  const cargo = {
+    id: 'exam-1',
+    slug: 'enfermeiro',
+    role: 'Enfermeiro',
+    description: null,
+    requirements: 'Superior em Enfermagem + COREN ativo',
+    salaryBase: '8500',
+    workload: '40h semanais',
+    vacancyCount: 10,
+    hasReserveList: true,
+    registrationFee: '85',
+    minPassingGrade: '60',
+    questionCount: 50,
+    examDate: '2023-05-14T00:00:00.000Z',
+    editalUrl: 'https://example.com/edital.pdf',
+    published: true,
+    ...overrides?.cargo,
+  }
+  const studyPlan: CargoDetail['studyPlan'] = {
+    currentStep: 'diagnostico',
+    attemptCount: 0,
+    bestScore: null,
+    scoreDelta: null,
+    weakSubjects: [],
+    ...overrides?.studyPlan,
+  }
   return {
     concurso: {
       id: 'c1',
@@ -292,34 +320,25 @@ export function makeCargoDetail(overrides?: {
       examDate: '2023-05-14T00:00:00.000Z',
       ...overrides?.concurso,
     },
-    cargo: {
-      id: 'exam-1',
-      slug: 'enfermeiro',
-      role: 'Enfermeiro',
-      description: null,
-      requirements: 'Superior em Enfermagem + COREN ativo',
-      salaryBase: '8500',
-      workload: '40h semanais',
-      vacancyCount: 10,
-      hasReserveList: true,
-      registrationFee: '85',
-      minPassingGrade: '60',
-      questionCount: 50,
-      examDate: '2023-05-14T00:00:00.000Z',
-      editalUrl: 'https://example.com/edital.pdf',
-      published: true,
-      ...overrides?.cargo,
-    },
+    cargo,
     syllabusGroups: overrides?.syllabusGroups ?? [],
+    // Default: cargo de prova única (a própria prova como primária), com o
+    // mesmo studyPlan do top-level.
+    provas: overrides?.provas ?? [
+      {
+        examBaseId: cargo.id,
+        slug: cargo.slug,
+        label: null,
+        isPrimary: true,
+        examDate: cargo.examDate,
+        questionCount: cargo.questionCount,
+        userStats: { attemptCount: 0, bestScore: null },
+        studyPlan,
+      },
+    ],
+    relatedProvas: overrides?.relatedProvas ?? [],
     previousExams: overrides?.previousExams ?? [],
-    studyPlan: {
-      currentStep: 'diagnostico',
-      attemptCount: 0,
-      bestScore: null,
-      scoreDelta: null,
-      weakSubjects: [],
-      ...overrides?.studyPlan,
-    },
+    studyPlan,
   }
 }
 
