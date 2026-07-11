@@ -22,9 +22,12 @@ export function institutionInitials(institution: string): string {
 export function InstitutionMark({
   institution,
   size = 'md',
+  style,
 }: {
   institution: string
   size?: 'sm' | 'md'
+  /** Estilo extra (ex.: `{ viewTransitionName: 'institution-mark' }`). */
+  style?: React.CSSProperties
 }) {
   const sizing =
     size === 'sm'
@@ -33,6 +36,7 @@ export function InstitutionMark({
   return (
     <div
       aria-hidden
+      style={style}
       className={`flex shrink-0 select-none items-center justify-center bg-slate-100 font-extrabold tracking-wide text-slate-600 ring-1 ring-inset ring-slate-200/80 ${sizing}`}
     >
       {institutionInitials(institution)}

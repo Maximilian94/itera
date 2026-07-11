@@ -25,9 +25,15 @@ afterEach(() => {
 const CARGO_PATH = '/concursos/pmc-2026/enfermeiro'
 const API = '/concursos/pmc-2026/cargos/enfermeiro'
 
-/** Abre a aba Detalhes (a página entra na aba Treino por padrão). */
+/** Abre a aba Detalhes (a página entra na aba Detalhes por padrão, mas o clique
+ *  é inofensivo e deixa o teste explícito). */
 function goToDetalhes() {
   fireEvent.click(screen.getByRole('tab', { name: /Detalhes/ }))
+}
+
+/** Abre a aba Treino (a página entra na aba Detalhes por padrão). */
+function goToTreino() {
+  fireEvent.click(screen.getByRole('tab', { name: /Treino/ }))
 }
 
 /** A aba Treino abre num quadro de provas; clicar "Treinar" numa prova entra
@@ -152,25 +158,20 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     ).toBeTruthy()
     expect(screen.getByText('Prova aplicada em 14/05/2023')).toBeTruthy()
 
+    goToTreino()
     // Quadro de provas: a prova oficial do concurso é a âncora.
     expect(screen.getByText('Prova do concurso')).toBeTruthy()
 
-    // Treinar a prova oficial → entra na vista de treino daquela prova.
+    // Treinar a prova oficial → entra na vista de treino em página cheia.
     await enterTraining('Treinar')
 
-    // Próximo passo: sem treino iniciado → começar pela prova diagnóstica.
-    expect(screen.getByText('Seu próximo passo')).toBeTruthy()
-    expect(screen.getByText('Fazer a prova diagnóstica')).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
-
-    // Plano de treino com os 5 estágios.
+    // Stepper das 5 fases + a fase atual (Prova) ocupa a página.
+    expect(screen.getByText('Diagnóstico')).toBeTruthy() // etapa do stepper
     expect(
-      screen.getByRole('heading', { name: 'Seu treino, do começo ao fim' }),
+      screen.getByRole('heading', { name: 'Prova diagnóstica' }),
     ).toBeTruthy()
-    expect(screen.getByText('Estudo')).toBeTruthy()
-
-    // Sem tentativas → prontidão convida ao diagnóstico (sem número de nota).
-    expect(screen.getByText(/Faça a prova diagnóstica para medir/)).toBeTruthy()
+    // Sem treino iniciado → começar pela prova diagnóstica.
+    expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
     // CTAs antigos de simulado avulso não existem mais.
     expect(screen.queryByRole('button', { name: /Fazer simulado/ })).toBeNull()
   })
@@ -223,29 +224,18 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
 
     // No quadro, a prova oficial já mostra a prontidão (melhor nota).
     expect(screen.getByText('72%')).toBeTruthy()
 
-    // Entra no treino da prova oficial.
+    // Entra no treino da prova oficial (página cheia).
     await enterTraining('Treinar')
 
-    // Prontidão: melhor nota, evolução e leitura contra o corte (vista de treino).
-    expect(screen.getByText('+8 pt')).toBeTruthy()
-    expect(screen.getByText(/Acima da nota de corte/)).toBeTruthy()
-    expect(screen.getByText('corte 60%')).toBeTruthy()
-
-    // Próximo passo guiado: sem sessão ainda → "Começar treino".
+    // A barra de contexto repete a prontidão; sem sessão ainda → "Começar treino".
+    expect(screen.getAllByText('72%').length).toBeGreaterThan(0)
     expect(screen.getByRole('button', { name: /Começar treino/ })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /Fazer simulado/ })).toBeNull()
-    expect(
-      screen.queryByRole('button', { name: /Treinar pontos fracos/ }),
-    ).toBeNull()
-
-    // Domínio por matéria (vista de treino): acerto por matéria com farol (async).
-    expect(
-      await screen.findByRole('heading', { name: 'Domínio por matéria' }),
-    ).toBeTruthy()
 
     // Acurácia por matéria + insight do ponto fraco ficam na aba Detalhes.
     goToDetalhes()
@@ -271,13 +261,14 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // A sessão (FINAL) chega via GET /training → a oficial vira "Treinar novamente".
     await enterTraining(/Treinar novamente/)
-    // Na vista de treino, ciclo concluído → novo ciclo + ver resultado.
+    // Vista de treino na fase Final → começar um novo ciclo.
     expect(
       await screen.findByRole('button', { name: /Começar novo ciclo/ }),
     ).toBeTruthy()
-    expect(screen.getByRole('button', { name: /Ver resultado/ })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'Resultado final' })).toBeTruthy()
   })
 
   it('treino em andamento: aba Treino ganha o selo "em andamento" e o próximo passo retoma', async () => {
@@ -300,15 +291,18 @@ describe('página do cargo — aba Treino (prova passada)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // Selo "em andamento" na aba Treino aparece após GET /training resolver.
     const treinoTab = screen.getByRole('tab', { name: /Treino/ })
     expect(await within(treinoTab).findByText('em andamento')).toBeTruthy()
     // A prova oficial está em andamento → "Continuar" entra na vista de treino.
     await enterTraining('Continuar')
-    // Estágio STUDY → próximo passo é estudar a matéria mais fraca.
-    expect(await screen.findByText(/Estudar: Português/)).toBeTruthy()
+    // Estágio STUDY → a página abre direto na fase Estudo.
     expect(
-      screen.getByRole('button', { name: /Continuar estudando/ }),
+      await screen.findByRole('heading', { name: 'Estudar pontos fracos' }),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /Ir para a re-tentativa/ }),
     ).toBeTruthy()
   })
 })
@@ -328,6 +322,7 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
 
     // Prova oficial futura: explica que ainda não tem questões próprias.
     expect(screen.getByText(/Esta prova ainda não foi aplicada/)).toBeTruthy()
@@ -366,11 +361,12 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // A oficial é futura (sem questões) → treina na equivalente.
     await enterTraining(/Treinar com prova equivalente/)
+    // A barra de contexto mostra a prontidão da prova equivalente, abaixo do corte.
     expect(screen.getByText('55%')).toBeTruthy()
-    expect(screen.getByText(/Faltam 5 pts para o corte de 60%/)).toBeTruthy()
-    expect(screen.getByText('-3 pt')).toBeTruthy()
+    expect(screen.getByText(/faltam 5 pts/)).toBeTruthy()
   })
 
   it('sem prova treinável: aba Treino vira link para o treino genérico', async () => {
@@ -408,6 +404,7 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     const cta = screen.getByRole('link', { name: /Ir para o treino/ })
     expect(cta.getAttribute('href')).toBe('/treino')
   })
@@ -462,6 +459,7 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // A primária (Tipo 1, com tentativas) é a prova oficial: prontidão 70%.
     expect(screen.getByText('Prova do concurso')).toBeTruthy()
     expect(screen.getByText('70%')).toBeTruthy()
@@ -541,6 +539,7 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // Oficial futura sem questões → as relacionadas viram provas recomendadas.
     const rec = screen
       .getByRole('heading', { name: 'Provas recomendadas para treinar' })
@@ -558,14 +557,15 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     // Quadro: só a prova oficial, sem seção de provas recomendadas.
     expect(screen.getByText('Prova do concurso')).toBeTruthy()
     expect(screen.queryByText('Provas recomendadas para treinar')).toBeNull()
     expect(screen.queryByText('relacionada')).toBeNull()
-    // Ao treinar a oficial, aparece o plano de treino.
+    // Ao treinar a oficial, abre a vista de treino em página cheia.
     await enterTraining('Treinar')
     expect(
-      screen.getByRole('heading', { name: 'Seu treino, do começo ao fim' }),
+      screen.getByRole('heading', { name: 'Prova diagnóstica' }),
     ).toBeTruthy()
   })
 })
@@ -604,8 +604,9 @@ describe('página do cargo — acessibilidade (axe)', () => {
     const { container } = renderPage(CARGO_PATH)
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
     await enterTraining('Treinar')
-    await screen.findByRole('heading', { name: 'Seu treino, do começo ao fim' })
+    await screen.findByRole('heading', { name: 'Prova diagnóstica' })
     await expectNoSeriousAxeViolations(container)
   })
 

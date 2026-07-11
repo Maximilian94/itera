@@ -174,7 +174,7 @@ export function StudyItemFocus(props: {
           onClick={onBack}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
-          <ArrowLeftIcon className="h-4 w-4" /> Voltar ao plano
+          <ArrowLeftIcon className="h-4 w-4" /> Voltar ao estudo
         </button>
       </div>
     )
@@ -211,7 +211,7 @@ export function StudyItemFocus(props: {
           className="inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-white/25"
         >
           <ArrowLeftIcon className="h-4 w-4" />
-          Voltar ao plano
+          Voltar ao estudo
         </button>
         <div className="min-w-0 text-right">
           <p className="text-[0.62rem] font-bold uppercase tracking-wide text-white/70">

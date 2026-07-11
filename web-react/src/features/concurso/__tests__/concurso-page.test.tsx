@@ -49,12 +49,12 @@ describe('página do concurso (nível 1)', () => {
       screen.getByText('Você ainda não treinou para este cargo'),
     ).toBeTruthy()
 
-    // Ficha do concurso na sidebar
+    // Ficha do concurso na sidebar concentra banca, vagas e cidade.
     expect(screen.getByText('Ficha do concurso')).toBeTruthy()
     expect(screen.getByText('Banca')).toBeTruthy()
-    expect(
-      screen.getByText('VUNESP · 12 vagas de enfermagem + CR · Campinas / SP'),
-    ).toBeTruthy()
+    expect(screen.getByText('VUNESP')).toBeTruthy()
+    expect(screen.getByText('12 + cadastro reserva')).toBeTruthy()
+    expect(screen.getByText('Campinas / SP')).toBeTruthy()
   })
 
   it('mostra skeleton acessível enquanto o payload não chega', async () => {

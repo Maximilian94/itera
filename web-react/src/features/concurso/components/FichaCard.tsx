@@ -21,11 +21,17 @@ export function FichaCard(props: {
   rows: Array<FichaFact>
   editalUrl: string | null
   enterIdx: number
+  /** Nome da transição compartilhada (ex.: 'ficha-card') para morfar a ficha
+   *  do concurso na ficha do cargo. */
+  viewTransitionName?: string
 }) {
   const e = enter(props.enterIdx)
   const rows = props.rows.filter((r) => r.value != null)
   return (
-    <section style={e.style} className={`${e.className} ${CARD} p-5`}>
+    <section
+      style={{ ...e.style, viewTransitionName: props.viewTransitionName }}
+      className={`${e.className} ${CARD} p-5`}
+    >
       <h2 className="text-sm font-bold text-slate-900">{props.title}</h2>
 
       {/* Fato principal */}

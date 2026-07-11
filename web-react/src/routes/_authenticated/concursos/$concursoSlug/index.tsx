@@ -1,14 +1,13 @@
+import { useRef } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   ArrowPathIcon,
   ArrowRightIcon,
-  ArrowTopRightOnSquareIcon,
   BriefcaseIcon,
   BuildingLibraryIcon,
   CalendarDaysIcon,
-  ChevronRightIcon,
+  ChevronLeftIcon,
   ClockIcon,
-  DocumentTextIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
   PencilSquareIcon,
@@ -99,14 +98,6 @@ function statusLabel(status: ConcursoStatus, timeline: ConcursoTimeline): string
   return applied != null ? `Prova aplicada em ${applied}` : 'Prova aplicada'
 }
 
-/** "70 vagas de enfermagem", com singular e cadastro de reserva. */
-function vacancyLine(vacancyTotal: number, hasCR: boolean): string | null {
-  if (vacancyTotal > 0) {
-    return `${vacancyTotal} ${vacancyTotal === 1 ? 'vaga' : 'vagas'} de enfermagem${hasCR ? ' + CR' : ''}`
-  }
-  return hasCR ? 'Cadastro de reserva' : null
-}
-
 /* ------------------------------------------------------------------ */
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
@@ -117,11 +108,13 @@ function ConcursoPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-6">
-      <Breadcrumb
-        current={
-          data != null ? `${data.concurso.institution} · ${data.concurso.year}` : null
-        }
-      />
+      <Link
+        to="/concursos"
+        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
+      >
+        <ChevronLeftIcon className="h-4 w-4" />
+        Concursos
+      </Link>
       {isPending ? (
         <ConcursoSkeleton />
       ) : error != null ? (
@@ -130,34 +123,6 @@ function ConcursoPage() {
         <ConcursoContent data={data} />
       )}
     </div>
-  )
-}
-
-function Breadcrumb({ current }: { current: string | null }) {
-  return (
-    <nav aria-label="Breadcrumb">
-      <ol className="flex flex-wrap items-center gap-1.5 text-sm">
-        <li>
-          <Link
-            to="/concursos"
-            className="font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
-          >
-            Concursos
-          </Link>
-        </li>
-        <li className="flex min-w-0 items-center gap-1.5">
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
-          {current != null ? (
-            <span className="truncate font-semibold text-slate-900">{current}</span>
-          ) : (
-            <span
-              aria-hidden
-              className="h-4 w-40 animate-pulse rounded bg-slate-200"
-            />
-          )}
-        </li>
-      </ol>
-    </nav>
   )
 }
 
@@ -189,10 +154,6 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
     concurso.city != null
       ? `${concurso.city}${concurso.state != null ? ` / ${concurso.state}` : ''}`
       : concurso.state
-
-  const contextLine = [bancaName, vacancyLine(summary.vacancyTotal, summary.hasCR), location]
-    .filter((p): p is string => p != null)
-    .join(' · ')
 
   const regStart = fmt(timeline.registrationStart, dayMonth)
   const regEnd = fmt(timeline.registrationEnd, fullDate)
@@ -237,65 +198,33 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
 
   return (
     <>
-      {/* ░░ Cabeçalho do concurso ░░ */}
-      <header {...enter(0)}>
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-start gap-4">
-            <InstitutionMark institution={concurso.institution} />
-            <div className="min-w-0 max-w-prose">
-              <StatusPill status={status} label={statusLabel(status, timeline)} />
-              <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
+      <div className="grid items-start gap-4 lg:grid-cols-3">
+        {/* ░░ Coluna principal — cabeçalho + escolha do cargo ░░ */}
+        <div className="flex flex-col gap-4 lg:col-span-2">
+          {/* ░░ Cabeçalho do concurso ░░ */}
+          <header {...enter(0)} className="flex min-w-0 items-center gap-4">
+            <InstitutionMark
+              institution={concurso.institution}
+              style={{ viewTransitionName: 'institution-mark' }}
+            />
+            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h1
+                style={{ viewTransitionName: 'concurso-heading' }}
+                className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+              >
                 Concurso {concurso.institution} {concurso.year}
               </h1>
-              {contextLine !== '' && (
-                <p className="mt-1 text-sm text-slate-500">{contextLine}</p>
-              )}
+              <StatusPill status={status} label={statusLabel(status, timeline)} />
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            {concurso.editalUrl != null && (
-              <a
-                href={concurso.editalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 no-underline transition-all hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-              >
-                <DocumentTextIcon className="h-4 w-4" />
-                Edital
-              </a>
-            )}
-            {status === 'open' && concurso.editalUrl != null && (
-              <a
-                href={concurso.editalUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white no-underline shadow-[0_4px_12px_-2px_rgba(8,145,178,0.4)] transition-all hover:bg-cyan-700 hover:shadow-[0_6px_16px_-2px_rgba(8,145,178,0.45)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-              >
-                <ArrowTopRightOnSquareIcon className="h-4 w-4" />
-                Inscrever-se
-              </a>
-            )}
-          </div>
-        </div>
-      </header>
+          </header>
 
-      <div className="grid items-start gap-4 lg:grid-cols-3">
-        {/* ░░ Coluna principal — escolha do cargo ░░ */}
-        <div className="flex flex-col gap-3 lg:col-span-2">
           {cargos.length === 0 ? (
             <EmptyCargos />
           ) : (
-            <section aria-labelledby="cargos-heading" className="flex flex-col gap-3">
-              <div {...enter(1)}>
-                <h2 id="cargos-heading" className="text-base font-bold text-slate-900">
-                  Escolha seu cargo
-                </h2>
-                <p className="mt-0.5 text-sm text-slate-500">
-                  Conteúdo, concorrência e nota de corte mudam por cargo. Entre no seu
-                  para ver os detalhes e treinar.
-                </p>
-              </div>
-
+            <section
+              aria-label="Cargos de enfermagem do concurso"
+              className="flex flex-col gap-3"
+            >
               {cargos.map((cargo, i) => (
                 <CargoCard
                   key={cargo.id}
@@ -305,7 +234,7 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                   isStarting={startingCargoId === cargo.id}
                   onStart={() => handleStartCargo(cargo)}
                   meters={meters}
-                  enterIdx={2 + i}
+                  enterIdx={1 + i}
                 />
               ))}
             </section>
@@ -320,6 +249,7 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
             rows={ficha}
             editalUrl={concurso.editalUrl}
             enterIdx={2}
+            viewTransitionName="ficha-card"
           />
 
           {hasTimeline && (
@@ -386,6 +316,16 @@ function CargoCard(props: {
     .join(' · ')
 
   const e = enter(enterIdx)
+  const roleRef = useRef<HTMLParagraphElement>(null)
+  /* Transição shared-element: ao clicar, o nome deste cargo vira o
+   * `cargo-heading` só durante a navegação → ele "sobe" do card para o
+   * título da página do cargo (a marca e o título do concurso também se
+   * transformam). Progressive enhancement via viewTransition. */
+  const handleNavigate = () => {
+    if (roleRef.current != null) {
+      roleRef.current.style.viewTransitionName = 'cargo-heading'
+    }
+  }
   /* Stretched link: o <Link> absoluto cobre o card inteiro (nível 2); o botão
    * "Começar" fica acima dele (z-10) sem aninhar interativo em interativo. */
   return (
@@ -396,12 +336,17 @@ function CargoCard(props: {
       <Link
         to="/concursos/$concursoSlug/$cargoSlug"
         params={{ concursoSlug, cargoSlug: cargo.slug ?? cargo.id }}
+        viewTransition
+        onClick={handleNavigate}
         aria-label={`Ver detalhes do cargo ${cargo.role}`}
         className="absolute inset-0 rounded-2xl focus-visible:outline-none"
       />
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-2">
         <div className="min-w-0">
-          <p className="text-lg font-bold text-slate-900 transition-colors group-hover:text-cyan-700">
+          <p
+            ref={roleRef}
+            className="text-lg font-bold text-slate-900 transition-colors group-hover:text-cyan-700"
+          >
             {cargo.role}
           </p>
           {meta !== '' && <p className="mt-1 text-sm text-slate-500">{meta}</p>}

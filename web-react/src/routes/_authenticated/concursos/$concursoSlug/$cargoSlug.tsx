@@ -1,11 +1,9 @@
 import { useState } from 'react'
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Link, createFileRoute } from '@tanstack/react-router'
 import {
   AcademicCapIcon,
   ArrowPathIcon,
   ArrowRightIcon,
-  ArrowTrendingDownIcon,
-  ArrowTrendingUpIcon,
   BanknotesIcon,
   ChartBarIcon,
   ChevronLeftIcon,
@@ -28,27 +26,21 @@ import type {
 } from '@/features/concurso/domain/concurso.types'
 import type { FichaFact } from '@/features/concurso/components/FichaCard'
 import type { TrainingListItem } from '@/features/training/domain/training.types'
-import type {ProvaTrainOption} from '@/features/concurso/components/treino/ProvasBoard';
+import type { ProvaTrainOption } from '@/features/concurso/components/treino/ProvasBoard'
 import {
   useCargoQuery,
   useCompetitionHistoryQuery,
   useSubjectDistributionQuery,
 } from '@/features/concurso/queries/concurso.queries'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
-import { getStagePath } from '@/routes/_authenticated/treino/-stages.config'
-import { useProgramActions } from '@/features/concurso/components/treino/useProgramActions'
-import { PlanPhases } from '@/features/concurso/components/treino/PlanPhases'
-import {
-  
-  ProvasBoard
-} from '@/features/concurso/components/treino/ProvasBoard'
-import { CollapsibleCard } from '@/features/concurso/components/CollapsibleCard'
+import { TrainingFlow } from '@/features/concurso/components/treino/TrainingFlow'
+import { ProvasBoard } from '@/features/concurso/components/treino/ProvasBoard'
 import { CARD } from '@/features/concurso/components/card'
-import { METER_BAR, enter, useMeters } from '@/features/concurso/components/motion'
+import { enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
+import { InstitutionMark } from '@/features/concurso/components/InstitutionMark'
 import { FichaCard } from '@/features/concurso/components/FichaCard'
 import { SubjectDistribution } from '@/features/concurso/components/SubjectDistribution'
-import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import { ApiError } from '@/lib/api'
 import { formatBRL } from '@/lib/utils'
 
@@ -174,15 +166,27 @@ function CargoPage() {
   const { concursoSlug, cargoSlug } = Route.useParams()
   const { data, isPending, error, refetch } = useCargoQuery(concursoSlug, cargoSlug)
 
+  const concursoLabel =
+    data != null ? `${data.concurso.institution} · ${data.concurso.year}` : null
+
   return (
     <div className="flex flex-col gap-4 pb-6">
-      <Breadcrumb
-        concursoSlug={concursoSlug}
-        concursoLabel={
-          data != null ? `${data.concurso.institution} · ${data.concurso.year}` : null
-        }
-        cargoLabel={data?.cargo.role ?? null}
-      />
+      {/* Back-link ao concurso — o título do concurso encolhe até aqui
+       * (view transition compartilhada). */}
+      <Link
+        to="/concursos/$concursoSlug"
+        params={{ concursoSlug }}
+        viewTransition
+        style={{ viewTransitionName: 'concurso-heading' }}
+        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
+      >
+        <ChevronLeftIcon className="h-4 w-4 shrink-0" />
+        {concursoLabel != null ? (
+          <span className="truncate">{concursoLabel}</span>
+        ) : (
+          <span aria-hidden className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        )}
+      </Link>
       {isPending ? (
         <CargoSkeleton />
       ) : error != null ? (
@@ -195,51 +199,6 @@ function CargoPage() {
         <CargoContent data={data} />
       )}
     </div>
-  )
-}
-
-function Breadcrumb(props: {
-  concursoSlug: string
-  concursoLabel: string | null
-  cargoLabel: string | null
-}) {
-  return (
-    <nav aria-label="Breadcrumb">
-      <ol className="flex flex-wrap items-center gap-1.5 text-sm">
-        <li>
-          <Link
-            to="/concursos"
-            className="font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
-          >
-            Concursos
-          </Link>
-        </li>
-        <li className="flex min-w-0 items-center gap-1.5">
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
-          {props.concursoLabel != null ? (
-            <Link
-              to="/concursos/$concursoSlug"
-              params={{ concursoSlug: props.concursoSlug }}
-              className="truncate font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
-            >
-              {props.concursoLabel}
-            </Link>
-          ) : (
-            <span aria-hidden className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-          )}
-        </li>
-        <li className="flex min-w-0 items-center gap-1.5">
-          <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300" />
-          {props.cargoLabel != null ? (
-            <span className="truncate font-semibold text-slate-900">
-              {props.cargoLabel}
-            </span>
-          ) : (
-            <span aria-hidden className="h-4 w-24 animate-pulse rounded bg-slate-200" />
-          )}
-        </li>
-      </ol>
-    </nav>
   )
 }
 
@@ -282,20 +241,13 @@ function CargoContent({ data }: { data: CargoDetail }) {
     (t) => cargoExamBaseIds.has(t.examBaseId) && t.currentStage !== 'FINAL',
   )
 
-  // Aba ativa: Treino é a porta de entrada (ação principal); Detalhes é a ficha.
-  const [tab, setTab] = useState<'treino' | 'detalhes'>('treino')
+  // Aba ativa: Detalhes é a porta de entrada (a ficha morfa vinda do concurso);
+  // Treino é a aba de ação.
+  const [tab, setTab] = useState<'treino' | 'detalhes'>('detalhes')
 
   const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const examDate = cargo.examDate
   const cut = toPercent(cargo.minPassingGrade)
-
-  const contextLine = [
-    `Concurso ${concurso.institution} ${concurso.year}`,
-    bancaName,
-    fmtDate(examDate) != null ? `prova ${fmtDate(examDate)}` : null,
-  ]
-    .filter((p): p is string => p != null)
-    .join(' · ')
 
   const fichaHero: FichaFact = {
     icon: BanknotesIcon,
@@ -329,19 +281,23 @@ function CargoContent({ data }: { data: CargoDetail }) {
 
   return (
     <>
-      {/* ░░ Cabeçalho do cargo ░░ */}
-      <header {...enter(0)}>
-        <div className="min-w-0 max-w-prose">
+      {/* ░░ Cabeçalho do cargo (mesmo shell do concurso: marca + título + chip) ░░ */}
+      <header {...enter(0)} className="flex min-w-0 items-center gap-4">
+        <InstitutionMark
+          institution={concurso.institution}
+          style={{ viewTransitionName: 'institution-mark' }}
+        />
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1
+            style={{ viewTransitionName: 'cargo-heading' }}
+            className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+          >
+            {cargo.role}
+          </h1>
           <StatusPill
             status={concurso.status}
             label={statusLabel(concurso.status, examDate)}
           />
-          <h1 className="mt-2 text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            {cargo.role}
-          </h1>
-          {contextLine !== '' && (
-            <p className="mt-1 text-sm text-slate-500">{contextLine}</p>
-          )}
         </div>
       </header>
 
@@ -404,6 +360,7 @@ function CargoContent({ data }: { data: CargoDetail }) {
               rows={ficha}
               editalUrl={cargo.editalUrl}
               enterIdx={2}
+              viewTransitionName="ficha-card"
             />
 
             {previousExams.length > 0 && concurso.examBoard != null && (
@@ -443,6 +400,18 @@ function CargoTabs(props: {
       <button
         type="button"
         role="tab"
+        aria-selected={tab === 'detalhes'}
+        onClick={() => onChange('detalhes')}
+        className={tabClass(tab === 'detalhes')}
+      >
+        Detalhes
+        {tab === 'detalhes' && (
+          <span className="absolute inset-x-2.5 -bottom-px h-0.5 rounded-full bg-cyan-600" />
+        )}
+      </button>
+      <button
+        type="button"
+        role="tab"
         aria-selected={tab === 'treino'}
         onClick={() => onChange('treino')}
         className={tabClass(tab === 'treino')}
@@ -464,18 +433,6 @@ function CargoTabs(props: {
           <span className="absolute inset-x-2.5 -bottom-px h-0.5 rounded-full bg-cyan-600" />
         )}
       </button>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={tab === 'detalhes'}
-        onClick={() => onChange('detalhes')}
-        className={tabClass(tab === 'detalhes')}
-      >
-        Detalhes
-        {tab === 'detalhes' && (
-          <span className="absolute inset-x-2.5 -bottom-px h-0.5 rounded-full bg-cyan-600" />
-        )}
-      </button>
     </div>
   )
 }
@@ -483,8 +440,6 @@ function CargoTabs(props: {
 /* ================================================================== */
 /*  Aba TREINO — cronograma guiado                                     */
 /* ================================================================== */
-
-type WeakSubject = { subject: string; accuracyPct: number }
 
 /** Ano (UTC) de uma data ISO date-only; null se inválida. */
 function yearOf(iso: string | null): string {
@@ -589,7 +544,6 @@ function TreinoTab(props: {
         option={selected}
         session={sessionByExamBase.get(selected.examBaseId) ?? null}
         cut={cut}
-        meters={meters}
         onBack={() => setSelectedId(null)}
       />
     )
@@ -615,23 +569,12 @@ function TrainingView(props: {
   option: ProvaTrainOption
   session: TrainingListItem | null
   cut: number | null
-  meters: boolean
   onBack: () => void
 }) {
-  const { option, session, cut, meters, onBack } = props
-  const subjectQuery = useSubjectDistributionQuery(option.examBaseId)
-  const plan = option.studyPlan
-
-  // Matéria mais fraca ponderada pelo peso na prova → guia o próximo passo.
-  const w = subjectQuery.data?.insight.weakestRelevant ?? null
-  const weakest: WeakSubject | null = w
-    ? { subject: w.subject, accuracyPct: Math.round(w.accuracy * 100) }
-    : plan.weakSubjects[0]
-      ? {
-          subject: plan.weakSubjects[0].subject,
-          accuracyPct: plan.weakSubjects[0].accuracy,
-        }
-      : null
+  const { option, session, cut, onBack } = props
+  const score =
+    option.studyPlan.bestScore != null ? Math.round(option.studyPlan.bestScore) : null
+  const passing = score != null && cut != null && score >= cut
 
   return (
     <div className="flex flex-col gap-4">
@@ -659,299 +602,33 @@ function TrainingView(props: {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
-        >
-          <ChevronLeftIcon className="h-4 w-4" />
-          Voltar às provas
-        </button>
-      </div>
-
-      <ReadinessStrip studyPlan={plan} cut={cut} meters={meters} />
-      <NextStepCard examBaseId={option.examBaseId} session={session} weakest={weakest} />
-      <PlanPhases examBaseId={option.examBaseId} session={session} cut={cut} />
-      <SubjectMastery query={subjectQuery} meters={meters} />
-    </div>
-  )
-}
-
-/** Barra de prontidão: melhor nota contra o corte (momentum honesto). */
-function ReadinessStrip(props: { studyPlan: StudyPlan; cut: number | null; meters: boolean }) {
-  const { studyPlan, cut, meters } = props
-  const score = studyPlan.bestScore != null ? Math.round(studyPlan.bestScore) : null
-  const delta = studyPlan.scoreDelta != null ? Math.round(studyPlan.scoreDelta) : null
-  const passing = score != null && cut != null && score >= cut
-
-  return (
-    <section {...enter(0)} className={`${CARD} p-5`}>
-      <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-        <div className="min-w-[12rem]">
-          <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-500">
-            Prontidão para aprovar
-          </p>
-          {score != null ? (
-            <>
-              <div className="mt-1.5 flex items-end gap-2.5">
-                <span
-                  className={`text-3xl font-extrabold leading-none tracking-tight ${
-                    cut == null ? 'text-slate-900' : passing ? 'text-emerald-600' : 'text-slate-900'
-                  }`}
-                >
-                  {score}%
-                </span>
-                {delta != null && delta !== 0 && (
-                  <span
-                    className={`mb-0.5 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-bold ${
-                      delta > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
-                    }`}
-                  >
-                    {delta > 0 ? (
-                      <ArrowTrendingUpIcon className="h-3.5 w-3.5" />
-                    ) : (
-                      <ArrowTrendingDownIcon className="h-3.5 w-3.5" />
-                    )}
-                    {delta > 0 ? '+' : ''}
-                    {delta} pt
-                  </span>
-                )}
-              </div>
-              <p className="mt-1 text-sm text-slate-500">
-                {cut == null
-                  ? 'sua melhor nota'
-                  : passing
-                    ? 'Acima da nota de corte. Mantenha o ritmo.'
-                    : `Faltam ${cut - score} pts para o corte de ${cut}%.`}
+        <div className="flex items-center gap-3">
+          {score != null && (
+            <div className="hidden text-right sm:block">
+              <p className="text-[0.6rem] font-bold uppercase tracking-wider text-slate-500">
+                Prontidão
               </p>
-            </>
-          ) : (
-            <p className="mt-1.5 max-w-sm text-sm text-slate-500">
-              Faça a prova diagnóstica para medir onde você está e quanto falta
-              para o corte{cut != null ? ` de ${cut}%` : ''}.
-            </p>
+              <p className="text-sm font-bold text-slate-700">
+                <span className={passing ? 'text-emerald-600' : 'text-slate-900'}>{score}%</span>
+                {cut != null && !passing && (
+                  <span className="text-slate-500"> · faltam {cut - score} pts</span>
+                )}
+              </p>
+            </div>
           )}
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+            Voltar às provas
+          </button>
         </div>
-        {score != null && (
-          <div className="min-w-[14rem] flex-1">
-            <ReadinessBar value={score} cut={cut} meters={meters} size="md" className="w-full" />
-            <div className="mt-2 flex justify-between text-xs text-slate-400">
-              <span>0%</span>
-              {cut != null && <span className="font-semibold text-slate-600">corte {cut}%</span>}
-              <span>100%</span>
-            </div>
-          </div>
-        )}
       </div>
-    </section>
-  )
-}
 
-/** Próximo passo: UMA ação em destaque, derivada do estágio do treino em foco. */
-function NextStepCard(props: {
-  examBaseId: string
-  session: TrainingListItem | null
-  weakest: WeakSubject | null
-}) {
-  const { examBaseId, session, weakest } = props
-  const navigate = useNavigate()
-  const { inProgress, isFinished, start, resume, isStarting, isError } = useProgramActions(
-    examBaseId,
-    session,
-  )
-
-  // Define título/legenda/CTA conforme o estágio atual do ciclo.
-  let title: string
-  let subtitle: string
-  let ctaLabel: string
-  const onCta = inProgress ? resume : start
-
-  if (inProgress && session != null) {
-    switch (session.currentStage) {
-      case 'EXAM':
-        title = 'Continuar a prova diagnóstica'
-        subtitle = 'Termine de responder para receber seu diagnóstico.'
-        ctaLabel = 'Continuar prova'
-        break
-      case 'DIAGNOSIS':
-        title = 'Ver seu diagnóstico'
-        subtitle = 'Descubra onde você está forte e onde precisa focar.'
-        ctaLabel = 'Ver diagnóstico'
-        break
-      case 'STUDY':
-        title = weakest != null ? `Estudar: ${weakest.subject}` : 'Continuar estudando'
-        subtitle =
-          weakest != null
-            ? `Sua matéria mais fraca entre as que mais caem (${weakest.accuracyPct}% de acerto).`
-            : 'Avance nas matérias que mais derrubam sua nota.'
-        ctaLabel = 'Continuar estudando'
-        break
-      case 'RETRY':
-        title = 'Refazer o que você errou'
-        subtitle = 'Segunda chance nas questões erradas, sem ver o que marcou antes.'
-        ctaLabel = 'Refazer questões'
-        break
-      default:
-        title = 'Continuar treino'
-        subtitle = 'Retome de onde você parou.'
-        ctaLabel = 'Continuar'
-    }
-  } else if (isFinished) {
-    title = 'Comece um novo ciclo'
-    subtitle = 'Você concluiu um ciclo. Faça outro para medir um novo ganho.'
-    ctaLabel = 'Começar novo ciclo'
-  } else {
-    title = 'Fazer a prova diagnóstica'
-    subtitle = 'Comece pelo diagnóstico — o plano se ajusta ao seu desempenho real.'
-    ctaLabel = 'Começar treino'
-  }
-
-  return (
-    <section
-      {...enter(1)}
-      className="rounded-2xl border border-cyan-200 bg-cyan-50/70 p-5 shadow-sm sm:p-6"
-    >
-      <p className="text-[0.62rem] font-bold uppercase tracking-wider text-cyan-700">
-        Seu próximo passo
-      </p>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-cyan-600 shadow-sm">
-          <AcademicCapIcon className="h-6 w-6 text-white" />
-        </span>
-        <div className="min-w-[12rem] flex-1">
-          <h3 className="text-lg font-extrabold tracking-tight text-slate-900">{title}</h3>
-          <p className="mt-0.5 text-sm text-cyan-800">{subtitle}</p>
-        </div>
-        <button
-          type="button"
-          onClick={onCta}
-          disabled={isStarting}
-          className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
-        >
-          <PlayIcon className="h-4 w-4" />
-          {isStarting ? 'Iniciando…' : ctaLabel}
-        </button>
-      </div>
-      {isFinished && session != null && (
-        <button
-          type="button"
-          onClick={() => void navigate({ to: getStagePath('final', session.trainingId) })}
-          className="mt-3 cursor-pointer text-sm font-semibold text-cyan-700 hover:text-cyan-800"
-        >
-          Ver resultado
-        </button>
-      )}
-      {isError && (
-        <p className="mt-3 text-sm text-rose-600">
-          Não foi possível começar o treino agora. Verifique seu plano ou tente novamente.
-        </p>
-      )}
-    </section>
-  )
-}
-
-
-const MASTERY = {
-  strong: { dot: 'bg-emerald-500', bar: 'bg-emerald-500', label: 'Sólido' },
-  mid: { dot: 'bg-amber-500', bar: 'bg-amber-500', label: 'Em construção' },
-  risk: { dot: 'bg-rose-500', bar: 'bg-rose-500', label: 'Precisa de atenção' },
-} as const
-type MasteryLevel = keyof typeof MASTERY
-
-function masteryLevel(acc: number): MasteryLevel {
-  if (acc >= 0.7) return 'strong'
-  if (acc >= 0.5) return 'mid'
-  return 'risk'
-}
-
-/** Domínio por matéria: farol de acerto por matéria, ponderado pelo peso. */
-function SubjectMastery(props: {
-  query: ReturnType<typeof useSubjectDistributionQuery>
-  meters: boolean
-}) {
-  const { query, meters } = props
-
-  if (query.isPending) {
-    return (
-      <div
-        role="status"
-        aria-label="Carregando domínio por matéria"
-        className={`h-72 animate-pulse rounded-2xl bg-slate-200/70 ${enter(3).className}`}
-        style={enter(3).style}
-      />
-    )
-  }
-  if (query.error != null || query.data.subjects.length === 0) return null
-
-  const total = query.data.totalQuestions || 1
-  // Prioriza matéria fraca e que pesa muito (share × (1−acerto)); sem dado de
-  // acerto vai para o fim, ordenada por peso.
-  const rows = [...query.data.subjects].sort((a, b) => {
-    const pa = a.userAccuracy != null ? a.share * (1 - a.userAccuracy) : -1
-    const pb = b.userAccuracy != null ? b.share * (1 - b.userAccuracy) : -1
-    if (pa !== pb) return pb - pa
-    return b.share - a.share
-  })
-
-  return (
-    <CollapsibleCard
-      title="Domínio por matéria"
-      subtitle="Seu acerto por matéria. Priorize as vermelhas que mais pesam na prova."
-      enterIdx={3}
-      aside={<span className="text-xs text-slate-500">o que cai nesta prova</span>}
-    >
-      <div className="mt-1">
-        {rows.map((s) => {
-          const weight = Math.round((s.count / total) * 100)
-          const acc = s.userAccuracy
-          const pct = acc != null ? Math.round(acc * 100) : null
-          const level = acc != null ? masteryLevel(acc) : null
-          return (
-            <div key={s.subject} className="border-t border-slate-100 py-3.5 first:border-t-0">
-              <div className="flex items-center gap-2.5">
-                <span
-                  className={`h-2.5 w-2.5 shrink-0 rounded-full ${level != null ? MASTERY[level].dot : 'bg-slate-300'}`}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm font-bold text-slate-900">
-                  {s.subject}
-                </span>
-                <span className="shrink-0 text-xs text-slate-400">{weight}% da prova</span>
-                <span className="w-11 shrink-0 text-right text-sm font-extrabold tabular-nums text-slate-900">
-                  {pct != null ? `${pct}%` : '—'}
-                </span>
-              </div>
-              <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100">
-                <div
-                  className={`${METER_BAR} h-full ${level != null ? MASTERY[level].bar : 'bg-slate-300'}`}
-                  style={{ width: meters && pct != null ? `${pct}%` : '0%' }}
-                />
-              </div>
-              {level === 'risk' && (
-                <p className="mt-1.5 text-xs font-semibold text-amber-700">
-                  Precisa de atenção
-                </p>
-              )}
-              {acc == null && (
-                <p className="mt-1.5 text-xs text-slate-400">
-                  Responda mais questões para medir seu domínio
-                </p>
-              )}
-            </div>
-          )
-        })}
-      </div>
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-400">
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-rose-500" />Precisa de atenção
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-amber-500" />Em construção
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <span className="h-2 w-2 rounded-full bg-emerald-500" />Sólido
-        </span>
-      </div>
-    </CollapsibleCard>
+      <TrainingFlow examBaseId={option.examBaseId} session={session} />
+    </div>
   )
 }
 
