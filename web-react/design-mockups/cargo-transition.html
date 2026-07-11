@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Protótipo · Transição concurso → cargo (shared element) — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    --success:#047857; --success-bg:#ecfdf5;
+    --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 6px 16px -4px rgba(15,23,42,.12);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;color:var(--body);
+    background:var(--surface-muted);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .shell{max-width:1040px;margin:0 auto;padding:22px 20px 80px}
+  a{color:inherit}h1,h2,h3,p{margin:0}
+
+  .backlink{display:inline-flex;width:fit-content;align-items:center;gap:5px;font-size:.85rem;font-weight:600;
+    color:var(--muted);text-decoration:none;transition:color .15s var(--ease)}
+  .backlink:hover{color:var(--primary-deep)}
+  .backlink svg{width:16px;height:16px}
+
+  .header{display:flex;align-items:center;gap:16px;margin-top:14px}
+  .mark{display:flex;flex-shrink:0;align-items:center;justify-content:center;height:56px;width:56px;border-radius:var(--r-2xl);
+    background:var(--surface-muted);font-weight:800;letter-spacing:.02em;color:var(--muted);
+    box-shadow:inset 0 0 0 1px rgba(203,213,225,.8);font-size:1rem}
+  .htext{display:flex;min-width:0;flex-wrap:wrap;align-items:center;gap:8px 12px}
+  .title{font-size:clamp(1.6rem,4vw,1.9rem);font-weight:800;letter-spacing:-.02em;color:var(--ink);line-height:1.1;text-wrap:balance}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:var(--r-full)}
+  .pill--future{background:var(--primary-tint);color:var(--primary-deep)}
+  .pill--past{background:var(--surface-muted);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:var(--r-full);background:currentColor}
+
+  .section-gap{margin-top:20px;display:flex;flex-direction:column;gap:12px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-rest);
+    padding:18px 20px;transition:box-shadow .18s var(--ease),border-color .18s var(--ease),transform .18s var(--ease);
+    cursor:pointer;display:flex;align-items:center;gap:14px;text-align:left;width:100%;font-family:inherit}
+  .card:hover{box-shadow:var(--sh-raised);border-color:#a5e8f2;transform:translateY(-2px)}
+  .card .role{font-size:1.05rem;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .card .meta{font-size:.82rem;color:var(--muted);margin-top:2px}
+  .card .chev{margin-left:auto;color:var(--border)}
+  .card .chev svg{width:20px;height:20px}
+
+  /* abas + conteúdo do cargo (leve, só pra dar corpo) */
+  .tabs{display:flex;gap:4px;margin-top:20px;border-bottom:1px solid var(--border-soft)}
+  .tab{font-size:.92rem;font-weight:700;color:var(--muted);padding:10px 14px 12px;position:relative}
+  .tab.on{color:var(--primary-deep)}
+  .tab.on::after{content:"";position:absolute;left:8px;right:8px;bottom:-1px;height:2.5px;background:var(--primary);border-radius:99px}
+  .panel{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-rest);padding:22px}
+  .panel h3{font-size:1.05rem;font-weight:800;color:var(--ink)}
+  .panel p{font-size:.9rem;color:var(--muted);margin-top:4px;max-width:60ch}
+
+  .view[hidden]{display:none}
+
+  /* ══════════ VIEW TRANSITIONS ══════════ */
+  /* nomes atribuídos por JS/estado; aqui só o timing e as animações custom */
+  ::view-transition-group(concurso-heading),
+  ::view-transition-group(cargo-heading),
+  ::view-transition-group(institution-mark){
+    animation-duration:.52s;
+    animation-timing-function:cubic-bezier(.22,1,.36,1);
+  }
+  /* o resto da página faz um crossfade rápido e discreto */
+  ::view-transition-old(root),::view-transition-new(root){animation-duration:.32s}
+
+  .note{margin-top:30px;font-size:.78rem;color:var(--body);background:var(--field);border:1px solid var(--border-soft);
+    border-radius:var(--r-xl);padding:13px 16px}
+  .note b{color:var(--ink)}
+  .fallback{margin-top:10px;font-size:.75rem;color:#b45309}
+
+  @media (prefers-reduced-motion: reduce){
+    ::view-transition-group(*){animation-duration:.001ms !important}
+    .card{transition:none}
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- ══════════ VIEW 1: CONCURSO ══════════ -->
+  <div class="view" id="view-concurso">
+    <a class="backlink" href="#" onclick="return false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>Concursos</a>
+    <div class="header">
+      <div class="mark" style="view-transition-name:institution-mark">PB</div>
+      <div class="htext">
+        <h1 class="title" style="view-transition-name:concurso-heading">Concurso Prefeitura de Bauru 2026</h1>
+        <span class="pill pill--future"><span class="dot"></span>Prova em 14/09/2026</span>
+      </div>
+    </div>
+
+    <div class="section-gap">
+      <button class="card" onclick="openCargo(this,'Enfermeiro','Prova em 14/09/2026','pill--future')">
+        <div>
+          <div class="role" data-role>Enfermeiro</div>
+          <div class="meta">32 vagas · corte 70% · 480 questões pra treinar</div>
+        </div>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+      <button class="card" onclick="openCargo(this,'Técnico de Enfermagem','Prova em 14/09/2026','pill--future')">
+        <div>
+          <div class="role" data-role>Técnico de Enfermagem</div>
+          <div class="meta">18 vagas · corte 60% · 300 questões pra treinar</div>
+        </div>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+      <button class="card" onclick="openCargo(this,'Enfermeiro do Trabalho','Prova em 14/09/2026','pill--future')">
+        <div>
+          <div class="role" data-role>Enfermeiro do Trabalho</div>
+          <div class="meta">4 vagas · corte 70% · 210 questões pra treinar</div>
+        </div>
+        <span class="chev"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m9 18 6-6-6-6"/></svg></span>
+      </button>
+    </div>
+
+    <p class="fallback" id="fallback" hidden>Seu navegador não suporta View Transitions — a troca acontece sem a animação (fallback). Teste no Chrome/Edge ou Safari 18+.</p>
+  </div>
+
+  <!-- ══════════ VIEW 2: CARGO ══════════ -->
+  <div class="view" id="view-cargo" hidden>
+    <a class="backlink" href="#" onclick="closeCargo();return false" style="view-transition-name:concurso-heading">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="m15 18-6-6 6-6"/></svg>
+      Prefeitura de Bauru · 2026
+    </a>
+    <div class="header">
+      <div class="mark" style="view-transition-name:institution-mark">PB</div>
+      <div class="htext">
+        <h1 class="title" id="cargo-title" style="view-transition-name:cargo-heading">Enfermeiro</h1>
+        <span class="pill pill--future" id="cargo-pill"><span class="dot"></span>Prova em 14/09/2026</span>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <span class="tab on">Treino</span>
+      <span class="tab">Detalhes</span>
+    </div>
+    <div class="panel">
+      <h3>Prova do concurso</h3>
+      <p>Aqui entra o quadro de provas / treino do cargo. O ponto do protótipo é a transição:
+        note que a marca <b>PB</b> ficou parada, o título do concurso <b>encolheu e virou o back-link</b>,
+        e o nome do cargo <b>subiu do card</b> pra ocupar o título.</p>
+    </div>
+  </div>
+
+  <p class="note">
+    <b>Protótipo da transição.</b> Clique num cargo. Três elementos são compartilhados via
+    <code>view-transition-name</code>: a <b>marca da instituição</b> (fica no lugar), o <b>título do concurso</b>
+    ↔ <b>back-link</b> (encolhe/cresce), e o <b>nome do cargo</b> (sobe do card pro título, e volta).
+    Sem troca "seca" de página. Requer navegador com View Transitions API (fallback degrada sem animação).
+  </p>
+</div>
+
+<script>
+  const vConcurso = document.getElementById('view-concurso');
+  const vCargo = document.getElementById('view-cargo');
+  const supported = typeof document.startViewTransition === 'function';
+  if (!supported) document.getElementById('fallback').hidden = false;
+
+  function openCargo(cardEl, role, pillLabel, pillClass){
+    // prepara o conteúdo do cargo
+    document.getElementById('cargo-title').textContent = role;
+    const pill = document.getElementById('cargo-pill');
+    pill.className = 'pill ' + pillClass;
+    pill.innerHTML = '<span class="dot"></span>' + pillLabel;
+
+    const roleEl = cardEl.querySelector('[data-role]');
+    const swap = () => { vConcurso.hidden = true; vCargo.hidden = false; window.scrollTo(0,0); };
+
+    if (!supported) { swap(); return; }
+    // o nome do card clicado vira o "cargo-heading" só durante a transição →
+    // ele voa do card pro título.
+    roleEl.style.viewTransitionName = 'cargo-heading';
+    const t = document.startViewTransition(swap);
+    t.finished.finally(() => { roleEl.style.viewTransitionName = ''; });
+  }
+
+  function closeCargo(){
+    const swap = () => { vCargo.hidden = true; vConcurso.hidden = false; window.scrollTo(0,0); };
+    if (!supported) { swap(); return; }
+    document.startViewTransition(swap);
+  }
+</script>
+</body>
+</html>
