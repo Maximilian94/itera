@@ -2,7 +2,6 @@ import {
   ArrowPathIcon,
   CheckBadgeIcon,
   ClockIcon,
-  InformationCircleIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline'
 import type { StudyPlan } from '@/features/concurso/domain/concurso.types'
@@ -30,17 +29,19 @@ export type ProvaTrainOption = {
   /** Selo do logo: sigla da banca + ano. */
   logoTop: string
   logoBottom: string
+  /** Por que esta prova está aqui (chip): "mesma banca", "outra banca", "este concurso". */
+  badge: string | null
 }
 
 /* ------------------------------------------------------------------ */
-/*  Helpers de sessão                                                  */
+/*  Helpers de sessão e recomendação                                   */
 /* ------------------------------------------------------------------ */
 
 /** Rótulo/variante do CTA conforme a sessão de treino daquela prova. */
 function actionFor(session: TrainingListItem | null) {
-  if (session == null) return { label: 'Treinar', icon: true }
-  if (session.currentStage === 'FINAL') return { label: 'Treinar novamente', icon: false }
-  return { label: 'Continuar', icon: true }
+  if (session == null) return { label: 'Treinar', restart: false }
+  if (session.currentStage === 'FINAL') return { label: 'Treinar novamente', restart: true }
+  return { label: 'Continuar', restart: false }
 }
 
 /** Selo de estado (em andamento / concluído) a partir da sessão. */
@@ -59,8 +60,45 @@ function stateOf(session: TrainingListItem | null): {
   return { text: `Em andamento · ${stage?.title ?? ''}`, tone: 'progress' }
 }
 
+/**
+ * O coach escolhe UMA prova para treinar agora:
+ * 1. sessão em andamento (retomar vence tudo);
+ * 2. a oficial, quando tem questões;
+ * 3. a primeira opção nunca treinada;
+ * 4. senão, a primeira da fila (treinar novamente).
+ */
+function pickRecommendation(
+  official: ProvaTrainOption | null,
+  recommended: Array<ProvaTrainOption>,
+  sessionByExamBase: Map<string, TrainingListItem>,
+): ProvaTrainOption | null {
+  const trainable = [
+    ...(official != null && official.questionCount > 0 ? [official] : []),
+    ...recommended,
+  ]
+  if (trainable.length === 0) return null
+  const inProgress = trainable.find((o) => {
+    const s = sessionByExamBase.get(o.examBaseId)
+    return s != null && s.currentStage !== 'FINAL'
+  })
+  if (inProgress != null) return inProgress
+  if (official != null && official.questionCount > 0) return official
+  return trainable.find((o) => sessionByExamBase.get(o.examBaseId) == null) ?? trainable[0]
+}
+
+/** Motivo curto da recomendação, dito como um treinador diria. */
+function reasonFor(option: ProvaTrainOption, session: TrainingListItem | null): string {
+  if (session != null && session.currentStage !== 'FINAL')
+    return 'Você tem um ciclo em andamento nesta prova. Retome de onde parou.'
+  if (option.kind === 'official') return 'É a prova real deste concurso, com as questões que valem.'
+  if (option.kind === 'own') return 'Outra prova deste mesmo concurso, com questões reais.'
+  if (option.badge === 'mesma banca')
+    return 'Mesmo cargo e mesma banca: o formato mais próximo da sua prova.'
+  return 'Mesmo cargo em outra banca: bom volume de questões reais para praticar.'
+}
+
 /* ================================================================== */
-/*  Quadro de provas para treinar                                      */
+/*  Mesa do treinador: 1 card de ação + lista de outras provas        */
 /* ================================================================== */
 
 export function ProvasBoard(props: {
@@ -69,44 +107,60 @@ export function ProvasBoard(props: {
   sessionByExamBase: Map<string, TrainingListItem>
   cut: number | null
   meters: boolean
+  /** Prova cujo título morfa card ↔ h1 do treino (view transition). */
+  morphExamBaseId?: string | null
   onTrain: (examBaseId: string) => void
 }) {
-  const { official, recommended, sessionByExamBase, cut, meters, onTrain } = props
-  const firstRecommendedId = recommended[0]?.examBaseId ?? null
+  const { official, recommended, sessionByExamBase, cut, meters, morphExamBaseId, onTrain } =
+    props
+
+  const officialTrainable = official != null && official.questionCount > 0
+  const pick = pickRecommendation(official, recommended, sessionByExamBase)
+  const pickIsOfficial = pick != null && official != null && pick.examBaseId === official.examBaseId
+  const others = recommended.filter((o) => o.examBaseId !== pick?.examBaseId)
 
   return (
     <div className="flex flex-col gap-4">
-      {official != null && (
-        <OfficialCard
+      {/* A oficial só ganha card próprio quando é treinável; futura sem
+       * questões vira uma nota dentro do "Treine agora" (menos camadas). */}
+      {officialTrainable && (
+        <GoalCard
           option={official}
           session={sessionByExamBase.get(official.examBaseId) ?? null}
           cut={cut}
           meters={meters}
-          firstRecommendedId={firstRecommendedId}
+          isRecommendation={pickIsOfficial}
+          morph={morphExamBaseId === official.examBaseId}
           onTrain={onTrain}
         />
       )}
 
-      {recommended.length > 0 && (
-        <section {...enter(2)} className={`${CARD} p-5 sm:p-6`}>
-          <h2 className="text-base font-bold text-slate-900" id="recomendadas">
-            Provas recomendadas para treinar
+      {pick != null && !pickIsOfficial && (
+        <TrainNowStrip
+          option={pick}
+          session={sessionByExamBase.get(pick.examBaseId) ?? null}
+          officialPending={official != null && !officialTrainable}
+          morph={morphExamBaseId === pick.examBaseId}
+          onTrain={onTrain}
+        />
+      )}
+
+      {others.length > 0 && (
+        <section {...enter(2)} className={`${CARD} p-4 sm:p-5`} aria-labelledby="outras-provas">
+          <h2 id="outras-provas" className="text-base font-bold text-slate-900">
+            Outras provas para treinar
           </h2>
-          <p className="mt-0.5 text-sm text-slate-500">
-            {official != null && official.questionCount === 0
-              ? 'Provas equivalentes (mesmo cargo) enquanto a oficial não sai. Cada uma tem seu próprio ciclo e questões reais.'
-              : 'Edições anteriores e provas equivalentes deste cargo. Cada uma tem seu próprio ciclo e questões reais.'}
-          </p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {recommended.map((opt) => (
-              <ProvaCard
+          <ul className="mt-2 divide-y divide-slate-100">
+            {others.map((opt) => (
+              <ProvaRow
                 key={opt.examBaseId}
                 option={opt}
                 session={sessionByExamBase.get(opt.examBaseId) ?? null}
+                morph={morphExamBaseId === opt.examBaseId}
                 onTrain={onTrain}
               />
             ))}
-          </div>
+          </ul>
         </section>
       )}
     </div>
@@ -114,179 +168,209 @@ export function ProvasBoard(props: {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Cartão da prova OFICIAL (âncora fixa)                              */
+/*  Selo de banca + ano                                                */
 /* ------------------------------------------------------------------ */
 
-function OfficialCard(props: {
-  option: ProvaTrainOption
-  session: TrainingListItem | null
-  cut: number | null
-  meters: boolean
-  firstRecommendedId: string | null
-  onTrain: (examBaseId: string) => void
-}) {
-  const { option, session, cut, meters, firstRecommendedId, onTrain } = props
-  const hasQuestions = option.questionCount > 0
-  const action = actionFor(session)
-
+function BancaSeal(props: { top: string; bottom: string; size?: 'md' | 'lg'; accent?: boolean }) {
+  const { top, bottom, size = 'md', accent = false } = props
+  const box = size === 'lg' ? 'h-12 w-12 rounded-xl' : 'h-10 w-10 rounded-lg'
+  const tone = accent ? 'bg-cyan-50 text-cyan-700' : 'bg-slate-100 text-slate-600'
   return (
-    <section
-      {...enter(1)}
-      className="relative overflow-hidden rounded-2xl border-[1.5px] border-cyan-200 bg-white shadow-sm"
+    <span
+      aria-hidden
+      className={`flex ${box} shrink-0 flex-col items-center justify-center leading-none ${tone}`}
     >
-      <span className="absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b from-cyan-500 to-cyan-700" aria-hidden />
-      <div className="p-5 pl-7 sm:p-6 sm:pl-8">
-        <div className="flex flex-wrap items-start gap-3">
-          <span className="flex h-12 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-cyan-50 leading-none text-cyan-700">
-            <span className="text-[0.78rem] font-extrabold">{option.logoTop}</span>
-            <span className="text-[0.6rem] font-bold opacity-80">{option.logoBottom}</span>
-          </span>
-          <div className="min-w-0 flex-1">
-            <h2 className="flex items-center gap-2 text-base font-extrabold text-slate-900">
-              Prova do concurso
-              <span className="rounded-full bg-cyan-600 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-white">
-                Oficial
-              </span>
-            </h2>
-            {option.subtitle != null && (
-              <p className="mt-0.5 text-sm text-slate-500">{option.subtitle}</p>
-            )}
-          </div>
-        </div>
-
-        {hasQuestions ? (
-          <>
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <div className="min-w-[8rem]">
-                <p className="text-[0.62rem] font-bold uppercase tracking-wider text-slate-500">
-                  Sua prontidão nesta prova
-                </p>
-                <p
-                  className={`text-2xl font-extrabold leading-none ${
-                    option.studyPlan.bestScore != null &&
-                    cut != null &&
-                    option.studyPlan.bestScore >= cut
-                      ? 'text-emerald-600'
-                      : 'text-slate-900'
-                  }`}
-                >
-                  {option.studyPlan.bestScore != null
-                    ? `${Math.round(option.studyPlan.bestScore)}%`
-                    : '—'}
-                </p>
-              </div>
-              {option.studyPlan.bestScore != null && (
-                <div className="min-w-[12rem] flex-1">
-                  <ReadinessBar
-                    value={Math.round(option.studyPlan.bestScore)}
-                    cut={cut}
-                    meters={meters}
-                    size="md"
-                    className="w-full"
-                  />
-                </div>
-              )}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                onClick={() => onTrain(option.examBaseId)}
-                className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-              >
-                {action.icon ? (
-                  <PlayIcon className="h-4 w-4" />
-                ) : (
-                  <ArrowPathIcon className="h-4 w-4" />
-                )}
-                {action.label}
-              </button>
-              <Quota />
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="mt-4 flex gap-3 rounded-xl border border-cyan-100 bg-cyan-50/70 px-4 py-3">
-              <InformationCircleIcon className="h-5 w-5 shrink-0 text-cyan-700" />
-              <p className="text-sm text-cyan-800">
-                <span className="font-bold text-slate-900">
-                  Esta prova ainda não foi aplicada
-                </span>
-                , então não tem questões próprias. Quando a prova sair, as questões reais
-                entram aqui. Por enquanto, treine com provas equivalentes — o desempenho
-                conta do mesmo jeito.
-              </p>
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-3">
-              <button
-                type="button"
-                disabled={firstRecommendedId == null}
-                onClick={() => firstRecommendedId != null && onTrain(firstRecommendedId)}
-                className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <PlayIcon className="h-4 w-4" />
-                Treinar com prova equivalente
-              </button>
-              <Quota />
-            </div>
-          </>
-        )}
-      </div>
-    </section>
+      <span className={size === 'lg' ? 'text-[0.78rem] font-extrabold' : 'text-[0.68rem] font-extrabold'}>
+        {top}
+      </span>
+      <span className={size === 'lg' ? 'text-[0.6rem] font-bold opacity-80' : 'text-[0.54rem] font-bold opacity-75'}>
+        {bottom}
+      </span>
+    </span>
   )
 }
 
 function Quota() {
   return (
-    <span className="inline-flex items-center gap-1.5 text-xs text-slate-400">
+    <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
       <ClockIcon className="h-4 w-4" />
       Consome 1 treino da sua cota
     </span>
   )
 }
 
-/* ------------------------------------------------------------------ */
-/*  Cartão de prova recomendada                                        */
-/* ------------------------------------------------------------------ */
-
-function ProvaCard(props: {
+function TrainButton(props: {
   option: ProvaTrainOption
   session: TrainingListItem | null
   onTrain: (examBaseId: string) => void
+  variant?: 'primary' | 'ghost'
 }) {
-  const { option, session, onTrain } = props
+  const { option, session, onTrain, variant = 'primary' } = props
   const action = actionFor(session)
+  const tone =
+    variant === 'primary'
+      ? 'bg-cyan-600 px-5 py-2.5 text-white hover:bg-cyan-700'
+      : 'border border-slate-300 bg-white px-4 py-2 text-slate-700 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700'
+  return (
+    <button
+      type="button"
+      aria-label={`${action.label}: ${option.title}`}
+      onClick={() => onTrain(option.examBaseId)}
+      className={`inline-flex items-center gap-2 rounded-lg text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${tone}`}
+    >
+      {action.restart ? <ArrowPathIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
+      {action.label}
+    </button>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Prova do concurso: meta + ação num card só                         */
+/* ------------------------------------------------------------------ */
+
+function GoalCard(props: {
+  option: ProvaTrainOption
+  session: TrainingListItem | null
+  cut: number | null
+  meters: boolean
+  /** Quando a oficial é a própria recomendação, o CTA primário mora aqui. */
+  isRecommendation: boolean
+  /** O título morfa até o h1 do treino (view transition). */
+  morph: boolean
+  onTrain: (examBaseId: string) => void
+}) {
+  const { option, session, cut, meters, isRecommendation, morph, onTrain } = props
+  const score = option.studyPlan.bestScore != null ? Math.round(option.studyPlan.bestScore) : null
+  const passing = score != null && cut != null && score >= cut
+  const delta =
+    option.studyPlan.scoreDelta != null ? Math.round(option.studyPlan.scoreDelta) : null
+
+  return (
+    <section {...enter(1)} className={`${CARD} p-4 sm:p-5`} aria-labelledby="meta-prova">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-3">
+        <BancaSeal top={option.logoTop} bottom={option.logoBottom} size="lg" accent />
+        <div className="min-w-0 flex-1 basis-40">
+          <h2
+            id="meta-prova"
+            style={morph ? { viewTransitionName: 'prova-title' } : undefined}
+            className="w-fit text-base font-extrabold text-slate-900"
+          >
+            Prova do concurso
+          </h2>
+          <p className="mt-0.5 text-sm text-slate-500">
+            {option.questionCount} questões reais
+            {cut != null && ` · corte ${cut}%`}
+          </p>
+        </div>
+
+        {/* Prontidão inline: nota grande + barra vs corte + leitura curta. */}
+        {score != null && (
+          <div className="flex w-full items-center gap-3 sm:w-64">
+            <p
+              className={`text-2xl font-extrabold leading-none tabular-nums ${
+                passing ? 'text-emerald-600' : 'text-slate-900'
+              }`}
+            >
+              {score}%
+            </p>
+            <div className="min-w-0 flex-1">
+              <ReadinessBar value={score} cut={cut} meters={meters} size="sm" />
+              <p className="mt-1 text-xs text-slate-500">
+                {passing
+                  ? 'acima do corte'
+                  : cut != null
+                    ? `faltam ${cut - score} pts`
+                    : 'sua melhor nota'}
+                {delta != null && delta > 0 && (
+                  <span className="font-semibold text-emerald-700"> · +{delta} pts</span>
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {isRecommendation && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+          <TrainButton option={option} session={session} onTrain={onTrain} />
+          {score == null && (
+            <span className="text-sm text-slate-600">
+              A prova diagnóstica mede sua prontidão.
+            </span>
+          )}
+          <Quota />
+        </div>
+      )}
+    </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Treine agora: a recomendação única do coach                        */
+/* ------------------------------------------------------------------ */
+
+function TrainNowStrip(props: {
+  option: ProvaTrainOption
+  session: TrainingListItem | null
+  /** A prova oficial existe mas ainda não saiu → nota explicativa aqui. */
+  officialPending: boolean
+  /** O título morfa até o h1 do treino (view transition). */
+  morph: boolean
+  onTrain: (examBaseId: string) => void
+}) {
+  const { option, session, officialPending, morph, onTrain } = props
   const state = stateOf(session)
 
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 transition-shadow hover:shadow-[0_8px_20px_-6px_rgba(15,23,42,0.16)]">
-      <div className="flex items-start gap-3">
-        <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-lg bg-slate-100 leading-none text-slate-500">
-          <span className="text-[0.72rem] font-extrabold">{option.logoTop}</span>
-          <span className="text-[0.58rem] font-bold opacity-75">{option.logoBottom}</span>
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900">
-            <span className="truncate">{option.title}</span>
-            <span
-              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[0.6rem] font-bold ${
-                option.kind === 'related'
-                  ? 'bg-slate-100 text-slate-500'
-                  : 'bg-cyan-50 text-cyan-700'
-              }`}
-            >
-              {option.kind === 'related' ? 'relacionada' : 'mesma banca'}
+    <section
+      {...enter(1)}
+      className="rounded-2xl border-[1.5px] border-cyan-200 bg-white p-4 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_1px_2px_rgba(15,23,42,0.06)] sm:p-5"
+      aria-labelledby="treine-agora"
+    >
+      <h2 id="treine-agora" className="text-base font-extrabold text-slate-900">
+        Treine agora
+      </h2>
+      <p className="mt-0.5 max-w-prose text-sm text-slate-600">
+        {officialPending ? (
+          <>
+            <span className="font-bold text-slate-900">
+              Esta prova ainda não foi aplicada
             </span>
-          </p>
-          {option.subtitle != null && (
-            <p className="mt-0.5 truncate text-xs text-slate-400">{option.subtitle}</p>
-          )}
-        </div>
-      </div>
+            , então não tem questões próprias. {reasonFor(option, session)} O desempenho
+            conta do mesmo jeito.
+          </>
+        ) : (
+          reasonFor(option, session)
+        )}
+      </p>
 
-      <div className="flex items-center gap-2 text-xs text-slate-400">
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-3">
+        <BancaSeal top={option.logoTop} bottom={option.logoBottom} />
+        <div className="min-w-0 flex-1 basis-40">
+          <p className="flex items-center gap-2 text-sm font-extrabold text-slate-900">
+            <span
+              className="truncate"
+              style={morph ? { viewTransitionName: 'prova-title' } : undefined}
+            >
+              {option.title}
+            </span>
+            {option.badge != null && (
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.62rem] font-bold text-slate-600">
+                {option.badge}
+              </span>
+            )}
+          </p>
+          <p className="mt-0.5 truncate text-xs text-slate-500">
+            {option.subtitle != null ? `${option.subtitle} · ` : ''}
+            {option.questionCount} questões reais
+          </p>
+        </div>
+        <TrainButton option={option} session={session} onTrain={onTrain} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
         {state != null ? (
           <span
-            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-semibold ${
+            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
               state.tone === 'success'
                 ? 'bg-emerald-50 text-emerald-700'
                 : 'bg-amber-50 text-amber-700'
@@ -296,22 +380,71 @@ function ProvaCard(props: {
             {state.text}
           </span>
         ) : (
-          <span>{option.questionCount} questões reais</span>
+          <Quota />
         )}
       </div>
+    </section>
+  )
+}
 
-      <button
-        type="button"
-        onClick={() => onTrain(option.examBaseId)}
-        className={`mt-auto inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
-          action.label === 'Treinar novamente'
-            ? 'border border-slate-300 bg-white text-slate-700 hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700'
-            : 'bg-cyan-600 text-white hover:bg-cyan-700'
-        }`}
-      >
-        {action.icon && <PlayIcon className="h-4 w-4" />}
-        {action.label}
-      </button>
-    </div>
+/* ------------------------------------------------------------------ */
+/*  Linha de prova (lista ranqueada, não grid de cards)                */
+/* ------------------------------------------------------------------ */
+
+function ProvaRow(props: {
+  option: ProvaTrainOption
+  session: TrainingListItem | null
+  /** O título morfa até o h1 do treino (view transition). */
+  morph: boolean
+  onTrain: (examBaseId: string) => void
+}) {
+  const { option, session, morph, onTrain } = props
+  const state = stateOf(session)
+  const score = option.studyPlan.bestScore != null ? Math.round(option.studyPlan.bestScore) : null
+
+  return (
+    <li className="flex flex-wrap items-center gap-3 py-3 first:pt-1 last:pb-1">
+      <BancaSeal top={option.logoTop} bottom={option.logoBottom} />
+      <div className="min-w-0 flex-1 basis-40">
+        <p className="flex items-center gap-2 text-sm font-bold text-slate-900">
+          <span
+            className="truncate"
+            style={morph ? { viewTransitionName: 'prova-title' } : undefined}
+          >
+            {option.title}
+          </span>
+          {option.badge != null && (
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[0.62rem] font-bold text-slate-600">
+              {option.badge}
+            </span>
+          )}
+        </p>
+        <p className="mt-0.5 truncate text-xs text-slate-500">
+          {option.subtitle != null ? `${option.subtitle} · ` : ''}
+          {option.questionCount} questões
+        </p>
+      </div>
+
+      {state != null ? (
+        <span
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold ${
+            state.tone === 'success'
+              ? 'bg-emerald-50 text-emerald-700'
+              : 'bg-amber-50 text-amber-700'
+          }`}
+        >
+          {state.tone === 'success' && <CheckBadgeIcon className="h-3.5 w-3.5" />}
+          {state.text}
+        </span>
+      ) : (
+        score != null && (
+          <span className="shrink-0 text-xs font-semibold tabular-nums text-slate-600">
+            prontidão {score}%
+          </span>
+        )
+      )}
+
+      <TrainButton option={option} session={session} onTrain={onTrain} variant="ghost" />
+    </li>
   )
 }

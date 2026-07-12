@@ -26,6 +26,7 @@ import {
   useRetryQuestionsWithFeedbackForStudyQuery,
   useTrainingStudyItemsQuery,
 } from '@/features/training/queries/training.queries'
+import { BackSquare } from '@/features/concurso/components/BackSquare'
 
 type Tab = 'rec' | 'exp' | 'exe' | 'err'
 
@@ -33,46 +34,47 @@ type Tab = 'rec' | 'exp' | 'exe' | 'err'
 /*  Navegador 1/N (exercícios e questões erradas)                      */
 /* ------------------------------------------------------------------ */
 
+const NAV_BTN =
+  'inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white p-2 text-slate-700 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-40'
+
+/** Contador + anterior/próxima, no mesmo vocabulário dos ghost buttons do app. */
 function Navigator(props: {
+  /** Substantivo do que se navega ("Exercício", "Questão"). */
+  noun: string
   current: number
   total: number
   onPrev: () => void
   onNext: () => void
 }) {
-  const { current, total, onPrev, onNext } = props
+  const { noun, current, total, onPrev, onNext } = props
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 rounded-xl bg-slate-50 px-4 py-2.5">
-      <button
-        type="button"
-        onClick={onPrev}
-        disabled={current === 0}
-        aria-label="Anterior"
-        className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        <ChevronLeftIcon className="h-5 w-5" />
-      </button>
-      <div className="flex items-center gap-1.5">
-        {Array.from({ length: total }, (_, i) => (
-          <span
-            key={i}
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              i === current ? 'w-6 bg-cyan-500' : i < current ? 'w-1.5 bg-cyan-300' : 'w-1.5 bg-slate-300'
-            }`}
-          />
-        ))}
+    <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <p className="text-sm font-semibold text-slate-900">
+        {noun}{' '}
+        <span className="tabular-nums">
+          {current + 1} <span className="font-normal text-slate-500">de {total}</span>
+        </span>
+      </p>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onPrev}
+          disabled={current === 0}
+          aria-label={`${noun} anterior`}
+          className={NAV_BTN}
+        >
+          <ChevronLeftIcon className="h-4 w-4" />
+        </button>
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={current === total - 1}
+          aria-label={`Próxima ${noun.toLowerCase()}`}
+          className={NAV_BTN}
+        >
+          <ChevronRightIcon className="h-4 w-4" />
+        </button>
       </div>
-      <span className="shrink-0 text-xs font-medium tabular-nums text-slate-500">
-        {current + 1}/{total}
-      </span>
-      <button
-        type="button"
-        onClick={onNext}
-        disabled={current === total - 1}
-        aria-label="Próxima"
-        className="shrink-0 cursor-pointer rounded-lg p-1.5 text-slate-500 transition-colors hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-30"
-      >
-        <ChevronRightIcon className="h-5 w-5" />
-      </button>
     </div>
   )
 }
@@ -149,11 +151,10 @@ function ExerciseBlock(props: {
 export function StudyItemFocus(props: {
   trainingId: string
   studyItemId: string
-  studyProgress: { done: number; total: number }
   onBack: () => void
 }) {
-  const { trainingId, studyItemId, studyProgress, onBack } = props
-  const [tab, setTab] = useState<Tab>('exe')
+  const { trainingId, studyItemId, onBack } = props
+  const [tab, setTab] = useState<Tab>('rec')
   const [exIdx, setExIdx] = useState(0)
   const [wrongIdx, setWrongIdx] = useState(0)
   const [selectedByExercise, setSelectedByExercise] = useState<Record<string, string>>({})
@@ -161,7 +162,6 @@ export function StudyItemFocus(props: {
   const { data: items = [] } = useTrainingStudyItemsQuery(trainingId)
   const { data: wrongQuestions = [], isLoading: loadingWrong } =
     useRetryQuestionsWithFeedbackForStudyQuery(trainingId)
-  const completeMutation = useCompleteStudyItemMutation(trainingId, studyItemId)
   const generateMutation = useGenerateStudyItemContentMutation(trainingId, studyItemId)
 
   const item = items.find((i) => i.id === studyItemId)
@@ -180,7 +180,6 @@ export function StudyItemFocus(props: {
     )
   }
 
-  const isDone = Boolean(item.completedAt)
   const exercises = item.exercises
   const linkedSet = new Set(item.linkedQuestionIds)
   const wrongForItem = wrongQuestions.filter((q) =>
@@ -198,59 +197,9 @@ export function StudyItemFocus(props: {
     { id: 'err', label: 'Questões que errei', icon: ClipboardDocumentListIcon, count: wrongForItem.length },
   ]
 
-  const studyPct =
-    studyProgress.total > 0 ? Math.round((studyProgress.done / studyProgress.total) * 100) : 0
-
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
-      {/* Topo: voltar ao plano + identidade + concluir */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-gradient-to-br from-cyan-600 to-cyan-700 px-4 py-3.5 text-white sm:px-5">
-        <button
-          type="button"
-          onClick={onBack}
-          className="inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-white/25"
-        >
-          <ArrowLeftIcon className="h-4 w-4" />
-          Voltar ao estudo
-        </button>
-        <div className="min-w-0 text-right">
-          <p className="text-[0.62rem] font-bold uppercase tracking-wide text-white/70">
-            Estudo · {item.subject}
-          </p>
-          <p className="truncate text-base font-extrabold">{item.recommendationTitle}</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => completeMutation.mutate(!isDone)}
-          disabled={completeMutation.isPending}
-          className={`inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-bold transition-colors ${
-            isDone
-              ? 'bg-white/20 text-white hover:bg-white/30'
-              : 'bg-white text-cyan-700 hover:bg-cyan-50'
-          } disabled:cursor-wait disabled:opacity-70`}
-        >
-          {completeMutation.isPending ? (
-            <CircularProgress size={15} color="inherit" />
-          ) : isDone ? (
-            <CheckCircleIcon className="h-4 w-4" />
-          ) : (
-            <CheckIcon className="h-4 w-4" />
-          )}
-          {isDone ? 'Concluído' : 'Marcar como concluído'}
-        </button>
-      </div>
-
-      {/* Progresso do estudo segue à vista */}
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2.5 text-xs text-slate-500 sm:px-5">
-        <span className="shrink-0">
-          Estudo: {studyProgress.done} de {studyProgress.total} recomendações
-        </span>
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200">
-          <div className="h-full rounded-full bg-cyan-500" style={{ width: `${studyPct}%` }} />
-        </div>
-        <span className="shrink-0 tabular-nums">{studyPct}%</span>
-      </div>
-
+      {/* Identidade + concluir vivem no header da página (StudyFocusHeader). */}
       {/* Abas */}
       <div className="flex overflow-x-auto border-b border-slate-200">
         {tabs.map((t) => {
@@ -273,7 +222,7 @@ export function StudyItemFocus(props: {
               {t.count != null && t.count > 0 && (
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[0.62rem] font-bold leading-none ${
-                    active ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-500'
+                    active ? 'bg-cyan-100 text-cyan-700' : 'bg-slate-100 text-slate-600'
                   }`}
                 >
                   {t.count}
@@ -371,6 +320,7 @@ export function StudyItemFocus(props: {
             ) : (
               <>
                 <Navigator
+                  noun="Exercício"
                   current={safeEx}
                   total={exercises.length}
                   onPrev={() => setExIdx((i) => Math.max(0, i - 1))}
@@ -405,6 +355,7 @@ export function StudyItemFocus(props: {
             ) : (
               <>
                 <Navigator
+                  noun="Questão"
                   current={safeWrong}
                   total={wrongForItem.length}
                   onPrev={() => setWrongIdx((i) => Math.max(0, i - 1))}
@@ -418,6 +369,77 @@ export function StudyItemFocus(props: {
           </div>
         )}
       </div>
+
     </section>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Header do ponto em foco (substitui o header da página)             */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Quando um ponto de estudo está aberto, o HEADER da página vira o ponto:
+ * matéria como eyebrow, título como h1 e o CTA de concluir à direita. O
+ * painel (`StudyItemFocus`) fica só com abas + conteúdo, e a saída é o
+ * breadcrumb "← Estudo".
+ */
+export function StudyFocusHeader(props: {
+  trainingId: string
+  studyItemId: string
+  onBack: () => void
+}) {
+  const { trainingId, studyItemId, onBack } = props
+  const { data: items = [] } = useTrainingStudyItemsQuery(trainingId)
+  const completeMutation = useCompleteStudyItemMutation(trainingId, studyItemId)
+
+  const item = items.find((i) => i.id === studyItemId)
+  if (item == null) {
+    return (
+      <header aria-busy className="flex items-center gap-4">
+        <BackSquare aria-label="Voltar à lista de estudo" onClick={onBack} />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <span className="h-3 w-32 animate-pulse rounded bg-slate-200" />
+          <span className="h-7 w-72 max-w-full animate-pulse rounded bg-slate-200" />
+        </div>
+      </header>
+    )
+  }
+  const isDone = Boolean(item.completedAt)
+
+  return (
+    <header className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+      <BackSquare aria-label="Voltar à lista de estudo" onClick={onBack} />
+      <div className="min-w-0 flex-1 basis-48">
+        <p className="text-[0.62rem] font-bold uppercase tracking-wide text-slate-500">
+          Estudo · {item.subject}
+        </p>
+        <h1
+          style={{ viewTransitionName: 'study-item-title' }}
+          className="text-balance text-xl font-extrabold tracking-tight text-slate-900 sm:text-2xl"
+        >
+          {item.recommendationTitle}
+        </h1>
+      </div>
+      <button
+        type="button"
+        onClick={() => completeMutation.mutate(!isDone)}
+        disabled={completeMutation.isPending}
+        className={`inline-flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${
+          isDone
+            ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+            : 'bg-cyan-600 text-white hover:bg-cyan-700'
+        } disabled:cursor-wait disabled:opacity-70`}
+      >
+        {completeMutation.isPending ? (
+          <CircularProgress size={15} color="inherit" />
+        ) : isDone ? (
+          <CheckCircleIcon className="h-4 w-4" />
+        ) : (
+          <CheckIcon className="h-4 w-4" />
+        )}
+        {isDone ? 'Concluído' : 'Marcar como concluído'}
+      </button>
+    </header>
   )
 }

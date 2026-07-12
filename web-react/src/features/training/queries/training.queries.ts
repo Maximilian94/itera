@@ -46,7 +46,7 @@ export function useCreateTrainingMutation() {
       immediateFeedback,
     }: {
       examBaseId: string
-      subjectFilter?: string[]
+      subjectFilter?: Array<string>
       immediateFeedback?: boolean
     }) => trainingService.create(examBaseId, subjectFilter, immediateFeedback),
     onSuccess: () => {
@@ -120,6 +120,9 @@ export function useUpdateTrainingStageMutation(trainingId: string) {
       trainingService.updateStage(trainingId, stage),
     onSuccess: (data) => {
       queryClient.setQueryData(trainingKeys.one(trainingId), data)
+      // A lista (GET /training) alimenta o stepper embutido na página do cargo;
+      // sem invalidar, o estágio atual fica defasado após avançar de fase.
+      queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
     },
   })
 }

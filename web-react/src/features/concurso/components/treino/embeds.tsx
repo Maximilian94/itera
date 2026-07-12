@@ -35,16 +35,14 @@ export function DiagnosticoEmbed({ feedback }: { feedback: ExamAttemptFeedback }
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Banner de resultado */}
+      {/* Banner de resultado: cor sólida semântica (acertou/errou o corte). */}
       <div
         className={`flex flex-wrap items-center justify-between gap-4 rounded-xl px-5 py-4 text-white ${
-          passed
-            ? 'bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-500'
-            : 'bg-gradient-to-br from-rose-600 via-rose-500 to-pink-500'
+          passed ? 'bg-emerald-600' : 'bg-rose-600'
         }`}
       >
         <div>
-          <p className="text-[0.62rem] font-bold uppercase tracking-wider text-white/70">
+          <p className="text-[0.62rem] font-bold uppercase tracking-wider text-white/85">
             Resultado da prova
           </p>
           <div className="mt-1.5 flex items-center gap-4">
@@ -52,14 +50,14 @@ export function DiagnosticoEmbed({ feedback }: { feedback: ExamAttemptFeedback }
               <p className="text-xl font-extrabold tabular-nums">
                 {overall.correct}/{overall.total}
               </p>
-              <p className="text-[0.62rem] font-medium uppercase tracking-wide text-white/60">
+              <p className="text-[0.62rem] font-medium uppercase tracking-wide text-white/85">
                 Questões certas
               </p>
             </div>
             <span className="h-9 w-px bg-white/25" />
             <div>
               <p className="text-xl font-extrabold tabular-nums">{cut}%</p>
-              <p className="text-[0.62rem] font-medium uppercase tracking-wide text-white/60">
+              <p className="text-[0.62rem] font-medium uppercase tracking-wide text-white/85">
                 Nota de corte
               </p>
             </div>
@@ -106,8 +104,8 @@ export function DiagnosticoEmbed({ feedback }: { feedback: ExamAttemptFeedback }
 
       {/* Feedback da IA — o ponto mais crítico */}
       {worst && worstFb && (
-        <div className="rounded-r-lg border-l-[3px] border-amber-500 bg-amber-50 px-4 py-3">
-          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-700">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-800">
             <SparklesIcon className="h-4 w-4" />
             Feedback da IA · {worst.subject}
           </p>
@@ -126,9 +124,11 @@ export function DiagnosticoEmbed({ feedback }: { feedback: ExamAttemptFeedback }
 
 export function EstudoListEmbed(props: {
   items: Array<TrainingStudyItemResponse>
+  /** Item cujo título morfa lista ↔ header do foco (view transition). */
+  morphItemId?: string | null
   onOpenItem: (id: string) => void
 }) {
-  const { items, onOpenItem } = props
+  const { items, morphItemId, onOpenItem } = props
   if (items.length === 0) {
     return (
       <p className="text-sm text-slate-500">
@@ -197,11 +197,18 @@ export function EstudoListEmbed(props: {
                     )}
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-bold text-slate-900">
+                    <span
+                      className="block truncate text-sm font-bold text-slate-900"
+                      style={
+                        item.id === morphItemId
+                          ? { viewTransitionName: 'study-item-title' }
+                          : undefined
+                      }
+                    >
                       {item.recommendationTitle}
                     </span>
                     {item.exercises.length > 0 && (
-                      <span className="text-xs text-slate-400">
+                      <span className="text-xs text-slate-500">
                         {item.exercises.length}{' '}
                         {item.exercises.length === 1 ? 'exercício' : 'exercícios'}
                       </span>
@@ -209,7 +216,7 @@ export function EstudoListEmbed(props: {
                   </span>
                   <span
                     className={`shrink-0 rounded-full px-2.5 py-0.5 text-[0.7rem] font-bold ${
-                      isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'
+                      isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
                     }`}
                   >
                     {isDone ? 'Concluído' : 'Pendente'}
@@ -270,7 +277,7 @@ export function FinalEmbed({ final }: { final: TrainingFinalPayload }) {
         )}
       </div>
       {final.finalFeedback && (
-        <div className="rounded-r-lg border-l-[3px] border-cyan-500 bg-cyan-50/70 px-4 py-3 text-sm leading-relaxed text-slate-700">
+        <div className="rounded-xl border border-cyan-100 bg-cyan-50/70 px-4 py-3 text-sm leading-relaxed text-slate-700">
           <Markdown>{final.finalFeedback}</Markdown>
         </div>
       )}

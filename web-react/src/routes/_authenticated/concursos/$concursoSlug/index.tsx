@@ -26,7 +26,7 @@ import { useConcursoQuery } from '@/features/concurso/queries/concurso.queries'
 import { CARD, CARD_RAISE } from '@/features/concurso/components/card'
 import { enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
-import { InstitutionMark } from '@/features/concurso/components/InstitutionMark'
+import { BACK_SQUARE } from '@/features/concurso/components/BackSquare'
 import {
   FichaCard
   
@@ -106,23 +106,36 @@ function ConcursoPage() {
   const { concursoSlug } = Route.useParams()
   const { data, isPending, error, refetch } = useConcursoQuery(concursoSlug)
 
+  // A volta à listagem vive no header do conteúdo (BackSquare); a linha de
+  // link só existe enquanto não há header (loading/erro).
   return (
     <div className="flex flex-col gap-4 pb-6">
-      <Link
-        to="/concursos"
-        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
-      >
-        <ChevronLeftIcon className="h-4 w-4" />
-        Concursos
-      </Link>
       {isPending ? (
-        <ConcursoSkeleton />
+        <>
+          <ConcursosBackRow />
+          <ConcursoSkeleton />
+        </>
       ) : error != null ? (
-        <ConcursoErrorState error={error} onRetry={() => refetch()} />
+        <>
+          <ConcursosBackRow />
+          <ConcursoErrorState error={error} onRetry={() => refetch()} />
+        </>
       ) : (
         <ConcursoContent data={data} />
       )}
     </div>
+  )
+}
+
+function ConcursosBackRow() {
+  return (
+    <Link
+      to="/concursos"
+      className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
+    >
+      <ChevronLeftIcon className="h-4 w-4" />
+      Concursos
+    </Link>
   )
 }
 
@@ -201,20 +214,29 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
       <div className="grid items-start gap-4 lg:grid-cols-3">
         {/* ░░ Coluna principal — cabeçalho + escolha do cargo ░░ */}
         <div className="flex flex-col gap-4 lg:col-span-2">
-          {/* ░░ Cabeçalho do concurso ░░ */}
+          {/* ░░ Cabeçalho do concurso: botão de voltar no lugar da marca +
+           * nível pai (Concursos) como subtítulo — sem linha de breadcrumb. ░░ */}
           <header {...enter(0)} className="flex min-w-0 items-center gap-4">
-            <InstitutionMark
-              institution={concurso.institution}
+            <Link
+              to="/concursos"
+              viewTransition
+              aria-label="Voltar aos concursos"
               style={{ viewTransitionName: 'institution-mark' }}
-            />
-            <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-              <h1
-                style={{ viewTransitionName: 'concurso-heading' }}
-                className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
-              >
-                Concurso {concurso.institution} {concurso.year}
-              </h1>
-              <StatusPill status={status} label={statusLabel(status, timeline)} />
+              className={BACK_SQUARE}
+            >
+              <ChevronLeftIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+            </Link>
+            <div className="min-w-0 flex-1">
+              <p className="w-fit text-sm font-medium text-slate-500">Concursos</p>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                <h1
+                  style={{ viewTransitionName: 'concurso-heading' }}
+                  className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+                >
+                  Concurso {concurso.institution} {concurso.year}
+                </h1>
+                <StatusPill status={status} label={statusLabel(status, timeline)} />
+              </div>
             </div>
           </header>
 

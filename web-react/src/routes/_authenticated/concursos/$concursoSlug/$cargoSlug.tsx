@@ -17,6 +17,7 @@ import {
   UsersIcon,
   ViewfinderCircleIcon,
 } from '@heroicons/react/24/outline'
+import { flushSync } from 'react-dom'
 import type {
   CargoDetail,
   CargoPreviousExam,
@@ -34,11 +35,13 @@ import {
 } from '@/features/concurso/queries/concurso.queries'
 import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { TrainingFlow } from '@/features/concurso/components/treino/TrainingFlow'
+import { StudyFocusHeader } from '@/features/concurso/components/treino/StudyItemFocus'
 import { ProvasBoard } from '@/features/concurso/components/treino/ProvasBoard'
 import { CARD } from '@/features/concurso/components/card'
-import { enter, useMeters } from '@/features/concurso/components/motion'
+import { enter, useMeters, withViewTransition } from '@/features/concurso/components/motion'
+import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
-import { InstitutionMark } from '@/features/concurso/components/InstitutionMark'
+import { BACK_SQUARE, BackSquare } from '@/features/concurso/components/BackSquare'
 import { FichaCard } from '@/features/concurso/components/FichaCard'
 import { SubjectDistribution } from '@/features/concurso/components/SubjectDistribution'
 import { ApiError } from '@/lib/api'
@@ -166,39 +169,50 @@ function CargoPage() {
   const { concursoSlug, cargoSlug } = Route.useParams()
   const { data, isPending, error, refetch } = useCargoQuery(concursoSlug, cargoSlug)
 
-  const concursoLabel =
-    data != null ? `${data.concurso.institution} · ${data.concurso.year}` : null
-
   return (
-    <div className="flex flex-col gap-4 pb-6">
-      {/* Back-link ao concurso — o título do concurso encolhe até aqui
-       * (view transition compartilhada). */}
-      <Link
-        to="/concursos/$concursoSlug"
-        params={{ concursoSlug }}
-        viewTransition
-        style={{ viewTransitionName: 'concurso-heading' }}
-        className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
-      >
-        <ChevronLeftIcon className="h-4 w-4 shrink-0" />
-        {concursoLabel != null ? (
-          <span className="truncate">{concursoLabel}</span>
-        ) : (
-          <span aria-hidden className="h-4 w-40 animate-pulse rounded bg-slate-200" />
-        )}
-      </Link>
+    /* Com o player embutido (prova/re-tentativa), a página troca para altura
+     * de app: a cadeia flex-1/min-h-0 desce até o player, que assume o scroll
+     * interno (mesma mecânica de /treino/$trainingId/prova). */
+    <div className="flex flex-col gap-4 pb-6 has-[[data-exam-player]]:min-h-0 has-[[data-exam-player]]:flex-1 has-[[data-exam-player]]:pb-2">
       {isPending ? (
-        <CargoSkeleton />
+        <>
+          <ConcursoBackLink concursoSlug={concursoSlug} label={null} />
+          <CargoSkeleton />
+        </>
       ) : error != null ? (
-        <CargoErrorState
-          error={error}
-          concursoSlug={concursoSlug}
-          onRetry={() => refetch()}
-        />
+        <>
+          <ConcursoBackLink concursoSlug={concursoSlug} label={null} />
+          <CargoErrorState
+            error={error}
+            concursoSlug={concursoSlug}
+            onRetry={() => refetch()}
+          />
+        </>
       ) : (
-        <CargoContent data={data} />
+        <CargoContent data={data} concursoSlug={concursoSlug} />
       )}
     </div>
+  )
+}
+
+/** Back-link ao concurso — o título do concurso encolhe até aqui
+ *  (view transition compartilhada). Label null → silhueta de loading. */
+function ConcursoBackLink(props: { concursoSlug: string; label: string | null }) {
+  return (
+    <Link
+      to="/concursos/$concursoSlug"
+      params={{ concursoSlug: props.concursoSlug }}
+      viewTransition
+      style={{ viewTransitionName: 'concurso-heading' }}
+      className="inline-flex w-fit items-center gap-1 text-sm font-medium text-slate-500 no-underline transition-colors hover:text-cyan-700"
+    >
+      <ChevronLeftIcon className="h-4 w-4 shrink-0" />
+      {props.label != null ? (
+        <span className="truncate">{props.label}</span>
+      ) : (
+        <span aria-hidden className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+      )}
+    </Link>
   )
 }
 
@@ -206,7 +220,8 @@ function CargoPage() {
 /*  Conteúdo (dados carregados)                                        */
 /* ------------------------------------------------------------------ */
 
-function CargoContent({ data }: { data: CargoDetail }) {
+function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
+  const { data, concursoSlug } = props
   const { concurso, cargo, syllabusGroups, previousExams } = data
   const meters = useMeters()
 
@@ -241,9 +256,47 @@ function CargoContent({ data }: { data: CargoDetail }) {
     (t) => cargoExamBaseIds.has(t.examBaseId) && t.currentStage !== 'FINAL',
   )
 
-  // Aba ativa: Detalhes é a porta de entrada (a ficha morfa vinda do concurso);
-  // Treino é a aba de ação.
-  const [tab, setTab] = useState<'treino' | 'detalhes'>('detalhes')
+  // Aba ativa: default inteligente — com treino em andamento entra direto no
+  // Treino (retomar é 1 clique); sem sessão, Detalhes (a ficha morfa vinda do
+  // concurso). O clique do usuário fixa a escolha.
+  const [tabChoice, setTabChoice] = useState<'treino' | 'detalhes' | null>(null)
+  const tab = tabChoice ?? (activeTraining != null ? 'treino' : 'detalhes')
+
+  /* Opções de treino da mesa (oficial + recomendadas). A prova selecionada
+   * sobe até aqui porque, em modo treino, o HEADER da página é substituído
+   * (identidade da prova + prontidão) e as abas saem de cena. */
+  const treinoOptions = buildProvaOptions(data)
+  const [trainingSel, setTrainingSel] = useState<string | null>(null)
+  const training =
+    tab === 'treino'
+      ? (treinoOptions.all.find((o) => o.examBaseId === trainingSel) ?? null)
+      : null
+  const trainingSession =
+    training != null ? (latestTrainingByExamBase.get(training.examBaseId) ?? null) : null
+
+  /* Ponto de estudo em foco (3º nível): o header vira o ponto (matéria +
+   * título + concluir) e o breadcrumb desce para "← Estudo". */
+  const [studyFocusId, setStudyFocusId] = useState<string | null>(null)
+  const studyFocus = training != null && trainingSession != null ? studyFocusId : null
+
+  /* Morph do título do ponto (card ↔ header): o item clicado recebe o
+   * view-transition-name ANTES do snapshot (flushSync) e o mantém depois de
+   * fechar, para o morph de volta ao card. */
+  const [studyMorphId, setStudyMorphId] = useState<string | null>(null)
+  const openStudyItem = (id: string | null) => {
+    if (id != null) flushSync(() => setStudyMorphId(id))
+    withViewTransition(() => setStudyFocusId(id))
+  }
+  /* Morph do título da prova (card ↔ h1 do treino), mesmo truque do ponto de
+   * estudo: a prova clicada recebe o view-transition-name antes do snapshot. */
+  const [provaMorphId, setProvaMorphId] = useState<string | null>(null)
+  const openTraining = (id: string | null) => {
+    if (id != null) flushSync(() => setProvaMorphId(id))
+    withViewTransition(() => {
+      setTrainingSel(id)
+      setStudyFocusId(null)
+    })
+  }
 
   const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const examDate = cargo.examDate
@@ -281,39 +334,88 @@ function CargoContent({ data }: { data: CargoDetail }) {
 
   return (
     <>
-      {/* ░░ Cabeçalho do cargo (mesmo shell do concurso: marca + título + chip) ░░ */}
-      <header {...enter(0)} className="flex min-w-0 items-center gap-4">
-        <InstitutionMark
-          institution={concurso.institution}
-          style={{ viewTransitionName: 'institution-mark' }}
+      {/* ░░ Cabeçalho: cada nível assume o header — botão de voltar no lugar
+       * da marca + nível pai como subtítulo acima do título (sem breadcrumb).
+       * Ponto de estudo → treino → cargo → concurso. ░░ */}
+      {studyFocus != null && trainingSession != null ? (
+        <StudyFocusHeader
+          trainingId={trainingSession.trainingId}
+          studyItemId={studyFocus}
+          onBack={() => openStudyItem(null)}
         />
-        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
-          <h1
-            style={{ viewTransitionName: 'cargo-heading' }}
-            className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
-          >
-            {cargo.role}
-          </h1>
-          <StatusPill
-            status={concurso.status}
-            label={statusLabel(concurso.status, examDate)}
+      ) : training != null ? (
+        <TrainingHeader
+          concursoTitle={`Concurso ${concurso.institution} ${concurso.year}`}
+          role={cargo.role}
+          option={training}
+          cut={cut}
+          meters={meters}
+          onBack={() => openTraining(null)}
+        />
+      ) : (
+        <>
+          <header {...enter(0)} className="flex min-w-0 items-center gap-4">
+            <Link
+              to="/concursos/$concursoSlug"
+              params={{ concursoSlug }}
+              viewTransition
+              aria-label={`Voltar ao concurso ${concurso.institution} ${concurso.year}`}
+              style={{ viewTransitionName: 'institution-mark' }}
+              className={BACK_SQUARE}
+            >
+              <ChevronLeftIcon className="h-5 w-5 sm:h-6 sm:w-6" />
+            </Link>
+            <div className="min-w-0 flex-1">
+              {/* O título do concurso encolhe até este subtítulo (morph). */}
+              <p
+                style={{ viewTransitionName: 'concurso-heading' }}
+                className="w-fit max-w-full truncate text-sm font-medium text-slate-500"
+              >
+                Concurso {concurso.institution} {concurso.year}
+              </p>
+              <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+                <h1
+                  style={{ viewTransitionName: 'cargo-heading' }}
+                  className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+                >
+                  {cargo.role}
+                </h1>
+                <StatusPill
+                  status={concurso.status}
+                  label={statusLabel(concurso.status, examDate)}
+                />
+              </div>
+            </div>
+          </header>
+
+          {/* ░░ Abas: Treino (ação) · Detalhes (ficha) ░░ */}
+          <CargoTabs
+            tab={tab}
+            onChange={setTabChoice}
+            hasActiveTraining={activeTraining != null}
           />
-        </div>
-      </header>
+        </>
+      )}
 
-      {/* ░░ Abas: Treino (porta de entrada) · Detalhes (ficha) ░░ */}
-      <CargoTabs
-        tab={tab}
-        onChange={setTab}
-        hasActiveTraining={activeTraining != null}
-      />
-
-      {tab === 'treino' ? (
+      {training != null ? (
+        <TrainingFlow
+          examBaseId={training.examBaseId}
+          session={trainingSession}
+          questionCount={training.questionCount}
+          cut={cut}
+          focusItemId={studyFocus}
+          morphItemId={studyMorphId}
+          onFocusItem={openStudyItem}
+        />
+      ) : tab === 'treino' ? (
         <TreinoTab
-          data={data}
+          official={treinoOptions.official}
+          recommended={treinoOptions.recommended}
           sessionByExamBase={latestTrainingByExamBase}
           cut={cut}
           meters={meters}
+          morphExamBaseId={provaMorphId}
+          onTrain={openTraining}
         />
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-3">
@@ -448,20 +550,12 @@ function yearOf(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? '' : String(d.getUTCFullYear())
 }
 
-/**
- * Aba Treino como um quadro de provas: a prova oficial do concurso é a âncora
- * fixa; ao clicar em "Treinar" numa prova, a aba troca para a experiência de
- * treino daquela prova — sem sair do concurso (breadcrumb/contexto preservados).
- */
-function TreinoTab(props: {
-  data: CargoDetail
-  sessionByExamBase: Map<string, TrainingListItem>
-  cut: number | null
-  meters: boolean
-}) {
-  const { data, sessionByExamBase, cut, meters } = props
-  const [selectedId, setSelectedId] = useState<string | null>(null)
-
+/** Opções de treino da mesa: a prova oficial (primária) + recomendadas. */
+function buildProvaOptions(data: CargoDetail): {
+  official: ProvaTrainOption | null
+  recommended: Array<ProvaTrainOption>
+  all: Array<ProvaTrainOption>
+} {
   const bancaLabel =
     data.concurso.examBoard?.alias ?? data.concurso.examBoard?.name ?? 'Banca'
   const boardId = data.concurso.examBoard?.id ?? null
@@ -482,6 +576,7 @@ function TreinoTab(props: {
         subtitle: `${data.cargo.role} · ${bancaLabel} · ${data.concurso.institution} ${data.concurso.year}`,
         logoTop: bancaLabel,
         logoBottom: yearOf(primary.examDate),
+        badge: null,
       }
     : null
 
@@ -498,6 +593,7 @@ function TreinoTab(props: {
       subtitle: `${data.concurso.institution} ${data.concurso.year}`,
       logoTop: bancaLabel,
       logoBottom: yearOf(p.examDate),
+      badge: 'este concurso',
     }))
   const related: Array<ProvaTrainOption> = data.relatedProvas.map((r) => ({
     examBaseId: r.examBaseId,
@@ -509,11 +605,32 @@ function TreinoTab(props: {
     subtitle: r.institution,
     logoTop: r.examBoardAlias ?? 'Banca',
     logoBottom: String(r.year),
+    badge: r.tier === 1 ? 'mesma banca' : 'outra banca',
   }))
   const recommended = [...ownExtra, ...related]
+  return {
+    official,
+    recommended,
+    all: official != null ? [official, ...recommended] : recommended,
+  }
+}
 
-  const allOptions = official != null ? [official, ...recommended] : recommended
-  const selected = allOptions.find((o) => o.examBaseId === selectedId) ?? null
+/**
+ * Aba Treino: a mesa do treinador. Ao clicar "Treinar" numa prova, quem assume
+ * é o CargoContent (header vira TrainingHeader + TrainingFlow na página).
+ */
+function TreinoTab(props: {
+  official: ProvaTrainOption | null
+  recommended: Array<ProvaTrainOption>
+  sessionByExamBase: Map<string, TrainingListItem>
+  cut: number | null
+  meters: boolean
+  /** Prova cujo título morfa card ↔ h1 do treino (view transition). */
+  morphExamBaseId?: string | null
+  onTrain: (examBaseId: string) => void
+}) {
+  const { official, recommended, sessionByExamBase, cut, meters, morphExamBaseId, onTrain } =
+    props
 
   // Sem prova oficial treinável e sem recomendadas → empty state.
   const officialTrainable = official != null && official.questionCount > 0
@@ -538,17 +655,6 @@ function TreinoTab(props: {
     )
   }
 
-  if (selected != null) {
-    return (
-      <TrainingView
-        option={selected}
-        session={sessionByExamBase.get(selected.examBaseId) ?? null}
-        cut={cut}
-        onBack={() => setSelectedId(null)}
-      />
-    )
-  }
-
   return (
     <ProvasBoard
       official={official}
@@ -556,79 +662,81 @@ function TreinoTab(props: {
       sessionByExamBase={sessionByExamBase}
       cut={cut}
       meters={meters}
-      onTrain={setSelectedId}
+      morphExamBaseId={morphExamBaseId}
+      onTrain={onTrain}
     />
   )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Vista de TREINO (uma prova selecionada, dentro do concurso)        */
+/*  Header de TREINO (substitui o header do cargo durante o treino)    */
 /* ------------------------------------------------------------------ */
 
-function TrainingView(props: {
+/**
+ * Em modo treino o header da página assume o contexto: botão de voltar no
+ * lugar da marca, "concurso · cargo" como subtítulo (cada peça herda o morph
+ * do nível anterior) e a prova treinada vira o título — subindo do card via
+ * `prova-title` — com o chip "treinando" e a prontidão vs corte à direita.
+ * Sem abas — o treino começa logo abaixo, no stepper.
+ */
+function TrainingHeader(props: {
+  concursoTitle: string
+  role: string
   option: ProvaTrainOption
-  session: TrainingListItem | null
   cut: number | null
+  meters: boolean
   onBack: () => void
 }) {
-  const { option, session, cut, onBack } = props
+  const { concursoTitle, role, option, cut, meters, onBack } = props
   const score =
     option.studyPlan.bestScore != null ? Math.round(option.studyPlan.bestScore) : null
   const passing = score != null && cut != null && score >= cut
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Barra de contexto: lembra que o treino é dentro do concurso. */}
-      <div
-        {...enter(0)}
-        className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 px-4 shadow-sm"
-      >
-        <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-cyan-50 leading-none text-cyan-700">
-            <span className="text-[0.66rem] font-extrabold">{option.logoTop}</span>
-            <span className="text-[0.56rem] font-bold opacity-80">{option.logoBottom}</span>
-          </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-extrabold text-slate-900">
-              Treinando: {option.kind === 'official' ? 'Prova oficial' : option.title}
-            </p>
-            <p className="truncate text-xs text-slate-500">
-              {option.kind === 'official'
-                ? 'Prova oficial do concurso'
-                : option.kind === 'related'
-                  ? 'Prova relacionada'
-                  : 'Prova equivalente'}{' '}
-              · dentro deste concurso
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          {score != null && (
-            <div className="hidden text-right sm:block">
-              <p className="text-[0.6rem] font-bold uppercase tracking-wider text-slate-500">
-                Prontidão
-              </p>
-              <p className="text-sm font-bold text-slate-700">
-                <span className={passing ? 'text-emerald-600' : 'text-slate-900'}>{score}%</span>
-                {cut != null && !passing && (
-                  <span className="text-slate-500"> · faltam {cut - score} pts</span>
-                )}
-              </p>
-            </div>
-          )}
-          <button
-            type="button"
-            onClick={onBack}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+    <header {...enter(0)} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+      <BackSquare aria-label={`Voltar às provas de ${role}`} onClick={onBack} />
+      <div className="min-w-0 flex-1 basis-48">
+        {/* Subtítulo composto: o subtítulo do concurso e o h1 do cargo do
+         * nível anterior encolhem até as próprias peças aqui (morph). */}
+        <p className="flex max-w-full flex-wrap items-baseline gap-x-1.5 text-sm font-medium text-slate-500">
+          <span
+            style={{ viewTransitionName: 'concurso-heading' }}
+            className="truncate"
           >
-            <ChevronLeftIcon className="h-4 w-4" />
-            Voltar às provas
-          </button>
+            {concursoTitle}
+          </span>
+          <span aria-hidden>·</span>
+          <span style={{ viewTransitionName: 'cargo-heading' }} className="truncate">
+            {role}
+          </span>
+        </p>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
+          <h1
+            style={{ viewTransitionName: 'prova-title' }}
+            className="text-balance text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl"
+          >
+            {option.kind === 'official' ? 'Prova oficial' : option.title}
+          </h1>
+          <span className="inline-flex items-center rounded-full bg-cyan-50 px-2.5 py-1 text-xs font-bold text-cyan-700 ring-1 ring-inset ring-cyan-200">
+            treinando
+          </span>
         </div>
       </div>
-
-      <TrainingFlow examBaseId={option.examBaseId} session={session} />
-    </div>
+      {score != null && (
+        <div className="w-full sm:w-48">
+          <p className="flex items-baseline justify-between text-xs font-semibold text-slate-600">
+            <span>Prontidão</span>
+            <span className="tabular-nums">
+              <span className={passing ? 'font-bold text-emerald-600' : 'font-bold text-slate-900'}>
+                {score}%
+              </span>
+              {cut != null && !passing && <span> · faltam {cut - score} pts</span>}
+            </span>
+          </p>
+          <ReadinessBar value={score} cut={cut} meters={meters} size="sm" className="mt-1" />
+        </div>
+      )}
+    </header>
   )
 }
 
