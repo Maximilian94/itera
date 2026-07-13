@@ -259,6 +259,11 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                   enterIdx={1 + i}
                 />
               ))}
+              {startSimulado.isError && (
+                <p role="alert" className="px-1 text-sm text-rose-600">
+                  Não foi possível começar o simulado agora. Tente novamente.
+                </p>
+              )}
             </section>
           )}
         </div>

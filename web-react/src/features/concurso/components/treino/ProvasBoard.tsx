@@ -4,6 +4,8 @@ import {
   ClockIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline'
+import { Link } from '@tanstack/react-router'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import type { StudyPlan } from '@/features/concurso/domain/concurso.types'
 import type { TrainingListItem } from '@/features/training/domain/training.types'
 import { CARD } from '@/features/concurso/components/card'
@@ -191,6 +193,22 @@ function BancaSeal(props: { top: string; bottom: string; size?: 'md' | 'lg'; acc
 }
 
 function Quota() {
+  const { trainingBlockedMessage, isEliteAtLimit } = useRequireAccess()
+  // Cota esgotada / plano sem treinos: o motivo aparece já na mesa (T5.1) —
+  // o CTA "Começar treino" do fluxo fica desabilitado com a mesma nota.
+  if (trainingBlockedMessage != null) {
+    return (
+      <span className="inline-flex flex-wrap items-center gap-1.5 text-xs font-medium text-amber-800">
+        <ClockIcon className="h-4 w-4" />
+        {trainingBlockedMessage}
+        {!isEliteAtLimit && (
+          <Link to="/planos" className="font-semibold text-cyan-700">
+            Ver planos
+          </Link>
+        )}
+      </span>
+    )
+  }
   return (
     <span className="inline-flex items-center gap-1.5 text-xs text-slate-500">
       <ClockIcon className="h-4 w-4" />

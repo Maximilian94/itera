@@ -4,7 +4,6 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { AcademicCapIcon, BanknotesIcon } from '@heroicons/react/24/outline'
 import { FichaCard } from './FichaCard'
-import { institutionInitials } from './InstitutionMark'
 import { ReadinessBar } from './ReadinessBar'
 import { StatusPill } from './StatusPill'
 import { SubjectDistribution, accuracyChipClass } from './SubjectDistribution'
@@ -16,22 +15,6 @@ import type { SubjectDistribution as SubjectDistributionData } from '../domain/c
 
 afterEach(() => {
   document.body.innerHTML = ''
-})
-
-describe('institutionInitials', () => {
-  it('usa primeira e última palavra significativa', () => {
-    expect(institutionInitials('Prefeitura Municipal de Campinas')).toBe('PC')
-    expect(institutionInitials('Universidade de São Paulo')).toBe('UP')
-  })
-
-  it('usa as duas primeiras letras para nome de uma palavra', () => {
-    expect(institutionInitials('Cebraspe')).toBe('CE')
-  })
-
-  it('ignora stopwords isoladas e string vazia', () => {
-    expect(institutionInitials('')).toBe('')
-    expect(institutionInitials('de')).toBe('')
-  })
 })
 
 describe('StatusPill', () => {

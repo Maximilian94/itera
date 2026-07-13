@@ -1,4 +1,5 @@
 import { Suspense, lazy, useState } from 'react'
+import { Link } from '@tanstack/react-router'
 import {
   ArrowRightIcon,
   ClipboardDocumentListIcon,
@@ -152,8 +153,13 @@ export function TrainingFlow(props: {
       </div>
 
       {actions.isError && (
-        <p className="px-1 text-sm text-rose-600">
+        <p role="alert" className="px-1 text-sm text-rose-600">
           Não foi possível começar o treino agora. Verifique seu plano ou tente novamente.
+        </p>
+      )}
+      {advanceStage.isError && (
+        <p role="alert" className="px-1 text-sm text-rose-600">
+          Não foi possível avançar de fase agora. Tente novamente.
         </p>
       )}
     </div>
@@ -168,13 +174,14 @@ function PrimaryBtn(props: {
   onClick: () => void
   children: React.ReactNode
   loading?: boolean
+  disabled?: boolean
   icon?: React.ReactNode
 }) {
   return (
     <button
       type="button"
       onClick={props.onClick}
-      disabled={props.loading}
+      disabled={props.loading || props.disabled}
       className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
     >
       {props.loading ? <CircularProgress size={15} color="inherit" /> : props.icon}
@@ -185,6 +192,20 @@ function PrimaryBtn(props: {
 
 const CARD =
   'rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.08),0_1px_2px_rgba(15,23,42,0.06)] sm:p-6'
+
+/** Motivo do bloqueio de cota/plano, com caminho de upgrade quando existe. */
+function BlockedNote(props: { message: string; showUpgrade: boolean }) {
+  return (
+    <p className="max-w-prose text-sm text-amber-800">
+      {props.message}{' '}
+      {props.showUpgrade && (
+        <Link to="/planos" className="font-semibold text-cyan-700">
+          Ver planos
+        </Link>
+      )}
+    </p>
+  )
+}
 
 /** Título da fase dentro do card do conteúdo (nada de header solto na página). */
 function PhaseHeader(props: { title: string; desc: string }) {
@@ -281,13 +302,22 @@ function PhaseContent(props: {
           desc="Responda a prova real no formato de simulado. É ela que calibra todo o seu plano."
           facts={facts}
           actions={
-            <PrimaryBtn
-              onClick={() => actions.start()}
-              loading={actions.isStarting}
-              icon={<PlayIcon className="h-4 w-4" />}
-            >
-              Começar treino
-            </PrimaryBtn>
+            <div className="flex flex-col items-start gap-2">
+              <PrimaryBtn
+                onClick={() => actions.start()}
+                loading={actions.isStarting}
+                disabled={actions.blockedMessage != null}
+                icon={<PlayIcon className="h-4 w-4" />}
+              >
+                Começar treino
+              </PrimaryBtn>
+              {actions.blockedMessage != null && (
+                <BlockedNote
+                  message={actions.blockedMessage}
+                  showUpgrade={!actions.isEliteAtLimit}
+                />
+              )}
+            </div>
           }
         />
       )
@@ -401,14 +431,21 @@ function PhaseContent(props: {
               </div>
             )}
           </section>
-          <div className="px-1">
+          <div className="flex flex-col items-start gap-2 px-1">
             <PrimaryBtn
               onClick={() => actions.start(() => onView('prova'))}
               loading={actions.isStarting}
+              disabled={actions.blockedMessage != null}
               icon={<SparklesIcon className="h-4 w-4" />}
             >
               Começar novo ciclo
             </PrimaryBtn>
+            {actions.blockedMessage != null && (
+              <BlockedNote
+                message={actions.blockedMessage}
+                showUpgrade={!actions.isEliteAtLimit}
+              />
+            )}
           </div>
         </div>
       )

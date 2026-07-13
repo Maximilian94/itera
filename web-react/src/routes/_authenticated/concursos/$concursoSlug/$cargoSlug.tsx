@@ -258,9 +258,14 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
 
   // Aba ativa: default inteligente — com treino em andamento entra direto no
   // Treino (retomar é 1 clique); sem sessão, Detalhes (a ficha morfa vinda do
-  // concurso). O clique do usuário fixa a escolha.
+  // concurso). O clique do usuário fixa a escolha. O default só resolve
+  // DEPOIS de a lista de treinos assentar (T5.3): antes disso a página abria
+  // em Detalhes e saltava para Treino quando os treinos chegavam.
   const [tabChoice, setTabChoice] = useState<'treino' | 'detalhes' | null>(null)
-  const tab = tabChoice ?? (activeTraining != null ? 'treino' : 'detalhes')
+  const tabsSettled = !trainingsQuery.isPending
+  const tab: 'treino' | 'detalhes' | null =
+    tabChoice ??
+    (!tabsSettled ? null : activeTraining != null ? 'treino' : 'detalhes')
 
   /* Opções de treino da mesa (oficial + recomendadas). A prova selecionada
    * sobe até aqui porque, em modo treino, o HEADER da página é substituído
@@ -389,11 +394,22 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
           </header>
 
           {/* ░░ Abas: Treino (ação) · Detalhes (ficha) ░░ */}
-          <CargoTabs
-            tab={tab}
-            onChange={setTabChoice}
-            hasActiveTraining={activeTraining != null}
-          />
+          {tab != null ? (
+            <CargoTabs
+              tab={tab}
+              onChange={setTabChoice}
+              hasActiveTraining={activeTraining != null}
+            />
+          ) : (
+            /* Mesma altura da linha de abas — a aba certa entra sem salto. */
+            <div
+              aria-hidden
+              className="-mb-px flex items-center gap-1 border-b border-slate-200"
+            >
+              <span className="mx-4 my-2.5 h-5 w-16 animate-pulse rounded bg-slate-200" />
+              <span className="mx-4 my-2.5 h-5 w-16 animate-pulse rounded bg-slate-200" />
+            </div>
+          )}
         </>
       )}
 
@@ -407,6 +423,9 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
           morphItemId={studyMorphId}
           onFocusItem={openStudyItem}
         />
+      ) : tab == null ? (
+        /* Aba default ainda não resolvida (T5.3) → silhueta neutra. */
+        <TreinoTabSkeleton />
       ) : tab === 'treino' ? (
         /* Gating da mesa: os CTAs "Treinar"/"Continuar" dependem de saber se
          * há sessão em andamento — começar um treino consome cota. Enquanto a
