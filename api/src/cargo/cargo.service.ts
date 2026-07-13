@@ -415,97 +415,12 @@ export class CargoService {
 
   /**
    * Cargo default 1:1 para uma prova (R4.1 item 4): o caso comum "1 prova =
-   * 1 cargo" continua sem passo extra no wizard. Idempotente — prova já
-   * vinculada a algum cargo retorna o existente. Prova sem institution não
-   * tem concurso → sem cargo (retorna null; ela fica fora das páginas de
-   * concurso, comportamento atual).
-   *
-   * Determinístico como o backfill: o Cargo default usa o id da própria
-   * prova, então o fallback por UUID de getCargoDetail funciona por
-   * construção.
+   * 1 cargo" continua sem passo extra no wizard. A implementação mora no
+   * ConcursoLinkService (o self-heal de leitura do R4.2 usa a mesma rotina
+   * sem criar ciclo de módulos); aqui fica a porta usada pelos hooks de
+   * escrita (wizard admin e promoção do scraper).
    */
-  async ensureDefaultCargo(examBaseId: string): Promise<string | null> {
-    const existing = await this.prisma.cargoProva.findFirst({
-      where: { examBaseId },
-      select: { cargoId: true },
-    });
-    if (existing) return existing.cargoId;
-
-    const concursoId =
-      await this.concursoLink.ensureConcursoForExamBase(examBaseId);
-    if (!concursoId) return null;
-
-    const prova = await this.prisma.examBase.findUniqueOrThrow({
-      where: { id: examBaseId },
-      select: {
-        id: true,
-        slug: true,
-        role: true,
-        description: true,
-        requirements: true,
-        salaryBase: true,
-        workload: true,
-        vacancyCount: true,
-        hasReserveList: true,
-        applicantCount: true,
-        registrationFee: true,
-        minPassingGradeNonQuota: true,
-        actualCutScore: true,
-        isNursingRelevant: true,
-        provaLabel: true,
-      },
-    });
-
-    const createCargo = (slug: string | null) =>
-      this.prisma.$transaction(async (tx) => {
-        await tx.cargo.create({
-          data: {
-            id: prova.id,
-            slug,
-            role: prova.role,
-            description: prova.description,
-            requirements: prova.requirements,
-            salaryBase: prova.salaryBase,
-            workload: prova.workload,
-            vacancyCount: prova.vacancyCount,
-            hasReserveList: prova.hasReserveList,
-            applicantCount: prova.applicantCount,
-            registrationFee: prova.registrationFee,
-            minPassingGradeNonQuota: prova.minPassingGradeNonQuota,
-            actualCutScore: prova.actualCutScore,
-            isNursingRelevant: prova.isNursingRelevant,
-            concursoId,
-          },
-        });
-        await tx.cargoProva.create({
-          data: {
-            cargoId: prova.id,
-            examBaseId: prova.id,
-            provaLabel: prova.provaLabel,
-            isOficial: true,
-            order: 0,
-          },
-        });
-      });
-
-    try {
-      await createCargo(prova.slug);
-    } catch (err) {
-      if (
-        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
-        err.code !== 'P2002'
-      ) {
-        throw err;
-      }
-      // Corrida (cargo/vínculo criado em paralelo) → devolve o existente;
-      // clash de slug com outro cargo → cria sem slug (heal depois).
-      const raced = await this.prisma.cargoProva.findFirst({
-        where: { examBaseId },
-        select: { cargoId: true },
-      });
-      if (raced) return raced.cargoId;
-      await createCargo(null);
-    }
-    return prova.id;
+  ensureDefaultCargo(examBaseId: string): Promise<string | null> {
+    return this.concursoLink.ensureDefaultCargo(examBaseId);
   }
 }

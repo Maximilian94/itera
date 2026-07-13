@@ -441,11 +441,30 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     user: { findUnique: jest.Mock };
     examBase: { findMany: jest.Mock; updateMany: jest.Mock };
     concurso: { findFirst: jest.Mock; update: jest.Mock };
+    cargo: { findMany: jest.Mock };
     examBaseAttempt: { groupBy: jest.Mock };
   };
+  let concursoLink: { ensureDefaultCargo: jest.Mock };
 
+  /** Prova (query da tupla): só temporais + heal (a ficha mora no Cargo). */
   function buildProva(overrides: Record<string, unknown> = {}) {
     return {
+      id: 'eb-enfermeiro',
+      examDate: new Date('2026-07-12T00:00:00.000Z'),
+      registrationStart: new Date('2026-05-01T00:00:00.000Z'),
+      registrationEnd: new Date('2026-05-31T00:00:00.000Z'),
+      resultDate: new Date('2026-09-30T00:00:00.000Z'),
+      editalUrl: null,
+      isNursingRelevant: true,
+      cargoProvas: [{ cargoId: 'eb-enfermeiro' }],
+      _count: { questions: 120 },
+      ...overrides,
+    };
+  }
+
+  /** Card de cargo: ficha do model Cargo + provas vinculadas. */
+  function buildCargoRow(overrides: Record<string, unknown> = {}) {
+    const base = {
       id: 'eb-enfermeiro',
       slug: 'pref-campinas-2026-enfermeiro',
       role: 'Enfermeiro',
@@ -455,15 +474,20 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
       workload: '40h semanais',
       registrationFee: '90',
       minPassingGradeNonQuota: '60',
-      examDate: new Date('2026-07-12T00:00:00.000Z'),
-      registrationStart: new Date('2026-05-01T00:00:00.000Z'),
-      registrationEnd: new Date('2026-05-31T00:00:00.000Z'),
-      resultDate: new Date('2026-09-30T00:00:00.000Z'),
-      published: true,
-      editalUrl: null,
-      isNursingRelevant: true,
-      _count: { questions: 120 },
       ...overrides,
+    };
+    return {
+      provas: [
+        {
+          isOficial: true,
+          examBase: {
+            id: base.id,
+            published: true,
+            _count: { questions: 120 },
+          },
+        },
+      ],
+      ...base,
     };
   }
 
@@ -478,13 +502,15 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
         findFirst: jest.fn().mockResolvedValue({ ...CONCURSO }),
         update: jest.fn(),
       },
+      cargo: { findMany: jest.fn().mockResolvedValue([buildCargoRow()]) },
       examBaseAttempt: { groupBy: jest.fn().mockResolvedValue([]) },
     };
+    concursoLink = { ensureDefaultCargo: jest.fn().mockResolvedValue(null) };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ConcursoService,
-        ConcursoLinkService,
+        { provide: ConcursoLinkService, useValue: concursoLink },
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -533,6 +559,12 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
       name: 'Cebraspe (Cespe/UnB)',
       alias: 'CEBRASPE',
     });
+    // Cards vêm do model Cargo, filtrados por relevância no banco.
+    expect(prisma.cargo.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { concursoId: CONCURSO.id, isNursingRelevant: true },
+      }),
+    );
   });
 
   it('autenticado: stats do usuário mapeadas por cargo', async () => {
@@ -567,16 +599,16 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
   });
 
   it('cargos ordenados por salário desc, null por último; agregados batem', async () => {
-    prisma.examBase.findMany.mockResolvedValue([
-      buildProva({
+    prisma.cargo.findMany.mockResolvedValue([
+      buildCargoRow({
         id: 'eb-tecnico',
         role: 'Técnico de Enfermagem',
         salaryBase: '4800',
         vacancyCount: 50,
         hasReserveList: true,
       }),
-      buildProva({ id: 'eb-sem-salario', role: 'Auxiliar', salaryBase: null }),
-      buildProva(),
+      buildCargoRow({ id: 'eb-sem-salario', role: 'Auxiliar', salaryBase: null }),
+      buildCargoRow(),
     ]);
 
     const result = await service.getConcursoDetail(CONCURSO.slug);
@@ -596,17 +628,17 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     });
   });
 
-  it('cargo irrelevante sai de cargos e dos agregados, mas o link self-healing cobre todos', async () => {
+  it('cargo irrelevante fica fora (filtro no banco), mas o link self-healing cobre todas as provas', async () => {
     prisma.examBase.findMany.mockResolvedValue([
       buildProva(),
       buildProva({
         id: 'eb-medico',
-        role: 'Médico Clínico',
         isNursingRelevant: false,
-        vacancyCount: 100,
-        salaryBase: '15000',
+        cargoProvas: [{ cargoId: 'eb-medico' }],
       }),
     ]);
+    // O banco (where isNursingRelevant: true) já devolve só o Enfermeiro.
+    prisma.cargo.findMany.mockResolvedValue([buildCargoRow()]);
 
     const result = await service.getConcursoDetail(CONCURSO.slug);
 
@@ -623,10 +655,20 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     });
   });
 
-  it('taxas de inscrição divergentes entre cargos → summary.registrationFee null', async () => {
+  it('prova legada sem linha de Cargo é healada na leitura (rotina do backfill)', async () => {
     prisma.examBase.findMany.mockResolvedValue([
-      buildProva(),
-      buildProva({
+      buildProva({ cargoProvas: [] }),
+    ]);
+
+    await service.getConcursoDetail(CONCURSO.slug);
+
+    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith('eb-enfermeiro');
+  });
+
+  it('taxas de inscrição divergentes entre cargos → summary.registrationFee null', async () => {
+    prisma.cargo.findMany.mockResolvedValue([
+      buildCargoRow(),
+      buildCargoRow({
         id: 'eb-tecnico',
         role: 'Técnico de Enfermagem',
         registrationFee: '60',
@@ -636,6 +678,30 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     const result = await service.getConcursoDetail(CONCURSO.slug);
 
     expect(result.concurso.summary.registrationFee).toBeNull();
+  });
+
+  it('cargo sem nenhuma prova publicada fica fora do payload para usuário comum', async () => {
+    prisma.cargo.findMany.mockResolvedValue([
+      buildCargoRow(),
+      {
+        ...buildCargoRow({ id: 'eb-oculto', role: 'Enfermeiro Noturno' }),
+        provas: [
+          {
+            isOficial: true,
+            examBase: {
+              id: 'eb-oculto',
+              published: false,
+              _count: { questions: 10 },
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.getConcursoDetail(CONCURSO.slug);
+
+    expect(result.cargos.map((c) => c.role)).toEqual(['Enfermeiro']);
+    expect(result.concurso.summary.cargoCount).toBe(1);
   });
 });
 
@@ -666,11 +732,15 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       updateMany: jest.Mock;
     };
     concurso: { findFirst: jest.Mock; update: jest.Mock };
+    cargo: { findFirst: jest.Mock };
     examBaseAttempt: { findMany: jest.Mock; groupBy: jest.Mock };
     examBaseAttemptAnswer: { findMany: jest.Mock };
   };
+  let concursoLink: { ensureDefaultCargo: jest.Mock };
 
+  /** Linha do model Cargo: ficha + syllabus + vínculos com as provas. */
   function buildCargo(overrides: Record<string, unknown> = {}) {
+    const questionCount = (overrides.questionCount as number) ?? 0;
     return {
       id: 'eb-enfermeiro',
       slug: 'pref-campinas-2026-enfermeiro',
@@ -683,16 +753,23 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       hasReserveList: false,
       registrationFee: '90',
       minPassingGradeNonQuota: '60',
-      examDate: new Date('2026-07-12T00:00:00.000Z'),
-      editalUrl: null,
-      published: true,
-      cargoGroupId: null,
-      provaLabel: null,
-      isPrimaryProva: true,
       syllabusGroups: [
         { name: 'SUS', topics: 'Lei 8.080; Lei 8.142', order: 0 },
       ],
-      _count: { questions: 0 },
+      provas: [
+        {
+          provaLabel: null,
+          isOficial: true,
+          examBase: {
+            id: 'eb-enfermeiro',
+            slug: 'pref-campinas-2026-enfermeiro',
+            examDate: new Date('2026-07-12T00:00:00.000Z'),
+            editalUrl: null,
+            published: true,
+            _count: { questions: questionCount },
+          },
+        },
+      ],
       ...overrides,
     };
   }
@@ -721,21 +798,20 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   }
 
   /**
-   * findMany é chamado três vezes no getCargoDetail:
-   * - provas do cargo (grupo), filtrado por `id`/`cargoGroupId` → cargoSelect;
-   * - siblings (só a chave do concurso) → status/timeline;
-   * - previousExams (`where.role`) → edições anteriores.
+   * findMany do examBase é roteado pelo shape do where:
+   * - `where.role` → previousExams (previousEditionsWhere);
+   * - `where.OR`   → relacionadas (tier 1/2, com take no banco);
+   * - resto (chave do concurso) → siblings (status/timeline).
    */
   function mockExamBaseLists({
-    group = [buildCargo()] as Record<string, unknown>[],
     siblings = [buildSibling()],
     previous = [] as Record<string, unknown>[],
+    related = [] as Record<string, unknown>[],
   } = {}) {
     prisma.examBase.findMany.mockImplementation(
-      (args: { where: { role?: string; id?: string; cargoGroupId?: string } }) => {
+      (args: { where: { role?: string; OR?: unknown } }) => {
         if (args.where.role) return Promise.resolve(previous);
-        if (args.where.id != null || args.where.cargoGroupId != null)
-          return Promise.resolve(group);
+        if (args.where.OR) return Promise.resolve(related);
         return Promise.resolve(siblings);
       },
     );
@@ -745,7 +821,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     prisma = {
       user: { findUnique: jest.fn().mockResolvedValue(null) },
       examBase: {
-        findFirst: jest.fn().mockResolvedValue(buildCargo()),
+        findFirst: jest.fn().mockResolvedValue(null),
         findMany: jest.fn().mockResolvedValue([]),
         updateMany: jest.fn().mockResolvedValue({ count: 0 }),
       },
@@ -753,18 +829,20 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
         findFirst: jest.fn().mockResolvedValue({ ...CONCURSO }),
         update: jest.fn(),
       },
+      cargo: { findFirst: jest.fn().mockResolvedValue(buildCargo()) },
       examBaseAttempt: {
         findMany: jest.fn().mockResolvedValue([]),
         groupBy: jest.fn().mockResolvedValue([]),
       },
       examBaseAttemptAnswer: { findMany: jest.fn().mockResolvedValue([]) },
     };
+    concursoLink = { ensureDefaultCargo: jest.fn().mockResolvedValue(null) };
     mockExamBaseLists();
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         ConcursoService,
-        ConcursoLinkService,
+        { provide: ConcursoLinkService, useValue: concursoLink },
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -786,20 +864,30 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     ).rejects.toThrow('concurso not found');
   });
 
-  it('404 para cargo que não pertence ao concurso (where restringe à chave do concurso)', async () => {
-    prisma.examBase.findFirst.mockResolvedValue(null);
+  it('404 para cargo que não pertence ao concurso (cargo E prova restritos à chave)', async () => {
+    prisma.cargo.findFirst.mockResolvedValue(null);
 
     await expect(
       service.getCargoDetail(CONCURSO.slug, 'cargo-de-outro-concurso'),
     ).rejects.toThrow('cargo not found');
 
+    // Resolução primária: pelo model Cargo, restrito ao concurso.
+    expect(prisma.cargo.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          slug: 'cargo-de-outro-concurso',
+          concursoId: CONCURSO.id,
+          isNursingRelevant: true,
+        }) as object,
+      }),
+    );
+    // Fallback: por prova, restrito à chave do concurso.
     expect(prisma.examBase.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           slug: 'cargo-de-outro-concurso',
           institution: CONCURSO.institution,
           examBoardId: CONCURSO.examBoardId,
-          isNursingRelevant: true,
           published: true,
         }) as object,
       }),
@@ -812,13 +900,29 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       '11111111-2222-3333-4444-555555555555',
     );
 
-    expect(prisma.examBase.findFirst).toHaveBeenCalledWith(
+    expect(prisma.cargo.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           id: '11111111-2222-3333-4444-555555555555',
         }) as object,
       }),
     );
+  });
+
+  it('fallback por prova legada: slug de prova sem Cargo é healado e resolve', async () => {
+    prisma.cargo.findFirst
+      .mockResolvedValueOnce(null) // não há cargo com esse slug
+      .mockResolvedValueOnce(buildCargo()); // pós-heal
+    prisma.examBase.findFirst.mockResolvedValue({ id: 'eb-enfermeiro' });
+    concursoLink.ensureDefaultCargo.mockResolvedValue('eb-enfermeiro');
+
+    const result = await service.getCargoDetail(
+      CONCURSO.slug,
+      'pref-campinas-2026-enfermeiro-tipo-2',
+    );
+
+    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith('eb-enfermeiro');
+    expect(result.cargo.role).toBe('Enfermeiro');
   });
 
   it('anônimo: ficha completa + studyPlan zerado em diagnostico, sem consultar attempts', async () => {
@@ -839,7 +943,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       minPassingGrade: '60',
       questionCount: 0,
     });
-    // editalUrl do cargo é null → herda o do concurso.
+    // editalUrl da prova oficial é null → herda o do concurso.
     expect(result.cargo.editalUrl).toBe('https://example.com/edital.pdf');
     expect(result.concurso.status).toBe('future');
     expect(result.studyPlan).toEqual({
@@ -869,7 +973,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     expect(result.syllabusGroups).toEqual([]);
   });
 
-  it('previousExams: mesma instituição+banca+role, anos anteriores, com stats do usuário', async () => {
+  it('previousExams: mesma instituição+banca+role (via Cargo), anos anteriores, com stats do usuário', async () => {
     mockExamBaseLists({ previous: [buildPreviousExam()] });
     prisma.examBaseAttempt.groupBy.mockResolvedValue([
       {
@@ -906,10 +1010,28 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     ]);
   });
 
+  it('relacionadas: cap no banco (take) nas duas queries de tier', async () => {
+    await service.getCargoDetail(
+      CONCURSO.slug,
+      'pref-campinas-2026-enfermeiro',
+      'user-1',
+    );
+
+    const relatedCalls = prisma.examBase.findMany.mock.calls.filter(
+      ([args]: [{ where: { OR?: unknown } }]) => args.where.OR != null,
+    );
+    expect(relatedCalls).toHaveLength(2); // tier 1 (mesma banca) + tier 2
+    for (const [args] of relatedCalls) {
+      expect(args.take).toBe(8);
+    }
+    expect(relatedCalls[0][0].where.examBoardId).toBe('board-1');
+    expect(relatedCalls[1][0].where.NOT).toEqual({ examBoardId: 'board-1' });
+  });
+
   it('prova futura sem questões: studyPlan computado sobre as previousExams', async () => {
     mockExamBaseLists({ previous: [buildPreviousExam()] });
     prisma.examBaseAttempt.findMany.mockResolvedValue([
-      { scorePercentage: '50' },
+      { examBaseId: 'eb-2023', scorePercentage: '50' },
     ]);
 
     await service.getCargoDetail(
@@ -928,10 +1050,8 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('prova com questões próprias: studyPlan usa a própria prova', async () => {
-    mockExamBaseLists({
-      group: [buildCargo({ _count: { questions: 120 } })],
-      previous: [buildPreviousExam()],
-    });
+    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    mockExamBaseLists({ previous: [buildPreviousExam()] });
 
     await service.getCargoDetail(
       CONCURSO.slug,
@@ -949,7 +1069,8 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('currentStep: sem tentativa → diagnostico; abaixo do corte → treino_dirigido; no corte → reta_final', async () => {
-    mockExamBaseLists({ group: [buildCargo({ _count: { questions: 120 } })] });
+    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    mockExamBaseLists();
 
     let result = await service.getCargoDetail(
       CONCURSO.slug,
@@ -959,8 +1080,8 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     expect(result.studyPlan.currentStep).toBe('diagnostico');
 
     prisma.examBaseAttempt.findMany.mockResolvedValue([
-      { scorePercentage: '40' },
-      { scorePercentage: '55' },
+      { examBaseId: 'eb-enfermeiro', scorePercentage: '40' },
+      { examBaseId: 'eb-enfermeiro', scorePercentage: '55' },
     ]);
     result = await service.getCargoDetail(
       CONCURSO.slug,
@@ -975,8 +1096,8 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     });
 
     prisma.examBaseAttempt.findMany.mockResolvedValue([
-      { scorePercentage: '40' },
-      { scorePercentage: '60' },
+      { examBaseId: 'eb-enfermeiro', scorePercentage: '40' },
+      { examBaseId: 'eb-enfermeiro', scorePercentage: '60' },
     ]);
     result = await service.getCargoDetail(
       CONCURSO.slug,
@@ -987,14 +1108,16 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('weakSubjects: top 3 piores matérias, exigindo mínimo de respostas por matéria', async () => {
-    mockExamBaseLists({ group: [buildCargo({ _count: { questions: 120 } })] });
+    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    mockExamBaseLists();
     prisma.examBaseAttempt.findMany.mockResolvedValue([
-      { scorePercentage: '40' },
+      { examBaseId: 'eb-enfermeiro', scorePercentage: '40' },
     ]);
 
     const answer = (subject: string, correct: boolean) => ({
       selectedAlternative: { key: correct ? 'A' : 'B' },
       examBaseQuestion: { subject, correctAlternative: 'A' },
+      examBaseAttempt: { examBaseId: 'eb-enfermeiro' },
     });
     prisma.examBaseAttemptAnswer.findMany.mockResolvedValue([
       // SUS: 5 respondidas, 1 certa → 20%

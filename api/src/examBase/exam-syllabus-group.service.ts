@@ -58,9 +58,19 @@ export class ExamSyllabusGroupService {
       order = last ? last.order + 1 : 0;
     }
 
+    // Remodelagem R4.2: o dono do conteúdo programático é o CARGO (as
+    // leituras de /concursos leem por cargoId). Enquanto o editor admin
+    // continua por prova (até R4.3), grava também o cargo onde esta prova é
+    // a oficial — dual-write da transição.
+    const oficialLink = await this.prisma.cargoProva.findFirst({
+      where: { examBaseId, isOficial: true },
+      select: { cargoId: true },
+    });
+
     return this.prisma.examSyllabusGroup.create({
       data: {
         examBaseId,
+        cargoId: oficialLink?.cargoId ?? null,
         order,
         name: normalizeRequiredText(input.name, 'name'),
         topics: normalizeRequiredText(input.topics, 'topics'),

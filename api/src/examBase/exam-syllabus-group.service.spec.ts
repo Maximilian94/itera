@@ -11,6 +11,7 @@ describe('ExamSyllabusGroupService', () => {
   let service: ExamSyllabusGroupService;
   let prisma: {
     examBase: { findUnique: jest.Mock };
+    cargoProva: { findFirst: jest.Mock };
     examSyllabusGroup: {
       findMany: jest.Mock;
       findFirst: jest.Mock;
@@ -26,6 +27,8 @@ describe('ExamSyllabusGroupService', () => {
       examBase: {
         findUnique: jest.fn().mockResolvedValue({ id: EXAM_BASE_ID }),
       },
+      // Dual-write R4.2: create grava também o cargo onde a prova é oficial.
+      cargoProva: { findFirst: jest.fn().mockResolvedValue(null) },
       examSyllabusGroup: {
         findMany: jest.fn().mockResolvedValue([]),
         findFirst: jest.fn().mockResolvedValue(null),

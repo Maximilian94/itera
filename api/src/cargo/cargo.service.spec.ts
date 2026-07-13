@@ -37,7 +37,10 @@ describe('CargoService (invariantes da remodelagem, R4.1)', () => {
     };
     concurso: { findUnique: jest.Mock };
   };
-  let concursoLink: { ensureConcursoForExamBase: jest.Mock };
+  let concursoLink: {
+    ensureConcursoForExamBase: jest.Mock;
+    ensureDefaultCargo: jest.Mock;
+  };
 
   beforeEach(async () => {
     prisma = {
@@ -72,7 +75,10 @@ describe('CargoService (invariantes da remodelagem, R4.1)', () => {
       },
       concurso: { findUnique: jest.fn() },
     };
-    concursoLink = { ensureConcursoForExamBase: jest.fn().mockResolvedValue(null) };
+    concursoLink = {
+      ensureConcursoForExamBase: jest.fn().mockResolvedValue(null),
+      ensureDefaultCargo: jest.fn().mockResolvedValue(null),
+    };
 
     const moduleRef = await Test.createTestingModule({
       providers: [
@@ -272,63 +278,14 @@ describe('CargoService (invariantes da remodelagem, R4.1)', () => {
     });
   });
 
-  describe('ensureDefaultCargo (1 prova = 1 cargo sem passo extra)', () => {
-    it('prova já vinculada → retorna o cargo existente sem criar nada', async () => {
-      prisma.cargoProva.findFirst.mockResolvedValue({ cargoId: 'cargo-x' });
+  describe('ensureDefaultCargo', () => {
+    it('delega para o ConcursoLinkService (implementação compartilhada com o self-heal de leitura)', async () => {
+      concursoLink.ensureDefaultCargo.mockResolvedValue('cargo-x');
 
       const result = await service.ensureDefaultCargo(PROVA_A);
 
       expect(result).toBe('cargo-x');
-      expect(prisma.cargo.create).not.toHaveBeenCalled();
-    });
-
-    it('prova sem institution (sem concurso) → null, sem cargo', async () => {
-      concursoLink.ensureConcursoForExamBase.mockResolvedValue(null);
-
-      const result = await service.ensureDefaultCargo(PROVA_A);
-
-      expect(result).toBeNull();
-      expect(prisma.cargo.create).not.toHaveBeenCalled();
-    });
-
-    it('cria cargo com id/slug/ficha da prova e vínculo oficial', async () => {
-      concursoLink.ensureConcursoForExamBase.mockResolvedValue('concurso-1');
-      prisma.examBase.findUniqueOrThrow.mockResolvedValue({
-        id: PROVA_A,
-        slug: 'pref-x-2026-enfermeiro',
-        role: 'Enfermeiro',
-        description: null,
-        requirements: 'COREN',
-        salaryBase: '8500',
-        workload: null,
-        vacancyCount: 10,
-        hasReserveList: false,
-        applicantCount: null,
-        registrationFee: null,
-        minPassingGradeNonQuota: '60',
-        actualCutScore: null,
-        isNursingRelevant: true,
-        provaLabel: null,
-      });
-
-      const result = await service.ensureDefaultCargo(PROVA_A);
-
-      expect(result).toBe(PROVA_A);
-      expect(prisma.cargo.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          id: PROVA_A,
-          slug: 'pref-x-2026-enfermeiro',
-          role: 'Enfermeiro',
-          concursoId: 'concurso-1',
-        }) as object,
-      });
-      expect(prisma.cargoProva.create).toHaveBeenCalledWith({
-        data: expect.objectContaining({
-          cargoId: PROVA_A,
-          examBaseId: PROVA_A,
-          isOficial: true,
-        }) as object,
-      });
+      expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith(PROVA_A);
     });
   });
 });

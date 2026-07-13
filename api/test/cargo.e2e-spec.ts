@@ -4,7 +4,13 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { createTestApp, TEST_USER_HEADER } from './create-app';
-import { createExamBoard, createUser, truncateAll } from './factories';
+import {
+  addQuestions,
+  createExamBoard,
+  createFinishedAttempt,
+  createUser,
+  truncateAll,
+} from './factories';
 
 /**
  * E2E da gestão ADMIN de cargos (remodelagem Cargo↔Prova, R4.1) contra
@@ -229,6 +235,79 @@ describe('Cargos (admin, e2e)', () => {
     });
     expect(String(prova.salaryBase)).toBe('9100');
     expect(prova.vacancyCount).toBe(25);
+  });
+
+  it('R4.2: prova compartilhada aparece nos DOIS cargos com o mesmo questionCount; treino de um reflete prontidão no outro', async () => {
+    // Recompartilha a prova do Geral com o Pediatra e dá questões a ela.
+    await asAdmin(
+      request(http).post(
+        `/cargos/${cargoOf(provaPediatra)}/provas/${provaGeral}`,
+      ),
+    ).expect(201);
+    const questions = await addQuestions(prisma, provaGeral, [
+      { subject: 'SUS', count: 6 },
+    ]);
+    // O usuário treina a prova compartilhada (nota 50).
+    await createFinishedAttempt(prisma, {
+      userId: user.id,
+      examBaseId: provaGeral,
+      scorePercentage: 50,
+      answers: questions.map((q, i) => ({ question: q, correct: i % 2 === 0 })),
+    });
+
+    // Provas do wizard nascem despublicadas; publica para a leitura de user.
+    await prisma.examBase.updateMany({
+      where: { id: { in: [provaGeral, provaPediatra] } },
+      data: { published: true },
+    });
+    const cargoGeral = await prisma.cargo.findUniqueOrThrow({
+      where: { id: cargoOf(provaGeral) },
+      select: { concurso: { select: { slug: true, id: true } } },
+    });
+    const concursoRef = cargoGeral.concurso.slug ?? cargoGeral.concurso.id;
+
+    // Cargos por UUID (o slug do cargo default segue o da prova, que o wizard
+    // ainda não gerou) — o fallback por id é parte do contrato.
+    const [geral, pediatra] = await Promise.all([
+      asUser(
+        request(http).get(
+          `/concursos/${concursoRef}/cargos/${cargoOf(provaGeral)}`,
+        ),
+      ).expect(200),
+      asUser(
+        request(http).get(
+          `/concursos/${concursoRef}/cargos/${cargoOf(provaPediatra)}`,
+        ),
+      ).expect(200),
+    ]);
+
+    type Prova = {
+      examBaseId: string;
+      isPrimary: boolean;
+      questionCount: number;
+      userStats: { attemptCount: number; bestScore: number | null };
+      studyPlan: { bestScore: number | null };
+    };
+    const sharedInGeral = (geral.body.provas as Prova[]).find(
+      (p) => p.examBaseId === provaGeral,
+    )!;
+    const sharedInPed = (pediatra.body.provas as Prova[]).find(
+      (p) => p.examBaseId === provaGeral,
+    )!;
+
+    // É a MESMA prova: contagem e prontidão idênticas nos dois cargos.
+    expect(sharedInGeral.questionCount).toBe(6);
+    expect(sharedInPed.questionCount).toBe(6);
+    expect(sharedInGeral.userStats).toEqual({ attemptCount: 1, bestScore: 50 });
+    expect(sharedInPed.userStats).toEqual({ attemptCount: 1, bestScore: 50 });
+    expect(sharedInGeral.studyPlan.bestScore).toBe(50);
+    expect(sharedInPed.studyPlan.bestScore).toBe(50);
+    // No Geral ela é a oficial; no Pediatra é prova extra.
+    expect(sharedInGeral.isPrimary).toBe(true);
+    expect(sharedInPed.isPrimary).toBe(false);
+    // As fichas continuam independentes: cada cargo com seu salário.
+    expect(geral.body.cargo.salaryBase).toBe('9100');
+    expect(pediatra.body.cargo.salaryBase).toBe('8200');
   });
 
   it('editar janela da prova sincroniza a janela agregada do Concurso (§2b)', async () => {

@@ -106,6 +106,148 @@ export class ConcursoLinkService {
   }
 
   /**
+   * Cargo self-heal (R4.2): garante a linha `Cargo` + vínculos de uma prova,
+   * espelhando o backfill da migration — provas legadas (criadas fora dos
+   * hooks de escrita: seeds, factories, dados pré-remodelagem) ganham o cargo
+   * na primeira leitura. Respeita o `cargoGroupId` legado: grupo → 1 Cargo
+   * (id = cargoGroupId, ficha do representante, TODAS as provas do grupo
+   * vinculadas); standalone → cargo 1:1 (id = id da prova).
+   * Retorna o cargoId, ou null quando a prova não tem institution.
+   */
+  async ensureDefaultCargo(examBaseId: string): Promise<string | null> {
+    const existing = await this.prisma.cargoProva.findFirst({
+      where: { examBaseId },
+      select: { cargoId: true },
+    });
+    if (existing) return existing.cargoId;
+
+    const concursoId = await this.ensureConcursoForExamBase(examBaseId);
+    if (!concursoId) return null;
+
+    const prova = await this.prisma.examBase.findUniqueOrThrow({
+      where: { id: examBaseId },
+      select: { id: true, cargoGroupId: true },
+    });
+
+    // Membros do cargo: o grupo legado inteiro, ou só a própria prova.
+    const members = prova.cargoGroupId
+      ? await this.prisma.examBase.findMany({
+          where: { cargoGroupId: prova.cargoGroupId },
+          orderBy: [
+            { isPrimaryProva: 'desc' },
+            { examDate: 'asc' },
+            { id: 'asc' },
+          ],
+          select: {
+            id: true,
+            slug: true,
+            role: true,
+            description: true,
+            requirements: true,
+            salaryBase: true,
+            workload: true,
+            vacancyCount: true,
+            hasReserveList: true,
+            applicantCount: true,
+            registrationFee: true,
+            minPassingGradeNonQuota: true,
+            actualCutScore: true,
+            isNursingRelevant: true,
+            provaLabel: true,
+            concursoId: true,
+          },
+        })
+      : await this.prisma.examBase.findMany({
+          where: { id: examBaseId },
+          select: {
+            id: true,
+            slug: true,
+            role: true,
+            description: true,
+            requirements: true,
+            salaryBase: true,
+            workload: true,
+            vacancyCount: true,
+            hasReserveList: true,
+            applicantCount: true,
+            registrationFee: true,
+            minPassingGradeNonQuota: true,
+            actualCutScore: true,
+            isNursingRelevant: true,
+            provaLabel: true,
+            concursoId: true,
+          },
+        });
+    const rep = members[0];
+    const cargoId = prova.cargoGroupId ?? prova.id;
+
+    const create = (slug: string | null) =>
+      this.prisma.$transaction(async (tx) => {
+        await tx.cargo.create({
+          data: {
+            id: cargoId,
+            slug,
+            role: rep.role,
+            description: rep.description,
+            requirements: rep.requirements,
+            salaryBase: rep.salaryBase,
+            workload: rep.workload,
+            vacancyCount: rep.vacancyCount,
+            hasReserveList: rep.hasReserveList,
+            applicantCount: rep.applicantCount,
+            registrationFee: rep.registrationFee,
+            minPassingGradeNonQuota: rep.minPassingGradeNonQuota,
+            actualCutScore: rep.actualCutScore,
+            isNursingRelevant: rep.isNursingRelevant,
+            concursoId,
+          },
+        });
+        await tx.cargoProva.createMany({
+          data: members.map((m, i) => ({
+            cargoId,
+            examBaseId: m.id,
+            provaLabel: m.provaLabel,
+            isOficial: m.id === rep.id,
+            order: i,
+          })),
+          skipDuplicates: true,
+        });
+        // Membros do grupo em outro concurso não deveriam existir; garante o
+        // vínculo de concurso dos que ainda não têm.
+        await tx.examBase.updateMany({
+          where: { id: { in: members.map((m) => m.id) }, concursoId: null },
+          data: { concursoId },
+        });
+        // Como no backfill: o conteúdo programático da prova oficial passa a
+        // pertencer ao cargo (linhas legadas criadas só com examBaseId).
+        await tx.examSyllabusGroup.updateMany({
+          where: { examBaseId: rep.id, cargoId: null },
+          data: { cargoId },
+        });
+      });
+
+    try {
+      await create(rep.slug);
+    } catch (err) {
+      if (
+        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+        err.code !== 'P2002'
+      ) {
+        throw err;
+      }
+      // Corrida (cargo criado em paralelo) → devolve o existente; clash de
+      // slug/id com outro cargo → tenta sem slug (heal depois).
+      const raced = await this.prisma.cargoProva.findFirst({
+        where: { examBaseId },
+        select: { cargoId: true },
+      });
+      if (raced) return raced.cargoId;
+      await create(null);
+    }
+    return cargoId;
+  }
+
+  /**
    * Garante o Concurso de uma prova e popula `concursoId` (versão eager do
    * lazy-link, usada na criação/edição da prova pelo wizard admin). Prova sem
    * `institution` não tem chave de agrupamento → retorna null (ela fica fora

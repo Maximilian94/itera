@@ -30,29 +30,6 @@ const MIN_ANSWERS_PER_SUBJECT = 5;
 const DEFAULT_PASSING_GRADE = 60;
 
 /**
- * Agrupa provas (ExamBase) por cargo. A chave é `cargoGroupId ?? id`, então
- * uma prova standalone (cargoGroupId null) forma seu próprio cargo — preserva
- * o comportamento de "1 prova = 1 cargo". Em cada grupo o `primary`
- * (`isPrimaryProva`, fallback = primeira) representa o cargo: carrega os
- * metadados e define o slug canônico. Usado por getConcursoDetail/getCargoDetail.
- */
-function groupByCargo<
-  T extends { id: string; cargoGroupId: string | null; isPrimaryProva: boolean },
->(provas: T[]): Array<{ primary: T; provas: T[] }> {
-  const groups = new Map<string, T[]>();
-  for (const p of provas) {
-    const key = p.cargoGroupId ?? p.id;
-    const bucket = groups.get(key);
-    if (bucket) bucket.push(p);
-    else groups.set(key, [p]);
-  }
-  return [...groups.values()].map((bucket) => ({
-    primary: bucket.find((p) => p.isPrimaryProva) ?? bucket[0],
-    provas: bucket,
-  }));
-}
-
-/**
  * A "Concurso" (edital) groups one or more "Provas" (ExamBase, one per cargo).
  * The Concurso model exists in the schema but historically every concurso-level
  * fact lived on each ExamBase row. This service wires the relation up for real:
@@ -311,6 +288,19 @@ export class ConcursoService {
         resultDate: true,
         cargoGroupId: true,
         isPrimaryProva: true,
+        cargoProvas: {
+          select: {
+            cargoId: true,
+            cargo: {
+              select: {
+                salaryBase: true,
+                vacancyCount: true,
+                hasReserveList: true,
+                isNursingRelevant: true,
+              },
+            },
+          },
+        },
         concurso: { select: { id: true, slug: true } },
         _count: { select: { questions: true } },
       },
@@ -341,12 +331,55 @@ export class ConcursoService {
       const timeline = aggregateConcursoTimeline(bucket);
       const status = deriveConcursoStatus(timeline);
 
-      // Provas do mesmo cargo (tipos) agrupadas: contagens de cargo e vagas
-      // usam o primário de cada grupo p/ não contar a mesma vaga várias vezes.
-      const cargoGroups = groupByCargo(bucket);
+      // Cargos do concurso (R4.2): a ficha vem do model Cargo via vínculos.
+      // Esta listagem é READ-ONLY (não roda o heal), então provas legadas sem
+      // vínculo caem no agrupamento antigo (cargoGroupId ?? id, ficha da
+      // primária) até alguma leitura de detalhe healá-las.
+      type CargoAgg = {
+        salaryBase: unknown;
+        vacancyCount: number | null;
+        hasReserveList: boolean;
+        provaIds: string[];
+        fichaFromPrimary: boolean;
+      };
+      const cargoMap = new Map<string, CargoAgg>();
+      for (const p of bucket) {
+        if (p.cargoProvas.length > 0) {
+          for (const link of p.cargoProvas) {
+            if (!link.cargo.isNursingRelevant) continue;
+            const agg = cargoMap.get(link.cargoId) ?? {
+              salaryBase: link.cargo.salaryBase,
+              vacancyCount: link.cargo.vacancyCount,
+              hasReserveList: link.cargo.hasReserveList,
+              provaIds: [],
+              fichaFromPrimary: true,
+            };
+            agg.provaIds.push(p.id);
+            cargoMap.set(link.cargoId, agg);
+          }
+        } else {
+          const key = p.cargoGroupId ?? p.id;
+          const agg = cargoMap.get(key) ?? {
+            salaryBase: p.salaryBase,
+            vacancyCount: p.vacancyCount,
+            hasReserveList: p.hasReserveList,
+            provaIds: [],
+            fichaFromPrimary: p.isPrimaryProva,
+          };
+          agg.provaIds.push(p.id);
+          if (p.isPrimaryProva && !agg.fichaFromPrimary) {
+            agg.salaryBase = p.salaryBase;
+            agg.vacancyCount = p.vacancyCount;
+            agg.hasReserveList = p.hasReserveList;
+            agg.fichaFromPrimary = true;
+          }
+          cargoMap.set(key, agg);
+        }
+      }
+      const cargoGroups = [...cargoMap.values()];
 
       const salaries = cargoGroups
-        .map((g) => g.primary.salaryBase)
+        .map((g) => g.salaryBase)
         .filter((s): s is NonNullable<typeof s> => s != null);
 
       // Prefer an existing concurso (slug + id); else link by a representative
@@ -385,10 +418,10 @@ export class ConcursoService {
         },
         cargoCount: cargoGroups.length,
         vacancyTotal: cargoGroups.reduce(
-          (acc, g) => acc + (g.primary.vacancyCount ?? 0),
+          (acc, g) => acc + (g.vacancyCount ?? 0),
           0,
         ),
-        hasCR: cargoGroups.some((g) => g.primary.hasReserveList),
+        hasCR: cargoGroups.some((g) => g.hasReserveList),
         salaryMin: salaries.length
           ? String(salaries.reduce((a, b) => (Number(b) < Number(a) ? b : a)))
           : null,
@@ -398,7 +431,9 @@ export class ConcursoService {
         questionCount: bucket.reduce((acc, p) => acc + p._count.questions, 0),
         userStats: {
           attemptedCargos: cargoGroups.filter((g) =>
-            g.provas.some((p) => (statsByExamBaseId.get(p.id)?.attemptCount ?? 0) > 0),
+            g.provaIds.some(
+              (id) => (statsByExamBaseId.get(id)?.attemptCount ?? 0) > 0,
+            ),
           ).length,
           bestScore: bestScores.length ? Math.max(...bestScores) : null,
         },
@@ -508,23 +543,13 @@ export class ConcursoService {
       },
       select: {
         id: true,
-        slug: true,
-        role: true,
-        vacancyCount: true,
-        hasReserveList: true,
-        salaryBase: true,
-        workload: true,
-        registrationFee: true,
-        minPassingGradeNonQuota: true,
         examDate: true,
         registrationStart: true,
         registrationEnd: true,
         resultDate: true,
-        published: true,
         editalUrl: true,
         isNursingRelevant: true,
-        cargoGroupId: true,
-        isPrimaryProva: true,
+        cargoProvas: { select: { cargoId: true } },
         _count: { select: { questions: true } },
       },
     });
@@ -539,6 +564,12 @@ export class ConcursoService {
 
     await this.healEditalUrl(concurso, provas);
 
+    // Cargo self-heal (R4.2): provas legadas ainda sem linha de Cargo ganham
+    // uma (mesma rotina do backfill — respeita grupos legados). Normalmente 0.
+    for (const p of provas.filter((x) => x.cargoProvas.length === 0)) {
+      await this.concursoLink.ensureDefaultCargo(p.id);
+    }
+
     const relevantProvas = provas.filter((p) => p.isNursingRelevant);
     // Timeline still derives from all siblings when nothing is relevant, so
     // the status stays meaningful for an (edge-case) empty concurso page.
@@ -551,32 +582,69 @@ export class ConcursoService {
       relevantProvas.map((p) => p.id),
     );
 
-    // Um cargo pode ter várias provas (tipos) com bancos de questões próprios.
-    // Agrupa para emitir UM card por cargo (representado pela prova primária),
-    // com agregados do grupo. Cargo de 1 prova → grupo de 1, igual a antes.
-    const cargoGroups = groupByCargo(relevantProvas);
+    // Cards de cargo direto do model Cargo (R4.2): ficha da própria linha —
+    // não mais da prova primária (o bug "primária despublicada troca a ficha"
+    // morre aqui). Prova compartilhada aparece em cada cargo vinculado.
+    const cargoRows = await this.prisma.cargo.findMany({
+      where: { concursoId: concurso.id, isNursingRelevant: true },
+      select: {
+        id: true,
+        slug: true,
+        role: true,
+        vacancyCount: true,
+        hasReserveList: true,
+        salaryBase: true,
+        workload: true,
+        registrationFee: true,
+        minPassingGradeNonQuota: true,
+        provas: {
+          orderBy: { order: 'asc' as const },
+          select: {
+            isOficial: true,
+            examBase: {
+              select: {
+                id: true,
+                published: true,
+                _count: { select: { questions: true } },
+              },
+            },
+          },
+        },
+      },
+    });
+    // Visibilidade como antes: usuário comum só conta provas publicadas;
+    // cargo sem nenhuma prova visível fica fora do payload.
+    const cargoGroups = cargoRows
+      .map((c) => ({
+        cargo: c,
+        links: c.provas.filter((l) => showUnpublished || l.examBase.published),
+      }))
+      .filter((g) => g.links.length > 0)
+      .map((g) => ({
+        ...g,
+        oficial: g.links.find((l) => l.isOficial) ?? g.links[0],
+      }));
 
     // Cargo cards sorted by salary desc (Enfermeiro before Técnico), nulls last.
     const sortedCargos = [...cargoGroups].sort((a, b) => {
-      const sa = a.primary.salaryBase;
-      const sb = b.primary.salaryBase;
+      const sa = a.cargo.salaryBase;
+      const sb = b.cargo.salaryBase;
       if (sa == null) return sb == null ? 0 : 1;
       if (sb == null) return -1;
       return Number(sb) - Number(sa);
     });
 
-    // Agregados de cargo (salário/vagas/fee) saem do primário de cada grupo,
-    // evitando contar a mesma vaga uma vez por tipo de prova.
+    // Agregados de cargo (salário/vagas/fee) saem da ficha de cada Cargo.
     const salaries = cargoGroups
-      .map((g) => g.primary.salaryBase)
+      .map((g) => g.cargo.salaryBase)
       .filter((s): s is NonNullable<typeof s> => s != null);
     // A single fee across cargos is the common case; when editions charge
     // different fees per cargo there is no honest single number for the hero,
     // so the summary omits it (the cargo page shows the per-cargo fee).
     const fees = new Set(
       cargoGroups
-        .filter((g) => g.primary.registrationFee != null)
-        .map((g) => String(g.primary.registrationFee)),
+        .filter((g) => g.cargo.registrationFee != null)
+        .map((g) => String(g.cargo.registrationFee)),
     );
 
     return {
@@ -605,10 +673,10 @@ export class ConcursoService {
         },
         summary: {
           vacancyTotal: cargoGroups.reduce(
-            (acc, g) => acc + (g.primary.vacancyCount ?? 0),
+            (acc, g) => acc + (g.cargo.vacancyCount ?? 0),
             0,
           ),
-          hasCR: cargoGroups.some((g) => g.primary.hasReserveList),
+          hasCR: cargoGroups.some((g) => g.cargo.hasReserveList),
           salaryMin: salaries.length
             ? String(salaries.reduce((a, b) => (Number(b) < Number(a) ? b : a)))
             : null,
@@ -620,32 +688,35 @@ export class ConcursoService {
         },
       },
       cargos: sortedCargos.map((g) => {
-        const p = g.primary;
-        // Progresso do cargo = agregado das tentativas em todas as suas provas.
-        const groupStats = g.provas
-          .map((x) => statsByExamBaseId.get(x.id))
+        // Progresso do cargo = agregado das tentativas em todas as suas provas
+        // (prova compartilhada conta a MESMA prontidão nos dois cargos).
+        const groupStats = g.links
+          .map((l) => statsByExamBaseId.get(l.examBase.id))
           .filter((s): s is NonNullable<typeof s> => s != null);
         const bestScores = groupStats
           .map((s) => s.bestScore)
           .filter((s): s is number => s != null);
         return {
-          id: p.id,
-          slug: p.slug,
-          role: p.role,
-          vacancyCount: p.vacancyCount,
-          hasReserveList: p.hasReserveList,
-          salaryBase: p.salaryBase != null ? String(p.salaryBase) : null,
-          workload: p.workload,
-          questionCount: g.provas.reduce(
-            (acc, x) => acc + x._count.questions,
+          // Contrato: o id do card continua sendo um id de PROVA (a oficial)
+          // — deep links e stats do front são examBaseId-keyed.
+          id: g.oficial.examBase.id,
+          slug: g.cargo.slug,
+          role: g.cargo.role,
+          vacancyCount: g.cargo.vacancyCount,
+          hasReserveList: g.cargo.hasReserveList,
+          salaryBase:
+            g.cargo.salaryBase != null ? String(g.cargo.salaryBase) : null,
+          workload: g.cargo.workload,
+          questionCount: g.links.reduce(
+            (acc, l) => acc + l.examBase._count.questions,
             0,
           ),
-          provaCount: g.provas.length,
+          provaCount: g.links.length,
           minPassingGrade:
-            p.minPassingGradeNonQuota != null
-              ? String(p.minPassingGradeNonQuota)
+            g.cargo.minPassingGradeNonQuota != null
+              ? String(g.cargo.minPassingGradeNonQuota)
               : null,
-          published: p.published,
+          published: g.oficial.examBase.published,
           userStats: {
             attemptCount: groupStats.reduce((acc, s) => acc + s.attemptCount, 0),
             bestScore: bestScores.length ? Math.max(...bestScores) : null,
@@ -656,105 +727,141 @@ export class ConcursoService {
   }
 
   /**
-   * Plano de estudos do usuário sobre um conjunto de provas-alvo (a própria
-   * prova do cargo ou, quando ela é futura/sem questões, as edições
-   * anteriores). Anônimo ou sem tentativa finalizada → `diagnostico` zerado.
+   * Planos de estudo do usuário para VÁRIAS provas de uma vez: cada alvo
+   * (`id`) deriva seu plano do conjunto `planIds` (a própria prova quando tem
+   * questões; as edições anteriores quando é futura). Tentativas e respostas
+   * são carregadas em DUAS queries para a união dos ids e os planos derivados
+   * em memória. Anônimo ou sem tentativa finalizada → `diagnostico` zerado.
    * `scoreDelta` compara o melhor score com a primeira tentativa;
    * `weakSubjects` são as 3 piores matérias por acurácia (% inteiro), com no
    * mínimo MIN_ANSWERS_PER_SUBJECT questões respondidas.
    */
-  private async getStudyPlan(
+  private async getStudyPlansBatch(
     userId: string | undefined,
-    examBaseIds: string[],
+    targets: Array<{ id: string; planIds: string[] }>,
     passingGrade: number,
-  ): Promise<{
-    currentStep: StudyPlanStep;
-    attemptCount: number;
-    bestScore: number | null;
-    scoreDelta: number | null;
-    weakSubjects: { subject: string; accuracy: number }[];
-  }> {
-    const empty = {
-      currentStep: 'diagnostico' as StudyPlanStep,
+  ): Promise<
+    Map<
+      string,
+      {
+        currentStep: StudyPlanStep;
+        attemptCount: number;
+        bestScore: number | null;
+        scoreDelta: number | null;
+        weakSubjects: { subject: string; accuracy: number }[];
+      }
+    >
+  > {
+    type Plan = {
+      currentStep: StudyPlanStep;
+      attemptCount: number;
+      bestScore: number | null;
+      scoreDelta: number | null;
+      weakSubjects: { subject: string; accuracy: number }[];
+    };
+    const empty = (): Plan => ({
+      currentStep: 'diagnostico',
       attemptCount: 0,
       bestScore: null,
       scoreDelta: null,
       weakSubjects: [],
-    };
-    if (!userId || examBaseIds.length === 0) return empty;
+    });
+    const plans = new Map<string, Plan>();
+    const allIds = [...new Set(targets.flatMap((t) => t.planIds))];
+    if (!userId || allIds.length === 0) {
+      for (const t of targets) plans.set(t.id, empty());
+      return plans;
+    }
 
     const attempts = await this.prisma.examBaseAttempt.findMany({
       where: {
         userId,
         finishedAt: { not: null },
-        examBaseId: { in: examBaseIds },
+        examBaseId: { in: allIds },
       },
       orderBy: { finishedAt: 'asc' },
-      select: { scorePercentage: true },
+      select: { examBaseId: true, scorePercentage: true },
     });
-    if (attempts.length === 0) return empty;
-
-    const scores = attempts
-      .map((a) =>
-        a.scorePercentage != null ? Number(a.scorePercentage) : null,
-      )
-      .filter((s): s is number => s != null);
-    const bestScore = scores.length ? Math.max(...scores) : null;
-    const firstScore = scores.length ? scores[0] : null;
-    const scoreDelta =
-      bestScore != null && firstScore != null
-        ? Math.round((bestScore - firstScore) * 100) / 100
-        : null;
-    // Regra simples v1: tentou mas não bateu o corte → treino dirigido;
-    // bateu o corte → reta final. Sem score mensurável, continua treinando.
-    const currentStep: StudyPlanStep =
-      bestScore != null && bestScore >= passingGrade
-        ? 'reta_final'
-        : 'treino_dirigido';
-
     // Acurácia por matéria (ExamBaseQuestion.subject) nas respostas do
     // usuário; só questões efetivamente respondidas (alternativa marcada).
-    const answers = await this.prisma.examBaseAttemptAnswer.findMany({
-      where: {
-        selectedAlternativeId: { not: null },
-        examBaseAttempt: {
-          userId,
-          finishedAt: { not: null },
-          examBaseId: { in: examBaseIds },
-        },
-      },
-      select: {
-        selectedAlternative: { select: { key: true } },
-        examBaseQuestion: {
-          select: { subject: true, correctAlternative: true },
-        },
-      },
-    });
-    const bySubject = new Map<string, { answered: number; correct: number }>();
-    for (const a of answers) {
-      const { subject, correctAlternative } = a.examBaseQuestion;
-      if (!subject || !correctAlternative) continue;
-      const acc = bySubject.get(subject) ?? { answered: 0, correct: 0 };
-      acc.answered += 1;
-      if (a.selectedAlternative?.key === correctAlternative) acc.correct += 1;
-      bySubject.set(subject, acc);
-    }
-    const weakSubjects = [...bySubject.entries()]
-      .filter(([, s]) => s.answered >= MIN_ANSWERS_PER_SUBJECT)
-      .map(([subject, s]) => ({
-        subject,
-        accuracy: Math.round((s.correct / s.answered) * 100),
-      }))
-      .sort((a, b) => a.accuracy - b.accuracy)
-      .slice(0, 3);
+    const answers =
+      attempts.length === 0
+        ? []
+        : await this.prisma.examBaseAttemptAnswer.findMany({
+            where: {
+              selectedAlternativeId: { not: null },
+              examBaseAttempt: {
+                userId,
+                finishedAt: { not: null },
+                examBaseId: { in: allIds },
+              },
+            },
+            select: {
+              selectedAlternative: { select: { key: true } },
+              examBaseQuestion: {
+                select: { subject: true, correctAlternative: true },
+              },
+              examBaseAttempt: { select: { examBaseId: true } },
+            },
+          });
 
-    return {
-      currentStep,
-      attemptCount: attempts.length,
-      bestScore,
-      scoreDelta,
-      weakSubjects,
-    };
+    for (const target of targets) {
+      const idSet = new Set(target.planIds);
+      const targetAttempts = attempts.filter((a) => idSet.has(a.examBaseId));
+      if (targetAttempts.length === 0) {
+        plans.set(target.id, empty());
+        continue;
+      }
+
+      const scores = targetAttempts
+        .map((a) =>
+          a.scorePercentage != null ? Number(a.scorePercentage) : null,
+        )
+        .filter((s): s is number => s != null);
+      const bestScore = scores.length ? Math.max(...scores) : null;
+      const firstScore = scores.length ? scores[0] : null;
+      const scoreDelta =
+        bestScore != null && firstScore != null
+          ? Math.round((bestScore - firstScore) * 100) / 100
+          : null;
+      // Regra simples v1: tentou mas não bateu o corte → treino dirigido;
+      // bateu o corte → reta final. Sem score mensurável, continua treinando.
+      const currentStep: StudyPlanStep =
+        bestScore != null && bestScore >= passingGrade
+          ? 'reta_final'
+          : 'treino_dirigido';
+
+      const bySubject = new Map<
+        string,
+        { answered: number; correct: number }
+      >();
+      for (const a of answers) {
+        if (!idSet.has(a.examBaseAttempt.examBaseId)) continue;
+        const { subject, correctAlternative } = a.examBaseQuestion;
+        if (!subject || !correctAlternative) continue;
+        const acc = bySubject.get(subject) ?? { answered: 0, correct: 0 };
+        acc.answered += 1;
+        if (a.selectedAlternative?.key === correctAlternative) acc.correct += 1;
+        bySubject.set(subject, acc);
+      }
+      const weakSubjects = [...bySubject.entries()]
+        .filter(([, s]) => s.answered >= MIN_ANSWERS_PER_SUBJECT)
+        .map(([subject, s]) => ({
+          subject,
+          accuracy: Math.round((s.correct / s.answered) * 100),
+        }))
+        .sort((a, b) => a.accuracy - b.accuracy)
+        .slice(0, 3);
+
+      plans.set(target.id, {
+        currentStep,
+        attemptCount: targetAttempts.length,
+        bestScore,
+        scoreDelta,
+        weakSubjects,
+      });
+    }
+    return plans;
   }
 
   /**
@@ -789,25 +896,10 @@ export class ConcursoService {
       examDate: { gte: start, lt: end },
     };
 
-    // Resolve a prova pedida (slug/id) só para achar o cargo (grupo) e validar
-    // acesso — o cargoSlug pode ser de qualquer prova/tipo do cargo.
-    const requested = await this.prisma.examBase.findFirst({
-      where: {
-        ...(UUID_RE.test(cargoSlugOrId)
-          ? { id: cargoSlugOrId }
-          : { slug: cargoSlugOrId }),
-        ...concursoKey,
-        isNursingRelevant: true,
-        ...(showUnpublished ? {} : { published: true }),
-      },
-      select: { id: true, cargoGroupId: true },
-    });
-    if (!requested) throw new NotFoundException('cargo not found');
-
-    // Um cargo pode ter várias provas (tipos) com bancos próprios. Carrega o
-    // grupo inteiro; a prova PRIMÁRIA representa o cargo (ficha, edital,
-    // conteúdo programático, slug canônico). Cargo de 1 prova → grupo de 1.
-    const cargoSelect = {
+    // Remodelagem R4.2: a ficha mora no model Cargo; as provas vêm da join
+    // CargoProva (a OFICIAL define identidade/temporais do payload). Resolve
+    // primeiro pela própria tabela (slug canônico ou UUID de cargo)…
+    const cargoDetailSelect = {
       id: true,
       slug: true,
       role: true,
@@ -819,32 +911,84 @@ export class ConcursoService {
       hasReserveList: true,
       registrationFee: true,
       minPassingGradeNonQuota: true,
-      examDate: true,
-      editalUrl: true,
-      published: true,
-      provaLabel: true,
-      isPrimaryProva: true,
-      cargoGroupId: true,
       syllabusGroups: {
         orderBy: { order: 'asc' as const },
         select: { name: true, topics: true, order: true },
       },
-      _count: { select: { questions: true } },
-    } as const;
-
-    const groupProvas = await this.prisma.examBase.findMany({
-      where: {
-        ...concursoKey,
-        isNursingRelevant: true,
-        ...(showUnpublished ? {} : { published: true }),
-        ...(requested.cargoGroupId != null
-          ? { cargoGroupId: requested.cargoGroupId }
-          : { id: requested.id }),
+      provas: {
+        orderBy: { order: 'asc' as const },
+        select: {
+          provaLabel: true,
+          isOficial: true,
+          examBase: {
+            select: {
+              id: true,
+              slug: true,
+              examDate: true,
+              editalUrl: true,
+              published: true,
+              _count: { select: { questions: true } },
+            },
+          },
+        },
       },
-      select: cargoSelect,
+    } as const;
+    const cargoWhere = { concursoId: concurso.id, isNursingRelevant: true };
+
+    let cargoRow = await this.prisma.cargo.findFirst({
+      where: {
+        ...(UUID_RE.test(cargoSlugOrId)
+          ? { id: cargoSlugOrId }
+          : { slug: cargoSlugOrId }),
+        ...cargoWhere,
+      },
+      select: cargoDetailSelect,
     });
-    const cargo = groupProvas.find((p) => p.isPrimaryProva) ?? groupProvas[0];
-    if (!cargo) throw new NotFoundException('cargo not found');
+
+    // …senão por prova (slug/UUID de qualquer prova vinculada — URLs antigas
+    // e links diretos por examBaseId), com self-heal para provas legadas
+    // ainda sem linha de Cargo (mesma rotina do backfill).
+    if (!cargoRow) {
+      const requested = await this.prisma.examBase.findFirst({
+        where: {
+          ...(UUID_RE.test(cargoSlugOrId)
+            ? { id: cargoSlugOrId }
+            : { slug: cargoSlugOrId }),
+          ...concursoKey,
+          ...(showUnpublished ? {} : { published: true }),
+        },
+        select: { id: true },
+      });
+      if (!requested) throw new NotFoundException('cargo not found');
+      const healedId = await this.concursoLink.ensureDefaultCargo(requested.id);
+      if (healedId) {
+        cargoRow = await this.prisma.cargo.findFirst({
+          where: { id: healedId, ...cargoWhere },
+          select: cargoDetailSelect,
+        });
+      }
+    }
+    if (!cargoRow) throw new NotFoundException('cargo not found');
+
+    // Visibilidade por prova como antes: usuário comum só enxerga provas
+    // publicadas; cargo sem NENHUMA prova visível → 404 (era o 404 da prova
+    // não publicada no modelo antigo).
+    const visibleLinks = cargoRow.provas.filter(
+      (l) => showUnpublished || l.examBase.published,
+    );
+    if (visibleLinks.length === 0) throw new NotFoundException('cargo not found');
+    // A oficial representa o cargo no payload (id/examDate/published) — o
+    // contrato mantém cargo.id como um id de PROVA (o front consome
+    // /exam-bases/:id/subject-distribution e /competition-history com ele).
+    const oficial = visibleLinks.find((l) => l.isOficial) ?? visibleLinks[0];
+    const cargo = {
+      ...cargoRow,
+      id: oficial.examBase.id,
+      examDate: oficial.examBase.examDate,
+      editalUrl: oficial.examBase.editalUrl,
+      published: oficial.examBase.published,
+      _count: oficial.examBase._count,
+    };
 
     // Status do concurso agregado dos siblings, como no nível 1; a leitura
     // também aproveita para rodar o self-healing link/edital.
@@ -878,7 +1022,7 @@ export class ConcursoService {
     const status = deriveConcursoStatus(timeline);
 
     // Edições anteriores do mesmo cargo (helper comum com MAX-17/MAX-18).
-    // Alimentam o treino quando a prova é futura.
+    // Alimentam o treino quando a prova é futura. O role vem do CARGO (R4.2).
     const previousExams = await this.prisma.examBase.findMany({
       where: previousEditionsWhere({
         institution: concurso.institution,
@@ -895,79 +1039,92 @@ export class ConcursoService {
         _count: { select: { questions: true } },
       },
     });
-    const previousStats = await this.getUserStatsByExamBase(
-      userId,
-      previousExams.map((p) => p.id),
-    );
 
-    // Stats do usuário por prova do cargo (para a seção "Provas deste cargo").
-    const provasStats = await this.getUserStatsByExamBase(
-      userId,
-      groupProvas.map((p) => p.id),
-    );
-
-    // Provas recomendadas para treinar: mesmo cargo (role) com questões, fora
-    // do grupo deste cargo. tier 1 = mesma banca; tier 2 = mesmo cargo, outra
-    // banca. Ordena por tier (1 antes de 2) e depois por examDate desc; limita.
+    // Provas recomendadas para treinar: mesmo cargo (role, resolvido via
+    // Cargo — o OR na coluna legada cobre provas ainda não healadas) com
+    // questões, fora deste cargo. tier 1 = mesma banca; tier 2 = outra banca.
+    // O cap desce ao banco: 2 queries com take (era fetch-all + sort).
     const RELATED_LIMIT = 8;
-    const ownGroupIds = groupProvas.map((p) => p.id);
-    const relatedRaw = await this.prisma.examBase.findMany({
-      where: {
-        role: cargo.role,
-        isNursingRelevant: true,
-        ...(showUnpublished ? {} : { published: true }),
-        questions: { some: {} },
-        id: { notIn: ownGroupIds },
-      },
-      orderBy: { examDate: 'desc' },
-      select: {
-        id: true,
-        slug: true,
-        institution: true,
-        examDate: true,
-        examBoardId: true,
-        examBoard: { select: { alias: true, name: true } },
-        _count: { select: { questions: true } },
-      },
-    });
-    const related = relatedRaw
-      .map((p) => ({
-        ...p,
-        tier: p.examBoardId === concurso.examBoardId ? 1 : 2,
-      }))
-      .sort(
-        (a, b) => a.tier - b.tier || b.examDate.getTime() - a.examDate.getTime(),
-      )
-      .slice(0, RELATED_LIMIT);
-    const relatedStats = await this.getUserStatsByExamBase(
-      userId,
-      related.map((p) => p.id),
-    );
+    const ownGroupIds = cargoRow.provas.map((l) => l.examBase.id);
+    const relatedSelect = {
+      id: true,
+      slug: true,
+      institution: true,
+      examDate: true,
+      examBoardId: true,
+      examBoard: { select: { alias: true, name: true } },
+      _count: { select: { questions: true } },
+    } as const;
+    const relatedBaseWhere = {
+      OR: [
+        { cargoProvas: { some: { cargo: { role: cargo.role } } } },
+        { role: cargo.role },
+      ],
+      isNursingRelevant: true,
+      ...(showUnpublished ? {} : { published: true }),
+      questions: { some: {} },
+      id: { notIn: ownGroupIds },
+    };
+    const [tier1, tier2] = await Promise.all([
+      this.prisma.examBase.findMany({
+        where: { ...relatedBaseWhere, examBoardId: concurso.examBoardId },
+        orderBy: [{ examDate: 'desc' }, { id: 'asc' }],
+        take: RELATED_LIMIT,
+        select: relatedSelect,
+      }),
+      this.prisma.examBase.findMany({
+        where: {
+          ...relatedBaseWhere,
+          NOT: { examBoardId: concurso.examBoardId },
+        },
+        orderBy: [{ examDate: 'desc' }, { id: 'asc' }],
+        take: RELATED_LIMIT,
+        select: relatedSelect,
+      }),
+    ]);
+    const related = [
+      ...tier1.map((p) => ({ ...p, tier: 1 })),
+      ...tier2.map((p) => ({ ...p, tier: 2 })),
+    ].slice(0, RELATED_LIMIT);
 
-    // Corte é cargo-level (do primário). Um plano de estudos POR prova: o
-    // seletor da página re-escopa tudo para a prova escolhida. Prova com
-    // questões → plano sobre ela; sem questões (futura) → sobre as edições
-    // anteriores do cargo.
+    // Stats do usuário: UM groupBy para provas do cargo + relacionadas +
+    // edições anteriores (era 3 queries — absorvido do antigo T1.5).
+    const statsById = await this.getUserStatsByExamBase(userId, [
+      ...new Set([
+        ...visibleLinks.map((l) => l.examBase.id),
+        ...related.map((p) => p.id),
+        ...previousExams.map((p) => p.id),
+      ]),
+    ]);
+    const previousStats = statsById;
+    const provasStats = statsById;
+    const relatedStats = statsById;
+
+    // Corte é cargo-level (da ficha do Cargo). Um plano de estudos POR prova:
+    // prova com questões → plano sobre ela; sem questões (futura) → sobre as
+    // edições anteriores do cargo. As respostas do usuário são carregadas UMA
+    // vez para o conjunto inteiro e os planos derivados em memória (era ~2
+    // queries por prova — absorvido do antigo T1.5).
     const passingGrade =
       cargo.minPassingGradeNonQuota != null
         ? Number(cargo.minPassingGradeNonQuota)
         : DEFAULT_PASSING_GRADE;
-    const planByProva = new Map<
-      string,
-      Awaited<ReturnType<typeof this.getStudyPlan>>
-    >();
+    const previousIds = previousExams.map((pe) => pe.id);
     const planTargets = [
-      ...groupProvas.map((p) => ({ id: p.id, hasQuestions: p._count.questions > 0 })),
+      ...visibleLinks.map((l) => ({
+        id: l.examBase.id,
+        planIds:
+          l.examBase._count.questions > 0 ? [l.examBase.id] : previousIds,
+      })),
       // Relacionadas sempre têm questões → plano sobre elas mesmas.
-      ...related.map((p) => ({ id: p.id, hasQuestions: true })),
+      ...related.map((p) => ({ id: p.id, planIds: [p.id] })),
     ];
-    await Promise.all(
-      planTargets.map(async ({ id, hasQuestions }) => {
-        const ids = hasQuestions ? [id] : previousExams.map((pe) => pe.id);
-        planByProva.set(id, await this.getStudyPlan(userId, ids, passingGrade));
-      }),
+    const planByProva = await this.getStudyPlansBatch(
+      userId,
+      planTargets,
+      passingGrade,
     );
-    // Plano top-level = o do primário (cargo de prova única usa só este).
+    // Plano top-level = o da prova oficial (cargo de prova única usa só este).
     const studyPlan = planByProva.get(cargo.id)!;
 
     // Conteúdo programático só faz sentido para prova ainda não aplicada;
@@ -1017,27 +1174,26 @@ export class ConcursoService {
         published: cargo.published,
       },
       syllabusGroups: cargoIsPast ? [] : cargo.syllabusGroups,
-      // Provas do cargo (tipos). Primário primeiro, depois por rótulo. Cargo de
-      // 1 prova → array de 1 (front esconde o seletor). Todas compartilham a
-      // banca do concurso, então o player usa concurso.examBoard.id.
-      provas: [...groupProvas]
+      // Provas do cargo (vínculos CargoProva). Oficial primeiro, depois pela
+      // ordem do vínculo. `isPrimary` deriva de `isOficial` (contrato externo
+      // inalterado). Cargo de 1 prova → array de 1.
+      provas: [...visibleLinks]
         .sort((a, b) => {
-          if (a.isPrimaryProva !== b.isPrimaryProva)
-            return a.isPrimaryProva ? -1 : 1;
+          if (a.isOficial !== b.isOficial) return a.isOficial ? -1 : 1;
           return (a.provaLabel ?? '').localeCompare(b.provaLabel ?? '');
         })
-        .map((p) => ({
-          examBaseId: p.id,
-          slug: p.slug,
-          label: p.provaLabel,
-          isPrimary: p.isPrimaryProva,
-          examDate: p.examDate.toISOString(),
-          questionCount: p._count.questions,
-          userStats: provasStats.get(p.id) ?? {
+        .map((l) => ({
+          examBaseId: l.examBase.id,
+          slug: l.examBase.slug,
+          label: l.provaLabel,
+          isPrimary: l.isOficial,
+          examDate: l.examBase.examDate.toISOString(),
+          questionCount: l.examBase._count.questions,
+          userStats: provasStats.get(l.examBase.id) ?? {
             attemptCount: 0,
             bestScore: null,
           },
-          studyPlan: planByProva.get(p.id)!,
+          studyPlan: planByProva.get(l.examBase.id)!,
         })),
       // Provas recomendadas para treinar (mesmo cargo). tier 1 = mesma banca,
       // tier 2 = outra banca. Cada uma com seu plano (treina nela mesma).

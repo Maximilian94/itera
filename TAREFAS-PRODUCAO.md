@@ -373,6 +373,10 @@ observação antes do drop).
    os que subiram ao `Concurso` (`editalUrl`, `registrationStart/End`,
    `resultDate` — design doc §2b); dropar `exam_syllabus_groups.examBaseId`.
 2. Remover o dual-write dos services.
+   ⚠️ Antes de dropar `exam_bases.role`: reescrever `previousEditionsWhere`
+   (e o match legado de `relatedProvas`) para resolver role via join
+   `cargoProvas → cargo.role` — hoje casam pela coluna legada, válida
+   apenas enquanto o dual-write existir.
 3. **Mesma disciplina de deploy do drop de `registrationDate`** (T7.1): código
    que não referencia as colunas primeiro, migration depois; SQL de rollback
    documentado.
