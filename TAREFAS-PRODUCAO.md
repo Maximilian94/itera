@@ -190,7 +190,7 @@ Concurso (edital)
    e `concursoId` (FK obrigatória? decidir — recomendação: obrigatória, cargo
    sem edital não existe; o lazy-link garante o Concurso antes).
 2. **Campos que ficam na `ExamBase` (Prova):** `name`, `examDate`,
-   `examBoardId`, `published`, `processingPhase`, `editalUrl`, `adminNotes`,
+   `examBoardId`, `published`, `processingPhase`, `adminNotes`,
    questões/attempts/treino. `institution/state/city/governmentScope` ficam
    **por ora** (a chave do lazy-link do Concurso depende deles — remoção é
    limpeza futura, fora deste épico).
@@ -199,10 +199,12 @@ Concurso (edital)
    prova), `isOficial` (substituto do `isPrimaryProva`: a prova que define a
    meta/corte no `GoalCard`; **invariante: no máximo 1 por cargo, garantido em
    transação** — a lição do antigo T1.3), `order` para exibição.
-4. **Janela de inscrição** (`registrationStart/End`, `resultDate`): decidir se
-   fica na Prova (mínimo churn — o agregado do concurso já funciona) ou migra
-   para o Cargo. Recomendação: **fica na Prova** neste épico; registrar a
-   dúvida.
+4. **Janela de inscrição + editalUrl** (`registrationStart/End`, `resultDate`):
+   ~~decidir se fica na Prova ou migra~~ → **DECIDIDO (2026-07-13): sobem para
+   o `Concurso`** (o edital e a janela são do concurso, não da prova). Como
+   `Cargo.concursoId` é obrigatório, o wizard passa a garantir o Concurso
+   eagerly na criação da prova; admin/IA escrevem no Concurso, dual-write nas
+   colunas da prova até R6.1. Detalhes no design doc §2b.
 5. **Regras de vínculo:** prova compartilhada só entre cargos do **mesmo
    concurso** (validação de serviço); `relatedProvas` (recomendação de treino)
    passa a resolver o `role` via `CargoProva → Cargo.role` — uma prova ligada
@@ -367,8 +369,9 @@ observação antes do drop).
 
 **Requisitos:**
 1. Migration dropando de `exam_bases`: `cargoGroupId`, `isPrimaryProva`,
-   `provaLabel` e os campos de ficha migrados para `Cargo` (lista do R3.1);
-   dropar `exam_syllabus_groups.examBaseId`.
+   `provaLabel`, os campos de ficha migrados para `Cargo` (lista do R3.1) e
+   os que subiram ao `Concurso` (`editalUrl`, `registrationStart/End`,
+   `resultDate` — design doc §2b); dropar `exam_syllabus_groups.examBaseId`.
 2. Remover o dual-write dos services.
 3. **Mesma disciplina de deploy do drop de `registrationDate`** (T7.1): código
    que não referencia as colunas primeiro, migration depois; SQL de rollback

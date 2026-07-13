@@ -15,7 +15,7 @@ não pode representar dois cargos com fichas diferentes.
 ## Modelo alvo
 
 ```
-Concurso (edital)
+Concurso (edital)                   ← ganha editalUrl canônico + janela de inscrição
  └── Cargo (ficha da vaga)          ← NOVO model
        └── CargoProva (join M:N)    ← NOVO model
              └── ExamBase (prova)   ← continua dona de questões/attempts/treino
@@ -23,7 +23,15 @@ Concurso (edital)
 
 **Princípio:** `ExamBase` continua sendo a **Prova**. Tudo `examBaseId`-keyed
 (questões, attempts, treino, player, scoring, import) fica **intacto**. A
-migração é da camada de metadados.
+migração é da camada de metadados — cada dado sobe para o nível a que
+pertence: ficha da vaga → `Cargo`; edital e janela de inscrição → `Concurso`.
+
+**Consequência estrutural (decisão 2026-07-13):** como `Cargo.concursoId` é
+obrigatório, a criação de prova no wizard admin passa a **garantir o Concurso
+eagerly** (mesmo find-or-create do lazy-link) quando a prova tem
+`institution`. Prova sem `institution` → sem Concurso e sem Cargo default até
+o campo ser preenchido (ela já é invisível nas páginas de concurso hoje —
+comportamento preservado).
 
 ## 1. Model `Cargo` — campos que MIGRAM de `ExamBase`
 
@@ -53,21 +61,43 @@ Relação que migra: `ExamSyllabusGroup.examBaseId` → ganha `cargoId`
 
 ## 2. `ExamBase` (Prova) — campos que FICAM
 
-- Identidade da prova: `name`, `examDate`, `examBoardId`, `slug` (da prova).
-- Operação: `published`, `processingPhase`, `editalUrl`, `adminNotes`.
+- Identidade da prova: `name`, `examDate` (cada prova tem a sua),
+  `examBoardId` (a **banca** que aplica a prova — usada pelo player, pelos
+  tiers de `relatedProvas` e pela chave do lazy-link), `slug` (da prova).
+- Operação: `published`, `processingPhase` (fase do wizard/pipeline admin:
+  EDITAL→…→CONCLUIDO), `adminNotes`.
 - Conteúdo: questões, attempts, treino (tudo intacto).
 - **Ficam por ora** (chave do lazy-link do Concurso depende deles):
   `institution`, `state`, `city`, `governmentScope`. Remoção é limpeza
   futura, fora deste épico.
-- **Janela de inscrição fica na Prova** (`registrationStart`,
-  `registrationEnd`, `resultDate`): o agregado temporal do concurso
-  (`concurso-status.ts`) já funciona sobre as provas; mover para o Cargo
-  seria churn sem ganho neste épico. ⚠️ Dúvida registrada: se um dia dois
-  cargos do mesmo edital tiverem janelas diferentes sobre a MESMA prova,
-  revisitar.
-- Colunas antigas (`cargoGroupId`, `provaLabel`, `isPrimaryProva` e as de
-  ficha) **continuam existindo e recebendo dual-write** até R6.1 → rollback
-  trivial.
+- Colunas antigas (`cargoGroupId`, `provaLabel`, `isPrimaryProva`, as de
+  ficha e as que sobem ao Concurso — `editalUrl`, `registrationStart/End`,
+  `resultDate`) **continuam existindo e recebendo dual-write** até R6.1 →
+  rollback trivial.
+
+## 2b. `Concurso` — campos que SOBEM da Prova (decisão 2026-07-13)
+
+O edital e a janela de inscrição são do **concurso**, não da prova — estavam
+na `ExamBase` por razão operacional (o Concurso nascia lazy na leitura; no
+momento da criação/extração por IA não havia onde escrever). Com o Concurso
+garantido eagerly (ver Modelo alvo), sobem de vez:
+
+| Campo | Nota |
+|---|---|
+| `editalUrl` | já existe no Concurso (self-heal); vira o **dono da escrita** |
+| `registrationStart` | NOVO — backfill: mais cedo entre as provas vinculadas |
+| `registrationEnd` | NOVO — backfill: mais tarde entre as provas |
+| `resultDate` | NOVO — backfill: mais tarde entre as provas |
+
+- **Leitura:** `aggregateConcursoTimeline` passa a preferir as colunas do
+  Concurso, com fallback ao agregado das provas (dados antigos ainda não
+  backfillados / provas órfãs). `examDate` da timeline continua derivado das
+  provas (cada uma tem a sua; a última define o "past"). Payload `timeline`
+  idêntico.
+- **Escrita:** wizard admin + extração por IA (`exam-base-ai.service`)
+  escrevem no Concurso; dual-write nas colunas da prova até R6.1.
+- **Edge:** prova sem `institution` → sem Concurso → os valores ficam só na
+  prova até o campo ser preenchido; aí o find-or-create roda e promove.
 
 ## 3. Join `CargoProva`
 
@@ -117,6 +147,9 @@ Relação que migra: `ExamSyllabusGroup.examBaseId` → ganha `cargoId`
   da prova — **pré-passo:** garantir Concurso para provas órfãs (rodar o
   find-or-create do lazy-link ou SQL equivalente na migration).
 - `exam_syllabus_groups.cargoId` backfillado via prova primária.
+- **Janela/edital do Concurso** (§2b): `registrationStart` = mais cedo,
+  `registrationEnd`/`resultDate` = mais tarde entre as provas vinculadas;
+  `editalUrl` mantém o self-heal existente (prova mais antiga com valor).
 - Validação: nº de Cargos = nº de grupos + standalones; roda sobre
   `seed-multi-prova.ts` e dump de prod sem erro.
 
@@ -154,5 +187,6 @@ mock/payload** — eles são o harness de regressão da remodelagem.
 
 - Mover `institution/state/city/governmentScope` da Prova (chave do
   lazy-link) — limpeza futura.
-- Janela de inscrição por cargo (ver §2).
 - Drop das colunas antigas → R6.1, após 1–2 semanas de observação em prod.
+  A lista de drops em `exam_bases` agora inclui também `editalUrl`,
+  `registrationStart`, `registrationEnd` e `resultDate` (§2b).
