@@ -6,22 +6,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, ProcessingPhase, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { slugify } from '../common/slugify';
+import { CargoService } from '../cargo/cargo.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
   return t === '' ? null : (t ?? null);
-}
-
-function slugify(value: string): string {
-  return value
-    .trim()
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/[^a-z0-9-]/g, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
 }
 
 function assertValidGovernmentScopeLocation(input: {
@@ -66,7 +56,101 @@ export class ExamBaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly cargoService: CargoService,
   ) {}
+
+  /**
+   * Pós-escrita da prova (remodelagem R3.1): garante o Cargo default 1:1
+   * (com Concurso eager) quando a prova tem institution, espelha a ficha nos
+   * cargos onde esta prova é a oficial (dual-write reverso — o admin ainda
+   * edita a prova até R4.3) e mantém a janela/edital do Concurso em dia.
+   */
+  private async afterProvaWrite(
+    examBaseId: string,
+    ficha?: {
+      role?: string;
+      salaryBase?: string | number | null;
+      minPassingGradeNonQuota?: string | number | null;
+      vacancyCount?: number | null;
+      applicantCount?: number | null;
+      registrationFee?: string | number | null;
+      description?: string | null;
+      workload?: string | null;
+      isNursingRelevant?: boolean;
+    },
+  ): Promise<void> {
+    await this.cargoService.ensureDefaultCargo(examBaseId);
+
+    if (ficha && Object.values(ficha).some((v) => v !== undefined)) {
+      await this.prisma.cargo.updateMany({
+        where: { provas: { some: { examBaseId, isOficial: true } } },
+        data: {
+          role: ficha.role,
+          salaryBase: ficha.salaryBase === undefined ? undefined : ficha.salaryBase,
+          minPassingGradeNonQuota:
+            ficha.minPassingGradeNonQuota === undefined
+              ? undefined
+              : ficha.minPassingGradeNonQuota,
+          vacancyCount:
+            ficha.vacancyCount === undefined ? undefined : ficha.vacancyCount,
+          applicantCount:
+            ficha.applicantCount === undefined ? undefined : ficha.applicantCount,
+          registrationFee:
+            ficha.registrationFee === undefined ? undefined : ficha.registrationFee,
+          description:
+            ficha.description === undefined
+              ? undefined
+              : normalizeOptionalText(ficha.description),
+          workload:
+            ficha.workload === undefined
+              ? undefined
+              : normalizeOptionalText(ficha.workload),
+          isNursingRelevant: ficha.isNursingRelevant,
+        },
+      });
+    }
+
+    await this.syncConcursoFromProvas(examBaseId);
+  }
+
+  /**
+   * Janela/edital do Concurso (R3.1 §2b): recomputa o agregado das provas
+   * vinculadas — mesmas regras do backfill (start mais cedo, end/resultado
+   * mais tarde, edital da prova mais antiga com valor). Dual-write até R6.1:
+   * o admin/IA ainda escrevem na prova; o Concurso acompanha na hora.
+   */
+  private async syncConcursoFromProvas(examBaseId: string): Promise<void> {
+    const prova = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { concursoId: true },
+    });
+    if (!prova?.concursoId) return;
+
+    const provas = await this.prisma.examBase.findMany({
+      where: { concursoId: prova.concursoId },
+      orderBy: [{ examDate: 'asc' }, { id: 'asc' }],
+      select: {
+        registrationStart: true,
+        registrationEnd: true,
+        resultDate: true,
+        editalUrl: true,
+      },
+    });
+    const earliest = (ds: (Date | null)[]) =>
+      ds.reduce<Date | null>((a, d) => (d && (!a || d < a) ? d : a), null);
+    const latest = (ds: (Date | null)[]) =>
+      ds.reduce<Date | null>((a, d) => (d && (!a || d > a) ? d : a), null);
+
+    await this.prisma.concurso.update({
+      where: { id: prova.concursoId },
+      data: {
+        registrationStart: earliest(provas.map((p) => p.registrationStart)),
+        registrationEnd: latest(provas.map((p) => p.registrationEnd)),
+        resultDate: latest(provas.map((p) => p.resultDate)),
+        editalUrl: provas.find((p) => p.editalUrl)?.editalUrl ?? null,
+      },
+    });
+  }
 
   private async triggerRevalidate(slug?: string | null): Promise<void> {
     const baseUrl = this.config.get<string>('NEXTJS_URL');
@@ -123,12 +207,18 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Lazily-linked concurso (MAX-25): populated once any concurso-aware
+        // read heals the link; the UI falls back to the exam base id
+        // (GET /concursos/:id also accepts it) while still null.
+        concurso: { select: { id: true, slug: true } },
         _count: { select: { questions: true } },
       },
     });
@@ -317,12 +407,22 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Concurso do lazy-link (R4.3): o admin usa para listar os cargos do
+        // mesmo edital na gestão de vínculos. Null até a prova ter institution.
+        concurso: { select: { id: true, slug: true } },
+        // Conteúdo programático do edital (MAX-14). Sem grupos → array vazio.
+        syllabusGroups: {
+          orderBy: { order: 'asc' },
+          select: { id: true, order: true, name: true, topics: true },
+        },
       },
     });
     if (!examBase) throw new NotFoundException('exam base not found');
@@ -452,7 +552,7 @@ export class ExamBaseService {
     });
   }
 
-  create(input: {
+  async create(input: {
     name: string;
     examBoardId?: string;
     institution?: string;
@@ -465,6 +565,7 @@ export class ExamBaseService {
     minPassingGradeNonQuota?: string | number | null;
     editalUrl?: string | null;
     adminNotes?: string | null;
+    isNursingRelevant?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -472,7 +573,7 @@ export class ExamBaseService {
       city: input.city,
     });
 
-    return this.prisma.examBase.create({
+    const created = await this.prisma.examBase.create({
       data: {
         name: input.name,
         examBoardId: input.examBoardId,
@@ -486,6 +587,7 @@ export class ExamBaseService {
         minPassingGradeNonQuota: input.minPassingGradeNonQuota ?? undefined,
         editalUrl: normalizeOptionalText(input.editalUrl),
         adminNotes: normalizeOptionalText(input.adminNotes),
+        isNursingRelevant: input.isNursingRelevant,
       },
       select: {
         id: true,
@@ -500,11 +602,16 @@ export class ExamBaseService {
         minPassingGradeNonQuota: true,
         editalUrl: true,
         adminNotes: true,
+        isNursingRelevant: true,
         processingPhase: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
+    // Cargo default 1:1 (R4.1): o caso comum "1 prova = 1 cargo" sem passo
+    // extra, com Concurso garantido eagerly quando há institution.
+    await this.afterProvaWrite(created.id);
+    return created;
   }
 
   async remove(examBaseId: string) {
@@ -539,14 +646,21 @@ export class ExamBaseService {
       vacancyCount?: number | null;
       applicantCount?: number | null;
       registrationFee?: string | number | null;
-      registrationDate?: string | null;
+      registrationStart?: string | null;
+      registrationEnd?: string | null;
       description?: string | null;
       workload?: string | null;
+      isNursingRelevant?: boolean;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
       where: { id: examBaseId },
-      select: { id: true, governmentScope: true, state: true, city: true },
+      select: {
+        id: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+      },
     });
     if (!exists) throw new NotFoundException('exam base not found');
 
@@ -585,9 +699,24 @@ export class ExamBaseService {
         vacancyCount: input.vacancyCount === undefined ? undefined : input.vacancyCount,
         applicantCount: input.applicantCount === undefined ? undefined : input.applicantCount,
         registrationFee: input.registrationFee === undefined ? undefined : input.registrationFee,
-        registrationDate: input.registrationDate === undefined ? undefined : (input.registrationDate ? new Date(input.registrationDate) : null),
+        registrationStart:
+          input.registrationStart === undefined
+            ? undefined
+            : input.registrationStart
+              ? new Date(input.registrationStart)
+              : null,
+        registrationEnd:
+          input.registrationEnd === undefined
+            ? undefined
+            : input.registrationEnd
+              ? new Date(input.registrationEnd)
+              : null,
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
+        isNursingRelevant: input.isNursingRelevant,
+        // cargoGroupId/provaLabel/isPrimaryProva não são mais aceitos aqui:
+        // os vínculos cargo↔prova são geridos pelo CargoService (R4.1/R4.3),
+        // que faz o dual-write das colunas legadas até o drop em R6.1.
       },
       select: {
         id: true,
@@ -607,13 +736,29 @@ export class ExamBaseService {
         vacancyCount: true,
         applicantCount: true,
         registrationFee: true,
-        registrationDate: true,
+        registrationStart: true,
+        registrationEnd: true,
         description: true,
         workload: true,
+        isNursingRelevant: true,
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
+    // Remodelagem R4.1: Cargo default garantido, ficha espelhada nos cargos
+    // onde esta prova é oficial e janela/edital do Concurso recomputados.
+    await this.afterProvaWrite(examBaseId, {
+      role: input.role,
+      salaryBase: input.salaryBase,
+      minPassingGradeNonQuota: input.minPassingGradeNonQuota,
+      vacancyCount: input.vacancyCount,
+      applicantCount: input.applicantCount,
+      registrationFee: input.registrationFee,
+      description: input.description,
+      workload: input.workload,
+      isNursingRelevant: input.isNursingRelevant,
+    });
+
     await this.triggerRevalidate(result.slug);
     return result;
   }

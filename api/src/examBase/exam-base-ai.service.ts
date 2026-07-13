@@ -26,12 +26,13 @@ Campos a extrair:
 - vacancyCount: número total de vagas para o cargo de Enfermeiro (ex: 10), null se não encontrado
 - applicantCount: número de inscritos para o cargo de Enfermeiro, null se não encontrado (geralmente não consta no edital)
 - registrationFee: taxa de inscrição como string numérica com até 2 decimais (ex: "120.00"), null se não encontrado
-- registrationDate: data limite de inscrição no formato ISO 8601 (ex: "2024-05-20"), null se não encontrada
+- registrationStart: data de abertura das inscrições no formato ISO 8601 (ex: "2024-05-10"), null se não encontrada
+- registrationEnd: data limite (encerramento) das inscrições no formato ISO 8601 (ex: "2024-05-20"), null se não encontrada
 - description: descrição da vaga / atribuições do cargo de Enfermeiro conforme consta no edital, null se não encontrada. Inclua as responsabilidades e funções principais.
 - workload: carga horária semanal do cargo (ex: "40h semanais"), null se não encontrada
 
 Retorne apenas o JSON. Exemplo:
-{"name":"...","role":"Enfermeiro","governmentScope":"MUNICIPAL","examDate":"2024-06-15","institution":"...","state":"SP","city":"São Paulo","salaryBase":"5800.00","minPassingGradeNonQuota":"60.00","examBoardName":"Fundação Carlos Chagas","examBoardAlias":"FCC","editalUrl":null,"vacancyCount":10,"applicantCount":null,"registrationFee":"120.00","registrationDate":"2024-05-20","description":"Prestar assistência de enfermagem...","workload":"40h semanais"}
+{"name":"...","role":"Enfermeiro","governmentScope":"MUNICIPAL","examDate":"2024-06-15","institution":"...","state":"SP","city":"São Paulo","salaryBase":"5800.00","minPassingGradeNonQuota":"60.00","examBoardName":"Fundação Carlos Chagas","examBoardAlias":"FCC","editalUrl":null,"vacancyCount":10,"applicantCount":null,"registrationFee":"120.00","registrationStart":"2024-05-10","registrationEnd":"2024-05-20","description":"Prestar assistência de enfermagem...","workload":"40h semanais"}
 `.trim();
 
 @Injectable()

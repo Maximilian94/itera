@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { trainingService } from '../services/training.service'
+import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
 
 function isUuid(value: string | undefined): value is string {
   if (!value) return false
@@ -46,12 +47,16 @@ export function useCreateTrainingMutation() {
       immediateFeedback,
     }: {
       examBaseId: string
-      subjectFilter?: string[]
+      subjectFilter?: Array<string>
       immediateFeedback?: boolean
     }) => trainingService.create(examBaseId, subjectFilter, immediateFeedback),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
       queryClient.invalidateQueries({ queryKey: ['training'] })
+      // Começar um treino muda o payload do cargo (attemptCount/plano); o
+      // detalhe tem staleTime de 5 min — sem invalidar, a prontidão fica
+      // stale (paridade com useStartSimuladoMutation, T2.3).
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }
@@ -120,6 +125,18 @@ export function useUpdateTrainingStageMutation(trainingId: string) {
       trainingService.updateStage(trainingId, stage),
     onSuccess: (data) => {
       queryClient.setQueryData(trainingKeys.one(trainingId), data)
+      // A lista (GET /training) alimenta o stepper embutido na página do cargo;
+      // sem invalidar, o estágio atual fica defasado após avançar de fase.
+      queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
+      // Avançar para STUDY cria os itens de estudo no backend; no fluxo
+      // embutido o TrainingFlow não remonta — sem invalidar, a fase Estudo
+      // mostraria "Nenhuma recomendação ainda" com a lista já criada (T2.2).
+      queryClient.invalidateQueries({
+        queryKey: trainingKeys.studyItems(trainingId),
+      })
+      // GoalCard/TrainingHeader/ReadinessBar leem o detalhe do cargo
+      // (staleTime 5 min): avanço de fase muda plano/prontidão (T2.3).
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }

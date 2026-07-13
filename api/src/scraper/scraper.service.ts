@@ -7,6 +7,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { GovernmentScope, PciEntryStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
+import { CargoService } from '../cargo/cargo.service';
 import { DEFAULT_CARGO_SLUGS, SCRAPER_QUEUE_NAME } from './scraper.constants';
 import type { ScraperJobPayload } from './scraper.processor';
 
@@ -14,6 +15,7 @@ import type { ScraperJobPayload } from './scraper.processor';
 export class ScraperService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly cargoService: CargoService,
     @InjectQueue(SCRAPER_QUEUE_NAME) private readonly queue: Queue,
   ) {}
 
@@ -124,10 +126,16 @@ export class ScraperService {
           entry.governmentScope ?? GovernmentScope.MUNICIPAL,
         state: entry.state,
         city: entry.city,
-        examDate: new Date(entry.year, 0, 1),
+        // UTC: new Date(year, 0, 1) no fuso local armazenaria 31/dez do ano
+        // anterior em servidores UTC+ (mesma classe de bug do T1.2).
+        examDate: new Date(Date.UTC(entry.year, 0, 1)),
         examBoardId,
       },
     });
+
+    // Remodelagem R4.1: prova promovida com institution ganha Concurso eager
+    // + Cargo default 1:1 na hora, como no wizard.
+    await this.cargoService.ensureDefaultCargo(examBase.id);
 
     await this.prisma.pciExamEntry.update({
       where: { id },

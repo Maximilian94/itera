@@ -118,3 +118,27 @@ code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
     monospace;
 }
+
+/* ── Transição de elemento compartilhado: concurso ↔ cargo ──────────
+   A marca da instituição fica no lugar; o título do concurso ↔ back-link
+   encolhe/cresce; o nome do cargo sobe do card para o título. Os nomes
+   (view-transition-name) são atribuídos nos componentes. Progressive
+   enhancement: sem suporte à View Transitions API, a navegação acontece
+   sem animação. */
+::view-transition-group(concurso-heading),
+::view-transition-group(cargo-heading),
+::view-transition-group(institution-mark),
+::view-transition-group(study-item-title),
+::view-transition-group(prova-title),
+::view-transition-group(treino-stepper) {
+  animation-duration: 0.5s;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.001ms !important;
+  }
+}

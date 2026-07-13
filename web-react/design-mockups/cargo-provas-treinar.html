@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Mockup · Provas para treinar (prova oficial fixa) — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    --success:#047857; --success-bg:#ecfdf5; --success-solid:#10b981;
+    --warning:#b45309; --warning-bg:#fffbeb;
+    --r-md:6px; --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 8px 20px -6px rgba(15,23,42,.16);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;color:var(--body);
+    background:var(--surface-muted);line-height:1.6;-webkit-font-smoothing:antialiased}
+  .shell{max-width:1040px;margin:0 auto;padding:24px 20px 90px}
+  a{color:inherit}h1,h2,h3,h4,p{margin:0}
+
+  .crumb{font-size:.8rem;color:var(--muted);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .crumb a{text-decoration:none;color:var(--muted)}.crumb a:hover{color:var(--primary-deep)}
+  .crumb .here{color:var(--ink);font-weight:700}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:var(--r-full)}
+  .pill--future{background:var(--primary-tint);color:var(--primary-deep)}
+  .pill--past{background:var(--surface-muted);color:var(--muted)}
+  .dot{width:7px;height:7px;border-radius:var(--r-full);background:currentColor}
+  .role{margin-top:10px;font-size:clamp(1.6rem,4vw,2rem);font-weight:800;color:var(--ink);letter-spacing:-.02em;line-height:1.12}
+  .context{margin-top:4px;font-size:.9rem;color:var(--muted)}
+
+  .tabs{display:flex;gap:4px;margin:22px 0 0;border-bottom:1px solid var(--border-soft)}
+  .tab{background:none;border:0;cursor:pointer;font-family:inherit;font-size:.95rem;font-weight:700;color:var(--muted);
+    padding:11px 16px 13px;display:inline-flex;align-items:center;gap:8px;position:relative}
+  .tab[aria-selected="true"]{color:var(--primary-deep)}
+  .tab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2.5px;background:var(--primary);border-radius:var(--r-full)}
+
+  .panel{padding-top:22px}
+  .eyebrow{font-size:.66rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+  .muted{color:var(--muted)}.small{font-size:.85rem}
+
+  /* segmented control (alterna estados no mockup) */
+  .seg{display:inline-flex;background:var(--surface-muted);border-radius:var(--r-lg);padding:3px;gap:2px}
+  .seg button{border:0;background:none;cursor:pointer;font-family:inherit;font-size:.82rem;font-weight:700;color:var(--muted);
+    padding:6px 14px;border-radius:6px}
+  .seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--sh-rest)}
+  .demo-note{font-size:.72rem;color:var(--muted);display:flex;align-items:center;gap:8px;margin-bottom:14px}
+  .demo-note b{color:var(--warning)}
+
+  /* botões */
+  .btn{appearance:none;font-family:inherit;cursor:pointer;border:0;border-radius:var(--r-lg);font-weight:700;font-size:.9rem;
+    padding:10px 18px;display:inline-flex;align-items:center;gap:8px;text-decoration:none;transition:background .16s,transform .16s}
+  .btn svg{width:17px;height:17px}
+  .btn--primary{background:var(--primary);color:#fff}.btn--primary:hover{background:var(--primary-deep)}
+  .btn--ghost{background:var(--surface);color:var(--ink);border:1px solid var(--border)}.btn--ghost:hover{background:var(--field)}
+  .btn--sm{padding:8px 14px;font-size:.84rem}.btn:active{transform:translateY(1px)}
+  .btn[disabled]{opacity:.5;cursor:not-allowed}
+
+  /* ====== PROVA OFICIAL (âncora fixa) ====== */
+  .official{position:relative;border:1.5px solid #a5e8f2;border-radius:var(--r-2xl);background:var(--surface);box-shadow:var(--sh-rest);overflow:hidden}
+  .official::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(var(--primary),var(--primary-deep))}
+  .off-pad{padding:20px 22px 20px 26px}
+  .off-head{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start;justify-content:space-between}
+  .off-logo{width:54px;height:54px;border-radius:var(--r-xl);background:var(--primary-tint);color:var(--primary-deep);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;line-height:1.05}
+  .off-logo .b{font-size:.82rem}.off-logo .y{font-size:.66rem;opacity:.8}
+  .off-titlewrap{min-width:0;flex:1}
+  .off-title{font-size:1.15rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .badge{font-size:.64rem;font-weight:800;padding:2px 8px;border-radius:var(--r-full);text-transform:uppercase;letter-spacing:.04em}
+  .badge--official{background:var(--primary);color:#fff}
+  .off-meta{font-size:.84rem;color:var(--muted);margin-top:3px}
+
+  /* explicação prova futura */
+  .explain{margin-top:16px;display:flex;gap:12px;background:var(--primary-tint);border:1px solid #bae9f2;border-radius:var(--r-xl);padding:14px 16px}
+  .explain svg{width:20px;height:20px;color:var(--primary-deep);flex-shrink:0;margin-top:1px}
+  .explain p{font-size:.86rem;color:var(--primary-deep)}
+  .explain b{color:var(--ink)}
+
+  /* faixa de prontidão da prova aplicada */
+  .ready{margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  .ready .num{font-size:1.5rem;font-weight:800;color:var(--ink);line-height:1}
+  .ready .track{position:relative;flex:1;min-width:200px;height:9px;border-radius:var(--r-full);background:var(--surface-muted)}
+  .ready .track .fill{position:absolute;inset:0 auto 0 0;border-radius:var(--r-full);background:var(--success-solid);width:78%}
+  .ready .track .cut{position:absolute;top:-4px;bottom:-4px;left:70%;width:2.5px;background:var(--ink);border-radius:2px}
+  .ready .cap{font-size:.78rem;color:var(--muted)}
+
+  .off-actions{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  .quota{font-size:.74rem;color:var(--muted);display:inline-flex;align-items:center;gap:6px}
+  .quota svg{width:14px;height:14px}
+
+  /* ====== GRID de provas recomendadas ====== */
+  .sec-title{font-size:1.02rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin-top:26px}
+  .sec-sub{font-size:.86rem;color:var(--muted);margin-top:2px;margin-bottom:14px}
+  .grid{display:grid;gap:14px;grid-template-columns:1fr}
+  @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
+
+  .pcard{position:relative;border:1px solid var(--border);border-radius:var(--r-2xl);background:var(--surface);box-shadow:var(--sh-rest);
+    padding:18px;display:flex;flex-direction:column;gap:14px;transition:box-shadow .18s,border-color .18s}
+  .pcard:hover{box-shadow:var(--sh-raised);border-color:#a5e8f2}
+  .pcard-top{display:flex;gap:13px;align-items:flex-start}
+  .plogo{width:46px;height:46px;border-radius:var(--r-lg);background:var(--surface-muted);color:var(--muted);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;line-height:1.05}
+  .plogo .b{font-size:.74rem}.plogo .y{font-size:.62rem;opacity:.75}
+  .ptitle{font-weight:800;color:var(--ink);font-size:.98rem;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .pmeta{font-size:.8rem;color:var(--muted);margin-top:2px}
+  .tag{font-size:.62rem;font-weight:700;padding:1px 8px;border-radius:var(--r-full)}
+  .tag--same{background:var(--primary-tint);color:var(--primary-deep)}
+  .tag--rel{background:var(--surface-muted);color:var(--muted)}
+  .pstate{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--muted)}
+  .pstate .bar{flex:1;height:6px;border-radius:var(--r-full);background:var(--surface-muted);overflow:hidden}
+  .pstate .bar i{display:block;height:100%;background:var(--primary);border-radius:var(--r-full)}
+  .pchip{font-size:.68rem;font-weight:700;padding:2px 8px;border-radius:var(--r-full);background:var(--warning-bg);color:var(--warning)}
+  .pcard-actions{display:flex;gap:8px;align-items:center;margin-top:auto}
+  .pcard-actions .btn{flex:1;justify-content:center}
+
+  /* ====== ESTADO "TREINANDO DENTRO DO CONCURSO" ====== */
+  .ctxbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--r-xl);padding:12px 16px;box-shadow:var(--sh-rest)}
+  .ctxbar .who{display:flex;align-items:center;gap:11px;min-width:0}
+  .ctxbar .who .l{width:40px;height:40px;border-radius:var(--r-lg);background:var(--primary-tint);color:var(--primary-deep);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;flex-shrink:0;line-height:1.05;font-size:.72rem}
+  .ctxbar .who .t{font-weight:800;color:var(--ink);font-size:.95rem}
+  .ctxbar .who .s{font-size:.78rem;color:var(--muted)}
+  .back{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.85rem;color:var(--primary-deep);text-decoration:none;
+    padding:8px 12px;border-radius:var(--r-lg);border:1px solid var(--border);background:var(--surface)}
+  .back:hover{background:var(--field)}
+
+  .stepbar{display:flex;align-items:center;gap:0;margin-top:16px;background:var(--surface);border:1px solid var(--border-soft);
+    border-radius:var(--r-lg);padding:8px;overflow-x:auto}
+  .stepbar .st{display:flex;align-items:center;gap:7px;padding:6px 10px;border-radius:var(--r-md);font-size:.82rem;font-weight:700;color:var(--muted);white-space:nowrap}
+  .stepbar .st .n{width:20px;height:20px;border-radius:var(--r-full);display:flex;align-items:center;justify-content:center;font-size:.7rem;background:var(--surface-muted)}
+  .stepbar .st.done{color:var(--success)}.stepbar .st.done .n{background:var(--success-bg)}
+  .stepbar .st.cur{color:#fff;background:var(--primary)}.stepbar .st.cur .n{background:rgba(255,255,255,.25);color:#fff}
+  .stepbar .sep{width:14px;height:2px;background:var(--border-soft);flex-shrink:0}
+
+  .training-body{margin-top:16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);box-shadow:var(--sh-rest);padding:22px}
+  .training-body h3{font-size:1.05rem;font-weight:800;color:var(--ink)}
+  .training-body p{font-size:.9rem;color:var(--muted);margin-top:4px}
+
+  .view[hidden]{display:none}
+  .note{margin-top:30px;font-size:.78rem;color:var(--muted);background:var(--warning-bg);border:1px solid #fde68a;border-radius:var(--r-lg);padding:11px 16px}
+  .note b{color:var(--warning)}
+  @media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <!-- breadcrumb: o treino acontece SEMPRE dentro deste contexto -->
+  <nav class="crumb" aria-label="Trilha">
+    <a href="#">Concursos</a><span>›</span>
+    <a href="#">Prefeitura de Santos 2026 · IBFC</a><span>›</span>
+    <span class="here" id="crumb-tail">Enfermeiro</span>
+  </nav>
+  <header>
+    <div style="margin-top:10px"><span class="pill pill--future" id="hpill"><span class="dot"></span>Prova em 14/09/2026</span></div>
+    <h1 class="role">Enfermeiro</h1>
+    <p class="context">Concurso Prefeitura de Santos 2026 · IBFC · nota de corte 70%</p>
+  </header>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" aria-selected="true">Treino</button>
+    <button class="tab" role="tab" aria-selected="false">Detalhes</button>
+  </div>
+
+  <section class="panel">
+
+    <!-- ░░░ VIEW 1: PROVAS PARA TREINAR ░░░ -->
+    <div class="view" id="view-board">
+
+      <div class="demo-note">
+        <b>Mockup</b> — alterne o estado da prova oficial:
+        <span class="seg" role="group" aria-label="Estado da prova oficial">
+          <button aria-pressed="true" onclick="setOfficial('future')">Prova futura</button>
+          <button aria-pressed="false" onclick="setOfficial('past')">Prova já aplicada</button>
+        </span>
+      </div>
+
+      <!-- PROVA OFICIAL (fixa, sempre no topo) -->
+      <div class="official">
+        <div class="off-pad">
+          <div class="off-head">
+            <div style="display:flex;gap:14px;align-items:flex-start;min-width:0">
+              <div class="off-logo"><span class="b">IBFC</span><span class="y">2026</span></div>
+              <div class="off-titlewrap">
+                <div class="off-title">Prova do concurso <span class="badge badge--official">Oficial</span></div>
+                <p class="off-meta">Enfermeiro · IBFC · Prefeitura de Santos 2026</p>
+              </div>
+            </div>
+            <span class="pill" id="off-pill"></span>
+          </div>
+
+          <!-- estado FUTURA -->
+          <div id="off-future">
+            <div class="explain">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+              <p><b>Esta prova ainda não foi aplicada</b>, então ela não tem questões próprias.
+                Quando a prova sair, as questões reais entram aqui. Por enquanto, treine com
+                provas equivalentes (mesma banca e cargo) — o desempenho conta do mesmo jeito.</p>
+            </div>
+            <div class="off-actions">
+              <a class="btn btn--primary" href="#recomendadas">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Treinar com prova equivalente
+              </a>
+              <span class="quota">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                Consome 1 treino da sua cota
+              </span>
+            </div>
+          </div>
+
+          <!-- estado APLICADA -->
+          <div id="off-past" hidden>
+            <div class="ready">
+              <div><p class="eyebrow">Sua prontidão nesta prova</p><span class="num" style="color:var(--success)">78%</span></div>
+              <div class="track" aria-hidden="true"><div class="fill"></div><div class="cut"></div></div>
+              <span class="cap">Acima do corte de 70% · 50 questões reais</span>
+            </div>
+            <div class="off-actions">
+              <a class="btn btn--primary" href="#" onclick="goTrain('IBFC · 2026','Prova oficial');return false">
+                <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                Treinar novamente
+              </a>
+              <a class="btn btn--ghost" href="#" onclick="return false">Ver resultado anterior</a>
+              <span class="quota">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+                Consome 1 treino da sua cota
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- RECOMENDADAS -->
+      <h2 class="sec-title" id="recomendadas">Provas recomendadas para treinar</h2>
+      <p class="sec-sub" id="rec-sub">Provas equivalentes (mesma banca e cargo) enquanto a oficial não sai. Cada uma tem seu próprio ciclo de treino e questões reais.</p>
+
+      <div class="grid">
+        <!-- card: mesma banca, em andamento -->
+        <div class="pcard">
+          <div class="pcard-top">
+            <div class="plogo"><span class="b">IBFC</span><span class="y">2024</span></div>
+            <div style="min-width:0;flex:1">
+              <div class="ptitle">IBFC · 2024 <span class="tag tag--same">mesma banca</span></div>
+              <p class="pmeta">Prefeitura de Cubatão · 40 questões</p>
+            </div>
+          </div>
+          <div class="pstate">
+            <span class="pchip">Em andamento · Estudo</span>
+            <div class="bar"><i style="width:55%"></i></div>
+            <span>55%</span>
+          </div>
+          <div class="pcard-actions">
+            <a class="btn btn--primary btn--sm" href="#" onclick="goTrain('IBFC · 2024','prova equivalente · mesma banca');return false">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Continuar
+            </a>
+          </div>
+        </div>
+
+        <!-- card: mesma banca, novo -->
+        <div class="pcard">
+          <div class="pcard-top">
+            <div class="plogo"><span class="b">IBFC</span><span class="y">2022</span></div>
+            <div style="min-width:0;flex:1">
+              <div class="ptitle">IBFC · 2022 <span class="tag tag--same">mesma banca</span></div>
+              <p class="pmeta">Prefeitura de Guarujá · 40 questões</p>
+            </div>
+          </div>
+          <div class="pstate"><span>Ainda não treinado</span></div>
+          <div class="pcard-actions">
+            <a class="btn btn--primary btn--sm" href="#" onclick="goTrain('IBFC · 2022','prova equivalente · mesma banca');return false">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Treinar
+            </a>
+          </div>
+        </div>
+
+        <!-- card: outra banca relacionada -->
+        <div class="pcard">
+          <div class="pcard-top">
+            <div class="plogo"><span class="b">VUNE</span><span class="y">2023</span></div>
+            <div style="min-width:0;flex:1">
+              <div class="ptitle">VUNESP · 2023 <span class="tag tag--rel">relacionada</span></div>
+              <p class="pmeta">Prefeitura de São Vicente · 50 questões</p>
+            </div>
+          </div>
+          <div class="pstate"><span>Cargo equivalente, banca diferente</span></div>
+          <div class="pcard-actions">
+            <a class="btn btn--primary btn--sm" href="#" onclick="goTrain('VUNESP · 2023','prova relacionada');return false">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+              Treinar
+            </a>
+          </div>
+        </div>
+
+        <!-- card: concluído -->
+        <div class="pcard">
+          <div class="pcard-top">
+            <div class="plogo"><span class="b">VUNE</span><span class="y">2021</span></div>
+            <div style="min-width:0;flex:1">
+              <div class="ptitle">VUNESP · 2021 <span class="tag tag--rel">relacionada</span></div>
+              <p class="pmeta">Prefeitura de Praia Grande · 50 questões</p>
+            </div>
+          </div>
+          <div class="pstate"><span class="pchip" style="background:var(--success-bg);color:var(--success)">Ciclo concluído · 71%</span></div>
+          <div class="pcard-actions">
+            <a class="btn btn--ghost btn--sm" href="#" onclick="goTrain('VUNESP · 2021','prova relacionada');return false">Treinar novamente</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ░░░ VIEW 2: TREINANDO (DENTRO DO CONCURSO) ░░░ -->
+    <div class="view" id="view-train" hidden>
+      <div class="ctxbar">
+        <div class="who">
+          <div class="l"><span id="tw-logo">IBFC</span></div>
+          <div>
+            <div class="t" id="tw-title">Treinando: IBFC · 2024</div>
+            <div class="s" id="tw-sub">prova equivalente · mesma banca — dentro do concurso Prefeitura de Santos 2026</div>
+          </div>
+        </div>
+        <a class="back" href="#" onclick="goBoard();return false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="15" height="15"><path d="m15 18-6-6 6-6"/></svg>
+          Voltar às provas
+        </a>
+      </div>
+
+      <!-- a "página de treino" aparece aqui, sem perder o breadcrumb do concurso -->
+      <div class="stepbar" aria-label="Etapas do treino">
+        <span class="st done"><span class="n">✓</span>Prova</span><span class="sep"></span>
+        <span class="st done"><span class="n">✓</span>Diagnóstico</span><span class="sep"></span>
+        <span class="st cur"><span class="n">3</span>Estudo</span><span class="sep"></span>
+        <span class="st"><span class="n">4</span>Re-tentativa</span><span class="sep"></span>
+        <span class="st"><span class="n">5</span>Final</span>
+      </div>
+
+      <div class="training-body">
+        <h3>Estudar pontos fracos</h3>
+        <p>Aqui entra o conteúdo do treino (diagnóstico, lista de estudo, modo foco…) — a mesma
+          experiência de <code>/treino</code>, só que renderizada <b>dentro da página do concurso</b>:
+          o breadcrumb continua "Concursos › Prefeitura de Santos › Enfermeiro", e "Voltar às provas"
+          devolve você ao quadro acima.</p>
+      </div>
+    </div>
+
+  </section>
+
+  <p class="note">
+    <b>Resumo do conceito:</b> a aba Treino vira um <b>quadro de provas</b>. A <b>prova oficial</b> do
+    concurso é a âncora fixa no topo — se ainda não foi aplicada, explicamos e oferecemos treinar nas
+    <b>equivalentes</b>; se já foi, mostramos sua prontidão e "Treinar novamente". Cada cartão tem
+    <b>Treinar / Continuar / Treinar novamente</b>, e ao clicar a navegação troca para a página de treino
+    <b>sem sair do concurso</b> (breadcrumb e contexto preservados).
+  </p>
+</div>
+
+<script>
+  function setOfficial(state){
+    const fut = state === 'future';
+    document.getElementById('off-future').hidden = !fut;
+    document.getElementById('off-past').hidden = fut;
+    document.getElementById('off-pill').className = 'pill ' + (fut ? 'pill--future' : 'pill--past');
+    document.getElementById('off-pill').innerHTML = '<span class="dot"></span>' + (fut ? 'Aplicação em 14/09/2026' : 'Aplicada em 14/05/2024');
+    document.getElementById('hpill').className = 'pill ' + (fut ? 'pill--future' : 'pill--past');
+    document.getElementById('hpill').innerHTML = '<span class="dot"></span>' + (fut ? 'Prova em 14/09/2026' : 'Prova aplicada em 14/05/2024');
+    document.getElementById('rec-sub').textContent = fut
+      ? 'Provas equivalentes (mesma banca e cargo) enquanto a oficial não sai. Cada uma tem seu próprio ciclo de treino e questões reais.'
+      : 'Além da prova oficial, treine com edições anteriores e provas equivalentes deste cargo.';
+    document.querySelectorAll('.seg button').forEach((b,i)=>b.setAttribute('aria-pressed', String(i===0?fut:!fut)));
+  }
+  function goTrain(title, sub){
+    document.getElementById('view-board').hidden = true;
+    document.getElementById('view-train').hidden = false;
+    document.getElementById('tw-title').textContent = 'Treinando: ' + title;
+    document.getElementById('tw-sub').textContent = sub + ' — dentro do concurso Prefeitura de Santos 2026';
+    document.getElementById('tw-logo').textContent = title.split(' ')[0].slice(0,4).toUpperCase();
+    document.getElementById('crumb-tail').textContent = 'Enfermeiro › Treino';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function goBoard(){
+    document.getElementById('view-train').hidden = true;
+    document.getElementById('view-board').hidden = false;
+    document.getElementById('crumb-tail').textContent = 'Enfermeiro';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  setOfficial('future');
+</script>
+</body>
+</html>

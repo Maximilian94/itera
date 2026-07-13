@@ -1,5 +1,15 @@
 import { GovernmentScope, ProcessingPhase } from '@prisma/client';
-import { IsDateString, IsDecimal, IsEnum, IsInt, IsOptional, IsString, IsUrl, IsUUID } from 'class-validator';
+import {
+  IsBoolean,
+  IsDateString,
+  IsDecimal,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  IsUrl,
+  IsUUID,
+} from 'class-validator';
 
 export class UpdateExamBaseDto {
   @IsOptional()
@@ -72,7 +82,11 @@ export class UpdateExamBaseDto {
 
   @IsOptional()
   @IsDateString()
-  registrationDate?: string | null;
+  registrationStart?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  registrationEnd?: string | null;
 
   @IsOptional()
   @IsString()
@@ -81,5 +95,12 @@ export class UpdateExamBaseDto {
   @IsOptional()
   @IsString()
   workload?: string | null;
-}
 
+  /// Quando false, o cargo fica fora da página do concurso (ex.: Médico).
+  @IsOptional()
+  @IsBoolean()
+  isNursingRelevant?: boolean;
+
+
+
+}

@@ -10,6 +10,14 @@ export interface TrainingListItem {
   examBaseId: string
   examBoardId: string | null
   examTitle: string
+  /** Slug do cargo (nível 2) para navegar de volta. Null até o lazy-link popular. */
+  cargoSlug: string | null
+  /** Rótulo do cargo (role + provaLabel), ex.: "Enfermeiro · Tipo 1". */
+  cargoLabel: string
+  /** Slug do concurso (nível 1). Null até o lazy-link popular. */
+  concursoSlug: string | null
+  /** Título do concurso para agrupar, ex.: "Prefeitura de São José dos Campos 2026". */
+  concursoTitle: string
   currentStage: TrainingStage
   attemptId: string
   createdAt: string

@@ -293,7 +293,20 @@ export class TrainingService {
       where: { userId },
       orderBy: { updatedAt: 'desc' },
       include: {
-        examBase: { select: { id: true, name: true, examBoardId: true, minPassingGradeNonQuota: true } },
+        examBase: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            role: true,
+            institution: true,
+            examDate: true,
+            provaLabel: true,
+            examBoardId: true,
+            minPassingGradeNonQuota: true,
+            concurso: { select: { slug: true, institution: true, year: true } },
+          },
+        },
         examBaseAttempt: { select: { id: true, finishedAt: true, scorePercentage: true } },
       },
     });
@@ -302,6 +315,13 @@ export class TrainingService {
       examBaseId: s.examBaseId,
       examBoardId: s.examBase.examBoardId ?? null,
       examTitle: s.examBase.name,
+      cargoSlug: s.examBase.slug ?? null,
+      cargoLabel: [s.examBase.role, s.examBase.provaLabel].filter(Boolean).join(' · '),
+      concursoSlug: s.examBase.concurso?.slug ?? null,
+      concursoTitle: s.examBase.concurso
+        ? `${s.examBase.concurso.institution} ${s.examBase.concurso.year}`
+        : (s.examBase.institution ??
+          `${s.examBase.name} ${new Date(s.examBase.examDate).getFullYear()}`),
       currentStage: s.currentStage,
       attemptId: s.examBaseAttempt.id,
       createdAt: s.createdAt,
@@ -332,6 +352,11 @@ export class TrainingService {
   /**
    * Creates a new attempt and training session. Returns ids for frontend routing.
    *
+   * Idempotente por prova: se o usuário já tem uma sessão EM ANDAMENTO
+   * (currentStage != FINAL) para o mesmo examBaseId, retorna a existente sem
+   * criar outra nem cobrar a cota — elimina a classe de bugs de clique duplo,
+   * abas duplicadas e lista de treinos ainda carregando no front (T2.1).
+   *
    * Before creating, validates that the user's subscription plan allows trainings
    * (Estratégico or Elite) and that the monthly limit has not been reached.
    *
@@ -343,6 +368,26 @@ export class TrainingService {
     userId: string,
     dto?: { subjectFilter?: string[]; immediateFeedback?: boolean },
   ) {
+    // ---- Idempotência: sessão ativa nesta prova → retorna a existente ----
+    const active = await this.prisma.trainingSession.findFirst({
+      where: { userId, examBaseId, currentStage: { not: 'FINAL' } },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        examBaseAttemptId: true,
+        examBaseId: true,
+        examBase: { select: { examBoardId: true } },
+      },
+    });
+    if (active) {
+      return {
+        trainingId: active.id,
+        attemptId: active.examBaseAttemptId,
+        examBaseId: active.examBaseId,
+        examBoardId: active.examBase.examBoardId,
+      };
+    }
+
     // ---- Plan & limit enforcement ----
     const user = await this.prisma.user.findUnique({
       where: { id: userId },

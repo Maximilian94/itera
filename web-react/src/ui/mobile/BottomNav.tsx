@@ -1,14 +1,10 @@
 import {
-  AcademicCapIcon,
-  ClockIcon,
   DocumentTextIcon,
   HomeIcon,
   UserIcon,
 } from '@heroicons/react/24/outline'
 import type { ElementType } from 'react'
 import {
-  AcademicCapIcon as AcademicCapIconSolid,
-  ClockIcon as ClockIconSolid,
   DocumentTextIcon as DocumentTextIconSolid,
   HomeIcon as HomeIconSolid,
   UserIcon as UserIconSolid,
@@ -18,10 +14,12 @@ import { PhoneSafeArea } from './PhoneSafeArea'
 
 type BottomNavItem = {
   label: string
-  to: '/dashboard' | '/exams' | '/treino' | '/history' | '/account'
+  to: '/dashboard' | '/concursos' | '/account'
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
+  /** Rotas extras que mantêm o item ativo (sempre fuzzy). */
+  alsoMatch?: Array<'/exams'>
 }
 
 const items: BottomNavItem[] = [
@@ -32,25 +30,16 @@ const items: BottomNavItem[] = [
     activeIcon: HomeIconSolid,
   },
   {
-    label: 'Exams',
-    to: '/exams',
+    label: 'Concursos',
+    to: '/concursos',
     icon: DocumentTextIcon,
     activeIcon: DocumentTextIconSolid,
     fuzzy: true,
+    // Concursos é a porta de entrada (MAX-28); /exams mantém o item ativo.
+    alsoMatch: ['/exams'],
   },
-  {
-    label: 'Treino',
-    to: '/treino',
-    icon: AcademicCapIcon,
-    activeIcon: AcademicCapIconSolid,
-    fuzzy: true,
-  },
-  {
-    label: 'Histórico',
-    to: '/history',
-    icon: ClockIcon,
-    activeIcon: ClockIconSolid,
-  },
+  // Navegação enxuta: o treino vive embutido na página do cargo — tudo
+  // parte de Concursos ("Treinos"/"Histórico" removidos).
   {
     label: 'Perfil',
     to: '/account',
@@ -70,10 +59,15 @@ export function BottomNav() {
     >
       <nav className="mx-auto flex h-[var(--mobile-bottom-nav-height)] max-w-md items-center justify-between px-2">
         {items.map((item) => {
-          const isActive = matchRoute({
-            to: item.to,
-            fuzzy: item.fuzzy ?? false,
-          })
+          const isActive = Boolean(
+            matchRoute({
+              to: item.to,
+              fuzzy: item.fuzzy ?? false,
+            }) ||
+              (item.alsoMatch ?? []).some((to) =>
+                matchRoute({ to, fuzzy: true }),
+              ),
+          )
           const Icon = isActive ? item.activeIcon : item.icon
 
           return (

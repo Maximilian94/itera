@@ -16,7 +16,6 @@ import {
   ArrowRightIcon,
   ArrowTrendingUpIcon,
   ArrowUpIcon,
-  ClockIcon,
   DocumentTextIcon,
   PlayIcon,
   PlusIcon,
@@ -27,8 +26,15 @@ import { LineChart } from '@mui/x-charts/LineChart'
 import { SparkLineChart } from '@mui/x-charts/SparkLineChart'
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useEffect } from 'react'
-import { getStagePath } from './treino/-stages.config'
-import type { TreinoStageSlug } from './treino/-stages.config'
+import type { TrainingListItem } from '@/features/training/domain/training.types'
+
+/** Destino do treino embutido: página do cargo (slugs com fallback por UUID). */
+function trainingParams(t: TrainingListItem) {
+  return {
+    concursoSlug: t.concursoSlug ?? t.examBaseId,
+    cargoSlug: t.cargoSlug ?? t.examBaseId,
+  }
+}
 import dayjs from 'dayjs'
 import { formatExamBaseTitle } from '@/lib/utils'
 import colors from 'tailwindcss/colors'
@@ -81,14 +87,6 @@ const STAGE_COLORS: Record<string, string> = {
   STUDY: 'bg-emerald-100 text-emerald-700',
   RETRY: 'bg-violet-100 text-violet-700',
   FINAL: 'bg-rose-100 text-rose-700',
-}
-
-const STAGE_SLUG: Record<string, TreinoStageSlug> = {
-  EXAM: 'prova',
-  DIAGNOSIS: 'diagnostico',
-  STUDY: 'estudo',
-  RETRY: 'retentativa',
-  FINAL: 'final',
 }
 
 const STAGE_PROGRESS: Record<string, number> = {
@@ -268,7 +266,6 @@ function Dashboard() {
     )
   }
 
-  const totalTrainings = trainings.length
   const concludedTrainings = trainings.filter(
     (t) => t.currentStage === 'FINAL',
   ).length
@@ -385,16 +382,15 @@ function Dashboard() {
       return
     }
     if (lastActiveTraining) {
+      // O treino vive embutido na página do cargo (retoma sozinho).
       navigate({
-        to: getStagePath(
-          STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
-          lastActiveTraining.trainingId,
-        ),
+        to: '/concursos/$concursoSlug/$cargoSlug',
+        params: trainingParams(lastActiveTraining),
       })
       return
     }
     if (canCreateTraining) {
-      navigate({ to: '/treino/novo' })
+      navigate({ to: '/concursos' })
       return
     }
   }
@@ -592,32 +588,11 @@ function Dashboard() {
           </h2>
           <div className="grid grid-cols-2 gap-3">
             <MobileActionTile
-              to="/treino/novo"
+              to="/concursos"
               icon={RocketLaunchIcon}
-              title="Novo treino"
+              title="Concursos"
               accent="text-cyan-700"
               iconBg="bg-cyan-100"
-            />
-            <MobileActionTile
-              to="/treino"
-              icon={AcademicCapIcon}
-              title="Meus treinos"
-              accent="text-emerald-700"
-              iconBg="bg-emerald-100"
-            />
-            <MobileActionTile
-              to="/exams"
-              icon={DocumentTextIcon}
-              title="Exames"
-              accent="text-violet-700"
-              iconBg="bg-violet-100"
-            />
-            <MobileActionTile
-              to="/history"
-              icon={ClockIcon}
-              title="Histórico"
-              accent="text-slate-700"
-              iconBg="bg-slate-100"
             />
           </div>
         </div>
@@ -628,12 +603,6 @@ function Dashboard() {
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">
                 Treinos em andamento
               </h2>
-              <Link
-                to="/treino"
-                className="text-sm font-semibold text-cyan-700 no-underline"
-              >
-                Ver todos
-              </Link>
             </div>
 
             <div className="grid gap-3">
@@ -642,13 +611,13 @@ function Dashboard() {
                   STAGE_LABELS[t.currentStage] ?? t.currentStage
                 const stageColor =
                   STAGE_COLORS[t.currentStage] ?? 'bg-slate-100 text-slate-700'
-                const slug = STAGE_SLUG[t.currentStage] ?? 'prova'
                 const progress = STAGE_PROGRESS[t.currentStage] ?? 0
 
                 return (
                   <Link
                     key={t.trainingId}
-                    to={getStagePath(slug, t.trainingId)}
+                    to="/concursos/$concursoSlug/$cargoSlug"
+                    params={trainingParams(t)}
                     className="block text-inherit no-underline"
                   >
                     <MobileCard>
@@ -733,10 +702,8 @@ function Dashboard() {
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
               {lastActiveTraining ? (
                 <Link
-                  to={getStagePath(
-                    STAGE_SLUG[lastActiveTraining.currentStage] ?? 'prova',
-                    lastActiveTraining.trainingId,
-                  )}
+                  to="/concursos/$concursoSlug/$cargoSlug"
+                  params={trainingParams(lastActiveTraining)}
                   className="no-underline"
                 >
                   <Button
@@ -749,14 +716,14 @@ function Dashboard() {
                   </Button>
                 </Link>
               ) : canCreateTraining ? (
-                <Link to="/treino/novo" className="no-underline">
+                <Link to="/concursos" className="no-underline">
                   <Button
                     variant="contained"
                     color="primary"
                     size="small"
                     startIcon={<PlusIcon className="w-4 h-4" />}
                   >
-                    Criar treino
+                    Ver concursos
                   </Button>
                 </Link>
               ) : isLimitReached ? (
@@ -1013,45 +980,14 @@ function Dashboard() {
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <ActionCard
-            to="/treino/novo"
+            to="/concursos"
             icon={RocketLaunchIcon}
-            title="Criar novo treino"
-            description="Escolha um simulado e comece a evoluir"
+            title="Concursos"
+            description="Encontre seu concurso, escolha o cargo e treine"
             accent="text-cyan-600"
             iconBg="bg-cyan-100"
             primary
             animDelay={150}
-          />
-          <ActionCard
-            to="/treino"
-            icon={AcademicCapIcon}
-            title="Meus treinos"
-            description={
-              totalTrainings > 0
-                ? `${totalTrainings} treino${totalTrainings !== 1 ? 's' : ''} · ${concludedTrainings} concluído${concludedTrainings !== 1 ? 's' : ''}`
-                : 'Veja seus treinos e continue onde parou'
-            }
-            accent="text-cyan-600"
-            iconBg="bg-cyan-100"
-            animDelay={200}
-          />
-          <ActionCard
-            to="/exams"
-            icon={DocumentTextIcon}
-            title="Exames"
-            description="Explore provas e simulados disponíveis"
-            accent="text-violet-600"
-            iconBg="bg-violet-100"
-            animDelay={250}
-          />
-          <ActionCard
-            to="/history"
-            icon={ClockIcon}
-            title="Histórico"
-            description="Histórico completo de tentativas"
-            accent="text-slate-600"
-            iconBg="bg-slate-100"
-            animDelay={300}
           />
         </div>
       </div>
@@ -1062,12 +998,6 @@ function Dashboard() {
             <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wide">
               Treinos em andamento
             </h2>
-            <Link
-              to="/treino"
-              className="text-xs text-cyan-600 hover:text-cyan-500 font-medium no-underline"
-            >
-              Ver todos
-            </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {activeTrainings.slice(0, 3).map((t, idx) => {
@@ -1075,13 +1005,13 @@ function Dashboard() {
                 STAGE_LABELS[t.currentStage] ?? t.currentStage
               const stageColor =
                 STAGE_COLORS[t.currentStage] ?? 'bg-slate-100 text-slate-700'
-              const slug = STAGE_SLUG[t.currentStage] ?? 'prova'
               const progress = STAGE_PROGRESS[t.currentStage] ?? 0
 
               return (
                 <Link
                   key={t.trainingId}
-                  to={getStagePath(slug, t.trainingId)}
+                  to="/concursos/$concursoSlug/$cargoSlug"
+                  params={trainingParams(t)}
                   className="no-underline text-inherit block"
                 >
                   <Card

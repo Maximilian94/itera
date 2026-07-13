@@ -15,6 +15,8 @@ import { AttemptsModule } from './attempts/attempts.module';
 import { ExamsModule } from './exams/exams.module';
 import { ExamBoardModule } from './examBoard/exam-board.module';
 import { ExamBaseModule } from './examBase/exam-base.module';
+import { ConcursoModule } from './concurso/concurso.module';
+import { CargoModule } from './cargo/cargo.module';
 import { ExamBaseQuestionModule } from './examBaseQuestion/exam-base-question.module';
 import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.module';
 import { TrainingModule } from './training/training.module';
@@ -46,6 +48,8 @@ import { ScraperModule } from './scraper/scraper.module';
     ExamsModule,
     ExamBoardModule,
     ExamBaseModule,
+    ConcursoModule,
+    CargoModule,
     ExamBaseQuestionModule,
     ExamBaseAttemptModule,
     TrainingModule,
