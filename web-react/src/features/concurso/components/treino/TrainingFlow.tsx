@@ -17,11 +17,11 @@ import type {
   TrainingListItem,
   TrainingStudyItemResponse,
 } from '@/features/training/domain/training.types'
-import type { TreinoStageSlug } from '@/routes/_authenticated/treino/-stages.config'
+import type { TreinoStageSlug } from '@/features/training/domain/stages.config'
 import {
   TRAINING_STAGE_ORDER,
   TREINO_STAGES,
-} from '@/routes/_authenticated/treino/-stages.config'
+} from '@/features/training/domain/stages.config'
 import {
   useTrainingQuery,
   useTrainingStudyItemsQuery,

@@ -96,10 +96,18 @@ export function getStageById(id: number) {
   return TREINO_STAGES.find((s) => s.id === id)
 }
 
-/** Path for each stage. When trainingId is provided, use /treino/:trainingId/:slug */
-export function getStagePath(slug: TreinoStageSlug, trainingId?: string) {
-  if (trainingId) return `/treino/${trainingId}/${slug}`
-  return `/treino/${slug}`
+/**
+ * Destino de um treino: a página do CARGO, que abre direto na aba Treino
+ * quando há sessão em andamento (o fluxo embutido substituiu as rotas
+ * /treino/:id/*). Slugs ausentes caem no fallback por UUID de prova, que
+ * ambos os níveis resolvem (`/concursos/:id` e `getCargoDetail`).
+ */
+export function getTrainingHref(t: {
+  concursoSlug?: string | null
+  cargoSlug?: string | null
+  examBaseId: string
+}): string {
+  return `/concursos/${t.concursoSlug ?? t.examBaseId}/${t.cargoSlug ?? t.examBaseId}`
 }
 
 /** Order of stages from the API (TrainingStage). Index = allowed up to that stage. */

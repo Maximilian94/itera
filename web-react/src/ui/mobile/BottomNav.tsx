@@ -1,14 +1,10 @@
 import {
-  AcademicCapIcon,
-  ClockIcon,
   DocumentTextIcon,
   HomeIcon,
   UserIcon,
 } from '@heroicons/react/24/outline'
 import type { ElementType } from 'react'
 import {
-  AcademicCapIcon as AcademicCapIconSolid,
-  ClockIcon as ClockIconSolid,
   DocumentTextIcon as DocumentTextIconSolid,
   HomeIcon as HomeIconSolid,
   UserIcon as UserIconSolid,
@@ -18,7 +14,7 @@ import { PhoneSafeArea } from './PhoneSafeArea'
 
 type BottomNavItem = {
   label: string
-  to: '/dashboard' | '/concursos' | '/treino' | '/history' | '/account'
+  to: '/dashboard' | '/concursos' | '/account'
   icon: ElementType
   activeIcon: ElementType
   fuzzy?: boolean
@@ -42,19 +38,8 @@ const items: BottomNavItem[] = [
     // Concursos é a porta de entrada (MAX-28); /exams mantém o item ativo.
     alsoMatch: ['/exams'],
   },
-  {
-    label: 'Treinos',
-    to: '/treino',
-    icon: AcademicCapIcon,
-    activeIcon: AcademicCapIconSolid,
-    fuzzy: true,
-  },
-  {
-    label: 'Histórico',
-    to: '/history',
-    icon: ClockIcon,
-    activeIcon: ClockIconSolid,
-  },
+  // Navegação enxuta: o treino vive embutido na página do cargo — tudo
+  // parte de Concursos ("Treinos"/"Histórico" removidos).
   {
     label: 'Perfil',
     to: '/account',

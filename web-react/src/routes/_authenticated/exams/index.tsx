@@ -1463,12 +1463,6 @@ function ExamsPage() {
             <h3 className="text-sm font-semibold text-slate-800">
               Suas tentativas
             </h3>
-            <Link
-              to="/history"
-              className="text-xs text-cyan-600 hover:text-cyan-700 font-medium no-underline"
-            >
-              Ver histórico
-            </Link>
           </div>
           <div className="grid grid-cols-3 gap-4">
             <div className="flex items-center gap-3">

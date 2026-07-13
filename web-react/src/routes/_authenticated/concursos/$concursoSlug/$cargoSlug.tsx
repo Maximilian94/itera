@@ -700,15 +700,15 @@ function TreinoTab(props: {
           Ainda não há provas para treinar este cargo
         </h2>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Enquanto cadastramos as questões, você pode treinar com simulados gerais
-          de enfermagem.
+          Enquanto cadastramos as questões, você pode treinar por outro
+          concurso do mesmo cargo.
         </p>
         <Link
-          to="/treino"
+          to="/concursos"
           className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2 text-sm font-semibold text-white no-underline transition-colors hover:bg-cyan-700"
         >
           <PlayIcon className="h-4 w-4" />
-          Ir para o treino
+          Ver concursos
         </Link>
       </section>
     )

@@ -35,7 +35,7 @@ export function AccessGate({
     isLimitReached,
     isEliteAtLimit,
   } = useRequireAccess()
-  const { openPortal, loading: portalLoading } = useOpenPortal('/treino/novo')
+  const { openPortal, loading: portalLoading } = useOpenPortal('/concursos')
   const shouldCheckAdminBypass =
     !isLoading &&
     ((type === 'prova' && !hasAccess) ||

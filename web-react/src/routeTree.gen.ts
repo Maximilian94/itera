@@ -14,12 +14,9 @@ import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as MobilePreviewRouteImport } from './routes/mobile-preview'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedTreinoRouteImport } from './routes/_authenticated/treino'
 import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
-import { Route as AuthenticatedHistoryRouteImport } from './routes/_authenticated/history'
 import { Route as AuthenticatedExamsRouteImport } from './routes/_authenticated/exams'
-import { Route as AuthenticatedExamBoardsRouteImport } from './routes/_authenticated/exam-boards'
 import { Route as AuthenticatedEvolucaoComoFuncionaRouteImport } from './routes/_authenticated/evolucao-como-funciona'
 import { Route as AuthenticatedDatabaseRouteImport } from './routes/_authenticated/database'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
@@ -28,32 +25,15 @@ import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedTreinoIndexRouteImport } from './routes/_authenticated/treino/index'
 import { Route as AuthenticatedExamsIndexRouteImport } from './routes/_authenticated/exams/index'
 import { Route as AuthenticatedConcursosIndexRouteImport } from './routes/_authenticated/concursos/index'
-import { Route as AuthenticatedTreinoRetentativaRouteImport } from './routes/_authenticated/treino/retentativa'
-import { Route as AuthenticatedTreinoProvaRouteImport } from './routes/_authenticated/treino/prova'
-import { Route as AuthenticatedTreinoNovoRouteImport } from './routes/_authenticated/treino/novo'
-import { Route as AuthenticatedTreinoFinalRouteImport } from './routes/_authenticated/treino/final'
-import { Route as AuthenticatedTreinoEstudoRouteImport } from './routes/_authenticated/treino/estudo'
-import { Route as AuthenticatedTreinoDiagnosticoRouteImport } from './routes/_authenticated/treino/diagnostico'
-import { Route as AuthenticatedTreinoTrainingIdRouteImport } from './routes/_authenticated/treino/$trainingId'
+import { Route as AuthenticatedTreinoSplatRouteImport } from './routes/_authenticated/treino/$'
 import { Route as AuthenticatedExamsEditarRouteImport } from './routes/_authenticated/exams/editar'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminPciScraperRouteImport } from './routes/_authenticated/admin/pci-scraper'
-import { Route as AuthenticatedTreinoTrainingIdIndexRouteImport } from './routes/_authenticated/treino/$trainingId/index'
-import { Route as AuthenticatedExamsExamBoardIndexRouteImport } from './routes/_authenticated/exams/$examBoard/index'
 import { Route as AuthenticatedConcursosConcursoSlugIndexRouteImport } from './routes/_authenticated/concursos/$concursoSlug/index'
-import { Route as AuthenticatedTreinoTrainingIdRetentativaRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa'
-import { Route as AuthenticatedTreinoTrainingIdProvaRouteImport } from './routes/_authenticated/treino/$trainingId/prova'
-import { Route as AuthenticatedTreinoTrainingIdFinalRouteImport } from './routes/_authenticated/treino/$trainingId/final'
-import { Route as AuthenticatedTreinoTrainingIdEstudoRouteImport } from './routes/_authenticated/treino/$trainingId/estudo'
-import { Route as AuthenticatedTreinoTrainingIdDiagnosticoRouteImport } from './routes/_authenticated/treino/$trainingId/diagnostico'
 import { Route as AuthenticatedExamsEditarExamBaseIdRouteImport } from './routes/_authenticated/exams/editar/$examBaseId'
 import { Route as AuthenticatedExamsExamBoardExamIdRouteImport } from './routes/_authenticated/exams/$examBoard/$examId'
 import { Route as AuthenticatedConcursosConcursoSlugCargoSlugRouteImport } from './routes/_authenticated/concursos/$concursoSlug/$cargoSlug'
-import { Route as AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa/index'
-import { Route as AuthenticatedTreinoTrainingIdEstudoIndexRouteImport } from './routes/_authenticated/treino/$trainingId/estudo/index'
 import { Route as AuthenticatedExamsExamBoardExamIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/index'
-import { Route as AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport } from './routes/_authenticated/treino/$trainingId/retentativa/prova'
-import { Route as AuthenticatedTreinoTrainingIdEstudoStudyItemIdRouteImport } from './routes/_authenticated/treino/$trainingId/estudo/$studyItemId'
 import { Route as AuthenticatedExamsExamBoardExamIdQuestoesV2RouteImport } from './routes/_authenticated/exams/$examBoard/$examId/questoes-v2'
 import { Route as AuthenticatedExamsExamBoardExamIdQuestoesRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/questoes'
 import { Route as AuthenticatedExamsExamBoardExamIdAttemptIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/$attemptId/index'
@@ -83,11 +63,6 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedTreinoRoute = AuthenticatedTreinoRouteImport.update({
-  id: '/treino',
-  path: '/treino',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedPlanosRoute = AuthenticatedPlanosRouteImport.update({
   id: '/planos',
   path: '/planos',
@@ -98,19 +73,9 @@ const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
   path: '/onboarding',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedHistoryRoute = AuthenticatedHistoryRouteImport.update({
-  id: '/history',
-  path: '/history',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
 const AuthenticatedExamsRoute = AuthenticatedExamsRouteImport.update({
   id: '/exams',
   path: '/exams',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedExamBoardsRoute = AuthenticatedExamBoardsRouteImport.update({
-  id: '/exam-boards',
-  path: '/exam-boards',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedEvolucaoComoFuncionaRoute =
@@ -142,9 +107,9 @@ const AuthenticatedAccountRoute = AuthenticatedAccountRouteImport.update({
 } as any)
 const AuthenticatedTreinoIndexRoute =
   AuthenticatedTreinoIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedTreinoRoute,
+    id: '/treino/',
+    path: '/treino/',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedExamsIndexRoute = AuthenticatedExamsIndexRouteImport.update({
   id: '/',
@@ -157,46 +122,11 @@ const AuthenticatedConcursosIndexRoute =
     path: '/concursos/',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedTreinoRetentativaRoute =
-  AuthenticatedTreinoRetentativaRouteImport.update({
-    id: '/retentativa',
-    path: '/retentativa',
-    getParentRoute: () => AuthenticatedTreinoRoute,
-  } as any)
-const AuthenticatedTreinoProvaRoute =
-  AuthenticatedTreinoProvaRouteImport.update({
-    id: '/prova',
-    path: '/prova',
-    getParentRoute: () => AuthenticatedTreinoRoute,
-  } as any)
-const AuthenticatedTreinoNovoRoute = AuthenticatedTreinoNovoRouteImport.update({
-  id: '/novo',
-  path: '/novo',
-  getParentRoute: () => AuthenticatedTreinoRoute,
-} as any)
-const AuthenticatedTreinoFinalRoute =
-  AuthenticatedTreinoFinalRouteImport.update({
-    id: '/final',
-    path: '/final',
-    getParentRoute: () => AuthenticatedTreinoRoute,
-  } as any)
-const AuthenticatedTreinoEstudoRoute =
-  AuthenticatedTreinoEstudoRouteImport.update({
-    id: '/estudo',
-    path: '/estudo',
-    getParentRoute: () => AuthenticatedTreinoRoute,
-  } as any)
-const AuthenticatedTreinoDiagnosticoRoute =
-  AuthenticatedTreinoDiagnosticoRouteImport.update({
-    id: '/diagnostico',
-    path: '/diagnostico',
-    getParentRoute: () => AuthenticatedTreinoRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdRoute =
-  AuthenticatedTreinoTrainingIdRouteImport.update({
-    id: '/$trainingId',
-    path: '/$trainingId',
-    getParentRoute: () => AuthenticatedTreinoRoute,
+const AuthenticatedTreinoSplatRoute =
+  AuthenticatedTreinoSplatRouteImport.update({
+    id: '/treino/$',
+    path: '/treino/$',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedExamsEditarRoute =
   AuthenticatedExamsEditarRouteImport.update({
@@ -215,53 +145,11 @@ const AuthenticatedAdminPciScraperRoute =
     path: '/admin/pci-scraper',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedTreinoTrainingIdIndexRoute =
-  AuthenticatedTreinoTrainingIdIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
-  } as any)
-const AuthenticatedExamsExamBoardIndexRoute =
-  AuthenticatedExamsExamBoardIndexRouteImport.update({
-    id: '/$examBoard/',
-    path: '/$examBoard/',
-    getParentRoute: () => AuthenticatedExamsRoute,
-  } as any)
 const AuthenticatedConcursosConcursoSlugIndexRoute =
   AuthenticatedConcursosConcursoSlugIndexRouteImport.update({
     id: '/concursos/$concursoSlug/',
     path: '/concursos/$concursoSlug/',
     getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdRetentativaRoute =
-  AuthenticatedTreinoTrainingIdRetentativaRouteImport.update({
-    id: '/retentativa',
-    path: '/retentativa',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdProvaRoute =
-  AuthenticatedTreinoTrainingIdProvaRouteImport.update({
-    id: '/prova',
-    path: '/prova',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdFinalRoute =
-  AuthenticatedTreinoTrainingIdFinalRouteImport.update({
-    id: '/final',
-    path: '/final',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdEstudoRoute =
-  AuthenticatedTreinoTrainingIdEstudoRouteImport.update({
-    id: '/estudo',
-    path: '/estudo',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdDiagnosticoRoute =
-  AuthenticatedTreinoTrainingIdDiagnosticoRouteImport.update({
-    id: '/diagnostico',
-    path: '/diagnostico',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRoute,
   } as any)
 const AuthenticatedExamsEditarExamBaseIdRoute =
   AuthenticatedExamsEditarExamBaseIdRouteImport.update({
@@ -281,35 +169,11 @@ const AuthenticatedConcursosConcursoSlugCargoSlugRoute =
     path: '/concursos/$concursoSlug/$cargoSlug',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedTreinoTrainingIdRetentativaIndexRoute =
-  AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRetentativaRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdEstudoIndexRoute =
-  AuthenticatedTreinoTrainingIdEstudoIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdEstudoRoute,
-  } as any)
 const AuthenticatedExamsExamBoardExamIdIndexRoute =
   AuthenticatedExamsExamBoardExamIdIndexRouteImport.update({
     id: '/',
     path: '/',
     getParentRoute: () => AuthenticatedExamsExamBoardExamIdRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdRetentativaProvaRoute =
-  AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport.update({
-    id: '/prova',
-    path: '/prova',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdRetentativaRoute,
-  } as any)
-const AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute =
-  AuthenticatedTreinoTrainingIdEstudoStudyItemIdRouteImport.update({
-    id: '/$studyItemId',
-    path: '/$studyItemId',
-    getParentRoute: () => AuthenticatedTreinoTrainingIdEstudoRoute,
   } as any)
 const AuthenticatedExamsExamBoardExamIdQuestoesV2Route =
   AuthenticatedExamsExamBoardExamIdQuestoesV2RouteImport.update({
@@ -346,43 +210,23 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
   '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
-  '/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/exams': typeof AuthenticatedExamsRouteWithChildren
-  '/history': typeof AuthenticatedHistoryRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
-  '/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
-  '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
-  '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
-  '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
-  '/treino/final': typeof AuthenticatedTreinoFinalRoute
-  '/treino/novo': typeof AuthenticatedTreinoNovoRoute
-  '/treino/prova': typeof AuthenticatedTreinoProvaRoute
-  '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
+  '/treino/$': typeof AuthenticatedTreinoSplatRoute
   '/concursos/': typeof AuthenticatedConcursosIndexRoute
   '/exams/': typeof AuthenticatedExamsIndexRoute
   '/treino/': typeof AuthenticatedTreinoIndexRoute
   '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
-  '/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
-  '/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoRouteWithChildren
-  '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
-  '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
-  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
   '/concursos/$concursoSlug/': typeof AuthenticatedConcursosConcursoSlugIndexRoute
-  '/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
-  '/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
   '/exams/$examBoard/$examId/questoes-v2': typeof AuthenticatedExamsExamBoardExamIdQuestoesV2Route
-  '/treino/$trainingId/estudo/$studyItemId': typeof AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute
-  '/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/exams/$examBoard/$examId/': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
-  '/treino/$trainingId/estudo/': typeof AuthenticatedTreinoTrainingIdEstudoIndexRoute
-  '/treino/$trainingId/retentativa/': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/exams/$examBoard/$examId/$attemptId/': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -396,37 +240,21 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/database': typeof AuthenticatedDatabaseRoute
   '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
-  '/exam-boards': typeof AuthenticatedExamBoardsRoute
-  '/history': typeof AuthenticatedHistoryRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
-  '/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
-  '/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
-  '/treino/final': typeof AuthenticatedTreinoFinalRoute
-  '/treino/novo': typeof AuthenticatedTreinoNovoRoute
-  '/treino/prova': typeof AuthenticatedTreinoProvaRoute
-  '/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
+  '/treino/$': typeof AuthenticatedTreinoSplatRoute
   '/concursos': typeof AuthenticatedConcursosIndexRoute
   '/exams': typeof AuthenticatedExamsIndexRoute
   '/treino': typeof AuthenticatedTreinoIndexRoute
   '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
-  '/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
-  '/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
-  '/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
   '/concursos/$concursoSlug': typeof AuthenticatedConcursosConcursoSlugIndexRoute
-  '/exams/$examBoard': typeof AuthenticatedExamsExamBoardIndexRoute
-  '/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
   '/exams/$examBoard/$examId/questoes-v2': typeof AuthenticatedExamsExamBoardExamIdQuestoesV2Route
-  '/treino/$trainingId/estudo/$studyItemId': typeof AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute
-  '/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
-  '/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoIndexRoute
-  '/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/exams/$examBoard/$examId/$attemptId': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -442,43 +270,23 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/database': typeof AuthenticatedDatabaseRoute
   '/_authenticated/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
-  '/_authenticated/exam-boards': typeof AuthenticatedExamBoardsRoute
   '/_authenticated/exams': typeof AuthenticatedExamsRouteWithChildren
-  '/_authenticated/history': typeof AuthenticatedHistoryRoute
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
-  '/_authenticated/treino': typeof AuthenticatedTreinoRouteWithChildren
   '/_authenticated/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
-  '/_authenticated/treino/$trainingId': typeof AuthenticatedTreinoTrainingIdRouteWithChildren
-  '/_authenticated/treino/diagnostico': typeof AuthenticatedTreinoDiagnosticoRoute
-  '/_authenticated/treino/estudo': typeof AuthenticatedTreinoEstudoRoute
-  '/_authenticated/treino/final': typeof AuthenticatedTreinoFinalRoute
-  '/_authenticated/treino/novo': typeof AuthenticatedTreinoNovoRoute
-  '/_authenticated/treino/prova': typeof AuthenticatedTreinoProvaRoute
-  '/_authenticated/treino/retentativa': typeof AuthenticatedTreinoRetentativaRoute
+  '/_authenticated/treino/$': typeof AuthenticatedTreinoSplatRoute
   '/_authenticated/concursos/': typeof AuthenticatedConcursosIndexRoute
   '/_authenticated/exams/': typeof AuthenticatedExamsIndexRoute
   '/_authenticated/treino/': typeof AuthenticatedTreinoIndexRoute
   '/_authenticated/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/_authenticated/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/_authenticated/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
-  '/_authenticated/treino/$trainingId/diagnostico': typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
-  '/_authenticated/treino/$trainingId/estudo': typeof AuthenticatedTreinoTrainingIdEstudoRouteWithChildren
-  '/_authenticated/treino/$trainingId/final': typeof AuthenticatedTreinoTrainingIdFinalRoute
-  '/_authenticated/treino/$trainingId/prova': typeof AuthenticatedTreinoTrainingIdProvaRoute
-  '/_authenticated/treino/$trainingId/retentativa': typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
   '/_authenticated/concursos/$concursoSlug/': typeof AuthenticatedConcursosConcursoSlugIndexRoute
-  '/_authenticated/exams/$examBoard/': typeof AuthenticatedExamsExamBoardIndexRoute
-  '/_authenticated/treino/$trainingId/': typeof AuthenticatedTreinoTrainingIdIndexRoute
   '/_authenticated/exams/$examBoard/$examId/questoes': typeof AuthenticatedExamsExamBoardExamIdQuestoesRoute
   '/_authenticated/exams/$examBoard/$examId/questoes-v2': typeof AuthenticatedExamsExamBoardExamIdQuestoesV2Route
-  '/_authenticated/treino/$trainingId/estudo/$studyItemId': typeof AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute
-  '/_authenticated/treino/$trainingId/retentativa/prova': typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
   '/_authenticated/exams/$examBoard/$examId/': typeof AuthenticatedExamsExamBoardExamIdIndexRoute
-  '/_authenticated/treino/$trainingId/estudo/': typeof AuthenticatedTreinoTrainingIdEstudoIndexRoute
-  '/_authenticated/treino/$trainingId/retentativa/': typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
   '/_authenticated/exams/$examBoard/$examId/$attemptId/feedback': typeof AuthenticatedExamsExamBoardExamIdAttemptIdFeedbackRoute
   '/_authenticated/exams/$examBoard/$examId/$attemptId/': typeof AuthenticatedExamsExamBoardExamIdAttemptIdIndexRoute
 }
@@ -494,43 +302,23 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/database'
     | '/evolucao-como-funciona'
-    | '/exam-boards'
     | '/exams'
-    | '/history'
     | '/onboarding'
     | '/planos'
-    | '/treino'
     | '/admin/pci-scraper'
     | '/admin/users'
     | '/exams/editar'
-    | '/treino/$trainingId'
-    | '/treino/diagnostico'
-    | '/treino/estudo'
-    | '/treino/final'
-    | '/treino/novo'
-    | '/treino/prova'
-    | '/treino/retentativa'
+    | '/treino/$'
     | '/concursos/'
     | '/exams/'
     | '/treino/'
     | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/$examBoard/$examId'
     | '/exams/editar/$examBaseId'
-    | '/treino/$trainingId/diagnostico'
-    | '/treino/$trainingId/estudo'
-    | '/treino/$trainingId/final'
-    | '/treino/$trainingId/prova'
-    | '/treino/$trainingId/retentativa'
     | '/concursos/$concursoSlug/'
-    | '/exams/$examBoard/'
-    | '/treino/$trainingId/'
     | '/exams/$examBoard/$examId/questoes'
     | '/exams/$examBoard/$examId/questoes-v2'
-    | '/treino/$trainingId/estudo/$studyItemId'
-    | '/treino/$trainingId/retentativa/prova'
     | '/exams/$examBoard/$examId/'
-    | '/treino/$trainingId/estudo/'
-    | '/treino/$trainingId/retentativa/'
     | '/exams/$examBoard/$examId/$attemptId/feedback'
     | '/exams/$examBoard/$examId/$attemptId/'
   fileRoutesByTo: FileRoutesByTo
@@ -544,37 +332,21 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/database'
     | '/evolucao-como-funciona'
-    | '/exam-boards'
-    | '/history'
     | '/onboarding'
     | '/planos'
     | '/admin/pci-scraper'
     | '/admin/users'
     | '/exams/editar'
-    | '/treino/diagnostico'
-    | '/treino/estudo'
-    | '/treino/final'
-    | '/treino/novo'
-    | '/treino/prova'
-    | '/treino/retentativa'
+    | '/treino/$'
     | '/concursos'
     | '/exams'
     | '/treino'
     | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/editar/$examBaseId'
-    | '/treino/$trainingId/diagnostico'
-    | '/treino/$trainingId/final'
-    | '/treino/$trainingId/prova'
     | '/concursos/$concursoSlug'
-    | '/exams/$examBoard'
-    | '/treino/$trainingId'
     | '/exams/$examBoard/$examId/questoes'
     | '/exams/$examBoard/$examId/questoes-v2'
-    | '/treino/$trainingId/estudo/$studyItemId'
-    | '/treino/$trainingId/retentativa/prova'
     | '/exams/$examBoard/$examId'
-    | '/treino/$trainingId/estudo'
-    | '/treino/$trainingId/retentativa'
     | '/exams/$examBoard/$examId/$attemptId/feedback'
     | '/exams/$examBoard/$examId/$attemptId'
   id:
@@ -589,43 +361,23 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/database'
     | '/_authenticated/evolucao-como-funciona'
-    | '/_authenticated/exam-boards'
     | '/_authenticated/exams'
-    | '/_authenticated/history'
     | '/_authenticated/onboarding'
     | '/_authenticated/planos'
-    | '/_authenticated/treino'
     | '/_authenticated/admin/pci-scraper'
     | '/_authenticated/admin/users'
     | '/_authenticated/exams/editar'
-    | '/_authenticated/treino/$trainingId'
-    | '/_authenticated/treino/diagnostico'
-    | '/_authenticated/treino/estudo'
-    | '/_authenticated/treino/final'
-    | '/_authenticated/treino/novo'
-    | '/_authenticated/treino/prova'
-    | '/_authenticated/treino/retentativa'
+    | '/_authenticated/treino/$'
     | '/_authenticated/concursos/'
     | '/_authenticated/exams/'
     | '/_authenticated/treino/'
     | '/_authenticated/concursos/$concursoSlug/$cargoSlug'
     | '/_authenticated/exams/$examBoard/$examId'
     | '/_authenticated/exams/editar/$examBaseId'
-    | '/_authenticated/treino/$trainingId/diagnostico'
-    | '/_authenticated/treino/$trainingId/estudo'
-    | '/_authenticated/treino/$trainingId/final'
-    | '/_authenticated/treino/$trainingId/prova'
-    | '/_authenticated/treino/$trainingId/retentativa'
     | '/_authenticated/concursos/$concursoSlug/'
-    | '/_authenticated/exams/$examBoard/'
-    | '/_authenticated/treino/$trainingId/'
     | '/_authenticated/exams/$examBoard/$examId/questoes'
     | '/_authenticated/exams/$examBoard/$examId/questoes-v2'
-    | '/_authenticated/treino/$trainingId/estudo/$studyItemId'
-    | '/_authenticated/treino/$trainingId/retentativa/prova'
     | '/_authenticated/exams/$examBoard/$examId/'
-    | '/_authenticated/treino/$trainingId/estudo/'
-    | '/_authenticated/treino/$trainingId/retentativa/'
     | '/_authenticated/exams/$examBoard/$examId/$attemptId/feedback'
     | '/_authenticated/exams/$examBoard/$examId/$attemptId/'
   fileRoutesById: FileRoutesById
@@ -675,13 +427,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/treino': {
-      id: '/_authenticated/treino'
-      path: '/treino'
-      fullPath: '/treino'
-      preLoaderRoute: typeof AuthenticatedTreinoRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/planos': {
       id: '/_authenticated/planos'
       path: '/planos'
@@ -696,25 +441,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/history': {
-      id: '/_authenticated/history'
-      path: '/history'
-      fullPath: '/history'
-      preLoaderRoute: typeof AuthenticatedHistoryRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/exams': {
       id: '/_authenticated/exams'
       path: '/exams'
       fullPath: '/exams'
       preLoaderRoute: typeof AuthenticatedExamsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/exam-boards': {
-      id: '/_authenticated/exam-boards'
-      path: '/exam-boards'
-      fullPath: '/exam-boards'
-      preLoaderRoute: typeof AuthenticatedExamBoardsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/evolucao-como-funciona': {
@@ -754,10 +485,10 @@ declare module '@tanstack/react-router' {
     }
     '/_authenticated/treino/': {
       id: '/_authenticated/treino/'
-      path: '/'
+      path: '/treino'
       fullPath: '/treino/'
       preLoaderRoute: typeof AuthenticatedTreinoIndexRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/exams/': {
       id: '/_authenticated/exams/'
@@ -773,54 +504,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConcursosIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/treino/retentativa': {
-      id: '/_authenticated/treino/retentativa'
-      path: '/retentativa'
-      fullPath: '/treino/retentativa'
-      preLoaderRoute: typeof AuthenticatedTreinoRetentativaRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/prova': {
-      id: '/_authenticated/treino/prova'
-      path: '/prova'
-      fullPath: '/treino/prova'
-      preLoaderRoute: typeof AuthenticatedTreinoProvaRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/novo': {
-      id: '/_authenticated/treino/novo'
-      path: '/novo'
-      fullPath: '/treino/novo'
-      preLoaderRoute: typeof AuthenticatedTreinoNovoRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/final': {
-      id: '/_authenticated/treino/final'
-      path: '/final'
-      fullPath: '/treino/final'
-      preLoaderRoute: typeof AuthenticatedTreinoFinalRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/estudo': {
-      id: '/_authenticated/treino/estudo'
-      path: '/estudo'
-      fullPath: '/treino/estudo'
-      preLoaderRoute: typeof AuthenticatedTreinoEstudoRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/diagnostico': {
-      id: '/_authenticated/treino/diagnostico'
-      path: '/diagnostico'
-      fullPath: '/treino/diagnostico'
-      preLoaderRoute: typeof AuthenticatedTreinoDiagnosticoRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
-    }
-    '/_authenticated/treino/$trainingId': {
-      id: '/_authenticated/treino/$trainingId'
-      path: '/$trainingId'
-      fullPath: '/treino/$trainingId'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRouteImport
-      parentRoute: typeof AuthenticatedTreinoRoute
+    '/_authenticated/treino/$': {
+      id: '/_authenticated/treino/$'
+      path: '/treino/$'
+      fullPath: '/treino/$'
+      preLoaderRoute: typeof AuthenticatedTreinoSplatRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/exams/editar': {
       id: '/_authenticated/exams/editar'
@@ -843,61 +532,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPciScraperRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/treino/$trainingId/': {
-      id: '/_authenticated/treino/$trainingId/'
-      path: '/'
-      fullPath: '/treino/$trainingId/'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdIndexRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
-    }
-    '/_authenticated/exams/$examBoard/': {
-      id: '/_authenticated/exams/$examBoard/'
-      path: '/$examBoard'
-      fullPath: '/exams/$examBoard/'
-      preLoaderRoute: typeof AuthenticatedExamsExamBoardIndexRouteImport
-      parentRoute: typeof AuthenticatedExamsRoute
-    }
     '/_authenticated/concursos/$concursoSlug/': {
       id: '/_authenticated/concursos/$concursoSlug/'
       path: '/concursos/$concursoSlug'
       fullPath: '/concursos/$concursoSlug/'
       preLoaderRoute: typeof AuthenticatedConcursosConcursoSlugIndexRouteImport
       parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/treino/$trainingId/retentativa': {
-      id: '/_authenticated/treino/$trainingId/retentativa'
-      path: '/retentativa'
-      fullPath: '/treino/$trainingId/retentativa'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
-    }
-    '/_authenticated/treino/$trainingId/prova': {
-      id: '/_authenticated/treino/$trainingId/prova'
-      path: '/prova'
-      fullPath: '/treino/$trainingId/prova'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdProvaRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
-    }
-    '/_authenticated/treino/$trainingId/final': {
-      id: '/_authenticated/treino/$trainingId/final'
-      path: '/final'
-      fullPath: '/treino/$trainingId/final'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdFinalRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
-    }
-    '/_authenticated/treino/$trainingId/estudo': {
-      id: '/_authenticated/treino/$trainingId/estudo'
-      path: '/estudo'
-      fullPath: '/treino/$trainingId/estudo'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdEstudoRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
-    }
-    '/_authenticated/treino/$trainingId/diagnostico': {
-      id: '/_authenticated/treino/$trainingId/diagnostico'
-      path: '/diagnostico'
-      fullPath: '/treino/$trainingId/diagnostico'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdDiagnosticoRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRoute
     }
     '/_authenticated/exams/editar/$examBaseId': {
       id: '/_authenticated/exams/editar/$examBaseId'
@@ -920,40 +560,12 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/treino/$trainingId/retentativa/': {
-      id: '/_authenticated/treino/$trainingId/retentativa/'
-      path: '/'
-      fullPath: '/treino/$trainingId/retentativa/'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRetentativaIndexRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRoute
-    }
-    '/_authenticated/treino/$trainingId/estudo/': {
-      id: '/_authenticated/treino/$trainingId/estudo/'
-      path: '/'
-      fullPath: '/treino/$trainingId/estudo/'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdEstudoIndexRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdEstudoRoute
-    }
     '/_authenticated/exams/$examBoard/$examId/': {
       id: '/_authenticated/exams/$examBoard/$examId/'
       path: '/'
       fullPath: '/exams/$examBoard/$examId/'
       preLoaderRoute: typeof AuthenticatedExamsExamBoardExamIdIndexRouteImport
       parentRoute: typeof AuthenticatedExamsExamBoardExamIdRoute
-    }
-    '/_authenticated/treino/$trainingId/retentativa/prova': {
-      id: '/_authenticated/treino/$trainingId/retentativa/prova'
-      path: '/prova'
-      fullPath: '/treino/$trainingId/retentativa/prova'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdRetentativaProvaRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRoute
-    }
-    '/_authenticated/treino/$trainingId/estudo/$studyItemId': {
-      id: '/_authenticated/treino/$trainingId/estudo/$studyItemId'
-      path: '/$studyItemId'
-      fullPath: '/treino/$trainingId/estudo/$studyItemId'
-      preLoaderRoute: typeof AuthenticatedTreinoTrainingIdEstudoStudyItemIdRouteImport
-      parentRoute: typeof AuthenticatedTreinoTrainingIdEstudoRoute
     }
     '/_authenticated/exams/$examBoard/$examId/questoes-v2': {
       id: '/_authenticated/exams/$examBoard/$examId/questoes-v2'
@@ -1032,7 +644,6 @@ interface AuthenticatedExamsRouteChildren {
   AuthenticatedExamsEditarRoute: typeof AuthenticatedExamsEditarRouteWithChildren
   AuthenticatedExamsIndexRoute: typeof AuthenticatedExamsIndexRoute
   AuthenticatedExamsExamBoardExamIdRoute: typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
-  AuthenticatedExamsExamBoardIndexRoute: typeof AuthenticatedExamsExamBoardIndexRoute
 }
 
 const AuthenticatedExamsRouteChildren: AuthenticatedExamsRouteChildren = {
@@ -1040,103 +651,10 @@ const AuthenticatedExamsRouteChildren: AuthenticatedExamsRouteChildren = {
   AuthenticatedExamsIndexRoute: AuthenticatedExamsIndexRoute,
   AuthenticatedExamsExamBoardExamIdRoute:
     AuthenticatedExamsExamBoardExamIdRouteWithChildren,
-  AuthenticatedExamsExamBoardIndexRoute: AuthenticatedExamsExamBoardIndexRoute,
 }
 
 const AuthenticatedExamsRouteWithChildren =
   AuthenticatedExamsRoute._addFileChildren(AuthenticatedExamsRouteChildren)
-
-interface AuthenticatedTreinoTrainingIdEstudoRouteChildren {
-  AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute: typeof AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute
-  AuthenticatedTreinoTrainingIdEstudoIndexRoute: typeof AuthenticatedTreinoTrainingIdEstudoIndexRoute
-}
-
-const AuthenticatedTreinoTrainingIdEstudoRouteChildren: AuthenticatedTreinoTrainingIdEstudoRouteChildren =
-  {
-    AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute:
-      AuthenticatedTreinoTrainingIdEstudoStudyItemIdRoute,
-    AuthenticatedTreinoTrainingIdEstudoIndexRoute:
-      AuthenticatedTreinoTrainingIdEstudoIndexRoute,
-  }
-
-const AuthenticatedTreinoTrainingIdEstudoRouteWithChildren =
-  AuthenticatedTreinoTrainingIdEstudoRoute._addFileChildren(
-    AuthenticatedTreinoTrainingIdEstudoRouteChildren,
-  )
-
-interface AuthenticatedTreinoTrainingIdRetentativaRouteChildren {
-  AuthenticatedTreinoTrainingIdRetentativaProvaRoute: typeof AuthenticatedTreinoTrainingIdRetentativaProvaRoute
-  AuthenticatedTreinoTrainingIdRetentativaIndexRoute: typeof AuthenticatedTreinoTrainingIdRetentativaIndexRoute
-}
-
-const AuthenticatedTreinoTrainingIdRetentativaRouteChildren: AuthenticatedTreinoTrainingIdRetentativaRouteChildren =
-  {
-    AuthenticatedTreinoTrainingIdRetentativaProvaRoute:
-      AuthenticatedTreinoTrainingIdRetentativaProvaRoute,
-    AuthenticatedTreinoTrainingIdRetentativaIndexRoute:
-      AuthenticatedTreinoTrainingIdRetentativaIndexRoute,
-  }
-
-const AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren =
-  AuthenticatedTreinoTrainingIdRetentativaRoute._addFileChildren(
-    AuthenticatedTreinoTrainingIdRetentativaRouteChildren,
-  )
-
-interface AuthenticatedTreinoTrainingIdRouteChildren {
-  AuthenticatedTreinoTrainingIdDiagnosticoRoute: typeof AuthenticatedTreinoTrainingIdDiagnosticoRoute
-  AuthenticatedTreinoTrainingIdEstudoRoute: typeof AuthenticatedTreinoTrainingIdEstudoRouteWithChildren
-  AuthenticatedTreinoTrainingIdFinalRoute: typeof AuthenticatedTreinoTrainingIdFinalRoute
-  AuthenticatedTreinoTrainingIdProvaRoute: typeof AuthenticatedTreinoTrainingIdProvaRoute
-  AuthenticatedTreinoTrainingIdRetentativaRoute: typeof AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren
-  AuthenticatedTreinoTrainingIdIndexRoute: typeof AuthenticatedTreinoTrainingIdIndexRoute
-}
-
-const AuthenticatedTreinoTrainingIdRouteChildren: AuthenticatedTreinoTrainingIdRouteChildren =
-  {
-    AuthenticatedTreinoTrainingIdDiagnosticoRoute:
-      AuthenticatedTreinoTrainingIdDiagnosticoRoute,
-    AuthenticatedTreinoTrainingIdEstudoRoute:
-      AuthenticatedTreinoTrainingIdEstudoRouteWithChildren,
-    AuthenticatedTreinoTrainingIdFinalRoute:
-      AuthenticatedTreinoTrainingIdFinalRoute,
-    AuthenticatedTreinoTrainingIdProvaRoute:
-      AuthenticatedTreinoTrainingIdProvaRoute,
-    AuthenticatedTreinoTrainingIdRetentativaRoute:
-      AuthenticatedTreinoTrainingIdRetentativaRouteWithChildren,
-    AuthenticatedTreinoTrainingIdIndexRoute:
-      AuthenticatedTreinoTrainingIdIndexRoute,
-  }
-
-const AuthenticatedTreinoTrainingIdRouteWithChildren =
-  AuthenticatedTreinoTrainingIdRoute._addFileChildren(
-    AuthenticatedTreinoTrainingIdRouteChildren,
-  )
-
-interface AuthenticatedTreinoRouteChildren {
-  AuthenticatedTreinoTrainingIdRoute: typeof AuthenticatedTreinoTrainingIdRouteWithChildren
-  AuthenticatedTreinoDiagnosticoRoute: typeof AuthenticatedTreinoDiagnosticoRoute
-  AuthenticatedTreinoEstudoRoute: typeof AuthenticatedTreinoEstudoRoute
-  AuthenticatedTreinoFinalRoute: typeof AuthenticatedTreinoFinalRoute
-  AuthenticatedTreinoNovoRoute: typeof AuthenticatedTreinoNovoRoute
-  AuthenticatedTreinoProvaRoute: typeof AuthenticatedTreinoProvaRoute
-  AuthenticatedTreinoRetentativaRoute: typeof AuthenticatedTreinoRetentativaRoute
-  AuthenticatedTreinoIndexRoute: typeof AuthenticatedTreinoIndexRoute
-}
-
-const AuthenticatedTreinoRouteChildren: AuthenticatedTreinoRouteChildren = {
-  AuthenticatedTreinoTrainingIdRoute:
-    AuthenticatedTreinoTrainingIdRouteWithChildren,
-  AuthenticatedTreinoDiagnosticoRoute: AuthenticatedTreinoDiagnosticoRoute,
-  AuthenticatedTreinoEstudoRoute: AuthenticatedTreinoEstudoRoute,
-  AuthenticatedTreinoFinalRoute: AuthenticatedTreinoFinalRoute,
-  AuthenticatedTreinoNovoRoute: AuthenticatedTreinoNovoRoute,
-  AuthenticatedTreinoProvaRoute: AuthenticatedTreinoProvaRoute,
-  AuthenticatedTreinoRetentativaRoute: AuthenticatedTreinoRetentativaRoute,
-  AuthenticatedTreinoIndexRoute: AuthenticatedTreinoIndexRoute,
-}
-
-const AuthenticatedTreinoRouteWithChildren =
-  AuthenticatedTreinoRoute._addFileChildren(AuthenticatedTreinoRouteChildren)
 
 interface AuthenticatedRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
@@ -1144,15 +662,14 @@ interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedDatabaseRoute: typeof AuthenticatedDatabaseRoute
   AuthenticatedEvolucaoComoFuncionaRoute: typeof AuthenticatedEvolucaoComoFuncionaRoute
-  AuthenticatedExamBoardsRoute: typeof AuthenticatedExamBoardsRoute
   AuthenticatedExamsRoute: typeof AuthenticatedExamsRouteWithChildren
-  AuthenticatedHistoryRoute: typeof AuthenticatedHistoryRoute
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
-  AuthenticatedTreinoRoute: typeof AuthenticatedTreinoRouteWithChildren
   AuthenticatedAdminPciScraperRoute: typeof AuthenticatedAdminPciScraperRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
+  AuthenticatedTreinoSplatRoute: typeof AuthenticatedTreinoSplatRoute
   AuthenticatedConcursosIndexRoute: typeof AuthenticatedConcursosIndexRoute
+  AuthenticatedTreinoIndexRoute: typeof AuthenticatedTreinoIndexRoute
   AuthenticatedConcursosConcursoSlugCargoSlugRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   AuthenticatedConcursosConcursoSlugIndexRoute: typeof AuthenticatedConcursosConcursoSlugIndexRoute
 }
@@ -1164,15 +681,14 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDatabaseRoute: AuthenticatedDatabaseRoute,
   AuthenticatedEvolucaoComoFuncionaRoute:
     AuthenticatedEvolucaoComoFuncionaRoute,
-  AuthenticatedExamBoardsRoute: AuthenticatedExamBoardsRoute,
   AuthenticatedExamsRoute: AuthenticatedExamsRouteWithChildren,
-  AuthenticatedHistoryRoute: AuthenticatedHistoryRoute,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
-  AuthenticatedTreinoRoute: AuthenticatedTreinoRouteWithChildren,
   AuthenticatedAdminPciScraperRoute: AuthenticatedAdminPciScraperRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
+  AuthenticatedTreinoSplatRoute: AuthenticatedTreinoSplatRoute,
   AuthenticatedConcursosIndexRoute: AuthenticatedConcursosIndexRoute,
+  AuthenticatedTreinoIndexRoute: AuthenticatedTreinoIndexRoute,
   AuthenticatedConcursosConcursoSlugCargoSlugRoute:
     AuthenticatedConcursosConcursoSlugCargoSlugRoute,
   AuthenticatedConcursosConcursoSlugIndexRoute:

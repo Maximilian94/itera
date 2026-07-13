@@ -380,7 +380,7 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     expect(screen.getByText(/faltam 5 pts/)).toBeTruthy()
   })
 
-  it('sem prova treinável: aba Treino vira link para o treino genérico', async () => {
+  it('sem prova treinável: aba Treino vira link de volta aos concursos', async () => {
     mockCargoApi({
       detail: makeCargoDetail({
         concurso: { status: 'future' },
@@ -416,8 +416,10 @@ describe('página do cargo — aba Treino (prova futura)', () => {
 
     await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
     goToTreino()
-    const cta = screen.getByRole('link', { name: /Ir para o treino/ })
-    expect(cta.getAttribute('href')).toBe('/treino')
+    // A navegação agora parte sempre dos concursos (as páginas /treino
+    // viraram redirects de compatibilidade).
+    const cta = screen.getByRole('link', { name: /Ver concursos/ })
+    expect(cta.getAttribute('href')).toBe('/concursos')
   })
 })
 

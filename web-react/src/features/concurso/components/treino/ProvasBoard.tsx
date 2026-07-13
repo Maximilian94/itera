@@ -12,7 +12,7 @@ import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import {
   TRAINING_STAGE_ORDER,
   TREINO_STAGES,
-} from '@/routes/_authenticated/treino/-stages.config'
+} from '@/features/training/domain/stages.config'
 
 /** Uma prova que pode ser treinada: a oficial do concurso ou uma recomendada. */
 export type ProvaTrainOption = {

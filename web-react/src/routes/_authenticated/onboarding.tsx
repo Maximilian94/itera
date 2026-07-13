@@ -8,7 +8,7 @@ import {
   SparklesIcon,
 } from '@heroicons/react/24/outline'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
-import { getStagePath } from './treino/-stages.config'
+import { getTrainingHref } from '@/features/training/domain/stages.config'
 import { useCreateTrainingMutation } from '@/features/training/queries/training.queries'
 import { useExamBaseFacade } from '@/features/examBase/hook/useExamBase.facade'
 import { useQuestionsCountBySubjectQuery } from '@/features/examBaseQuestion/queries/examBaseQuestions.queries'
@@ -72,7 +72,8 @@ function OnboardingPage() {
             examBaseId: examToUse.id,
           })
           setStartDialogOpen(false)
-          navigate({ to: getStagePath('prova', res.trainingId) })
+          // O treino vive embutido na página do cargo (fallback por UUID).
+          navigate({ href: getTrainingHref({ examBaseId: res.examBaseId }) })
         },
       },
     )

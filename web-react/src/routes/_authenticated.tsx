@@ -25,11 +25,12 @@ export const Route = createFileRoute('/_authenticated')({
 function RouteComponent() {
   const isMobile = useIsMobile()
   const pathname = useRouterState({ select: (state) => state.location.pathname })
+  // O player de prova precisa da altura toda no mobile: aqui só o caminho de
+  // /exams (player avulso); o treino embutido em /concursos é coberto pelo
+  // group-has-[[data-exam-player]] abaixo (as rotas /treino/* viraram
+  // redirects de compatibilidade).
   const hideBottomNav =
-    isMobile &&
-    (/^\/exams\/[^/]+\/[^/]+\/[^/]+\/?$/.test(pathname) ||
-      /^\/treino\/[^/]+\/prova\/?$/.test(pathname) ||
-      /^\/treino\/[^/]+\/retentativa(?:\/prova)?\/?$/.test(pathname))
+    isMobile && /^\/exams\/[^/]+\/[^/]+\/[^/]+\/?$/.test(pathname)
   const showBottomNav = isMobile && !hideBottomNav
 
   return (
