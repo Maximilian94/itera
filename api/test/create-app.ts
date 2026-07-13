@@ -4,14 +4,19 @@ import {
   INestApplication,
   Injectable,
   UnauthorizedException,
+  ValidationPipe,
 } from '@nestjs/common';
 import { APP_GUARD, Reflector } from '@nestjs/core';
 import { Test } from '@nestjs/testing';
 import type { Request } from 'express';
+import { ConfigModule } from '@nestjs/config';
+import { CargoModule } from '../src/cargo/cargo.module';
 import { ConcursoModule } from '../src/concurso/concurso.module';
+import { ExamBaseModule } from '../src/examBase/exam-base.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { IS_OPTIONAL_AUTH_KEY } from '../src/common/decorators/optional-auth.decorator';
 import { IS_PUBLIC_KEY } from '../src/common/decorators/public.decorator';
+import { RolesGuard } from '../src/common/guards/roles.guard';
 
 /** Header que os testes usam para "logar" como um usuário seedado. */
 export const TEST_USER_HEADER = 'x-test-user-id';
@@ -60,15 +65,33 @@ class TestAuthGuard implements CanActivate {
 /**
  * App e2e enxuto: só os módulos sob teste (Prisma é @Global) — sem Redis,
  * Clerk, Stripe etc. Novos módulos de endpoint entram em `imports` conforme
- * ganharem cobertura e2e.
+ * ganharem cobertura e2e. O RolesGuard global preserva a semântica de
+ * @Roles('ADMIN') (403 para usuário comum), como em produção.
  */
 export async function createTestApp(): Promise<INestApplication> {
   const moduleFixture = await Test.createTestingModule({
-    imports: [PrismaModule, ConcursoModule],
-    providers: [{ provide: APP_GUARD, useClass: TestAuthGuard }],
+    imports: [
+      ConfigModule.forRoot({ isGlobal: true }),
+      PrismaModule,
+      ConcursoModule,
+      CargoModule,
+      ExamBaseModule,
+    ],
+    providers: [
+      { provide: APP_GUARD, useClass: TestAuthGuard },
+      { provide: APP_GUARD, useClass: RolesGuard },
+    ],
   }).compile();
 
   const app = moduleFixture.createNestApplication();
+  // Mesmo pipe global de produção (main.ts) — DTOs validam igual no e2e.
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  );
   await app.init();
   return app;
 }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ConcursoController } from './concurso.controller';
 import { ConcursosController } from './concursos.controller';
 import { ConcursoService } from './concurso.service';
+import { ConcursoLinkService } from './concurso-link.service';
 import { SubjectDistributionService } from './subject-distribution.service';
 import { CompetitionHistoryService } from './competition-history.service';
 
@@ -9,8 +10,12 @@ import { CompetitionHistoryService } from './competition-history.service';
   controllers: [ConcursoController, ConcursosController],
   providers: [
     ConcursoService,
+    ConcursoLinkService,
     SubjectDistributionService,
     CompetitionHistoryService,
   ],
+  // O find-or-create do Concurso é compartilhado com CargoModule/ExamBaseModule
+  // (Concurso eager na criação da prova — remodelagem R3.1).
+  exports: [ConcursoLinkService],
 })
 export class ConcursoModule {}

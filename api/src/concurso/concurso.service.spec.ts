@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { Test } from '@nestjs/testing';
 import { GovernmentScope, Prisma } from '@prisma/client';
 import { ConcursoService } from './concurso.service';
+import { ConcursoLinkService } from './concurso-link.service';
 import { PrismaService } from '../prisma/prisma.service';
 
 const EXAM_BASE_ID = 'eb-1';
@@ -81,6 +82,7 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
     const moduleRef = await Test.createTestingModule({
       providers: [
         ConcursoService,
+        ConcursoLinkService,
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -482,6 +484,7 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     const moduleRef = await Test.createTestingModule({
       providers: [
         ConcursoService,
+        ConcursoLinkService,
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();
@@ -761,6 +764,7 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
     const moduleRef = await Test.createTestingModule({
       providers: [
         ConcursoService,
+        ConcursoLinkService,
         { provide: PrismaService, useValue: prisma },
       ],
     }).compile();

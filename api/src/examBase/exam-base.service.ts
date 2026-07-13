@@ -7,6 +7,7 @@ import { ConfigService } from '@nestjs/config';
 import { GovernmentScope, ProcessingPhase, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { slugify } from '../common/slugify';
+import { CargoService } from '../cargo/cargo.service';
 
 function normalizeOptionalText(v: string | null | undefined) {
   const t = typeof v === 'string' ? v.trim() : v;
@@ -55,7 +56,101 @@ export class ExamBaseService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly config: ConfigService,
+    private readonly cargoService: CargoService,
   ) {}
+
+  /**
+   * Pós-escrita da prova (remodelagem R3.1): garante o Cargo default 1:1
+   * (com Concurso eager) quando a prova tem institution, espelha a ficha nos
+   * cargos onde esta prova é a oficial (dual-write reverso — o admin ainda
+   * edita a prova até R4.3) e mantém a janela/edital do Concurso em dia.
+   */
+  private async afterProvaWrite(
+    examBaseId: string,
+    ficha?: {
+      role?: string;
+      salaryBase?: string | number | null;
+      minPassingGradeNonQuota?: string | number | null;
+      vacancyCount?: number | null;
+      applicantCount?: number | null;
+      registrationFee?: string | number | null;
+      description?: string | null;
+      workload?: string | null;
+      isNursingRelevant?: boolean;
+    },
+  ): Promise<void> {
+    await this.cargoService.ensureDefaultCargo(examBaseId);
+
+    if (ficha && Object.values(ficha).some((v) => v !== undefined)) {
+      await this.prisma.cargo.updateMany({
+        where: { provas: { some: { examBaseId, isOficial: true } } },
+        data: {
+          role: ficha.role,
+          salaryBase: ficha.salaryBase === undefined ? undefined : ficha.salaryBase,
+          minPassingGradeNonQuota:
+            ficha.minPassingGradeNonQuota === undefined
+              ? undefined
+              : ficha.minPassingGradeNonQuota,
+          vacancyCount:
+            ficha.vacancyCount === undefined ? undefined : ficha.vacancyCount,
+          applicantCount:
+            ficha.applicantCount === undefined ? undefined : ficha.applicantCount,
+          registrationFee:
+            ficha.registrationFee === undefined ? undefined : ficha.registrationFee,
+          description:
+            ficha.description === undefined
+              ? undefined
+              : normalizeOptionalText(ficha.description),
+          workload:
+            ficha.workload === undefined
+              ? undefined
+              : normalizeOptionalText(ficha.workload),
+          isNursingRelevant: ficha.isNursingRelevant,
+        },
+      });
+    }
+
+    await this.syncConcursoFromProvas(examBaseId);
+  }
+
+  /**
+   * Janela/edital do Concurso (R3.1 §2b): recomputa o agregado das provas
+   * vinculadas — mesmas regras do backfill (start mais cedo, end/resultado
+   * mais tarde, edital da prova mais antiga com valor). Dual-write até R6.1:
+   * o admin/IA ainda escrevem na prova; o Concurso acompanha na hora.
+   */
+  private async syncConcursoFromProvas(examBaseId: string): Promise<void> {
+    const prova = await this.prisma.examBase.findUnique({
+      where: { id: examBaseId },
+      select: { concursoId: true },
+    });
+    if (!prova?.concursoId) return;
+
+    const provas = await this.prisma.examBase.findMany({
+      where: { concursoId: prova.concursoId },
+      orderBy: [{ examDate: 'asc' }, { id: 'asc' }],
+      select: {
+        registrationStart: true,
+        registrationEnd: true,
+        resultDate: true,
+        editalUrl: true,
+      },
+    });
+    const earliest = (ds: (Date | null)[]) =>
+      ds.reduce<Date | null>((a, d) => (d && (!a || d < a) ? d : a), null);
+    const latest = (ds: (Date | null)[]) =>
+      ds.reduce<Date | null>((a, d) => (d && (!a || d > a) ? d : a), null);
+
+    await this.prisma.concurso.update({
+      where: { id: prova.concursoId },
+      data: {
+        registrationStart: earliest(provas.map((p) => p.registrationStart)),
+        registrationEnd: latest(provas.map((p) => p.registrationEnd)),
+        resultDate: latest(provas.map((p) => p.resultDate)),
+        editalUrl: provas.find((p) => p.editalUrl)?.editalUrl ?? null,
+      },
+    });
+  }
 
   private async triggerRevalidate(slug?: string | null): Promise<void> {
     const baseUrl = this.config.get<string>('NEXTJS_URL');
@@ -454,7 +549,7 @@ export class ExamBaseService {
     });
   }
 
-  create(input: {
+  async create(input: {
     name: string;
     examBoardId?: string;
     institution?: string;
@@ -468,8 +563,11 @@ export class ExamBaseService {
     editalUrl?: string | null;
     adminNotes?: string | null;
     isNursingRelevant?: boolean;
+    /** @deprecated remodelagem R4.1 — vínculos são geridos pelo CargoService. */
     cargoGroupId?: string | null;
+    /** @deprecated remodelagem R4.1 — o rótulo mora no vínculo CargoProva. */
     provaLabel?: string | null;
+    /** @deprecated remodelagem R4.1 — use POST /cargos/:id/provas/:eb/oficial. */
     isPrimaryProva?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
@@ -478,7 +576,7 @@ export class ExamBaseService {
       city: input.city,
     });
 
-    return this.prisma.examBase.create({
+    const created = await this.prisma.examBase.create({
       data: {
         name: input.name,
         examBoardId: input.examBoardId,
@@ -493,9 +591,6 @@ export class ExamBaseService {
         editalUrl: normalizeOptionalText(input.editalUrl),
         adminNotes: normalizeOptionalText(input.adminNotes),
         isNursingRelevant: input.isNursingRelevant,
-        cargoGroupId: input.cargoGroupId ?? undefined,
-        provaLabel: normalizeOptionalText(input.provaLabel),
-        isPrimaryProva: input.isPrimaryProva,
       },
       select: {
         id: true,
@@ -516,6 +611,10 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
+    // Cargo default 1:1 (R4.1): o caso comum "1 prova = 1 cargo" sem passo
+    // extra, com Concurso garantido eagerly quando há institution.
+    await this.afterProvaWrite(created.id);
+    return created;
   }
 
   async remove(examBaseId: string) {
@@ -555,8 +654,11 @@ export class ExamBaseService {
       description?: string | null;
       workload?: string | null;
       isNursingRelevant?: boolean;
+      /** @deprecated remodelagem R4.1 — ignorado; vínculos via CargoService. */
       cargoGroupId?: string | null;
+      /** @deprecated remodelagem R4.1 — ignorado; o rótulo mora no vínculo. */
       provaLabel?: string | null;
+      /** @deprecated remodelagem R4.1 — ignorado; use o endpoint de oficial. */
       isPrimaryProva?: boolean;
     },
   ) {
@@ -567,7 +669,6 @@ export class ExamBaseService {
         governmentScope: true,
         state: true,
         city: true,
-        cargoGroupId: true,
       },
     });
     if (!exists) throw new NotFoundException('exam base not found');
@@ -622,12 +723,9 @@ export class ExamBaseService {
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
         isNursingRelevant: input.isNursingRelevant,
-        cargoGroupId: input.cargoGroupId === undefined ? undefined : input.cargoGroupId,
-        provaLabel:
-          input.provaLabel === undefined
-            ? undefined
-            : normalizeOptionalText(input.provaLabel),
-        isPrimaryProva: input.isPrimaryProva,
+        // cargoGroupId/provaLabel/isPrimaryProva: ignorados aqui desde a
+        // remodelagem (R4.1) — os vínculos cargo↔prova são geridos pelo
+        // CargoService, que faz o dual-write das colunas legadas.
       },
       select: {
         id: true,
@@ -656,20 +754,19 @@ export class ExamBaseService {
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
       },
     });
-    // Invariante: no máximo uma prova primária por cargoGroupId. Se esta virou
-    // primária e pertence a um grupo, as irmãs deixam de ser primárias.
-    const effectiveGroupId =
-      input.cargoGroupId === undefined ? exists.cargoGroupId : input.cargoGroupId;
-    if (input.isPrimaryProva === true && effectiveGroupId != null) {
-      await this.prisma.examBase.updateMany({
-        where: {
-          cargoGroupId: effectiveGroupId,
-          id: { not: examBaseId },
-          isPrimaryProva: true,
-        },
-        data: { isPrimaryProva: false },
-      });
-    }
+    // Remodelagem R4.1: Cargo default garantido, ficha espelhada nos cargos
+    // onde esta prova é oficial e janela/edital do Concurso recomputados.
+    await this.afterProvaWrite(examBaseId, {
+      role: input.role,
+      salaryBase: input.salaryBase,
+      minPassingGradeNonQuota: input.minPassingGradeNonQuota,
+      vacancyCount: input.vacancyCount,
+      applicantCount: input.applicantCount,
+      registrationFee: input.registrationFee,
+      description: input.description,
+      workload: input.workload,
+      isNursingRelevant: input.isNursingRelevant,
+    });
 
     await this.triggerRevalidate(result.slug);
     return result;
