@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { GovernmentScope, UserRole } from '@prisma/client';
+import { GovernmentScope, Prisma, UserRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { slugify } from '../common/slugify';
 import {
@@ -102,7 +102,9 @@ export class ConcursoService {
 
   /**
    * Finds (or creates) the Concurso row matching an exam base's identity.
-   * Keyed on institution + year + examBoardId, the model's @@unique tuple.
+   * Keyed on institution + year + examBoardId, the model's @@unique tuple
+   * (complementado por um índice único parcial para examBoardId NULL, onde
+   * o @@unique do Postgres não protege — NULLs são distintos).
    * Rows created before slugs existed are healed with one on read.
    */
   private async findOrCreateConcurso(input: {
@@ -119,12 +121,15 @@ export class ConcursoService {
       year: input.year,
       examBoardId: input.examBoardId,
     };
+    // Determinístico caso duplicatas pré-índice ainda existam: o sobrevivente
+    // eleito pela migration de dedup é sempre o mais antigo.
+    const orderBy = { createdAt: 'asc' } as const;
     const slugInput = {
       institution: input.institution,
       year: input.year,
       boardLabel: input.boardLabel,
     };
-    const existing = await this.prisma.concurso.findFirst({ where });
+    const existing = await this.prisma.concurso.findFirst({ where, orderBy });
     if (existing) {
       if (existing.slug) return existing;
       return this.prisma.concurso.update({
@@ -144,11 +149,18 @@ export class ConcursoService {
           examBoardId: input.examBoardId,
         },
       });
-    } catch {
-      // Lost a create race; the row now exists.
-      const row = await this.prisma.concurso.findFirst({ where });
+    } catch (err) {
+      // Só a corrida de create (unique violada → a linha agora existe) é
+      // recuperável; qualquer outro erro propaga com a causa original.
+      if (
+        !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+        err.code !== 'P2002'
+      ) {
+        throw err;
+      }
+      const row = await this.prisma.concurso.findFirst({ where, orderBy });
       if (row) return row;
-      throw new Error('Failed to find or create concurso');
+      throw new Error('Failed to find or create concurso', { cause: err });
     }
   }
 

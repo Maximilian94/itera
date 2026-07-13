@@ -1,6 +1,6 @@
 import 'reflect-metadata';
 import { Test } from '@nestjs/testing';
-import { GovernmentScope } from '@prisma/client';
+import { GovernmentScope, Prisma } from '@prisma/client';
 import { ConcursoService } from './concurso.service';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -221,6 +221,64 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
       data: { editalUrl: 'https://example.com/edital-a.pdf' },
     });
     expect(result.concurso?.editalUrl).toBe('https://example.com/edital-a.pdf');
+  });
+
+  describe('find-or-create: corrida de criação (T1.1)', () => {
+    const p2002 = () =>
+      new Prisma.PrismaClientKnownRequestError('unique constraint violated', {
+        code: 'P2002',
+        clientVersion: '6.19.2',
+      });
+
+    it('findFirst da tupla é determinístico (createdAt asc)', async () => {
+      await service.getConcursoProvas(EXAM_BASE_ID);
+
+      expect(prisma.concurso.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          orderBy: { createdAt: 'asc' },
+        }),
+      );
+    });
+
+    it('P2002 no create (perdeu a corrida) → retorna a linha existente sem lançar', async () => {
+      const winner = {
+        id: 'concurso-winner',
+        slug: 'prefeitura-de-campinas-2026-cebraspe',
+        institution: 'Prefeitura de Campinas',
+        year: 2026,
+        governmentScope: GovernmentScope.MUNICIPAL,
+        state: 'SP',
+        city: 'Campinas',
+        editalUrl: null,
+      };
+      prisma.concurso.findFirst
+        .mockResolvedValueOnce(null) // antes do create: ainda não existe
+        .mockResolvedValueOnce(winner); // retry pós-P2002: o vencedor da corrida
+      prisma.concurso.create.mockRejectedValue(p2002());
+
+      const result = await service.getConcursoProvas(EXAM_BASE_ID);
+
+      expect(result.concurso?.id).toBe('concurso-winner');
+      expect(prisma.concurso.findFirst).toHaveBeenLastCalledWith(
+        expect.objectContaining({ orderBy: { createdAt: 'asc' } }),
+      );
+    });
+
+    it('erro que não é P2002 propaga com a causa original', async () => {
+      const boom = new Error('connection reset');
+      prisma.concurso.create.mockRejectedValue(boom);
+
+      await expect(service.getConcursoProvas(EXAM_BASE_ID)).rejects.toBe(boom);
+    });
+
+    it('P2002 mas o retry não encontra a linha → erro com a causa encadeada', async () => {
+      prisma.concurso.findFirst.mockResolvedValue(null);
+      prisma.concurso.create.mockRejectedValue(p2002());
+
+      await expect(service.getConcursoProvas(EXAM_BASE_ID)).rejects.toThrow(
+        'Failed to find or create concurso',
+      );
+    });
   });
 
   describe('filtro de relevância (isNursingRelevant, MAX-13)', () => {

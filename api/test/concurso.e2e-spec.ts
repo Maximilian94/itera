@@ -403,6 +403,29 @@ describe('Concurso endpoints (e2e)', () => {
       expect(linked.concursoId).toBe(res.body.concurso.id);
     });
 
+    it('2 requests concorrentes para prova SEM banca criam 1 só Concurso (unique NULL-safe, T1.1)', async () => {
+      const semBanca = await createExamBase(prisma, {
+        institution: 'Hospital Sem Banca',
+        role: 'Enfermeiro',
+        slug: 'hospital-sem-banca-2024-enfermeiro',
+        examDate: new Date('2024-10-01T00:00:00.000Z'),
+        examBoardId: null,
+      });
+
+      const [res1, res2] = await Promise.all([
+        request(http).get(`/concursos/${semBanca.id}`).expect(200),
+        request(http).get(`/concursos/${semBanca.id}`).expect(200),
+      ]);
+
+      // Ambos resolvem para a MESMA linha — o perdedor da corrida recupera
+      // via retry do P2002 em vez de criar uma duplicata.
+      expect(res1.body.concurso.id).toBe(res2.body.concurso.id);
+      const rows = await prisma.concurso.findMany({
+        where: { institution: 'Hospital Sem Banca', year: 2024 },
+      });
+      expect(rows).toHaveLength(1);
+    });
+
     it('prova sem instituição → 404 (não há chave de agrupamento)', async () => {
       const semInstituicao = await createExamBase(prisma, {
         role: 'Enfermeiro',
