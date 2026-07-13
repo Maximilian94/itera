@@ -212,18 +212,91 @@ model Concurso {
   governmentScope GovernmentScope
   state           String?
   city            String?
-  /// URL pública do edital no nível do concurso (backfill: copiada da primeira prova com valor)
+  /// URL pública do edital — o edital é do concurso (remodelagem R3.1 §2b);
+  /// dono da escrita (as colunas da prova ficam em dual-write até R6.1).
   editalUrl       String?
+  /// Janela de inscrição do edital (R3.1 §2b — subiu da prova; backfill:
+  /// start mais cedo / end mais tarde entre as provas vinculadas).
+  registrationStart DateTime?
+  registrationEnd   DateTime?
+  /// Data do resultado final do concurso (mais tarde entre as provas).
+  resultDate        DateTime?
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid
   examBoard       ExamBoard?      @relation(fields: [examBoardId], references: [id], onDelete: SetNull)
 
   examBases       ExamBase[]
+  cargos          Cargo[]
 
   @@unique([institution, year, examBoardId])
   @@index([year])
   @@map("concursos")
+}
+
+/// Ficha da vaga (remodelagem Cargo↔Prova M:N, R3.1). Um cargo pertence a um
+/// concurso e treina em N provas via CargoProva; a mesma prova pode servir a
+/// N cargos do MESMO concurso (caso Recife). A prova (ExamBase) continua dona
+/// de questões/attempts/treino — aqui mora só o metadado da vaga.
+model Cargo {
+  id                      String   @id @default(uuid()) @db.Uuid
+  /// URL do nível 2. No backfill é copiado do slug da prova primária —
+  /// nenhum link /concursos/:slug/cargos/:cargoSlug existente quebra.
+  slug                    String?  @unique
+  role                    String
+  description             String?
+  requirements            String?
+  salaryBase              Decimal? @db.Decimal(10, 2)
+  workload                String?
+  vacancyCount            Int?
+  hasReserveList          Boolean  @default(false)
+  applicantCount          Int?
+  registrationFee         Decimal? @db.Decimal(10, 2)
+  /// Nota mínima do edital (ampla concorrência) — corte usado pelo GoalCard.
+  minPassingGradeNonQuota Decimal? @db.Decimal(5, 2)
+  /// Nota de corte REAL da última vaga, preenchida quando o resultado sai (MAX-18).
+  actualCutScore          Decimal? @db.Decimal(5, 2)
+  /// Quando false, o cargo fica fora da página do concurso e dos agregados.
+  isNursingRelevant       Boolean  @default(true)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  /// Obrigatório: cargo sem edital não existe (R3.1 §1). O wizard admin
+  /// garante o Concurso eagerly na criação da prova (quando há institution).
+  concursoId String   @db.Uuid
+  concurso   Concurso @relation(fields: [concursoId], references: [id], onDelete: Cascade)
+
+  provas         CargoProva[]
+  syllabusGroups ExamSyllabusGroup[]
+
+  @@index([concursoId])
+  @@index([role])
+  @@map("cargos")
+}
+
+/// Join M:N Cargo↔Prova. O rótulo ("Amarela"/"Tipo 1") é DO VÍNCULO, não da
+/// prova. Invariante: no máximo 1 `isOficial` por cargo — garantido no banco
+/// por unique parcial (migration `cargo_provas_one_oficial_per_cargo`) e nas
+/// escritas por $transaction (rebaixa a atual, promove a nova).
+model CargoProva {
+  id         String   @id @default(uuid()) @db.Uuid
+  createdAt  DateTime @default(now())
+
+  cargoId    String   @db.Uuid
+  cargo      Cargo    @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+  examBaseId String   @db.Uuid
+  examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  /// Rótulo desta prova dentro do cargo (ex.: "Tipo 1", "Amarela").
+  provaLabel String?
+  /// A prova que define a meta/corte do cargo no GoalCard (ex-isPrimaryProva).
+  isOficial  Boolean  @default(false)
+  /// Ordem de exibição das provas do cargo (0-based).
+  order      Int      @default(0)
+
+  @@unique([cargoId, examBaseId])
+  @@index([examBaseId])
+  @@map("cargo_provas")
 }
 
 model ExamBase {
@@ -293,6 +366,7 @@ model ExamBase {
   attempts          ExamBaseAttempt[]
   trainingSessions  TrainingSession[]
   syllabusGroups    ExamSyllabusGroup[]
+  cargoProvas       CargoProva[]
 
   @@index([examBoardId])
   @@index([concursoId])
@@ -308,8 +382,14 @@ model ExamSyllabusGroup {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  /// Legado (pré-remodelagem): mantido até R6.1; o dono passa a ser o Cargo.
   examBaseId String   @db.Uuid
   examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+
+  /// Dono na remodelagem R3.1: conteúdo programático é do cargo, não da prova.
+  /// Nullable durante a transição (backfill via prova primária).
+  cargoId String? @db.Uuid
+  cargo   Cargo?  @relation(fields: [cargoId], references: [id], onDelete: Cascade)
 
   /// Posição de exibição (0-based) dentro da prova
   order  Int
@@ -319,6 +399,7 @@ model ExamSyllabusGroup {
   topics String
 
   @@index([examBaseId])
+  @@index([cargoId])
   @@map("exam_syllabus_groups")
 }
 
