@@ -223,6 +223,39 @@ describe('ConcursoService.getConcursoProvas (slug + editalUrl lazy-link)', () =>
     expect(result.concurso?.editalUrl).toBe('https://example.com/edital-a.pdf');
   });
 
+  describe('ano da chave de agrupamento em UTC (T1.2)', () => {
+    // O script `npm test` roda o Jest com TZ=America/Sao_Paulo — o fuso não
+    // pode ser trocado em runtime (o V8 cacheia no primeiro uso de Date).
+    it('examDate à meia-noite UTC de 1º/jan → ano UTC, não o do fuso do servidor', async () => {
+      const midnightUtcJan1 = new Date('2026-01-01T00:00:00.000Z');
+      // Sanidade: no fuso de SP essa data ainda é 31/12/2025.
+      expect(midnightUtcJan1.getFullYear()).toBe(2025);
+      prisma.examBase.findFirst.mockResolvedValue(
+        buildCurrent({ examDate: midnightUtcJan1 }),
+      );
+
+      await service.getConcursoProvas(EXAM_BASE_ID);
+
+      expect(prisma.concurso.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          year: 2026,
+          slug: 'prefeitura-de-campinas-2026-cebraspe',
+        }) as object,
+      });
+      // O range do ano (já em UTC) encontra a prova: 2026-01-01 ∈ [start, end).
+      expect(prisma.examBase.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            examDate: {
+              gte: new Date(Date.UTC(2026, 0, 1)),
+              lt: new Date(Date.UTC(2027, 0, 1)),
+            },
+          }) as object,
+        }),
+      );
+    });
+  });
+
   describe('find-or-create: corrida de criação (T1.1)', () => {
     const p2002 = () =>
       new Prisma.PrismaClientKnownRequestError('unique constraint violated', {

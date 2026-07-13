@@ -422,6 +422,14 @@ observação antes do drop).
    vive no `Cargo` — revisar lá.
 2. Backfill da remodelagem (R3.2): amostrar cargos migrados (1 por tipo:
    standalone, grupo multi-prova, grupo sem primária) e conferir ficha/slug.
+3. **Ano divergente do lazy-link (T1.2):** rodar em prod a query de auditoria
+   (dev já verificado em 2026-07-13, 0 linhas) e corrigir `year`/slug se
+   houver resultado:
+   ```sql
+   SELECT c.id, c.slug, c.year, EXTRACT(YEAR FROM eb."examDate")::int AS utc_year
+   FROM concursos c JOIN exam_bases eb ON eb."concursoId" = c.id
+   WHERE EXTRACT(YEAR FROM eb."examDate")::int <> c.year;
+   ```
 
 ### T7.3 🟡 Smoke test pós-deploy
 

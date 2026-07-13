@@ -254,7 +254,10 @@ export class ConcursoService {
       return { concurso: null, provas: [] };
     }
 
-    const year = current.examDate.getFullYear();
+    // UTC como todo o resto da chave de agrupamento (listagem/ranges usam
+    // Date.UTC) — getFullYear() no fuso do servidor deslocava provas de
+    // 1º/jan para o ano anterior.
+    const year = current.examDate.getUTCFullYear();
     const concurso = await this.findOrCreateConcurso({
       institution: current.institution,
       year,
@@ -554,7 +557,7 @@ export class ConcursoService {
 
     const created = await this.findOrCreateConcurso({
       institution: examBase.institution,
-      year: examBase.examDate.getFullYear(),
+      year: examBase.examDate.getUTCFullYear(),
       governmentScope: examBase.governmentScope,
       state: examBase.state,
       city: examBase.city,
