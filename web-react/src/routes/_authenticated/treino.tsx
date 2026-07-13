@@ -28,13 +28,13 @@ function TreinoLayout() {
   const examTitle = examBase ? formatExamBaseTitle(examBase) : null
   const concursoSlug = examBase?.concurso?.slug ?? null
   const cargoSlug = examBase?.slug ?? null
-  // Concurso = contexto (ano/local/instituição + banca); Cargo = o papel (role) com rótulo da prova.
+  // Concurso = contexto (ano/local/instituição + banca); Cargo = o papel (role).
+  // (O rótulo da prova mora no vínculo CargoProva desde a remodelagem R4.3 —
+  // e o GET /exam-bases/:id nunca o retornou, então nada muda em runtime.)
   const bancaLabel = examBase?.examBoard?.alias ?? examBase?.examBoard?.name ?? null
   const concursoLabel =
     examTitle && bancaLabel ? `${examTitle} · ${bancaLabel}` : examTitle
-  const cargoLabel = examBase
-    ? [examBase.role, examBase.provaLabel].filter(Boolean).join(' · ')
-    : null
+  const cargoLabel = examBase?.role ?? null
 
   return (
     <div className="flex flex-col h-full min-h-0 gap-4 p-1">

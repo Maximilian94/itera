@@ -73,6 +73,9 @@ export function useUpdateExamBaseMutation(examBaseId: string) {
       examBaseService.update(examBaseId, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })
+      // Salvar a prova pode criar Concurso + Cargo default e espelha a ficha
+      // nos cargos onde ela é oficial (R4.3) — a seção de vínculos acompanha.
+      queryClient.invalidateQueries({ queryKey: ['cargo'] })
     },
   })
 }

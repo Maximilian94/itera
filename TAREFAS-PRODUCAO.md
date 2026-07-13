@@ -377,6 +377,9 @@ observação antes do drop).
    (e o match legado de `relatedProvas`) para resolver role via join
    `cargoProvas → cargo.role` — hoje casam pela coluna legada, válida
    apenas enquanto o dual-write existir.
+   ⚠️ Antes de dropar `exam_bases.provaLabel/role`: `training.service#list`
+   monta `cargoLabel` com as colunas legadas (`role + provaLabel`) —
+   migrar para o vínculo CargoProva/Cargo.
 3. **Mesma disciplina de deploy do drop de `registrationDate`** (T7.1): código
    que não referencia as colunas primeiro, migration depois; SQL de rollback
    documentado.
@@ -404,6 +407,10 @@ observação antes do drop).
   erros pré-existentes de imports não usados + 2 de tipos de rota; o
   `vite build` passa). Consertar num PR separado para o build voltar a ser
   gate confiável.
+- `api/test/app.e2e-spec.ts` (boilerplate com AppModule inteiro) tem teardown
+  flaky: o worker do BullMQ emite "Connection is closed" após o fim dos
+  testes e às vezes derruba o processo do Jest, marcando a suíte vizinha
+  como falha. Trocar por um app enxuto ou fechar as queues no afterAll.
 
 ---
 

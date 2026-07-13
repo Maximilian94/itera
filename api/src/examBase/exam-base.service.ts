@@ -415,6 +415,9 @@ export class ExamBaseService {
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
         examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        // Concurso do lazy-link (R4.3): o admin usa para listar os cargos do
+        // mesmo edital na gestão de vínculos. Null até a prova ter institution.
+        concurso: { select: { id: true, slug: true } },
         // Conteúdo programático do edital (MAX-14). Sem grupos → array vazio.
         syllabusGroups: {
           orderBy: { order: 'asc' },
@@ -563,12 +566,6 @@ export class ExamBaseService {
     editalUrl?: string | null;
     adminNotes?: string | null;
     isNursingRelevant?: boolean;
-    /** @deprecated remodelagem R4.1 — vínculos são geridos pelo CargoService. */
-    cargoGroupId?: string | null;
-    /** @deprecated remodelagem R4.1 — o rótulo mora no vínculo CargoProva. */
-    provaLabel?: string | null;
-    /** @deprecated remodelagem R4.1 — use POST /cargos/:id/provas/:eb/oficial. */
-    isPrimaryProva?: boolean;
   }) {
     assertValidGovernmentScopeLocation({
       governmentScope: input.governmentScope,
@@ -654,12 +651,6 @@ export class ExamBaseService {
       description?: string | null;
       workload?: string | null;
       isNursingRelevant?: boolean;
-      /** @deprecated remodelagem R4.1 — ignorado; vínculos via CargoService. */
-      cargoGroupId?: string | null;
-      /** @deprecated remodelagem R4.1 — ignorado; o rótulo mora no vínculo. */
-      provaLabel?: string | null;
-      /** @deprecated remodelagem R4.1 — ignorado; use o endpoint de oficial. */
-      isPrimaryProva?: boolean;
     },
   ) {
     const exists = await this.prisma.examBase.findUnique({
@@ -723,9 +714,9 @@ export class ExamBaseService {
         description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
         workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
         isNursingRelevant: input.isNursingRelevant,
-        // cargoGroupId/provaLabel/isPrimaryProva: ignorados aqui desde a
-        // remodelagem (R4.1) — os vínculos cargo↔prova são geridos pelo
-        // CargoService, que faz o dual-write das colunas legadas.
+        // cargoGroupId/provaLabel/isPrimaryProva não são mais aceitos aqui:
+        // os vínculos cargo↔prova são geridos pelo CargoService (R4.1/R4.3),
+        // que faz o dual-write das colunas legadas até o drop em R6.1.
       },
       select: {
         id: true,
