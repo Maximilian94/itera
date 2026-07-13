@@ -416,17 +416,49 @@ observação antes do drop).
 
 ## Fase 7 — Deploy
 
-### T7.1 🔴 Plano de deploy coordenado migration + código
+### T7.1 🔴 Plano de deploy coordenado migration + código — RUNBOOK (2026-07-13)
 
-1. **Drop de `registrationDate`** (migration `20260613055322`): o código da
-   `main` ainda seleciona a coluna (`exam-base.service.ts:126,320,610`) —
-   deploy do código novo primeiro (ou junto), migration depois; rollback exige
-   `ALTER TABLE exam_bases ADD COLUMN "registrationDate" TIMESTAMP(3)`
-   (documentar no runbook).
-2. **Migrations da remodelagem** (R3.2) são aditivas + backfill → seguras em
-   qualquer ordem em relação ao código antigo da branch (dual-write cobre a
-   transição). A migration de **limpeza** (R6.1) repete a disciplina do item 1.
-3. As demais 6 migrations do épico são aditivas e idempotentes.
+**Migrations pendentes em prod nesta branch (em ordem):** as 6 do épico
+anterior (aditivas/idempotentes), `20260613055322_drop_exam_base_registration_date`
+(**única destrutiva**), `20260713000000_concurso_unique_null_safe` (dedup +
+índice parcial) e `20260713143742_cargo_prova_m2m_backfill` (aditiva +
+backfill).
+
+**Ordem de deploy (o start:prod roda `prisma migrate deploy` antes do node —
+código e migrations sobem juntos no mesmo release):**
+
+1. **Pré-deploy (uma vez, com o banco de prod):**
+   - backup/snapshot do Postgres;
+   - conferir duplicatas de `Concurso` sem banca (a migration dedup resolve,
+     mas vale saber o antes):
+     `SELECT institution, year, count(*) FROM concursos WHERE "examBoardId" IS NULL GROUP BY 1,2 HAVING count(*)>1;`
+2. **Deploy do release da branch.** Sequência interna segura:
+   - o drop de `registrationDate` roda ANTES de o node novo subir (deploy
+     runner), e o código novo não referencia a coluna → ok. ⚠️ O código
+     ANTIGO (main) referencia — se o processo antigo continuar servindo
+     durante a janela da migration (rolling deploy), haverá erros 500 nas
+     rotas de exam-base até o processo novo assumir. Janela aceitável (~s);
+     para zero-downtime, escalar para 0 antes do deploy;
+   - dedup + unique NULL-safe: idempotente, segura com tráfego;
+   - backfill Cargo/CargoProva: aditivo, idempotente (IDs determinísticos,
+     ON CONFLICT DO NOTHING), seguro com tráfego; o código antigo ignora as
+     tabelas novas e o novo lê com self-heal para retardatários.
+3. **Pós-deploy:** T7.2 (auditorias) + T7.3 (smoke).
+
+**Rollback:**
+- Código: voltar o release anterior. As tabelas/colunas novas não atrapalham
+  a main (dual-write manteve as colunas legadas escritas). ÚNICO reparo
+  necessário: recriar a coluna dropada —
+  `ALTER TABLE exam_bases ADD COLUMN "registrationDate" TIMESTAMP(3);`
+  (dado é re-derivável: `UPDATE exam_bases SET "registrationDate" = "registrationStart";`).
+- Banco: nenhuma migration da remodelagem precisa ser revertida (aditivas);
+  se necessário limpar: `DROP TABLE cargo_provas, cargos;` +
+  `ALTER TABLE exam_syllabus_groups DROP COLUMN "cargoId";` +
+  `ALTER TABLE concursos DROP COLUMN "registrationStart","registrationEnd","resultDate";`
+  e remover as linhas de `_prisma_migrations` correspondentes.
+
+A migration de **limpeza** (R6.1, futura) repete a disciplina do drop:
+código que não referencia as colunas primeiro, migration depois.
 
 ### T7.2 🟠 Revisão manual pós-migration dos backfills
 
