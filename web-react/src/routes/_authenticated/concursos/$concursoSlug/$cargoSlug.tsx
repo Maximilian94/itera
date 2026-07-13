@@ -408,15 +408,24 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
           onFocusItem={openStudyItem}
         />
       ) : tab === 'treino' ? (
-        <TreinoTab
-          official={treinoOptions.official}
-          recommended={treinoOptions.recommended}
-          sessionByExamBase={latestTrainingByExamBase}
-          cut={cut}
-          meters={meters}
-          morphExamBaseId={provaMorphId}
-          onTrain={openTraining}
-        />
+        /* Gating da mesa: os CTAs "Treinar"/"Continuar" dependem de saber se
+         * há sessão em andamento — começar um treino consome cota. Enquanto a
+         * lista de treinos não assentar, nada de CTA (T2.1). */
+        trainingsQuery.isPending ? (
+          <TreinoTabSkeleton />
+        ) : trainingsQuery.isError ? (
+          <TreinoTabError onRetry={() => trainingsQuery.refetch()} />
+        ) : (
+          <TreinoTab
+            official={treinoOptions.official}
+            recommended={treinoOptions.recommended}
+            sessionByExamBase={latestTrainingByExamBase}
+            cut={cut}
+            meters={meters}
+            morphExamBaseId={provaMorphId}
+            onTrain={openTraining}
+          />
+        )
       ) : (
         <div className="grid items-start gap-4 lg:grid-cols-3">
           {/* ░░ Coluna principal ░░ */}
@@ -613,6 +622,56 @@ function buildProvaOptions(data: CargoDetail): {
     recommended,
     all: official != null ? [official, ...recommended] : recommended,
   }
+}
+
+/** Silhueta da mesa enquanto `GET /training` não assenta: sem CTA nenhum —
+ *  renderizar "Treinar" sem saber se há sessão em andamento cobraria cota. */
+function TreinoTabSkeleton() {
+  return (
+    <div aria-hidden className="flex flex-col gap-4">
+      <div className={`${CARD} p-4 sm:p-5`}>
+        <div className="flex items-center gap-4">
+          <span className="h-12 w-12 shrink-0 animate-pulse rounded-xl bg-slate-200" />
+          <div className="min-w-0 flex-1">
+            <div className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+            <div className="mt-2 h-3 w-56 animate-pulse rounded bg-slate-200" />
+          </div>
+        </div>
+        <div className="mt-4 h-10 w-36 animate-pulse rounded-lg bg-slate-200" />
+      </div>
+      <div className={`${CARD} p-4 sm:p-5`}>
+        <div className="h-4 w-52 animate-pulse rounded bg-slate-200" />
+        <div className="mt-3 flex flex-col gap-3">
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+          <div className="h-10 animate-pulse rounded-lg bg-slate-100" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/** Erro ao carregar a lista de treinos: sem retry não dá para saber se há
+ *  sessão em andamento — começar às cegas poderia duplicar e cobrar cota. */
+function TreinoTabError(props: { onRetry: () => void }) {
+  return (
+    <section className={`${CARD} p-6 text-center sm:p-8`} role="alert">
+      <h2 className="text-base font-bold text-slate-900">
+        Não foi possível carregar seus treinos
+      </h2>
+      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
+        Precisamos saber se você tem um ciclo em andamento antes de começar um
+        novo — senão um treino da sua cota poderia ser gasto à toa.
+      </p>
+      <button
+        type="button"
+        onClick={props.onRetry}
+        className="mt-4 inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+      >
+        <ArrowPathIcon className="h-4 w-4" />
+        Tentar novamente
+      </button>
+    </section>
+  )
 }
 
 /**

@@ -15,6 +15,7 @@ import {
   makeDistribution,
   renderPage,
 } from './page-test-utils'
+import type { FetchHandler } from './page-test-utils'
 import type { CargoDetail, SubjectDistribution } from '../domain/concurso.types'
 
 afterEach(() => {
@@ -43,7 +44,8 @@ async function enterTraining(name: RegExp | string = /^Treinar: /) {
   fireEvent.click(await screen.findByRole('button', { name }))
 }
 
-/** Monta o mapa de handlers da página: detail + blocos satélites. */
+/** Monta o mapa de handlers da página: detail + blocos satélites.
+ *  Retorna o record (mutável) para testes que trocam um handler no meio. */
 function mockCargoApi(opts: {
   detail: CargoDetail
   distribution?: SubjectDistribution
@@ -57,13 +59,15 @@ function mockCargoApi(opts: {
     examBaseId: string
     currentStage: string
   }>
+  /** Handler bruto de GET /training (estados pending/erro do gating T2.1). */
+  trainingsRaw?: FetchHandler
 }) {
-  const handlers: Record<string, { body: unknown }> = {
+  const handlers: Record<string, FetchHandler> = {
     [API]: { body: opts.detail },
     '/stripe/access': {
       body: { status: 'inactive', canDoFreeTraining: false },
     },
-    '/training': { body: opts.trainings ?? [] },
+    '/training': opts.trainingsRaw ?? { body: opts.trainings ?? [] },
     [`/exam-bases/${opts.detail.cargo.id}/competition-history`]: {
       body: { editions: [] },
     },
@@ -85,6 +89,7 @@ function mockCargoApi(opts: {
     }
   }
   installFetchMock(handlers)
+  return handlers
 }
 
 /** Detail de prova futura: sem questões próprias, treina numa prova
@@ -580,6 +585,56 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
     expect(
       screen.getByRole('heading', { name: 'Prova diagnóstica' }),
     ).toBeTruthy()
+  })
+})
+
+describe('página do cargo — gating da mesa por GET /training (T2.1)', () => {
+  /* Começar um treino consome cota: enquanto a lista de sessões não assenta,
+   * a mesa NUNCA mostra "Treinar" — clicar às cegas com uma sessão em
+   * andamento criaria outra sessão e cobraria o usuário. */
+
+  it('lista de treinos carregando: mesa sem nenhum CTA de treino (skeleton)', async () => {
+    mockCargoApi({
+      detail: makeCargoDetail(),
+      trainingsRaw: 'pending',
+      statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
+    })
+    renderPage(CARGO_PATH)
+
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
+
+    expect(screen.queryByRole('button', { name: /^Treinar/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Continuar/ })).toBeNull()
+    expect(screen.queryByText('Prova do concurso')).toBeNull()
+  })
+
+  it('erro na lista de treinos: estado de erro com retry; sem "Treinar" às cegas', async () => {
+    const handlers = mockCargoApi({
+      detail: makeCargoDetail(),
+      trainingsRaw: { status: 500, body: { message: 'boom' } },
+      statsBySubject: { 'exam-1': [{ subject: 'Enfermagem', count: 25 }] },
+    })
+    renderPage(CARGO_PATH)
+
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    goToTreino()
+
+    expect(
+      await screen.findByText('Não foi possível carregar seus treinos'),
+    ).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Treinar/ })).toBeNull()
+
+    // A rede volta → retry carrega a mesa (a sessão em andamento aparece).
+    handlers['/training'] = {
+      body: [{ trainingId: 't1', examBaseId: 'exam-1', currentStage: 'STUDY' }],
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Tentar novamente/ }))
+
+    expect(await screen.findByText('Prova do concurso')).toBeTruthy()
+    // Com a sessão em andamento revelada, o CTA é retomar — não "Treinar".
+    expect(screen.getByRole('button', { name: /^Continuar: / })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: /^Treinar: / })).toBeNull()
   })
 })
 
