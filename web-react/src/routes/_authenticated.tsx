@@ -33,7 +33,7 @@ function RouteComponent() {
   const showBottomNav = isMobile && !hideBottomNav
 
   return (
-    <div className="flex h-full bg-slate-100 p-0 md:p-2 gap-0 md:gap-2">
+    <div className="group/app flex h-full bg-slate-100 p-0 md:p-2 gap-0 md:gap-2">
       {!isMobile && <SideBarV2 />}
       {/* O scroll do app acontece neste div (não na window); o atributo abaixo
           faz o scrollRestoration do TanStack Router rastreá-lo e restaurar a
@@ -42,13 +42,21 @@ function RouteComponent() {
         data-scroll-restoration-id="authenticated-content"
         className={`flex-1 min-h-0 overflow-auto flex flex-col border-0 md:border md:border-solid md:border-slate-300 rounded-none md:rounded-lg bg-slate-50 p-2 ${
           showBottomNav
-            ? 'pb-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-inset-bottom)+0.5rem)]'
+            ? 'pb-[calc(var(--mobile-bottom-nav-height)+var(--safe-area-inset-bottom)+0.5rem)] has-[[data-exam-player]]:pb-2'
             : 'pb-2'
         } md:pb-2`}
       >
         <Outlet />
       </div>
-      {showBottomNav && <BottomNav />}
+      {/* Player embutido (prova/re-tentativa em /concursos/...) precisa da
+          altura toda no mobile: o nav some via CSS enquanto [data-exam-player]
+          existe na árvore e volta sozinho nas outras fases (T2.4). Os paths
+          de /exams e /treino continuam cobertos pelo hideBottomNav acima. */}
+      {showBottomNav && (
+        <div className="group-has-[[data-exam-player]]/app:hidden">
+          <BottomNav />
+        </div>
+      )}
     </div>
   )
 }
