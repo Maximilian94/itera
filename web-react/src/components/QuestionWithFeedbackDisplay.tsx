@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { CustomTabPanel } from '@/ui/customTabPanel'
+import type { ReactNode } from 'react'
 import { Markdown } from '@/components/Markdown'
 import {
   BookOpenIcon,
@@ -34,6 +34,10 @@ export interface QuestionWithFeedback {
 
 interface QuestionWithFeedbackDisplayProps {
   question: QuestionWithFeedback
+  /** Esconde as abas "em breve" (contextos embutidos, onde cada linha conta). */
+  compact?: boolean
+  /** Slot à direita da linha de abas (ex.: navegador 1/N) — evita uma linha extra. */
+  toolbar?: ReactNode
 }
 
 /**
@@ -42,6 +46,8 @@ interface QuestionWithFeedbackDisplayProps {
  */
 export function QuestionWithFeedbackDisplay({
   question,
+  compact = false,
+  toolbar,
 }: QuestionWithFeedbackDisplayProps) {
   const [value, setValue] = useState(0)
   const selectedAlternativeId = question.selectedAlternativeId ?? null
@@ -57,10 +63,14 @@ export function QuestionWithFeedbackDisplay({
     { value: 5, label: 'Notas', icon: PencilSquareIcon, comingSoon: true },
   ]
 
+  const visibleTabs = compact
+    ? tabButtons.filter((tab) => !tab.comingSoon)
+    : tabButtons
+
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex border-b border-slate-200 overflow-x-auto">
-        {tabButtons.map((tab) => {
+      <div className="flex items-center border-b border-slate-200 overflow-x-auto">
+        {visibleTabs.map((tab) => {
           const Icon = tab.icon
           const isActive = value === tab.value
           const isComingSoon = tab.comingSoon ?? false
@@ -86,11 +96,16 @@ export function QuestionWithFeedbackDisplay({
             </button>
           )
         })}
+        {toolbar != null && (
+          <div className="ml-auto flex shrink-0 items-center pb-2 pl-3">
+            {toolbar}
+          </div>
+        )}
       </div>
 
       <div className="min-h-0">
-        <CustomTabPanel value={value} hidden={value !== 0}>
-          <div className="flex flex-col gap-6 -mt-2">
+        {value === 0 && (
+          <div role="tabpanel" className="flex flex-col gap-6">
             {question.referenceText != null &&
               question.referenceText.trim() !== '' && (
                 <div>
@@ -150,10 +165,10 @@ export function QuestionWithFeedbackDisplay({
               })}
             </div>
           </div>
-        </CustomTabPanel>
+        )}
 
-        <CustomTabPanel value={value} hidden={value !== 1}>
-          <div className="flex flex-col gap-6 -mt-2">
+        {value === 1 && (
+          <div role="tabpanel" className="flex flex-col gap-6">
             <p className="text-sm font-semibold text-slate-700">
               Resposta correta: {correctAltKey ?? '—'}
             </p>
@@ -242,36 +257,36 @@ export function QuestionWithFeedbackDisplay({
               })}
             </div>
           </div>
-        </CustomTabPanel>
+        )}
 
-        <CustomTabPanel value={value} hidden={value !== 2}>
-          <div className="py-2 -mt-2">
+        {value === 2 && (
+          <div role="tabpanel" className="py-2">
             <span className="text-sm text-slate-500">
               Estatísticas (em breve)
             </span>
           </div>
-        </CustomTabPanel>
-        <CustomTabPanel value={value} hidden={value !== 3}>
-          <div className="py-2 -mt-2">
+        )}
+        {value === 3 && (
+          <div role="tabpanel" className="py-2">
             <span className="text-sm text-slate-500">
               Comentários (em breve)
             </span>
           </div>
-        </CustomTabPanel>
-        <CustomTabPanel value={value} hidden={value !== 4}>
-          <div className="py-2 -mt-2">
+        )}
+        {value === 4 && (
+          <div role="tabpanel" className="py-2">
             <span className="text-sm text-slate-500">
               Histórico (em breve)
             </span>
           </div>
-        </CustomTabPanel>
-        <CustomTabPanel value={value} hidden={value !== 5}>
-          <div className="py-2 -mt-2">
+        )}
+        {value === 5 && (
+          <div role="tabpanel" className="py-2">
             <span className="text-sm text-slate-500">
               Notas (em breve)
             </span>
           </div>
-        </CustomTabPanel>
+        )}
       </div>
     </div>
   )

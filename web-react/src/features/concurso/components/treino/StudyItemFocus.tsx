@@ -37,7 +37,11 @@ type Tab = 'rec' | 'exp' | 'exe' | 'err'
 const NAV_BTN =
   'inline-flex shrink-0 items-center justify-center rounded-lg border border-slate-300 bg-white p-2 text-slate-700 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 disabled:cursor-not-allowed disabled:opacity-40'
 
-/** Contador + anterior/próxima, no mesmo vocabulário dos ghost buttons do app. */
+/**
+ * Contador + anterior/próxima, no mesmo vocabulário dos ghost buttons do app.
+ * Uma linha enxuta, sem divisor próprio — o caller decide onde ela mora
+ * (solta acima do conteúdo ou embutida numa linha de abas via `toolbar`).
+ */
 function Navigator(props: {
   /** Substantivo do que se navega ("Exercício", "Questão"). */
   noun: string
@@ -45,17 +49,18 @@ function Navigator(props: {
   total: number
   onPrev: () => void
   onNext: () => void
+  className?: string
 }) {
-  const { noun, current, total, onPrev, onNext } = props
+  const { noun, current, total, onPrev, onNext, className } = props
   return (
-    <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
-      <p className="text-sm font-semibold text-slate-900">
+    <div className={`flex items-center gap-3 ${className ?? ''}`}>
+      <p className="whitespace-nowrap text-sm font-semibold text-slate-900">
         {noun}{' '}
         <span className="tabular-nums">
           {current + 1} <span className="font-normal text-slate-500">de {total}</span>
         </span>
       </p>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         <button
           type="button"
           onClick={onPrev}
@@ -325,6 +330,7 @@ export function StudyItemFocus(props: {
                   total={exercises.length}
                   onPrev={() => setExIdx((i) => Math.max(0, i - 1))}
                   onNext={() => setExIdx((i) => Math.min(exercises.length - 1, i + 1))}
+                  className="justify-between"
                 />
                 <ExerciseBlock
                   exercise={currentEx}
@@ -353,18 +359,25 @@ export function StudyItemFocus(props: {
                 <p className="text-sm text-slate-500">Nenhuma questão errada nesta matéria.</p>
               </div>
             ) : (
-              <>
-                <Navigator
-                  noun="Questão"
-                  current={safeWrong}
-                  total={wrongForItem.length}
-                  onPrev={() => setWrongIdx((i) => Math.max(0, i - 1))}
-                  onNext={() => setWrongIdx((i) => Math.min(wrongForItem.length - 1, i + 1))}
+              wrongForItem[safeWrong] && (
+                /* Navegador embutido na linha de abas da questão: evita empilhar
+                   uma linha extra entre as abas do ponto e as da questão. */
+                <QuestionWithFeedbackDisplay
+                  question={wrongForItem[safeWrong]}
+                  compact
+                  toolbar={
+                    <Navigator
+                      noun="Questão"
+                      current={safeWrong}
+                      total={wrongForItem.length}
+                      onPrev={() => setWrongIdx((i) => Math.max(0, i - 1))}
+                      onNext={() =>
+                        setWrongIdx((i) => Math.min(wrongForItem.length - 1, i + 1))
+                      }
+                    />
+                  }
                 />
-                {wrongForItem[safeWrong] && (
-                  <QuestionWithFeedbackDisplay question={wrongForItem[safeWrong]} />
-                )}
-              </>
+              )
             )}
           </div>
         )}
