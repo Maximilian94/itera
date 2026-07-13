@@ -15,6 +15,7 @@ import {
   trainingKeys,
   useTrainingQuery,
 } from '@/features/training/queries/training.queries'
+import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
 
 /*
  * Players embutidos na página do cargo: responder a prova diagnóstica e a
@@ -57,6 +58,9 @@ export function ProvaPlayerEmbed(props: {
     queryClient.invalidateQueries({
       queryKey: trainingKeys.studyItems(trainingId),
     })
+    // Terminar a prova muda a prontidão (bestScore) do cargo, que tem
+    // staleTime de 5 min — GoalCard/TrainingHeader/ReadinessBar (T2.3).
+    queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     setAnalysisApiDone(true)
   }, [queryClient, trainingId])
 
@@ -229,6 +233,9 @@ export function RetryPlayerEmbed(props: {
         onFinished={() => {
           queryClient.invalidateQueries({ queryKey: trainingKeys.one(trainingId) })
           queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
+          // Fim da re-tentativa fecha o ciclo (nota final) → prontidão do
+          // cargo muda; o detalhe tem staleTime de 5 min (T2.3).
+          queryClient.invalidateQueries({ queryKey: concursoKeys.all })
           onFinal()
         }}
         onNavigateToFinal={onFinal}

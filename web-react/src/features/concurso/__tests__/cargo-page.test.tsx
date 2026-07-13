@@ -667,6 +667,72 @@ describe('página do cargo — fluxo embutido invalida studyItems (T2.2)', () =>
   })
 })
 
+describe('página do cargo — ações de treino invalidam concursoKeys (T2.3)', () => {
+  /* O detalhe do cargo tem staleTime de 5 min; sem invalidar nas ações de
+   * treino, GoalCard/TrainingHeader/ReadinessBar mostram a prontidão antiga. */
+  it('avançar de fase refaz o detalhe do cargo: a prontidão nova aparece sem reload', async () => {
+    const tid = '11111111-2222-4333-8444-555555555555'
+    const trainingState = {
+      trainingId: tid,
+      currentStage: 'DIAGNOSIS',
+      immediateFeedback: true,
+      attemptId: 'a1',
+      examBaseId: 'exam-1',
+      examBoardId: 'board-1',
+      examTitle: 'Prova Enfermeiro',
+      studyCompletedSubjects: [],
+      attemptFinishedAt: '2026-06-01T00:00:00.000Z',
+      retryFinishedAt: null,
+      feedback: {
+        examTitle: 'Prova Enfermeiro',
+        minPassingGradeNonQuota: 60,
+        overall: { correct: 30, total: 50, percentage: 60 },
+        passed: true,
+        subjectStats: [{ subject: 'SUS', correct: 5, total: 15, percentage: 33 }],
+        subjectFeedback: {
+          SUS: { evaluation: 'Reforce a Lei 8.080.', recommendations: [] },
+        },
+      },
+    }
+    // bestScore null → o header do treino ainda não mostra "Prontidão".
+    const handlers = mockCargoApi({
+      detail: makeCargoDetail(),
+      trainings: [{ trainingId: tid, examBaseId: 'exam-1', currentStage: 'DIAGNOSIS' }],
+      statsBySubject: { 'exam-1': [{ subject: 'SUS', count: 15 }] },
+    })
+    handlers[`/training/${tid}`] = { body: trainingState }
+    handlers[`/training/${tid}/study-items`] = { body: [] }
+    handlers[`/training/${tid}/stage`] = {
+      body: { ...trainingState, currentStage: 'STUDY' },
+    }
+
+    renderPage(CARGO_PATH)
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    await enterTraining(/^Continuar: /)
+    await screen.findByRole('button', { name: /Ir para o estudo/ })
+    expect(screen.queryByText('Prontidão')).toBeNull()
+
+    // O servidor agora conhece a nota da prova → o refetch (invalidation)
+    // deve trazer a prontidão nova para o header do treino.
+    handlers[API] = {
+      body: makeCargoDetail({
+        studyPlan: {
+          currentStep: 'treino_dirigido',
+          attemptCount: 1,
+          bestScore: 55,
+          scoreDelta: null,
+          weakSubjects: [],
+        },
+      }),
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Ir para o estudo/ }))
+
+    expect(await screen.findByText('Prontidão')).toBeTruthy()
+    expect(await screen.findByText('55%')).toBeTruthy()
+    expect(screen.getByText(/faltam 5 pts/)).toBeTruthy()
+  })
+})
+
 describe('página do cargo — gating da mesa por GET /training (T2.1)', () => {
   /* Começar um treino consome cota: enquanto a lista de sessões não assenta,
    * a mesa NUNCA mostra "Treinar" — clicar às cegas com uma sessão em

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { trainingService } from '../services/training.service'
+import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
 
 function isUuid(value: string | undefined): value is string {
   if (!value) return false
@@ -52,6 +53,10 @@ export function useCreateTrainingMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
       queryClient.invalidateQueries({ queryKey: ['training'] })
+      // Começar um treino muda o payload do cargo (attemptCount/plano); o
+      // detalhe tem staleTime de 5 min — sem invalidar, a prontidão fica
+      // stale (paridade com useStartSimuladoMutation, T2.3).
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }
@@ -129,6 +134,9 @@ export function useUpdateTrainingStageMutation(trainingId: string) {
       queryClient.invalidateQueries({
         queryKey: trainingKeys.studyItems(trainingId),
       })
+      // GoalCard/TrainingHeader/ReadinessBar leem o detalhe do cargo
+      // (staleTime 5 min): avanço de fase muda plano/prontidão (T2.3).
+      queryClient.invalidateQueries({ queryKey: concursoKeys.all })
     },
   })
 }
