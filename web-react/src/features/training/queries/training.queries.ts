@@ -123,6 +123,12 @@ export function useUpdateTrainingStageMutation(trainingId: string) {
       // A lista (GET /training) alimenta o stepper embutido na página do cargo;
       // sem invalidar, o estágio atual fica defasado após avançar de fase.
       queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
+      // Avançar para STUDY cria os itens de estudo no backend; no fluxo
+      // embutido o TrainingFlow não remonta — sem invalidar, a fase Estudo
+      // mostraria "Nenhuma recomendação ainda" com a lista já criada (T2.2).
+      queryClient.invalidateQueries({
+        queryKey: trainingKeys.studyItems(trainingId),
+      })
     },
   })
 }

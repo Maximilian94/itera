@@ -51,6 +51,12 @@ export function ProvaPlayerEmbed(props: {
   const handleExamFinished = useCallback(() => {
     queryClient.invalidateQueries({ queryKey: trainingKeys.one(trainingId) })
     queryClient.invalidateQueries({ queryKey: trainingKeys.list() })
+    // A análise da prova gera as recomendações de estudo; o GET de studyItems
+    // (lazy no backend) precisa refetch para a fase Estudo nascer populada —
+    // no fluxo embutido nada remonta para forçar isso (T2.2).
+    queryClient.invalidateQueries({
+      queryKey: trainingKeys.studyItems(trainingId),
+    })
     setAnalysisApiDone(true)
   }, [queryClient, trainingId])
 

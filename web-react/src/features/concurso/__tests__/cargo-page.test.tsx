@@ -588,6 +588,85 @@ describe('página do cargo — provas em foco vs. outras provas', () => {
   })
 })
 
+describe('página do cargo — fluxo embutido invalida studyItems (T2.2)', () => {
+  /* No fluxo embutido o TrainingFlow não remonta entre as fases: sem invalidar
+   * trainingKeys.studyItems ao avançar para STUDY, a fase Estudo mostraria
+   * "Nenhuma recomendação ainda" com a lista já criada no backend. */
+  it('avançar Diagnóstico → Estudo refaz o GET de study-items e mostra a lista', async () => {
+    // UUID real: useTrainingQuery (feedback do diagnóstico) exige UUID válido.
+    const tid = '11111111-2222-4333-8444-555555555555'
+    const trainingState = {
+      trainingId: tid,
+      currentStage: 'DIAGNOSIS',
+      immediateFeedback: true,
+      attemptId: 'a1',
+      examBaseId: 'exam-1',
+      examBoardId: 'board-1',
+      examTitle: 'Prova Enfermeiro',
+      studyCompletedSubjects: [],
+      attemptFinishedAt: '2026-06-01T00:00:00.000Z',
+      retryFinishedAt: null,
+      feedback: {
+        examTitle: 'Prova Enfermeiro',
+        minPassingGradeNonQuota: 60,
+        overall: { correct: 30, total: 50, percentage: 60 },
+        passed: true,
+        subjectStats: [
+          { subject: 'SUS', correct: 5, total: 15, percentage: 33 },
+        ],
+        subjectFeedback: {
+          SUS: { evaluation: 'Reforce a Lei 8.080.', recommendations: [] },
+        },
+      },
+    }
+    const handlers = mockCargoApi({
+      detail: makeCargoDetail(),
+      trainings: [{ trainingId: tid, examBaseId: 'exam-1', currentStage: 'DIAGNOSIS' }],
+      statsBySubject: { 'exam-1': [{ subject: 'SUS', count: 15 }] },
+    })
+    handlers[`/training/${tid}`] = { body: trainingState }
+    // Estado do servidor ANTES do avanço: itens ainda não criados.
+    handlers[`/training/${tid}/study-items`] = { body: [] }
+    // PATCH /stage responde a sessão já em STUDY (o backend cria os itens aqui).
+    handlers[`/training/${tid}/stage`] = {
+      body: { ...trainingState, currentStage: 'STUDY' },
+    }
+
+    renderPage(CARGO_PATH)
+    await screen.findByRole('heading', { level: 1, name: 'Enfermeiro' })
+    // Sessão em andamento → retomar entra na fase Diagnóstico.
+    await enterTraining(/^Continuar: /)
+    expect(
+      await screen.findByRole('button', { name: /Ir para o estudo/ }),
+    ).toBeTruthy()
+
+    // O avanço cria os itens no backend; o refetch (invalidation) deve trazê-los.
+    handlers[`/training/${tid}/study-items`] = {
+      body: [
+        {
+          id: 'si-1',
+          subject: 'SUS',
+          topic: 'Lei 8.080',
+          linkedQuestionIds: ['q1'],
+          recommendationTitle: 'Revisar a Lei 8.080',
+          recommendationText: 'Foque nos princípios do SUS.',
+          explanation: null,
+          completedAt: null,
+          exercises: [],
+        },
+      ],
+    }
+    fireEvent.click(screen.getByRole('button', { name: /Ir para o estudo/ }))
+
+    // Fase Estudo SEM remount/refocus: a lista chega populada.
+    expect(
+      await screen.findByRole('heading', { name: 'Estudar pontos fracos' }),
+    ).toBeTruthy()
+    expect(await screen.findByText('Revisar a Lei 8.080')).toBeTruthy()
+    expect(screen.queryByText(/Nenhuma recomendação de estudo ainda/)).toBeNull()
+  })
+})
+
 describe('página do cargo — gating da mesa por GET /training (T2.1)', () => {
   /* Começar um treino consome cota: enquanto a lista de sessões não assenta,
    * a mesa NUNCA mostra "Treinar" — clicar às cegas com uma sessão em
