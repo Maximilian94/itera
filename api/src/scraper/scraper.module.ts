@@ -8,6 +8,7 @@ import { ScraperProcessor } from './scraper.processor';
 import { PciParserService } from './pci-parser.service';
 import { NormalizerService } from './normalizer.service';
 import { ScoringService } from './scoring.service';
+import { PdfLinkExtractorService } from './pdf-link-extractor.service';
 import { SCRAPER_QUEUE_NAME } from './scraper.constants';
 
 @Module({
@@ -23,6 +24,7 @@ import { SCRAPER_QUEUE_NAME } from './scraper.constants';
     PciParserService,
     NormalizerService,
     ScoringService,
+    PdfLinkExtractorService,
   ],
 })
 export class ScraperModule {}

@@ -8,9 +8,10 @@ import {
   Post,
 } from '@nestjs/common';
 import { PciEntryStatus } from '@prisma/client';
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsArray, IsEnum, IsOptional, IsString, IsUrl } from 'class-validator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { ScraperService } from './scraper.service';
+import { PdfLinkExtractorService } from './pdf-link-extractor.service';
 
 class TriggerRunDto {
   @IsOptional()
@@ -24,10 +25,23 @@ class UpdateEntryStatusDto {
   status: PciEntryStatus;
 }
 
+class ExtractPdfsDto {
+  @IsUrl({ require_protocol: true })
+  url: string;
+}
+
 @Controller('admin/scraper')
 @Roles('ADMIN')
 export class ScraperController {
-  constructor(private readonly scraper: ScraperService) {}
+  constructor(
+    private readonly scraper: ScraperService,
+    private readonly pdfExtractor: PdfLinkExtractorService,
+  ) {}
+
+  @Post('extract-pdfs')
+  extractPdfs(@Body() dto: ExtractPdfsDto) {
+    return this.pdfExtractor.extractFromUrl(dto.url);
+  }
 
   @Post('run')
   triggerRun(@Body() dto: TriggerRunDto) {
