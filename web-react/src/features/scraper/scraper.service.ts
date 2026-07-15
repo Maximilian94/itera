@@ -1,5 +1,10 @@
 import { apiFetch } from '@/lib/api'
-import type { PciExamEntry, PciEntryStatus, ScraperRun } from './scraper.types'
+import type {
+  PciExamEntry,
+  PciEntryStatus,
+  PdfExtractionResult,
+  ScraperRun,
+} from './scraper.types'
 
 const BASE = '/admin/scraper'
 
@@ -43,5 +48,12 @@ export const scraperService = {
     id: string,
   ): Promise<{ examBase: { id: string }; pciEntry: { id: string; status: string } }> {
     return apiFetch(`${BASE}/entries/${id}/promote`, { method: 'POST' })
+  },
+
+  extractPdfs(url: string): Promise<PdfExtractionResult> {
+    return apiFetch<PdfExtractionResult>(`${BASE}/extract-pdfs`, {
+      method: 'POST',
+      body: JSON.stringify({ url }),
+    })
   },
 }

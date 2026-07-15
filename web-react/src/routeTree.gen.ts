@@ -27,6 +27,7 @@ import { Route as AuthenticatedConcursosIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedTreinoSplatRouteImport } from './routes/_authenticated/treino/$'
 import { Route as AuthenticatedExamsEditarRouteImport } from './routes/_authenticated/exams/editar'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
+import { Route as AuthenticatedAdminPdfExtractorRouteImport } from './routes/_authenticated/admin/pdf-extractor'
 import { Route as AuthenticatedAdminPciScraperRouteImport } from './routes/_authenticated/admin/pci-scraper'
 import { Route as AuthenticatedConcursosConcursoSlugIndexRouteImport } from './routes/_authenticated/concursos/$concursoSlug/index'
 import { Route as AuthenticatedExamsEditarExamBaseIdRouteImport } from './routes/_authenticated/exams/editar/$examBaseId'
@@ -133,6 +134,12 @@ const AuthenticatedAdminUsersRoute = AuthenticatedAdminUsersRouteImport.update({
   path: '/admin/users',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminPdfExtractorRoute =
+  AuthenticatedAdminPdfExtractorRouteImport.update({
+    id: '/admin/pdf-extractor',
+    path: '/admin/pdf-extractor',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedAdminPciScraperRoute =
   AuthenticatedAdminPciScraperRouteImport.update({
     id: '/admin/pci-scraper',
@@ -207,6 +214,7 @@ export interface FileRoutesByFullPath {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
+  '/admin/pdf-extractor': typeof AuthenticatedAdminPdfExtractorRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/$': typeof AuthenticatedTreinoSplatRoute
@@ -235,6 +243,7 @@ export interface FileRoutesByTo {
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
+  '/admin/pdf-extractor': typeof AuthenticatedAdminPdfExtractorRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/treino/$': typeof AuthenticatedTreinoSplatRoute
@@ -265,6 +274,7 @@ export interface FileRoutesById {
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
+  '/_authenticated/admin/pdf-extractor': typeof AuthenticatedAdminPdfExtractorRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
   '/_authenticated/treino/$': typeof AuthenticatedTreinoSplatRoute
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planos'
     | '/admin/pci-scraper'
+    | '/admin/pdf-extractor'
     | '/admin/users'
     | '/exams/editar'
     | '/treino/$'
@@ -324,6 +335,7 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/planos'
     | '/admin/pci-scraper'
+    | '/admin/pdf-extractor'
     | '/admin/users'
     | '/exams/editar'
     | '/treino/$'
@@ -353,6 +365,7 @@ export interface FileRouteTypes {
     | '/_authenticated/onboarding'
     | '/_authenticated/planos'
     | '/_authenticated/admin/pci-scraper'
+    | '/_authenticated/admin/pdf-extractor'
     | '/_authenticated/admin/users'
     | '/_authenticated/exams/editar'
     | '/_authenticated/treino/$'
@@ -506,6 +519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminUsersRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/pdf-extractor': {
+      id: '/_authenticated/admin/pdf-extractor'
+      path: '/admin/pdf-extractor'
+      fullPath: '/admin/pdf-extractor'
+      preLoaderRoute: typeof AuthenticatedAdminPdfExtractorRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/admin/pci-scraper': {
       id: '/_authenticated/admin/pci-scraper'
       path: '/admin/pci-scraper'
@@ -646,6 +666,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedAdminPciScraperRoute: typeof AuthenticatedAdminPciScraperRoute
+  AuthenticatedAdminPdfExtractorRoute: typeof AuthenticatedAdminPdfExtractorRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedTreinoSplatRoute: typeof AuthenticatedTreinoSplatRoute
   AuthenticatedConcursosIndexRoute: typeof AuthenticatedConcursosIndexRoute
@@ -664,6 +685,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedAdminPciScraperRoute: AuthenticatedAdminPciScraperRoute,
+  AuthenticatedAdminPdfExtractorRoute: AuthenticatedAdminPdfExtractorRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedTreinoSplatRoute: AuthenticatedTreinoSplatRoute,
   AuthenticatedConcursosIndexRoute: AuthenticatedConcursosIndexRoute,

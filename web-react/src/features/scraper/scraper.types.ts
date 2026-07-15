@@ -33,3 +33,17 @@ export interface ScraperRun {
 }
 
 export type PciEntryStatus = PciExamEntry['status']
+
+export interface ExtractedPdfLink {
+  url: string
+  label: string | null
+  source: 'anchor' | 'embed' | 'network'
+}
+
+export interface PdfExtractionResult {
+  pageUrl: string
+  finalUrl: string
+  pageTitle: string
+  pdfLinks: ExtractedPdfLink[]
+  extractedAt: string
+}

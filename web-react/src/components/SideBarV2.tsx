@@ -6,11 +6,12 @@ import { Route as ConcursosRoute } from '@/routes/_authenticated/concursos/index
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as AdminUsersRoute } from '@/routes/_authenticated/admin/users'
 import { Route as AdminPciScraperRoute } from '@/routes/_authenticated/admin/pci-scraper'
+import { Route as AdminPdfExtractorRoute } from '@/routes/_authenticated/admin/pdf-extractor'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { useQuery } from '@tanstack/react-query'
 import { authService } from '@/features/auth/services/auth.service'
-import { HomeIcon, DocumentTextIcon, UsersIcon, MagnifyingGlassCircleIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
+import { HomeIcon, DocumentTextIcon, UsersIcon, MagnifyingGlassCircleIcon, DocumentArrowDownIcon } from '@heroicons/react/24/solid'
+import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, DocumentArrowDownIcon as DocumentArrowDownIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
 import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
 import { Menu, MenuItem } from '@mui/material'
 
@@ -92,6 +93,12 @@ export const SideBarV2 = () => {
             href: AdminPciScraperRoute.to,
             icon: MagnifyingGlassCircleIconOutline,
             activeIcon: MagnifyingGlassCircleIcon,
+        },
+        {
+            label: 'Extrator de PDFs',
+            href: AdminPdfExtractorRoute.to,
+            icon: DocumentArrowDownIconOutline,
+            activeIcon: DocumentArrowDownIcon,
         },
     ]
 

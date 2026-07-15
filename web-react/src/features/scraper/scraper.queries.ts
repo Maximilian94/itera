@@ -70,3 +70,9 @@ export function usePromoteEntryMutation() {
     },
   })
 }
+
+export function useExtractPdfsMutation() {
+  return useMutation({
+    mutationFn: (url: string) => scraperService.extractPdfs(url),
+  })
+}
