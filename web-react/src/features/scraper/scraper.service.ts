@@ -1,6 +1,11 @@
 import type {
+  AdminConcursoRow,
   AnalyzeDocumentResult,
   CheckConcursoDocumentsResult,
+  DiscoveryAddInput,
+  DiscoveryAddResult,
+  DiscoveryReextractResult,
+  DiscoverySearchResult,
   DocumentScrapeResult,
   NewConcursoDocument,
   PciEntryStatus,
@@ -118,5 +123,38 @@ export const scraperService = {
     id: string,
   ): Promise<{ examBase: { id: string }; pciEntry: { id: string; status: string } }> {
     return apiFetch(`${BASE}/entries/${id}/promote`, { method: 'POST' })
+  },
+
+  // ---- Descoberta de concursos (/admin/gerenciar-concursos) ----
+
+  /** Listagem admin de todos os concursos (com status + alerta de link). */
+  listAdminConcursos(): Promise<Array<AdminConcursoRow>> {
+    return apiFetch<Array<AdminConcursoRow>>(`${BASE}/concursos`, {
+      method: 'GET',
+    })
+  },
+
+  /** "Procurar novos concursos": raspa o pciconcursos e cruza com a base. */
+  discoverySearch(cargoSlug?: string): Promise<DiscoverySearchResult> {
+    return apiFetch<DiscoverySearchResult>(`${BASE}/discovery/search`, {
+      method: 'POST',
+      body: JSON.stringify(cargoSlug ? { cargoSlug } : {}),
+    })
+  },
+
+  /** Adiciona um concurso descoberto (stub + link oficial extraído da notícia). */
+  discoveryAdd(candidate: DiscoveryAddInput): Promise<DiscoveryAddResult> {
+    return apiFetch<DiscoveryAddResult>(`${BASE}/discovery/add`, {
+      method: 'POST',
+      body: JSON.stringify(candidate),
+    })
+  },
+
+  /** Recorrige em massa o link do concurso de todos os concursos vindos do pci. */
+  discoveryReextract(): Promise<DiscoveryReextractResult> {
+    return apiFetch<DiscoveryReextractResult>(`${BASE}/discovery/reextract`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
   },
 }

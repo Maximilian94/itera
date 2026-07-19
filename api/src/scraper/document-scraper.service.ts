@@ -92,6 +92,22 @@ export class DocumentScraperService {
   ) {}
 
   /**
+   * Busca pública p/ outros services (ex.: descoberta de concursos) reusarem a
+   * cascata anti-bot (fetch → cookie warm-up → got-scraping → Playwright).
+   * Best-effort: qualquer bloqueio/erro vira null em vez de lançar.
+   */
+  async fetchPageHtml(url: string): Promise<string | null> {
+    try {
+      return (await this.fetchHtml(url)).html;
+    } catch (err) {
+      this.logger.warn(
+        `fetchPageHtml falhou (${url}): ${(err as Error).message?.slice(0, 160)}`,
+      );
+      return null;
+    }
+  }
+
+  /**
    * "Verificar novas publicações" (aba Notícias): re-raspa a página de origem
    * do concurso (ou usa o HTML colado, p/ sites Cloudflare) e marca cada
    * documento como novo/existente comparando por URL com o que já está salvo.

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CargoModule } from '../cargo/cargo.module';
+import { ConcursoModule } from '../concurso/concurso.module';
 import { ExamBaseModule } from '../examBase/exam-base.module';
 import { PdfModule } from '../pdf/pdf.module';
 import { ScraperController } from './scraper.controller';
@@ -10,6 +11,7 @@ import { ScraperProcessor } from './scraper.processor';
 import { PciParserService } from './pci-parser.service';
 import { DocumentScraperService } from './document-scraper.service';
 import { ConcursoDocumentAnalysisService } from './concurso-document-analysis.service';
+import { ConcursoDiscoveryService } from './concurso-discovery.service';
 import { NormalizerService } from './normalizer.service';
 import { ScoringService } from './scoring.service';
 import { SCRAPER_QUEUE_NAME } from './scraper.constants';
@@ -18,6 +20,7 @@ import { SCRAPER_QUEUE_NAME } from './scraper.constants';
   imports: [
     PrismaModule,
     CargoModule,
+    ConcursoModule,
     ExamBaseModule,
     PdfModule,
     BullModule.registerQueue({ name: SCRAPER_QUEUE_NAME }),
@@ -29,6 +32,7 @@ import { SCRAPER_QUEUE_NAME } from './scraper.constants';
     PciParserService,
     DocumentScraperService,
     ConcursoDocumentAnalysisService,
+    ConcursoDiscoveryService,
     NormalizerService,
     ScoringService,
   ],

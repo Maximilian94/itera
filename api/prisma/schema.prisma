@@ -232,6 +232,10 @@ model Concurso {
   documentsSourceUrl String?
   /// Última vez que a página de origem foi verificada por novas publicações.
   documentsCheckedAt DateTime?
+  /// URL da notícia no pciconcursos que originou o concurso (fluxo "procurar
+  /// novos concursos" em /admin/gerenciar-concursos). Chave de dedupe idempotente
+  /// da busca e do futuro "atualizar concursos".
+  pciListingUrl   String?         @unique
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid

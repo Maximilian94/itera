@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { scraperService } from './scraper.service'
 import type {
+  DiscoveryAddInput,
   NewConcursoDocument,
   ProposedCargoSyllabus,
   ProposedChange,
@@ -12,6 +13,44 @@ export const scraperKeys = {
   runs: () => ['scraper', 'runs'] as const,
   run: (id: string) => ['scraper', 'run', id] as const,
   diff: (runId: string) => ['scraper', 'diff', runId] as const,
+  adminConcursos: () => ['scraper', 'admin-concursos'] as const,
+}
+
+export function useAdminConcursosQuery() {
+  return useQuery({
+    queryKey: scraperKeys.adminConcursos(),
+    queryFn: () => scraperService.listAdminConcursos(),
+  })
+}
+
+export function useDiscoverySearchMutation() {
+  return useMutation({
+    mutationFn: (cargoSlug?: string) => scraperService.discoverySearch(cargoSlug),
+  })
+}
+
+export function useDiscoveryAddMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (candidate: DiscoveryAddInput) =>
+      scraperService.discoveryAdd(candidate),
+    onSuccess: () => {
+      // O concurso novo entra na listagem admin e na descoberta pública.
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+    },
+  })
+}
+
+export function useDiscoveryReextractMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => scraperService.discoveryReextract(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+    },
+  })
 }
 
 export function useScraperEntriesQuery() {

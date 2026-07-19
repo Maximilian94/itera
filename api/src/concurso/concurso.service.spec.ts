@@ -971,7 +971,14 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       'pref-campinas-2026-enfermeiro',
     );
     expect(result.syllabusGroups).toEqual([
-      { name: 'SUS', topics: 'Lei 8.080; Lei 8.142', order: 0 },
+      {
+        name: 'SUS',
+        topics: 'Lei 8.080; Lei 8.142',
+        order: 0,
+        questionCount: undefined,
+        weight: null,
+        maxScore: null,
+      },
     ]);
 
     // Depois do dia da prova (12/07) o conteúdo programático some.

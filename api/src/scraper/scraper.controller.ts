@@ -24,6 +24,7 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { ScraperService } from './scraper.service';
 import { DocumentScraperService } from './document-scraper.service';
 import { ConcursoDocumentAnalysisService } from './concurso-document-analysis.service';
+import { ConcursoDiscoveryService } from './concurso-discovery.service';
 
 class TriggerRunDto {
   @IsOptional()
@@ -208,6 +209,30 @@ class ApplyChangesDto {
   syllabus?: ApplyCargoSyllabusDto[] | null;
 }
 
+/** "Procurar novos concursos": raspa a página de cargo do pciconcursos. */
+class DiscoverySearchDto {
+  @IsOptional()
+  @IsString()
+  cargoSlug?: string;
+}
+
+/** Um concurso descoberto escolhido para adicionar à base. */
+class DiscoveryAddDto {
+  @IsString()
+  @MinLength(1)
+  institution: string;
+
+  @IsOptional()
+  @IsString()
+  uf?: string | null;
+
+  @IsString()
+  headline: string;
+
+  @IsUrl({ require_protocol: true }, { message: 'newsUrl inválida.' })
+  newsUrl: string;
+}
+
 @Controller('admin/scraper')
 @Roles('ADMIN')
 export class ScraperController {
@@ -215,7 +240,37 @@ export class ScraperController {
     private readonly scraper: ScraperService,
     private readonly documentScraper: DocumentScraperService,
     private readonly documentAnalysis: ConcursoDocumentAnalysisService,
+    private readonly discovery: ConcursoDiscoveryService,
   ) {}
+
+  /** Listagem admin de todos os concursos (com status e alerta de link). */
+  @Get('concursos')
+  listConcursos() {
+    return this.discovery.listConcursosAdmin();
+  }
+
+  /** "Procurar novos concursos": lista os concursos do pciconcursos + dedupe. */
+  @Post('discovery/search')
+  discoverySearch(@Body() dto: DiscoverySearchDto) {
+    return this.discovery.search(dto.cargoSlug);
+  }
+
+  /** Adiciona um concurso descoberto (stub + link oficial extraído da notícia). */
+  @Post('discovery/add')
+  discoveryAdd(@Body() dto: DiscoveryAddDto) {
+    return this.discovery.add({
+      institution: dto.institution,
+      uf: dto.uf ?? null,
+      headline: dto.headline,
+      newsUrl: dto.newsUrl,
+    });
+  }
+
+  /** Recorrige em massa o link do concurso de todos os concursos vindos do pci. */
+  @Post('discovery/reextract')
+  discoveryReextract() {
+    return this.discovery.reextractLinks();
+  }
 
   @Post('documents')
   scrapeDocuments(@Body() dto: ScrapeDocumentsDto) {

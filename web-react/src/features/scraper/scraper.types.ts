@@ -121,3 +121,58 @@ export interface AnalyzeDocumentResult {
   /** Quadros de matérias propostos por cargo; null se o documento não mexe. */
   syllabus: Array<ProposedCargoSyllabus> | null
 }
+
+// ---- Descoberta de concursos (/admin/gerenciar-concursos) ----
+
+export type ConcursoStatus = 'open' | 'future' | 'past'
+
+/** Concurso descoberto na busca do pciconcursos + situação na base. */
+export interface DiscoveryCandidate {
+  institution: string
+  uf: string | null
+  headline: string
+  newsUrl: string
+  status: 'new' | 'exists'
+  matched: { id: string; slug: string | null } | null
+}
+
+export interface DiscoverySearchResult {
+  cargoSlug: string
+  fetchedAt: string
+  candidates: Array<DiscoveryCandidate>
+}
+
+/** Payload para adicionar um concurso descoberto (espelha DiscoveryAddDto). */
+export interface DiscoveryAddInput {
+  institution: string
+  uf: string | null
+  headline: string
+  newsUrl: string
+}
+
+export interface DiscoveryAddResult {
+  concurso: { id: string; slug: string | null; institution: string }
+  officialUrlFound: boolean
+  created: boolean
+}
+
+/** Linha da listagem admin de concursos. */
+export interface AdminConcursoRow {
+  id: string
+  slug: string | null
+  institution: string
+  state: string | null
+  year: number
+  status: ConcursoStatus
+  provaCount: number
+  needsSourceUrl: boolean
+  registrationEnd: string | null
+  createdAt: string
+}
+
+/** Resultado do "recorrigir links" em massa. */
+export interface DiscoveryReextractResult {
+  processed: number
+  updated: number
+  stillMissing: number
+}
