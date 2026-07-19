@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 /** Página do concurso (nível 1): payload mockado, estados e axe (MAX-26). */
-import { screen, within } from '@testing-library/react'
+import { fireEvent, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   expectNoSeriousAxeViolations,
@@ -55,6 +55,50 @@ describe('página do concurso (nível 1)', () => {
     expect(screen.getByText('VUNESP')).toBeTruthy()
     expect(screen.getByText('12 + cadastro reserva')).toBeTruthy()
     expect(screen.getByText('Campinas / SP')).toBeTruthy()
+
+    // Cronograma: as etapas datadas do edital viram os passos da timeline.
+    expect(screen.getByText('Cronograma')).toBeTruthy()
+    expect(screen.getByText('Prova Objetiva')).toBeTruthy()
+    expect(
+      screen.getByText('Caráter eliminatório e classificatório.'),
+    ).toBeTruthy()
+    expect(screen.getByText('Prova de Títulos')).toBeTruthy()
+  })
+
+  it('aba Notícias mostra a timeline de documentos, mais recente primeiro', async () => {
+    installFetchMock({ [API]: { body: makeConcursoDetail() } })
+    renderPage(CONCURSO_PATH)
+
+    await screen.findByRole('heading', { level: 1, name: /Concurso/ })
+
+    // Começa na aba Cargos: a timeline não está montada.
+    expect(screen.queryByText('Notícias do concurso')).toBeNull()
+
+    // Troca para Notícias.
+    fireEvent.click(screen.getByRole('tab', { name: /Notícias/ }))
+
+    // Timeline com os dois documentos do payload, edital + retificação.
+    expect(screen.getByText('Notícias do concurso')).toBeTruthy()
+    const edital = screen.getByRole('link', {
+      name: /Edital de Abertura nº 01\/2026/,
+    })
+    expect(edital.getAttribute('href')).toBe('https://example.com/edital-01.pdf')
+    expect(
+      screen.getByText('Prorroga as inscrições e ajusta o cronograma.'),
+    ).toBeTruthy()
+
+    // Ordem: retificação (20/06) antes do edital (01/06) — payload já ordenado.
+    const titles = screen
+      .getAllByRole('link')
+      .map((l) => l.textContent)
+      .filter((t) => /Retificação|Edital de Abertura/.test(t))
+    expect(titles[0]).toContain('Retificação')
+    expect(titles[1]).toContain('Edital de Abertura')
+
+    // Ao trocar de aba, os cards de cargo saem de cena.
+    expect(
+      screen.queryByRole('link', { name: 'Ver detalhes do cargo Enfermeiro' }),
+    ).toBeNull()
   })
 
   it('mostra skeleton acessível enquanto o payload não chega', async () => {

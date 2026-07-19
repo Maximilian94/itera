@@ -442,6 +442,7 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     examBase: { findMany: jest.Mock; updateMany: jest.Mock };
     concurso: { findFirst: jest.Mock; update: jest.Mock };
     cargo: { findMany: jest.Mock };
+    concursoDocument: { findMany: jest.Mock };
     examBaseAttempt: { groupBy: jest.Mock };
   };
   let concursoLink: { ensureDefaultCargo: jest.Mock };
@@ -503,6 +504,7 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
         update: jest.fn(),
       },
       cargo: { findMany: jest.fn().mockResolvedValue([buildCargoRow()]) },
+      concursoDocument: { findMany: jest.fn().mockResolvedValue([]) },
       examBaseAttempt: { groupBy: jest.fn().mockResolvedValue([]) },
     };
     concursoLink = { ensureDefaultCargo: jest.fn().mockResolvedValue(null) };
@@ -607,7 +609,11 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
         vacancyCount: 50,
         hasReserveList: true,
       }),
-      buildCargoRow({ id: 'eb-sem-salario', role: 'Auxiliar', salaryBase: null }),
+      buildCargoRow({
+        id: 'eb-sem-salario',
+        role: 'Auxiliar',
+        salaryBase: null,
+      }),
       buildCargoRow(),
     ]);
 
@@ -662,7 +668,9 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
 
     await service.getConcursoDetail(CONCURSO.slug);
 
-    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith('eb-enfermeiro');
+    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith(
+      'eb-enfermeiro',
+    );
   });
 
   it('taxas de inscrição divergentes entre cargos → summary.registrationFee null', async () => {
@@ -921,7 +929,9 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
       'pref-campinas-2026-enfermeiro-tipo-2',
     );
 
-    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith('eb-enfermeiro');
+    expect(concursoLink.ensureDefaultCargo).toHaveBeenCalledWith(
+      'eb-enfermeiro',
+    );
     expect(result.cargo.role).toBe('Enfermeiro');
   });
 
@@ -1050,7 +1060,9 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('prova com questões próprias: studyPlan usa a própria prova', async () => {
-    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    prisma.cargo.findFirst.mockResolvedValue(
+      buildCargo({ questionCount: 120 }),
+    );
     mockExamBaseLists({ previous: [buildPreviousExam()] });
 
     await service.getCargoDetail(
@@ -1069,7 +1081,9 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('currentStep: sem tentativa → diagnostico; abaixo do corte → treino_dirigido; no corte → reta_final', async () => {
-    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    prisma.cargo.findFirst.mockResolvedValue(
+      buildCargo({ questionCount: 120 }),
+    );
     mockExamBaseLists();
 
     let result = await service.getCargoDetail(
@@ -1108,7 +1122,9 @@ describe('ConcursoService.getCargoDetail (página do cargo, MAX-16)', () => {
   });
 
   it('weakSubjects: top 3 piores matérias, exigindo mínimo de respostas por matéria', async () => {
-    prisma.cargo.findFirst.mockResolvedValue(buildCargo({ questionCount: 120 }));
+    prisma.cargo.findFirst.mockResolvedValue(
+      buildCargo({ questionCount: 120 }),
+    );
     mockExamBaseLists();
     prisma.examBaseAttempt.findMany.mockResolvedValue([
       { examBaseId: 'eb-enfermeiro', scorePercentage: '40' },

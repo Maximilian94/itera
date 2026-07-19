@@ -9,7 +9,7 @@ export type ExamBaseAttempt = {
 
 export type ExamBaseAttemptWithQuestionsAndAnswers = {
   attempt: ExamBaseAttempt
-  questions: ExamBaseQuestion[]
+  questions: Array<ExamBaseQuestion>
   answers: Record<string, string | null>
 }
 
@@ -50,7 +50,7 @@ export type AdminExamBaseAttempt = {
   finishedAt: string | null
   scorePercentage: number | null
   isPartial: boolean
-  subjectFilter: string[]
+  subjectFilter: Array<string>
   totalQuestions: number
   answeredCount: number
   correctCount: number

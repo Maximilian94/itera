@@ -157,6 +157,7 @@ export function makeCargoSummary(
     salaryBase: '8500',
     workload: '40h semanais',
     questionCount: 50,
+    provaCount: 1,
     minPassingGrade: '60',
     published: true,
     userStats: { attemptCount: 2, bestScore: 72 },
@@ -230,8 +231,27 @@ export function makeConcursoList(
 export function makeConcursoDetail(overrides?: {
   concurso?: Partial<ConcursoDetail['concurso']>
   cargos?: Array<CargoSummary>
+  documents?: ConcursoDetail['documents']
 }): ConcursoDetail {
   return {
+    documents: overrides?.documents ?? [
+      {
+        id: 'doc-1',
+        title: 'Retificação nº 02 — cronograma',
+        summary: 'Prorroga as inscrições e ajusta o cronograma.',
+        url: 'https://example.com/retificacao-02.pdf',
+        kind: 'RETIFICACAO',
+        publishedAt: '2026-06-20T00:00:00.000Z',
+      },
+      {
+        id: 'doc-2',
+        title: 'Edital de Abertura nº 01/2026',
+        summary: 'Edital com cargos, vagas, requisitos e cronograma.',
+        url: 'https://example.com/edital-01.pdf',
+        kind: 'EDITAL_ABERTURA',
+        publishedAt: '2026-06-01T00:00:00.000Z',
+      },
+    ],
     concurso: {
       id: 'c1',
       slug: 'pmc-2026',
@@ -242,6 +262,14 @@ export function makeConcursoDetail(overrides?: {
       city: 'Campinas',
       examBoard: { id: 'board-1', name: 'Fundação VUNESP', alias: 'VUNESP' },
       editalUrl: 'https://example.com/edital.pdf',
+      etapas: [
+        {
+          name: 'Prova Objetiva',
+          description: 'Caráter eliminatório e classificatório.',
+          date: '2026-08-23',
+        },
+        { name: 'Prova de Títulos', description: null, date: '2026-09-15' },
+      ],
       status: 'open',
       // registrationEnd/examDate nulos → labels determinísticos (sem "N dias").
       timeline: {
@@ -330,7 +358,8 @@ export function makeCargoDetail(overrides?: {
         slug: cargo.slug,
         label: null,
         isPrimary: true,
-        examDate: cargo.examDate,
+        // Prova real sempre tem data; o null do cargo é só o caso sem prova.
+        examDate: cargo.examDate ?? '2023-05-14T00:00:00.000Z',
         questionCount: cargo.questionCount,
         userStats: { attemptCount: 0, bestScore: null },
         studyPlan,

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
-import type { ConcursoListFilters } from '../domain/concurso.types'
 import { concursoService } from '../services/concurso.service'
+import type { ConcursoListFilters } from '../domain/concurso.types'
 
 /** Dados de edital mudam raramente — 5 min sem refetch. */
 const CONCURSO_STALE_TIME = 5 * 60 * 1000

@@ -34,7 +34,7 @@ export type PlanInfo = {
   /** Short plan description. */
   description: string
   /** List of plan features for display. */
-  features: string[]
+  features: Array<string>
   /** Monthly price in cents (e.g. 4990 = R$ 49.90). */
   monthlyAmount: number
   /** Yearly price in cents. */

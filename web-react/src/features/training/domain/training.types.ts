@@ -44,7 +44,7 @@ export interface TrainingState {
   examBaseId: string
   examBoardId: string | null
   examTitle: string
-  studyCompletedSubjects: string[]
+  studyCompletedSubjects: Array<string>
   /** When the user finished the exam (submitted). Null if still in progress. */
   attemptFinishedAt: string | null
   /** When the user finished the re-tentativa (clicked Finalizar re-tentativa). Null if not yet. */
@@ -72,8 +72,8 @@ export interface TrainingFinalPayload {
   gainPoints: number
   gainPercent: number
   finalFeedback?: string
-  subjectStatsInitial?: SubjectStat[]
-  subjectStatsFinal?: SubjectStat[]
+  subjectStatsInitial?: Array<SubjectStat>
+  subjectStatsFinal?: Array<SubjectStat>
 }
 
 export interface TrainingStudyItemExercise {
@@ -93,12 +93,12 @@ export interface TrainingStudyItemResponse {
   id: string
   subject: string
   topic: string | null
-  linkedQuestionIds: string[]
+  linkedQuestionIds: Array<string>
   /** Title of the single recommendation this study item is for. */
   recommendationTitle: string
   /** Text of the recommendation. */
   recommendationText: string
   explanation: string | null
   completedAt: string | null
-  exercises: TrainingStudyItemExercise[]
+  exercises: Array<TrainingStudyItemExercise>
 }

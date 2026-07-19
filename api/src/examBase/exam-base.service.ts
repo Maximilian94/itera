@@ -86,7 +86,8 @@ export class ExamBaseService {
         where: { provas: { some: { examBaseId, isOficial: true } } },
         data: {
           role: ficha.role,
-          salaryBase: ficha.salaryBase === undefined ? undefined : ficha.salaryBase,
+          salaryBase:
+            ficha.salaryBase === undefined ? undefined : ficha.salaryBase,
           minPassingGradeNonQuota:
             ficha.minPassingGradeNonQuota === undefined
               ? undefined
@@ -94,9 +95,13 @@ export class ExamBaseService {
           vacancyCount:
             ficha.vacancyCount === undefined ? undefined : ficha.vacancyCount,
           applicantCount:
-            ficha.applicantCount === undefined ? undefined : ficha.applicantCount,
+            ficha.applicantCount === undefined
+              ? undefined
+              : ficha.applicantCount,
           registrationFee:
-            ficha.registrationFee === undefined ? undefined : ficha.registrationFee,
+            ficha.registrationFee === undefined
+              ? undefined
+              : ficha.registrationFee,
           description:
             ficha.description === undefined
               ? undefined
@@ -178,10 +183,7 @@ export class ExamBaseService {
     return user?.role === UserRole.ADMIN;
   }
 
-  async list(
-    input?: { examBoardId?: string },
-    userId?: string,
-  ) {
+  async list(input?: { examBoardId?: string }, userId?: string) {
     const showUnpublished = userId ? await this.isAdmin(userId) : false;
     const examBases = await this.prisma.examBase.findMany({
       where: {
@@ -214,7 +216,15 @@ export class ExamBaseService {
         isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        examBoard: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            websiteUrl: true,
+            logoUrl: true,
+          },
+        },
         // Lazily-linked concurso (MAX-25): populated once any concurso-aware
         // read heals the link; the UI falls back to the exam base id
         // (GET /concursos/:id also accepts it) while still null.
@@ -224,11 +234,9 @@ export class ExamBaseService {
     });
 
     if (!userId) {
-      return examBases as Array<
-        (typeof examBases)[number] & {
-          userStats?: { attemptCount: number; bestScore: number | null };
-        }
-      >;
+      return examBases as ((typeof examBases)[number] & {
+        userStats?: { attemptCount: number; bestScore: number | null };
+      })[];
     }
 
     const stats = await this.prisma.examBaseAttempt.groupBy({
@@ -253,8 +261,7 @@ export class ExamBaseService {
         ?.scorePercentage;
       statsByExamBaseId.set(s.examBaseId, {
         attemptCount: count,
-        bestScore:
-          maxScore != null ? Number(maxScore) : null,
+        bestScore: maxScore != null ? Number(maxScore) : null,
       });
     }
 
@@ -283,16 +290,15 @@ export class ExamBaseService {
       });
 
       if (attemptsWithoutScore.length > 0) {
-        const questionsByBase =
-          await this.prisma.examBaseQuestion.findMany({
-            where: { examBaseId: { in: examBaseIdsNeedingScore } },
-            select: {
-              id: true,
-              examBaseId: true,
-              correctAlternative: true,
-              alternatives: { select: { id: true, key: true } },
-            },
-          });
+        const questionsByBase = await this.prisma.examBaseQuestion.findMany({
+          where: { examBaseId: { in: examBaseIdsNeedingScore } },
+          select: {
+            id: true,
+            examBaseId: true,
+            correctAlternative: true,
+            alternatives: { select: { id: true, key: true } },
+          },
+        });
 
         const correctAltByQuestion = new Map<string, string>();
         for (const q of questionsByBase) {
@@ -312,8 +318,7 @@ export class ExamBaseService {
 
         const bestScoreByExamBaseId = new Map<string, number>();
         for (const a of attemptsWithoutScore) {
-          const total =
-            questionCountByExamBaseId.get(a.examBaseId) ?? 0;
+          const total = questionCountByExamBaseId.get(a.examBaseId) ?? 0;
           let correct = 0;
           for (const ans of a.answers) {
             const correctId = correctAltByQuestion.get(ans.examBaseQuestionId);
@@ -414,7 +419,15 @@ export class ExamBaseService {
         isNursingRelevant: true,
         ...(showUnpublished ? { adminNotes: true } : {}),
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        examBoard: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            websiteUrl: true,
+            logoUrl: true,
+          },
+        },
         // Concurso do lazy-link (R4.3): o admin usa para listar os cargos do
         // mesmo edital na gestão de vínculos. Null até a prova ter institution.
         concurso: { select: { id: true, slug: true } },
@@ -451,7 +464,15 @@ export class ExamBaseService {
         published: true,
         editalUrl: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        examBoard: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            websiteUrl: true,
+            logoUrl: true,
+          },
+        },
         _count: { select: { questions: true } },
       },
     });
@@ -484,7 +505,10 @@ export class ExamBaseService {
     parts.push(slugify(examBase.role));
 
     const slug = parts.filter(Boolean).join('-');
-    if (!slug) throw new BadRequestException('Não foi possível gerar slug (banca, estado/cidade e cargo são necessários).');
+    if (!slug)
+      throw new BadRequestException(
+        'Não foi possível gerar slug (banca, estado/cidade e cargo são necessários).',
+      );
 
     await this.prisma.examBase.update({
       where: { id: examBaseId },
@@ -500,7 +524,7 @@ export class ExamBaseService {
       select: { id: true, slug: true },
     });
     if (!exists) throw new NotFoundException('exam base not found');
-    if (published && (!exists.slug || !exists.slug.trim())) {
+    if (published && !exists.slug?.trim()) {
       throw new BadRequestException(
         'Não é possível publicar um exam base sem ter um slug definido. Use o endpoint POST /:id/generate-slug para gerar o slug.',
       );
@@ -605,7 +629,15 @@ export class ExamBaseService {
         isNursingRelevant: true,
         processingPhase: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        examBoard: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            websiteUrl: true,
+            logoUrl: true,
+          },
+        },
       },
     });
     // Cargo default 1:1 (R4.1): o caso comum "1 prova = 1 cargo" sem passo
@@ -664,11 +696,16 @@ export class ExamBaseService {
     });
     if (!exists) throw new NotFoundException('exam base not found');
 
-    const mergedGovernmentScope = input.governmentScope ?? exists.governmentScope;
+    const mergedGovernmentScope =
+      input.governmentScope ?? exists.governmentScope;
     const mergedState =
-      input.state === undefined ? exists.state : normalizeOptionalText(input.state);
+      input.state === undefined
+        ? exists.state
+        : normalizeOptionalText(input.state);
     const mergedCity =
-      input.city === undefined ? exists.city : normalizeOptionalText(input.city);
+      input.city === undefined
+        ? exists.city
+        : normalizeOptionalText(input.city);
 
     assertValidGovernmentScopeLocation({
       governmentScope: mergedGovernmentScope,
@@ -686,19 +723,31 @@ export class ExamBaseService {
         governmentScope: input.governmentScope,
         state: input.state === undefined ? undefined : mergedState,
         city: input.city === undefined ? undefined : mergedCity,
-        salaryBase: input.salaryBase === undefined ? undefined : input.salaryBase,
+        salaryBase:
+          input.salaryBase === undefined ? undefined : input.salaryBase,
         examDate: input.examDate ? new Date(input.examDate) : undefined,
         minPassingGradeNonQuota:
           input.minPassingGradeNonQuota === undefined
             ? undefined
             : input.minPassingGradeNonQuota,
         slug: input.slug === undefined ? undefined : input.slug,
-        editalUrl: input.editalUrl === undefined ? undefined : normalizeOptionalText(input.editalUrl),
-        adminNotes: input.adminNotes === undefined ? undefined : normalizeOptionalText(input.adminNotes),
+        editalUrl:
+          input.editalUrl === undefined
+            ? undefined
+            : normalizeOptionalText(input.editalUrl),
+        adminNotes:
+          input.adminNotes === undefined
+            ? undefined
+            : normalizeOptionalText(input.adminNotes),
         processingPhase: input.processingPhase,
-        vacancyCount: input.vacancyCount === undefined ? undefined : input.vacancyCount,
-        applicantCount: input.applicantCount === undefined ? undefined : input.applicantCount,
-        registrationFee: input.registrationFee === undefined ? undefined : input.registrationFee,
+        vacancyCount:
+          input.vacancyCount === undefined ? undefined : input.vacancyCount,
+        applicantCount:
+          input.applicantCount === undefined ? undefined : input.applicantCount,
+        registrationFee:
+          input.registrationFee === undefined
+            ? undefined
+            : input.registrationFee,
         registrationStart:
           input.registrationStart === undefined
             ? undefined
@@ -711,8 +760,14 @@ export class ExamBaseService {
             : input.registrationEnd
               ? new Date(input.registrationEnd)
               : null,
-        description: input.description === undefined ? undefined : normalizeOptionalText(input.description),
-        workload: input.workload === undefined ? undefined : normalizeOptionalText(input.workload),
+        description:
+          input.description === undefined
+            ? undefined
+            : normalizeOptionalText(input.description),
+        workload:
+          input.workload === undefined
+            ? undefined
+            : normalizeOptionalText(input.workload),
         isNursingRelevant: input.isNursingRelevant,
         // cargoGroupId/provaLabel/isPrimaryProva não são mais aceitos aqui:
         // os vínculos cargo↔prova são geridos pelo CargoService (R4.1/R4.3),
@@ -742,7 +797,15 @@ export class ExamBaseService {
         workload: true,
         isNursingRelevant: true,
         examBoardId: true,
-        examBoard: { select: { id: true, name: true, alias: true, websiteUrl: true, logoUrl: true } },
+        examBoard: {
+          select: {
+            id: true,
+            name: true,
+            alias: true,
+            websiteUrl: true,
+            logoUrl: true,
+          },
+        },
       },
     });
     // Remodelagem R4.1: Cargo default garantido, ficha espelhada nos cargos
@@ -763,4 +826,3 @@ export class ExamBaseService {
     return result;
   }
 }
-

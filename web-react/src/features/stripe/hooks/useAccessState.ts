@@ -114,7 +114,7 @@ export function useAccessState(): {
   isLoading: boolean
   isMock: boolean
 } {
-  const search = useSearch({ strict: false }) as { access?: unknown }
+  const search = useSearch({ strict: false })
   const paramOverride = useMemo(
     () => parseAccessParam(search?.access),
     [search?.access],

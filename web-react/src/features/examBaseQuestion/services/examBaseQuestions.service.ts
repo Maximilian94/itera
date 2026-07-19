@@ -1,4 +1,3 @@
-import { apiFetch, ApiError } from '@/lib/api'
 import type {
   CreateAlternativeInput,
   CreateExamBaseQuestionInput,
@@ -6,6 +5,7 @@ import type {
   UpdateAlternativeInput,
   UpdateExamBaseQuestionInput,
 } from '../domain/examBaseQuestion.types'
+import { ApiError, apiFetch } from '@/lib/api'
 
 export type ParsedQuestionItem = {
   subject: string
@@ -13,29 +13,29 @@ export type ParsedQuestionItem = {
   topic?: string
   /** Texto de referência da prova (ex.: texto base compartilhado por várias questões). */
   referenceText?: string
-  alternatives: { key: string; text: string }[]
+  alternatives: Array<{ key: string; text: string }>
 }
 
 export type ParsedQuestionStructure = {
   number: number
   subject: string
   topic: string
-  subtopics: string[]
+  subtopics: Array<string>
   statement: string
   referenceText: string | null
   hasImage: boolean
-  alternatives: { key: string; text: string }[]
+  alternatives: Array<{ key: string; text: string }>
 }
 
 export type ParsedQuestionFromPdf = {
   number: number
   subject: string
   topic: string
-  subtopics: string[]
+  subtopics: Array<string>
   statement: string
   referenceText: string | null
   hasImage: boolean
-  alternatives: { key: string; text: string; explanation: string }[]
+  alternatives: Array<{ key: string; text: string; explanation: string }>
   correctAlternative: string | null
   answerDoubt: boolean
   doubtReason: string | null
@@ -43,7 +43,7 @@ export type ParsedQuestionFromPdf = {
 
 export type GenerateExplanationsResponse = {
   topic: string
-  subtopics: string[]
+  subtopics: Array<string>
   explanations: Array<{ key: string; explanation: string }>
   agreesWithCorrectAnswer: boolean
   disagreementWarning?: string
@@ -51,8 +51,8 @@ export type GenerateExplanationsResponse = {
 
 export type GenerateMetadataResponse = {
   topic: string
-  subtopics: string[]
-  skills: string[]
+  subtopics: Array<string>
+  skills: Array<string>
 }
 
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/questions`
@@ -62,11 +62,11 @@ export type ExamBaseQuestionWithSource = ExamBaseQuestion & {
 }
 
 export const examBaseQuestionsService = {
-  list(examBaseId: string): Promise<ExamBaseQuestion[]> {
-    return apiFetch<ExamBaseQuestion[]>(basePath(examBaseId), { method: 'GET' })
+  list(examBaseId: string): Promise<Array<ExamBaseQuestion>> {
+    return apiFetch<Array<ExamBaseQuestion>>(basePath(examBaseId), { method: 'GET' })
   },
 
-  reorder(examBaseId: string, questionIds: string[]): Promise<void> {
+  reorder(examBaseId: string, questionIds: Array<string>): Promise<void> {
     return apiFetch<void>(`${basePath(examBaseId)}/reorder`, {
       method: 'PATCH',
       body: JSON.stringify({ questionIds }),
@@ -85,16 +85,16 @@ export const examBaseQuestionsService = {
   listAvailableToAdd(
     examBaseId: string,
     subject?: string,
-  ): Promise<ExamBaseQuestionWithSource[]> {
+  ): Promise<Array<ExamBaseQuestionWithSource>> {
     const params = subject ? `?subject=${encodeURIComponent(subject)}` : ''
-    return apiFetch<ExamBaseQuestionWithSource[]>(
+    return apiFetch<Array<ExamBaseQuestionWithSource>>(
       `${basePath(examBaseId)}/available-to-add${params}`,
       { method: 'GET' },
     )
   },
 
-  listAvailableSubjects(examBaseId: string): Promise<string[]> {
-    return apiFetch<string[]>(
+  listAvailableSubjects(examBaseId: string): Promise<Array<string>> {
+    return apiFetch<Array<string>>(
       `${basePath(examBaseId)}/available-to-add/subjects`,
       { method: 'GET' },
     )
@@ -118,8 +118,8 @@ export const examBaseQuestionsService = {
     examBaseId: string,
     markdown: string,
     provider: 'grok' | 'chatgpt' = 'grok',
-  ): Promise<{ questions: ParsedQuestionItem[]; rawResponse: string }> {
-    return apiFetch<{ questions: ParsedQuestionItem[]; rawResponse: string }>(
+  ): Promise<{ questions: Array<ParsedQuestionItem>; rawResponse: string }> {
+    return apiFetch<{ questions: Array<ParsedQuestionItem>; rawResponse: string }>(
       `${basePath(examBaseId)}/parse-from-markdown`,
       {
         method: 'POST',
@@ -282,11 +282,11 @@ export const examBaseQuestionsService = {
     examBaseId: string,
     markdown: string,
     gabaritoPdf: File,
-  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
+  ): Promise<{ questions: Array<ParsedQuestionFromPdf> }> {
     const formData = new FormData()
     formData.append('markdown', markdown)
     formData.append('gabaritoPdf', gabaritoPdf)
-    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+    return apiFetch<{ questions: Array<ParsedQuestionFromPdf> }>(
       `${basePath(examBaseId)}/parse-from-markdown-and-gabarito`,
       { method: 'POST', body: formData },
     )
@@ -310,8 +310,8 @@ export const examBaseQuestionsService = {
     examBaseId: string,
     markdownChunk: string,
     answerKey: Record<string, string>,
-  ): Promise<{ questions: ParsedQuestionFromPdf[] }> {
-    return apiFetch<{ questions: ParsedQuestionFromPdf[] }>(
+  ): Promise<{ questions: Array<ParsedQuestionFromPdf> }> {
+    return apiFetch<{ questions: Array<ParsedQuestionFromPdf> }>(
       `${basePath(examBaseId)}/parse-markdown-chunk`,
       { method: 'POST', body: JSON.stringify({ markdownChunk, answerKey }) },
     )
@@ -320,8 +320,8 @@ export const examBaseQuestionsService = {
 parseQuestionsStructureFromChunk(
     examBaseId: string,
     markdownChunk: string,
-  ): Promise<{ questions: ParsedQuestionStructure[] }> {
-    return apiFetch<{ questions: ParsedQuestionStructure[] }>(
+  ): Promise<{ questions: Array<ParsedQuestionStructure> }> {
+    return apiFetch<{ questions: Array<ParsedQuestionStructure> }>(
       `${basePath(examBaseId)}/parse-questions-structure`,
       { method: 'POST', body: JSON.stringify({ markdownChunk }) },
     )
@@ -344,8 +344,8 @@ parseQuestionsStructureFromChunk(
     examBaseId: string,
     markdown: string,
     imageMarkdown?: string,
-  ): Promise<{ questions: ParsedQuestionStructure[] }> {
-    return apiFetch<{ questions: ParsedQuestionStructure[] }>(
+  ): Promise<{ questions: Array<ParsedQuestionStructure> }> {
+    return apiFetch<{ questions: Array<ParsedQuestionStructure> }>(
       `${basePath(examBaseId)}/parse-from-pdf`,
       { method: 'POST', body: JSON.stringify({ markdown, imageMarkdown }) },
     )
@@ -373,7 +373,7 @@ parseQuestionsStructureFromChunk(
       referenceText?: string | null
       statementImageUrl?: string | null
       correctAlternative: string
-      alternatives: { key: string; text: string }[]
+      alternatives: Array<{ key: string; text: string }>
       examName?: string
     },
   ): Promise<GenerateExplanationsResponse> {
@@ -385,9 +385,9 @@ parseQuestionsStructureFromChunk(
 
   createBatch(
     examBaseId: string,
-    questions: CreateExamBaseQuestionInput[],
-  ): Promise<ExamBaseQuestion[]> {
-    return apiFetch<ExamBaseQuestion[]>(`${basePath(examBaseId)}/batch`, {
+    questions: Array<CreateExamBaseQuestionInput>,
+  ): Promise<Array<ExamBaseQuestion>> {
+    return apiFetch<Array<ExamBaseQuestion>>(`${basePath(examBaseId)}/batch`, {
       method: 'POST',
       body: JSON.stringify({ questions }),
     })

@@ -219,8 +219,19 @@ model Concurso {
   /// start mais cedo / end mais tarde entre as provas vinculadas).
   registrationStart DateTime?
   registrationEnd   DateTime?
+  /// Data de realização da prova objetiva (do edital). Fonte da timeline quando
+  /// ainda não há prova cadastrada; quando há, a data das provas tem prioridade.
+  examDate          DateTime?
   /// Data do resultado final do concurso (mais tarde entre as provas).
   resultDate        DateTime?
+  /// Etapas do certame (ex.: Prova Objetiva, Títulos, TAF), extraídas do
+  /// edital pelo fluxo criar-concurso. Array de { name, description|null }.
+  etapas            Json?
+  /// Página de origem dos documentos (para "verificar novas publicações" na
+  /// aba Notícias e o monitoramento futuro re-raspar). Vem da raspagem inicial.
+  documentsSourceUrl String?
+  /// Última vez que a página de origem foi verificada por novas publicações.
+  documentsCheckedAt DateTime?
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid
@@ -228,10 +239,45 @@ model Concurso {
 
   examBases       ExamBase[]
   cargos          Cargo[]
+  documents       ConcursoDocument[]
 
   @@unique([institution, year, examBoardId])
   @@index([year])
   @@map("concursos")
+}
+
+/// Documento publicado do concurso (edital, retificação, gabarito, resultado,
+/// convocação, comunicado...). Alimenta a timeline de "Notícias" do nível 1 e
+/// é a base para o automatismo futuro de monitoramento (re-raspar a página de
+/// origem e inserir só os documentos novos — upsert por (concursoId, url)).
+model ConcursoDocument {
+  id          String    @id @default(uuid()) @db.Uuid
+  concursoId  String    @db.Uuid
+  concurso    Concurso  @relation(fields: [concursoId], references: [id], onDelete: Cascade)
+  /// Título do documento como aparece na página de origem.
+  title       String
+  /// Resumo curto (1 frase) do que é o documento — gerado pela IA na raspagem.
+  summary     String?
+  /// URL absoluta do documento (normalmente um PDF).
+  url         String
+  /// Classificação (EDITAL_ABERTURA, RETIFICACAO, GABARITO, RESULTADO,
+  /// CONVOCACAO, COMUNICADO, OUTRO). String livre — o enum vive no scraper.
+  kind        String    @default("OUTRO")
+  /// Data de publicação do documento (date-only, UTC), null se a página não informa.
+  publishedAt DateTime?
+  /// Página de onde o documento foi raspado — o automatismo futuro re-checa aqui.
+  sourceUrl   String?
+  /// Fase 2 do monitoramento: quando o CONTEÚDO do documento (PDF) foi lido/
+  /// analisado, e quando as mudanças detectadas foram aplicadas ao concurso.
+  /// null = ainda não analisado (o sistema evita re-ler o que já tem analyzedAt).
+  analyzedAt       DateTime?
+  changesAppliedAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  /// Upsert idempotente pelo criar-concurso e pelo monitoramento futuro.
+  @@unique([concursoId, url])
+  @@index([concursoId, publishedAt])
+  @@map("concurso_documents")
 }
 
 /// Ficha da vaga (remodelagem Cargo↔Prova M:N, R3.1). Um cargo pertence a um
@@ -383,8 +429,10 @@ model ExamSyllabusGroup {
   updatedAt DateTime @updatedAt
 
   /// Legado (pré-remodelagem): mantido até R6.1; o dono passa a ser o Cargo.
-  examBaseId String   @db.Uuid
-  examBase   ExamBase @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
+  /// Nullable: grupos criados pelo fluxo criar/editar-concurso pertencem só ao
+  /// Cargo (o concurso pode não ter prova ainda) — não há examBase a apontar.
+  examBaseId String?   @db.Uuid
+  examBase   ExamBase? @relation(fields: [examBaseId], references: [id], onDelete: Cascade)
 
   /// Dono na remodelagem R3.1: conteúdo programático é do cargo, não da prova.
   /// Nullable durante a transição (backfill via prova primária).
@@ -393,10 +441,16 @@ model ExamSyllabusGroup {
 
   /// Posição de exibição (0-based) dentro da prova
   order  Int
-  /// Nome do grupo (ex.: "Saúde Coletiva e SUS")
+  /// Nome do grupo/matéria (ex.: "Saúde Coletiva e SUS")
   name   String
-  /// Tópicos em texto corrido, como no edital
+  /// Tópicos em texto corrido, como no edital (pode vir vazio quando a matéria
+  /// entra só pelo quadro de distribuição de questões, sem programa detalhado)
   topics String
+  /// Quadro de provas do edital (por matéria): número de questões, peso de cada
+  /// questão e pontuação máxima da matéria. Null quando o edital não informa.
+  questionCount Int?
+  weight        Decimal? @db.Decimal(6, 2)
+  maxScore      Decimal? @db.Decimal(7, 2)
 
   @@index([examBaseId])
   @@index([cargoId])

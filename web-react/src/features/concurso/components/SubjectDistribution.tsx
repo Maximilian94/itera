@@ -1,8 +1,8 @@
 import { Fragment } from 'react'
 import { ArrowRightIcon } from '@heroicons/react/24/outline'
-import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
 import { CARD } from './card'
-import { enter, METER_BAR } from './motion'
+import { METER_BAR, enter } from './motion'
+import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
 
 /** Faixas de acerto: verde/vermelho só como feedback de desempenho. */
 export function accuracyChipClass(v: number) {

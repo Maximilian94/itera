@@ -20,6 +20,8 @@ export function FichaCard(props: {
   hero: FichaFact
   rows: Array<FichaFact>
   editalUrl: string | null
+  /** Rótulo do botão de link; default "Ver edital oficial". */
+  editalLabel?: string
   enterIdx: number
   /** Nome da transição compartilhada (ex.: 'ficha-card') para morfar a ficha
    *  do concurso na ficha do cargo. */
@@ -82,7 +84,7 @@ export function FichaCard(props: {
           className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 no-underline transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
         >
           <DocumentTextIcon className="h-4 w-4" />
-          Ver edital oficial
+          {props.editalLabel ?? 'Ver edital oficial'}
         </a>
       )}
     </section>

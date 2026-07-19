@@ -1,17 +1,17 @@
-import { apiFetch } from '@/lib/api'
 import type {
-  ExamBaseAttempt,
-  ExamBaseAttemptWithQuestionsAndAnswers,
-  ExamBaseAttemptHistoryItem,
-  ExamAttemptFeedback,
-  UpsertAnswerInput,
   AdminExamBaseAttempt,
+  ExamAttemptFeedback,
+  ExamBaseAttempt,
+  ExamBaseAttemptHistoryItem,
+  ExamBaseAttemptWithQuestionsAndAnswers,
+  UpsertAnswerInput,
 } from '../domain/examBaseAttempt.types'
+import { apiFetch } from '@/lib/api'
 
 const basePath = (examBaseId: string) => `/exam-bases/${examBaseId}/attempts`
 
 export const examBaseAttemptService = {
-  listHistory(examBaseId?: string): Promise<ExamBaseAttemptHistoryItem[]> {
+  listHistory(examBaseId?: string): Promise<Array<ExamBaseAttemptHistoryItem>> {
     const url =
       examBaseId != null
         ? `/exam-base-attempts/history?examBaseId=${encodeURIComponent(examBaseId)}`
@@ -27,7 +27,7 @@ export const examBaseAttemptService = {
 
   create(
     examBaseId: string,
-    subjectFilter?: string[],
+    subjectFilter?: Array<string>,
   ): Promise<Pick<ExamBaseAttempt, 'id' | 'examBaseId' | 'startedAt'>> {
     return apiFetch(basePath(examBaseId), {
       method: 'POST',
@@ -74,7 +74,7 @@ export const examBaseAttemptService = {
   },
 
   /** Admin: list all attempts for an exam base across all users. */
-  listAllAdmin(examBaseId: string): Promise<AdminExamBaseAttempt[]> {
+  listAllAdmin(examBaseId: string): Promise<Array<AdminExamBaseAttempt>> {
     return apiFetch(`${basePath(examBaseId)}/admin/all`, { method: 'GET' })
   },
 

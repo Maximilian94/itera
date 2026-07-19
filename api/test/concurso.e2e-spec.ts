@@ -511,11 +511,17 @@ describe('Concurso endpoints (e2e)', () => {
           name: 'Saúde Coletiva e SUS',
           topics: 'Lei 8.080; Política Nacional',
           order: 0,
+          questionCount: null,
+          weight: null,
+          maxScore: null,
         },
         {
           name: 'Fundamentos de Enfermagem',
           topics: 'Semiologia; Biossegurança',
           order: 1,
+          questionCount: null,
+          weight: null,
+          maxScore: null,
         },
       ]);
       expect(

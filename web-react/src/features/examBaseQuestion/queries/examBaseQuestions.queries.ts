@@ -9,11 +9,11 @@ import {
   isConflictError,
 } from '../services/examBaseQuestions.service'
 import type {
-  ParsedQuestionItem,
-  ParsedQuestionFromPdf,
-  ParsedQuestionStructure,
   GenerateExplanationsResponse,
   GenerateMetadataResponse,
+  ParsedQuestionFromPdf,
+  ParsedQuestionItem,
+  ParsedQuestionStructure,
 } from '../services/examBaseQuestions.service'
 import type {
   CreateAlternativeInput,
@@ -71,7 +71,7 @@ export function useAvailableSubjectsQuery(examBaseId: string | undefined) {
 export function useReorderQuestionsMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (questionIds: string[]) =>
+    mutationFn: (questionIds: Array<string>) =>
       examBaseQuestionsService.reorder(examBaseId, questionIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })
@@ -191,7 +191,7 @@ export function useParseQuestionsFromMarkdownAndGabaritoMutation(examBaseId: str
 export function useCreateBatchQuestionsMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (questions: CreateExamBaseQuestionInput[]) =>
+    mutationFn: (questions: Array<CreateExamBaseQuestionInput>) =>
       examBaseQuestionsService.createBatch(examBaseId, questions),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examBaseQuestionsKeys.list(examBaseId) })

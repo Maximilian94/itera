@@ -112,11 +112,17 @@ function makeFutureDetail(studyPlan?: Partial<CargoDetail['studyPlan']>) {
         name: 'Enfermagem em Saúde Pública',
         topics: 'SUS, vigilância, imunização.',
         order: 1,
+        questionCount: 30,
+        weight: '2',
+        maxScore: '60.00',
       },
       {
         name: 'Fundamentos de Enfermagem',
         topics: 'Semiologia e semiotécnica.',
         order: 2,
+        questionCount: 10,
+        weight: '1',
+        maxScore: '10.00',
       },
     ],
     relatedProvas: [
@@ -346,6 +352,10 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     await goToDetalhes()
     expect(await screen.findByText('Conteúdo programático')).toBeTruthy()
     expect(screen.getByText('Enfermagem em Saúde Pública')).toBeTruthy()
+    // Quadro de provas: números por matéria + total + nota de corte.
+    expect(screen.getByText('30 questões · peso 2 · 60.00 pts')).toBeTruthy()
+    expect(screen.getByText(/Total: 40 questões · 70 pontos/)).toBeTruthy()
+    expect(screen.getByText(/Nota mínima para aprovação \(ampla\)/)).toBeTruthy()
     expect(screen.getByText('O que VUNESP costuma cobrar')).toBeTruthy()
     expect(screen.getByText(/estimativa, não garantia/)).toBeTruthy()
     expect(screen.queryByText('O que caiu na prova')).toBeNull()
@@ -810,6 +820,33 @@ describe('página do cargo — gating da mesa por GET /training (T2.1)', () => {
     // Com a sessão em andamento revelada, o CTA é retomar — não "Treinar".
     expect(screen.getByRole('button', { name: /^Continuar: / })).toBeTruthy()
     expect(screen.queryByRole('button', { name: /^Treinar: / })).toBeNull()
+  })
+})
+
+describe('página do cargo — cargo sem prova (concurso criado do edital)', () => {
+  it('abre com a ficha completa para estudar, sem chamar endpoints de prova', async () => {
+    const detail = makeCargoDetail({
+      cargo: {
+        examDate: null,
+        questionCount: 0,
+        description: 'Prestar assistência de enfermagem aos pacientes.',
+        requirements: 'Superior em Enfermagem + COREN',
+      },
+      provas: [],
+      relatedProvas: [],
+      previousExams: [],
+    })
+    mockCargoApi({ detail })
+    renderPage(CARGO_PATH)
+
+    await goToDetalhes()
+    // Ficha do edital renderizada mesmo sem prova.
+    expect(
+      await screen.findByText('Prestar assistência de enfermagem aos pacientes.'),
+    ).toBeTruthy()
+    expect(screen.getByText('Superior em Enfermagem + COREN')).toBeTruthy()
+    // Seções examBaseId-keyed ficam de fora (cargo.id não é id de prova).
+    expect(screen.queryByText('Concorrência')).toBeNull()
   })
 })
 

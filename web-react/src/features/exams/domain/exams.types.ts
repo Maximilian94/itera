@@ -14,6 +14,6 @@ export type ExamListItem = {
 }
 
 export type ListExamsResponse = {
-  exams: ExamListItem[]
+  exams: Array<ExamListItem>
 }
 

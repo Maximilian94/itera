@@ -1,19 +1,19 @@
 import { useRef, useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
+import { useQuery } from '@tanstack/react-query'
+import { DocumentMagnifyingGlassIcon, DocumentTextIcon, HomeIcon, MagnifyingGlassCircleIcon, UsersIcon } from '@heroicons/react/24/solid'
+import { ArrowRightOnRectangleIcon, Cog6ToothIcon, DocumentMagnifyingGlassIcon as DocumentMagnifyingGlassIconOutline, DocumentTextIcon as DocumentTextIconOutline, HomeIcon as HomeIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, UsersIcon as UsersIconOutline } from '@heroicons/react/24/outline'
+import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
+import { Menu, MenuItem } from '@mui/material'
 import { useClerkAuth } from '@/auth/clerk'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
 import { Route as ConcursosRoute } from '@/routes/_authenticated/concursos/index'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as AdminUsersRoute } from '@/routes/_authenticated/admin/users'
 import { Route as AdminPciScraperRoute } from '@/routes/_authenticated/admin/pci-scraper'
-import { Route as AdminPdfExtractorRoute } from '@/routes/_authenticated/admin/pdf-extractor'
+import { Route as AdminDocumentScraperRoute } from '@/routes/_authenticated/admin/document-scraper'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
-import { useQuery } from '@tanstack/react-query'
 import { authService } from '@/features/auth/services/auth.service'
-import { HomeIcon, DocumentTextIcon, UsersIcon, MagnifyingGlassCircleIcon, DocumentArrowDownIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, DocumentArrowDownIcon as DocumentArrowDownIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
-import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
-import { Menu, MenuItem } from '@mui/material'
 
 const PLAN_NAMES: Record<string, string> = {
     ESSENCIAL: 'Essencial',
@@ -95,10 +95,10 @@ export const SideBarV2 = () => {
             activeIcon: MagnifyingGlassCircleIcon,
         },
         {
-            label: 'Extrator de PDFs',
-            href: AdminPdfExtractorRoute.to,
-            icon: DocumentArrowDownIconOutline,
-            activeIcon: DocumentArrowDownIcon,
+            label: 'Documentos',
+            href: AdminDocumentScraperRoute.to,
+            icon: DocumentMagnifyingGlassIconOutline,
+            activeIcon: DocumentMagnifyingGlassIcon,
         },
     ]
 

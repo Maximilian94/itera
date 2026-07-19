@@ -1,9 +1,9 @@
-import { apiFetch } from '@/lib/api'
 import type {
   AdminCargo,
   CreateCargoInput,
   UpdateCargoInput,
 } from '../domain/cargo.types'
+import { apiFetch } from '@/lib/api'
 
 /** Cliente ADMIN de `/cargos` (gestão de vínculos cargo↔prova, R4.3). */
 class CargoService {

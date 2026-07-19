@@ -1,5 +1,5 @@
-import { apiFetch } from '@/lib/api'
 import type { ListExamsResponse } from '../domain/exams.types'
+import { apiFetch } from '@/lib/api'
 
 class ExamsService {
   private urlPath = '/exams'

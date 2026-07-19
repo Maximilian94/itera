@@ -230,11 +230,19 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
    * banca). Prova futura não tem questões próprias → só relacionadas. CADA
    * opção vira um programa de treino próprio (ProgramCard), todos visíveis. */
   const trainingOptions = buildTrainingOptions(data)
+  /* Cargo sem prova (concurso criado do edital): `cargo.id` é o id do próprio
+   * Cargo, não de uma ExamBase — os endpoints examBaseId-keyed (distribuição/
+   * concorrência) só são chamados quando existe prova de referência. */
+  const hasOwnProva = data.provas.length > 0
   // Bloco de matérias/concorrência usa a 1ª opção (recomendação principal).
-  const referenceExamBaseId = trainingOptions[0]?.examBaseId ?? cargo.id
+  // `.at(0)` (e não `[0]`) para o tipo refletir o array possivelmente vazio.
+  const referenceExamBaseId =
+    trainingOptions.at(0)?.examBaseId ?? (hasOwnProva ? cargo.id : undefined)
 
   const subjectQuery = useSubjectDistributionQuery(referenceExamBaseId)
-  const competitionQuery = useCompetitionHistoryQuery(cargo.id)
+  const competitionQuery = useCompetitionHistoryQuery(
+    hasOwnProva ? cargo.id : undefined,
+  )
 
   // Treino mais recente por prova: como a lista vem por updatedAt desc, a 1ª
   // ocorrência de cada examBaseId é a sessão mais recente daquela prova.
@@ -324,7 +332,6 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
             ? 'Cadastro de reserva'
             : null,
     },
-    { icon: AcademicCapIcon, label: 'Requisitos', value: cargo.requirements },
     {
       icon: TicketIcon,
       label: 'Taxa de inscrição',
@@ -466,20 +473,45 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
               )}
             </section>
 
-            {concurso.status !== 'past' && syllabusGroups.length > 0 && (
-              <SyllabusSection groups={syllabusGroups} enterIdx={2} />
+            {cargo.requirements != null && cargo.requirements.trim() !== '' && (
+              <section {...enter(2)} className={`${CARD} p-5 sm:p-6`}>
+                <div className="flex items-center gap-2">
+                  <AcademicCapIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                  <h2 className="text-base font-bold text-slate-900">
+                    Requisitos
+                  </h2>
+                </div>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  O que o edital exige para assumir o cargo
+                </p>
+                <p className="mt-3 max-w-prose whitespace-pre-line text-sm leading-6 text-slate-600">
+                  {cargo.requirements}
+                </p>
+              </section>
             )}
 
-            <SubjectBlock
-              query={subjectQuery}
-              status={concurso.status}
-              bancaName={bancaName}
-              examDate={examDate}
-              meters={meters}
-              enterIdx={3}
-            />
+            {concurso.status !== 'past' && syllabusGroups.length > 0 && (
+              <SyllabusSection
+                groups={syllabusGroups}
+                passingGrade={cargo.minPassingGrade}
+                enterIdx={3}
+              />
+            )}
 
-            <CompetitionSection query={competitionQuery} enterIdx={4} />
+            {referenceExamBaseId !== undefined && (
+              <SubjectBlock
+                query={subjectQuery}
+                status={concurso.status}
+                bancaName={bancaName}
+                examDate={examDate}
+                meters={meters}
+                enterIdx={4}
+              />
+            )}
+
+            {hasOwnProva && (
+              <CompetitionSection query={competitionQuery} enterIdx={5} />
+            )}
           </div>
 
           {/* ░░ Sidebar — ficha do cargo + provas anteriores ░░ */}
@@ -822,12 +854,36 @@ function TrainingHeader(props: {
 /*  Conteúdo programático (só prova aberta/futura, some se vazio)      */
 /* ------------------------------------------------------------------ */
 
+/** "10 questões · peso 1 · 10 pts" a partir dos números do quadro (omite o que falta). */
+function quadroLine(g: CargoDetail['syllabusGroups'][number]): string | null {
+  const parts = [
+    g.questionCount != null
+      ? `${g.questionCount} ${g.questionCount === 1 ? 'questão' : 'questões'}`
+      : null,
+    g.weight != null ? `peso ${g.weight}` : null,
+    g.maxScore != null ? `${g.maxScore} pts` : null,
+  ].filter(Boolean)
+  return parts.length ? parts.join(' · ') : null
+}
+
 function SyllabusSection(props: {
   groups: CargoDetail['syllabusGroups']
+  passingGrade: string | null
   enterIdx: number
 }) {
   const groups = [...props.groups].sort((a, b) => a.order - b.order)
   const e = enter(props.enterIdx)
+  // Totais do quadro (só aparecem quando o edital traz os números).
+  const totalQuestions = groups.reduce((acc, g) => acc + (g.questionCount ?? 0), 0)
+  const totalScore = groups.reduce((acc, g) => acc + (Number(g.maxScore) || 0), 0)
+  const totalLine = [
+    totalQuestions > 0
+      ? `${totalQuestions} ${totalQuestions === 1 ? 'questão' : 'questões'}`
+      : null,
+    totalScore > 0 ? `${totalScore.toLocaleString('pt-BR')} pontos` : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
   return (
     <section
       aria-labelledby="programatico-heading"
@@ -838,21 +894,66 @@ function SyllabusSection(props: {
         Conteúdo programático
       </h2>
       <p className="mt-0.5 text-sm text-slate-500">
-        O que pode ser cobrado, conforme o edital
+        Matérias, distribuição de questões e o que pode ser cobrado, conforme o
+        edital
       </p>
       <div className="mt-3 flex flex-col divide-y divide-slate-100">
-        {groups.map((g) => (
-          <details key={g.name} className="group py-1">
-            <summary className="-mx-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 [&::-webkit-details-marker]:hidden">
-              {g.name}
-              <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-90" />
-            </summary>
-            <p className="max-w-prose pb-2.5 pl-2 text-sm leading-6 text-slate-600">
-              {g.topics}
-            </p>
-          </details>
-        ))}
+        {groups.map((g) => {
+          const numbers = quadroLine(g)
+          const hasTopics = g.topics.trim() !== ''
+          // Sem tópicos não há o que expandir → linha estática (nome + números).
+          if (!hasTopics) {
+            return (
+              <div
+                key={g.name}
+                className="flex items-center justify-between gap-3 py-2.5 text-sm"
+              >
+                <span className="font-semibold text-slate-800">{g.name}</span>
+                {numbers && (
+                  <span className="shrink-0 text-xs font-medium tabular-nums text-slate-500">
+                    {numbers}
+                  </span>
+                )}
+              </div>
+            )
+          }
+          return (
+            <details key={g.name} className="group py-1">
+              <summary className="-mx-2 flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg px-2 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 [&::-webkit-details-marker]:hidden">
+                <span className="flex items-baseline gap-2">
+                  {g.name}
+                  {numbers && (
+                    <span className="text-xs font-medium tabular-nums text-slate-500">
+                      {numbers}
+                    </span>
+                  )}
+                </span>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-400 transition-transform duration-200 group-open:rotate-90" />
+              </summary>
+              <p className="max-w-prose pb-2.5 pl-2 text-sm leading-6 text-slate-600">
+                {g.topics}
+              </p>
+            </details>
+          )
+        })}
       </div>
+      {(totalLine !== '' || props.passingGrade != null) && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
+          {totalLine !== '' ? (
+            <span className="font-medium tabular-nums">Total: {totalLine}</span>
+          ) : (
+            <span />
+          )}
+          {props.passingGrade != null && (
+            <span>
+              Nota mínima para aprovação (ampla):{' '}
+              <strong className="font-semibold text-slate-700 tabular-nums">
+                {props.passingGrade}
+              </strong>
+            </span>
+          )}
+        </div>
+      )}
     </section>
   )
 }

@@ -5,9 +5,9 @@ import {
   PlayIcon,
 } from '@heroicons/react/24/outline'
 import { Link } from '@tanstack/react-router'
-import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import type { StudyPlan } from '@/features/concurso/domain/concurso.types'
 import type { TrainingListItem } from '@/features/training/domain/training.types'
+import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { CARD } from '@/features/concurso/components/card'
 import { enter } from '@/features/concurso/components/motion'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'

@@ -820,7 +820,7 @@ function ExamsPage() {
 
   async function handleCreateExam() {
     const { id } = await createDraftMutation.mutateAsync()
-    navigate({ to: '/exams/editar/$examBaseId', params: { examBaseId: id }, search: { board: undefined } })
+    navigate({ to: '/exams/editar/$examBaseId', params: { examBaseId: id }, search: {} })
   }
   const [search, setSearch] = useState('')
   const [selectedBoardId, setSelectedBoardId] = useState<string | null>(

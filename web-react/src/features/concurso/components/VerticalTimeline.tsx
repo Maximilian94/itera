@@ -1,13 +1,19 @@
 import { CheckIcon } from '@heroicons/react/24/outline'
-import type { ConcursoStatus, ConcursoTimeline } from '../domain/concurso.types'
+import type {
+  ConcursoEtapa,
+  ConcursoStatus,
+  ConcursoTimeline,
+} from '../domain/concurso.types'
 
 export type TimelineStepState = 'done' | 'current' | 'upcoming'
 
 export type TimelineStep = {
   label: string
-  /** null → a etapa some do cronograma. */
+  /** null → a etapa some do cronograma (a menos que `keepUndated`). */
   date: string | null
   state: TimelineStepState
+  /** Descrição opcional (caráter da etapa) — mostrada abaixo da data. */
+  description?: string | null
 }
 
 const dayMonth = new Intl.DateTimeFormat('pt-BR', {
@@ -33,7 +39,7 @@ const fmt = (iso: string | null, formatter: Intl.DateTimeFormat) =>
 export function buildConcursoTimelineSteps(
   timeline: ConcursoTimeline,
   status: ConcursoStatus,
-): TimelineStep[] {
+): Array<TimelineStep> {
   const regStart = fmt(timeline.registrationStart, dayMonth)
   const regEnd = fmt(timeline.registrationEnd, dayMonth)
   const registration =
@@ -58,13 +64,59 @@ export function buildConcursoTimelineSteps(
   ]
 }
 
+/**
+ * Constrói o cronograma a partir das ETAPAS datadas do concurso. Ordena por
+ * data (as sem data vão para o fim); estado deriva de hoje: passadas = done, a
+ * próxima futura = current, as demais = upcoming.
+ */
+export function buildEtapaTimelineSteps(
+  etapas: Array<ConcursoEtapa>,
+): Array<TimelineStep> {
+  const today = new Date()
+  const todayUTC = Date.UTC(
+    today.getUTCFullYear(),
+    today.getUTCMonth(),
+    today.getUTCDate(),
+  )
+  const parse = (d: string | null | undefined) =>
+    d != null && /^\d{4}-\d{2}-\d{2}/.test(d) ? Date.parse(`${d.slice(0, 10)}T00:00:00Z`) : null
+
+  const withTs = etapas.map((e) => ({ etapa: e, ts: parse(e.date) }))
+  const dated = withTs
+    .filter((e): e is { etapa: ConcursoEtapa; ts: number } => e.ts != null)
+    .sort((a, b) => a.ts - b.ts)
+  const undated = withTs.filter((e) => e.ts == null)
+  const currentTs = dated.find((e) => e.ts >= todayUTC)?.ts ?? null
+
+  return [...dated, ...undated].map(({ etapa, ts }) => ({
+    label: etapa.name,
+    description: etapa.description ?? null,
+    date: ts != null ? fullDate.format(new Date(ts)) : null,
+    state:
+      ts == null
+        ? 'upcoming'
+        : ts < todayUTC
+          ? 'done'
+          : ts === currentTs
+            ? 'current'
+            : 'upcoming',
+  }))
+}
+
 /** Cronograma vertical do sidebar (done/current/upcoming). */
-export function VerticalTimeline({ steps }: { steps: TimelineStep[] }) {
-  const visible = steps.filter((s) => s.date != null)
+export function VerticalTimeline({
+  steps,
+  keepUndated = false,
+}: {
+  steps: Array<TimelineStep>
+  /** Mantém etapas sem data (mostradas como "A definir"). */
+  keepUndated?: boolean
+}) {
+  const visible = keepUndated ? steps : steps.filter((s) => s.date != null)
   return (
     <ol className="mt-4 flex flex-col">
       {visible.map((step, i) => (
-        <li key={step.label} className="relative flex gap-3 pb-4 last:pb-0">
+        <li key={`${step.label}-${i}`} className="relative flex gap-3 pb-4 last:pb-0">
           {i < visible.length - 1 && (
             <span className="absolute left-[11px] top-6 h-full w-px bg-slate-200" />
           )}
@@ -93,7 +145,10 @@ export function VerticalTimeline({ steps }: { steps: TimelineStep[] }) {
             >
               {step.label}
             </p>
-            <p className="text-xs text-slate-500">{step.date}</p>
+            <p className="text-xs text-slate-500">{step.date ?? 'A definir'}</p>
+            {step.description != null && step.description !== '' && (
+              <p className="mt-0.5 text-xs text-slate-400">{step.description}</p>
+            )}
           </div>
         </li>
       ))}
