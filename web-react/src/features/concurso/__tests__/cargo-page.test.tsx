@@ -110,7 +110,7 @@ function makeFutureDetail(studyPlan?: Partial<CargoDetail['studyPlan']>) {
     syllabusGroups: [
       {
         name: 'Enfermagem em Saúde Pública',
-        topics: 'SUS, vigilância, imunização.',
+        topics: 'SUS; Vigilância epidemiológica; Imunização',
         order: 1,
         questionCount: 30,
         weight: '2',
@@ -352,8 +352,13 @@ describe('página do cargo — aba Treino (prova futura)', () => {
     await goToDetalhes()
     expect(await screen.findByText('Conteúdo programático')).toBeTruthy()
     expect(screen.getByText('Enfermagem em Saúde Pública')).toBeTruthy()
-    // Quadro de provas: números por matéria + total + nota de corte.
-    expect(screen.getByText('30 questões · peso 2 · 60.00 pts')).toBeTruthy()
+    // Quadro visual: valor da matéria (pts), selo "maior peso", legenda da barra,
+    // total e nota de corte. A matéria de maior pontuação vem primeiro/destacada.
+    expect(screen.getByText('60 pts')).toBeTruthy()
+    expect(screen.getByText('maior peso')).toBeTruthy()
+    expect(screen.getByText(/30 questões · peso 2/)).toBeTruthy()
+    // Tópicos do conteúdo programático viram itens de lista (não parágrafo corrido).
+    expect(screen.getByText('Vigilância epidemiológica')).toBeTruthy()
     expect(screen.getByText(/Total: 40 questões · 70 pontos/)).toBeTruthy()
     expect(screen.getByText(/Nota mínima para aprovação \(ampla\)/)).toBeTruthy()
     expect(screen.getByText('O que VUNESP costuma cobrar')).toBeTruthy()
