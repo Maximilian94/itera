@@ -66,6 +66,13 @@ function renderPage() {
   )
 }
 
+/** Relativo ao "agora" real: o rótulo de frescor é contado contra a data atual. */
+const daysAgo = (n: number) => {
+  const d = new Date()
+  d.setDate(d.getDate() - n)
+  return d.toISOString()
+}
+
 const ROWS: Array<AdminConcursoRow> = [
   {
     id: 'c-santos',
@@ -77,6 +84,7 @@ const ROWS: Array<AdminConcursoRow> = [
     provaCount: 0,
     needsSourceUrl: true,
     closed: false,
+    documentsCheckedAt: null,
     registrationEnd: '2026-08-01',
     createdAt: '2026-07-10T00:00:00.000Z',
   },
@@ -90,6 +98,7 @@ const ROWS: Array<AdminConcursoRow> = [
     provaCount: 2,
     needsSourceUrl: false,
     closed: false,
+    documentsCheckedAt: daysAgo(3),
     registrationEnd: null,
     createdAt: '2023-01-10T00:00:00.000Z',
   },
@@ -233,6 +242,7 @@ describe('gerenciar concursos (admin)', () => {
             provaCount: 0,
             needsSourceUrl: false,
             closed: true,
+            documentsCheckedAt: null,
             registrationEnd: null,
             createdAt: '2026-07-01T00:00:00.000Z',
           },
@@ -246,5 +256,16 @@ describe('gerenciar concursos (admin)', () => {
     expect(
       screen.getByRole('button', { name: /Reabrir Prefeitura Fechada/ }),
     ).toBeTruthy()
+    // Encerrado não tem manutenção pendente — o frescor não aparece.
+    expect(screen.queryByText('nunca verificado')).toBeNull()
+  })
+
+  it('mostra há quantos dias cada concurso não é verificado', async () => {
+    mockAll()
+    renderPage()
+
+    // Nunca verificado é o caso mais urgente da fila de manutenção.
+    expect(await screen.findByText('nunca verificado')).toBeTruthy()
+    expect(screen.getByText('há 3 dias')).toBeTruthy()
   })
 })

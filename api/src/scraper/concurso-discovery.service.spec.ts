@@ -1,10 +1,15 @@
 import {
+  ConcursoDiscoveryService,
   classifyCandidates,
   cleanConcursoUrl,
   normalizeInstitution,
   parseCandidates,
   type ExistingConcursoRef,
 } from './concurso-discovery.service';
+import type { ConfigService } from '@nestjs/config';
+import type { PrismaService } from '../prisma/prisma.service';
+import type { ConcursoLinkService } from '../concurso/concurso-link.service';
+import type { DocumentScraperService } from './document-scraper.service';
 
 // Trecho fiel do HTML real de /cargos/enfermeiro (dois concursos + links de vaga).
 const FIXTURE = `
@@ -155,5 +160,78 @@ describe('classifyCandidates', () => {
       },
     ];
     expect(classifyCandidates(candidates, existing)[0].status).toBe('new');
+  });
+});
+
+describe('listConcursosAdmin', () => {
+  /** Linha crua do prisma; datas nulas => todos com o mesmo status (future). */
+  const row = (
+    institution: string,
+    documentsCheckedAt: Date | null,
+    closedAt: Date | null = null,
+  ) => ({
+    id: institution,
+    slug: null,
+    institution,
+    state: 'SP',
+    year: 2026,
+    registrationStart: null,
+    registrationEnd: null,
+    examDate: null,
+    resultDate: null,
+    documentsSourceUrl: 'https://banca.org/x',
+    documentsCheckedAt,
+    editalUrl: null,
+    closedAt,
+    createdAt: new Date('2026-01-01'),
+    _count: { examBases: 0 },
+  });
+
+  const build = (rows: ReturnType<typeof row>[]) => {
+    const prisma = {
+      concurso: { findMany: jest.fn().mockResolvedValue(rows) },
+    } as unknown as PrismaService;
+    return new ConcursoDiscoveryService(
+      {} as ConfigService,
+      prisma,
+      {} as ConcursoLinkService,
+      {} as DocumentScraperService,
+    );
+  };
+
+  it('expõe a última verificação em ISO (null quando nunca verificado)', async () => {
+    const service = build([row('Nunca', null), row('Visto', new Date('2026-07-20T10:00:00Z'))]);
+    const result = await service.listConcursosAdmin();
+
+    expect(result.find((r) => r.institution === 'Nunca')?.documentsCheckedAt).toBeNull();
+    expect(result.find((r) => r.institution === 'Visto')?.documentsCheckedAt).toBe(
+      '2026-07-20T10:00:00.000Z',
+    );
+  });
+
+  it('ordena a fila de manutenção do mais parado para o mais recém-visto', async () => {
+    const service = build([
+      row('Recente', new Date('2026-07-30T00:00:00Z')),
+      row('Antigo', new Date('2026-07-01T00:00:00Z')),
+      row('Nunca', null),
+    ]);
+
+    expect((await service.listConcursosAdmin()).map((r) => r.institution)).toEqual([
+      'Nunca',
+      'Antigo',
+      'Recente',
+    ]);
+  });
+
+  it('encerrado vai para o fim mesmo estando parado há mais tempo', async () => {
+    const service = build([
+      row('Ativo', new Date('2026-07-30T00:00:00Z')),
+      row('Fechado', null, new Date('2026-07-15T00:00:00Z')),
+    ]);
+
+    expect((await service.listConcursosAdmin()).map((r) => r.institution)).toEqual([
+      'Ativo',
+      'Fechado',
+    ]);
   });
 });

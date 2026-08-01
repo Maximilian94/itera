@@ -7,6 +7,7 @@ import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   ArrowUturnLeftIcon,
+  ClockIcon,
   CloudArrowDownIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
@@ -28,6 +29,7 @@ import {
   useSetConcursoClosedMutation,
 } from '@/features/scraper/scraper.queries'
 import { scraperService } from '@/features/scraper/scraper.service'
+import { checkFreshness } from '@/features/scraper/check-freshness'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { ApiError } from '@/lib/api'
 
@@ -307,7 +309,7 @@ function GerenciarConcursosPage() {
         <div className="flex flex-col gap-6">
           <ConcursoSection
             title="Precisam de atenção"
-            hint="Em andamento, inscrições abertas ou sem link oficial da organizadora."
+            hint="Em andamento, inscrições abertas ou sem link oficial da organizadora. Os que estão há mais tempo sem verificação vêm primeiro."
             rows={attention}
             emptyLabel="Nenhum concurso pendente de manutenção."
           />
@@ -529,8 +531,20 @@ function ConcursoSection({
   )
 }
 
+/** Data+hora exata da última verificação (só no title, para não poluir a linha). */
+const checkStamp = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 function ConcursoRow({ row }: { row: AdminConcursoRow }) {
   const closeMutation = useSetConcursoClosedMutation()
+  // Quanto tempo faz que ninguém olha se este concurso publicou algo novo.
+  // Encerrado não tem manutenção pendente, então não mostra nada.
+  const freshness = row.closed ? null : checkFreshness(row.documentsCheckedAt)
   return (
     <li
       className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 ${
@@ -559,6 +573,21 @@ function ConcursoRow({ row }: { row: AdminConcursoRow }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
+        {freshness && (
+          <span
+            title={
+              row.documentsCheckedAt != null
+                ? `Última verificação: ${checkStamp.format(new Date(row.documentsCheckedAt))}`
+                : 'As publicações deste concurso nunca foram verificadas'
+            }
+            className={`inline-flex items-center gap-1 text-xs ${
+              freshness.stale ? 'font-medium text-amber-700' : 'text-slate-400'
+            }`}
+          >
+            <ClockIcon className="size-3.5" />
+            {freshness.label}
+          </span>
+        )}
         {!row.closed && row.needsSourceUrl && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
             <ExclamationTriangleIcon className="size-3.5" />

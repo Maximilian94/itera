@@ -61,6 +61,8 @@ export interface AdminConcursoRow {
   needsSourceUrl: boolean;
   /** true quando encerrado manualmente (closedAt) — sai da "atenção". */
   closed: boolean;
+  /** Última verificação de novas publicações (ISO); null = nunca verificado. */
+  documentsCheckedAt: string | null;
   registrationEnd: string | null;
   createdAt: string;
 }
@@ -299,6 +301,15 @@ export interface ExistingConcursoRef {
 /** `<normalizeInstitution(institution)>|<UF>` — chave de match candidato × base. */
 function instKey(institution: string, uf: string | null): string {
   return `${normalizeInstitution(institution)}|${(uf ?? '').toUpperCase()}`;
+}
+
+/**
+ * Chave de ordenação por "quão parado está": instante da última verificação,
+ * crescente (mais antigo primeiro). Nunca verificado vem antes de tudo — é o
+ * caso mais urgente da fila de manutenção.
+ */
+function staleRank(checkedAt: string | null): number {
+  return checkedAt == null ? -Infinity : new Date(checkedAt).getTime();
 }
 
 /**
@@ -548,6 +559,7 @@ export class ConcursoDiscoveryService {
         examDate: true,
         resultDate: true,
         documentsSourceUrl: true,
+        documentsCheckedAt: true,
         editalUrl: true,
         closedAt: true,
         createdAt: true,
@@ -580,14 +592,19 @@ export class ConcursoDiscoveryService {
           // (documentsSourceUrl); o edital em PDF sozinho não conta.
           needsSourceUrl: !c.documentsSourceUrl,
           closed: c.closedAt != null,
+          documentsCheckedAt: c.documentsCheckedAt?.toISOString() ?? null,
           registrationEnd: iso(c.registrationEnd),
           createdAt: c.createdAt.toISOString(),
         }))
-        // Encerrados vão para o fim; entre os ativos, ordena por status temporal.
+        // Encerrados vão para o fim; entre os ativos, ordena por status temporal
+        // e, dentro do status, do mais desatualizado para o mais recém-visto —
+        // a lista é a fila de manutenção manual, então o que está parado há mais
+        // tempo (nunca verificado primeiro) sobe.
         .sort(
           (a, b) =>
             Number(a.closed) - Number(b.closed) ||
             rank[a.status] - rank[b.status] ||
+            staleRank(a.documentsCheckedAt) - staleRank(b.documentsCheckedAt) ||
             a.institution.localeCompare(b.institution, 'pt-BR'),
         )
     );

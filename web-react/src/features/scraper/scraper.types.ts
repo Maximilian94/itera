@@ -168,6 +168,8 @@ export interface AdminConcursoRow {
   needsSourceUrl: boolean
   /** true quando encerrado manualmente (closedAt) — vai para "Concluídos". */
   closed: boolean
+  /** Última verificação de novas publicações (ISO); null = nunca verificado. */
+  documentsCheckedAt: string | null
   registrationEnd: string | null
   createdAt: string
 }
