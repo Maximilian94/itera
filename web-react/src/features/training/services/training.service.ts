@@ -1,21 +1,21 @@
-import { apiFetch } from '@/lib/api'
 import type {
   CreateTrainingResponse,
   TrainingListItem,
   TrainingState,
   TrainingStudyItemResponse,
 } from '../domain/training.types'
+import { apiFetch } from '@/lib/api'
 
 const basePath = (trainingId: string) => `/training/${trainingId}`
 
 export const trainingService = {
-  list(): Promise<TrainingListItem[]> {
+  list(): Promise<Array<TrainingListItem>> {
     return apiFetch('/training', { method: 'GET' })
   },
 
   create(
     examBaseId: string,
-    subjectFilter?: string[],
+    subjectFilter?: Array<string>,
     immediateFeedback?: boolean,
   ): Promise<CreateTrainingResponse> {
     const body: { subjectFilter?: Array<string>; immediateFeedback?: boolean } =
@@ -50,7 +50,7 @@ export const trainingService = {
     trainingId: string,
     subject: string,
     completed: boolean,
-  ): Promise<{ studyCompletedSubjects: string[] }> {
+  ): Promise<{ studyCompletedSubjects: Array<string> }> {
     return apiFetch(`${basePath(trainingId)}/study`, {
       method: 'PATCH',
       body: JSON.stringify({ subject, completed }),
@@ -59,7 +59,7 @@ export const trainingService = {
 
   listStudyItems(
     trainingId: string,
-  ): Promise<TrainingStudyItemResponse[]> {
+  ): Promise<Array<TrainingStudyItemResponse>> {
     return apiFetch(`${basePath(trainingId)}/study-items`, { method: 'GET' })
   },
 
@@ -67,7 +67,7 @@ export const trainingService = {
     trainingId: string,
     studyItemId: string,
     completed: boolean,
-  ): Promise<{ studyCompletedSubjects: string[] }> {
+  ): Promise<{ studyCompletedSubjects: Array<string> }> {
     return apiFetch(
       `${basePath(trainingId)}/study-items/${studyItemId}/complete`,
       {

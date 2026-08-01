@@ -1,4 +1,3 @@
-import { apiFetch } from '@/lib/api'
 import type {
   AccessApiResponse,
   CreateCheckoutSessionBody,
@@ -9,6 +8,7 @@ import type {
 
   RefundResponse,
 } from '../domain/stripe.types'
+import { apiFetch } from '@/lib/api'
 
 /**
  * Frontend service for communicating with Stripe/subscription endpoints on the backend.
@@ -18,8 +18,8 @@ class StripeService {
   private urlPath = '/stripe'
 
   /** Fetches the 3 available plans with prices and features. */
-  async getPlans(): Promise<PlanInfo[]> {
-    return apiFetch<PlanInfo[]>(`${this.urlPath}/plans`, {
+  async getPlans(): Promise<Array<PlanInfo>> {
+    return apiFetch<Array<PlanInfo>>(`${this.urlPath}/plans`, {
       method: 'GET',
     })
   }

@@ -32,5 +32,5 @@ export interface AdminUser {
   currentSubscription: AdminUserSubscription | null
   examAttemptCount: number
   trainingSessionCount: number
-  examAttempts: AdminUserExamAttempt[]
+  examAttempts: Array<AdminUserExamAttempt>
 }

@@ -99,9 +99,45 @@ export type CargoSummary = {
   salaryBase: string | null
   workload: string | null
   questionCount: number
+  /** 0 = cargo criado direto do edital, prova ainda não cadastrada (sem link). */
+  provaCount: number
   minPassingGrade: string | null
   published: boolean
   userStats: UserExamStats
+}
+
+/** Etapa/fase do certame com data — monta o Cronograma (Prova, Títulos, TAF). */
+export type ConcursoEtapa = {
+  name: string
+  description: string | null
+  /** Data da etapa (ISO date-only). Opcional: payload anterior ao campo. */
+  date?: string | null
+}
+
+/** Classificação de um documento do concurso (espelha o enum do scraper). */
+export type ConcursoDocumentKind =
+  | 'EDITAL_ABERTURA'
+  | 'RETIFICACAO'
+  | 'GABARITO'
+  | 'RESULTADO'
+  | 'CONVOCACAO'
+  | 'COMUNICADO'
+  | 'OUTRO'
+
+/** Documento publicado do concurso (edital, retificação, gabarito...) — item
+ *  da timeline de Notícias do nível 1, ordenado do mais recente ao mais antigo. */
+export type ConcursoDocument = {
+  id: string
+  title: string
+  summary: string | null
+  url: string
+  /** String livre no payload; casa com ConcursoDocumentKind quando conhecido. */
+  kind: string
+  publishedAt: string | null
+  /** Fase 2: quando o conteúdo do PDF foi lido e quando as mudanças foram
+   *  aplicadas ao concurso. null = ainda não analisado. */
+  analyzedAt?: string | null
+  changesAppliedAt?: string | null
 }
 
 /** Payload canônico da página do concurso (nível 1). */
@@ -116,11 +152,21 @@ export type ConcursoDetail = {
     city: string | null
     examBoard: ExamBoardRef | null
     editalUrl: string | null
+    /** Página de origem dos documentos (para "verificar novas publicações"). */
+    documentsSourceUrl?: string | null
+    /** Última verificação de novas publicações (ISO); null se nunca. */
+    documentsCheckedAt?: string | null
+    /** Etapas do certame (criar-concurso admin); [] quando não preenchidas.
+     *  Opcional: payload de servidor/cache anterior ao campo não o traz. */
+    etapas?: Array<ConcursoEtapa>
     status: ConcursoStatus
     timeline: ConcursoTimeline
     summary: ConcursoSummaryStats
   }
   cargos: Array<CargoSummary>
+  /** Documentos do concurso (Notícias), mais recente primeiro. Opcional:
+   *  payload de servidor/cache anterior ao campo não o traz. */
+  documents?: Array<ConcursoDocument>
 }
 
 // ── Página do cargo (nível 2) ────────────────────────────────────────────────
@@ -138,11 +184,15 @@ export type StudyPlan = {
   weakSubjects: Array<{ subject: string; accuracy: number }>
 }
 
-/** Grupo do conteúdo programático do edital (vazio para prova passada). */
+/** Grupo/matéria do conteúdo programático do edital (vazio para prova passada). */
 export type CargoSyllabusGroup = {
   name: string
   topics: string
   order: number
+  /** Quadro de provas: nº de questões, peso e pontuação máxima da matéria. */
+  questionCount: number | null
+  weight: string | null
+  maxScore: string | null
 }
 
 /** Edição anterior do mesmo cargo/banca/instituição. */
@@ -208,7 +258,8 @@ export type CargoDetail = {
     registrationFee: string | null
     minPassingGrade: string | null
     questionCount: number
-    examDate: string
+    /** Null quando o cargo ainda não tem prova (concurso criado do edital). */
+    examDate: string | null
     editalUrl: string | null
     published: boolean
   }

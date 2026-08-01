@@ -205,9 +205,9 @@ describe('ExamSyllabusGroupService', () => {
       prisma.examSyllabusGroup.findMany.mockResolvedValue(groups);
 
       // faltando g3
-      await expect(
-        service.reorder(EXAM_BASE_ID, ['g1', 'g2']),
-      ).rejects.toThrow(BadRequestException);
+      await expect(service.reorder(EXAM_BASE_ID, ['g1', 'g2'])).rejects.toThrow(
+        BadRequestException,
+      );
       // id de outra prova
       await expect(
         service.reorder(EXAM_BASE_ID, ['g1', 'g2', 'outro']),

@@ -43,7 +43,7 @@ export type ExamBase = {
    */
   concurso?: { id: string; slug: string | null } | null
   /** Conteúdo programático do edital, ordenado. Presente apenas no detalhe (getOne). */
-  syllabusGroups?: ExamSyllabusGroup[]
+  syllabusGroups?: Array<ExamSyllabusGroup>
   _count?: { questions: number }
   userStats?: { attemptCount: number; bestScore: number | null }
   reviewStats?: { reviewedCount: number; totalCount: number }
@@ -79,7 +79,7 @@ export type ConcursoSummary = {
 
 export type ConcursoProvasResponse = {
   concurso: ConcursoSummary | null
-  provas: ConcursoProva[]
+  provas: Array<ConcursoProva>
 }
 
 export type CreateExamBaseInput = {
@@ -113,8 +113,62 @@ export type ExtractedExamMetadata = {
   registrationFee?: string | null
   registrationStart?: string | null
   registrationEnd?: string | null
+  resultDate?: string | null
   description?: string | null
+  requirements?: string | null
   workload?: string | null
+  hasReserveList?: boolean | null
+}
+
+/** Uma matéria do quadro de provas / conteúdo programático de um cargo. */
+export type ExtractedSyllabusGroup = {
+  name: string
+  topics?: string | null
+  questionCount?: number | null
+  weight?: string | null
+  maxScore?: string | null
+}
+
+/** Ficha compacta de UM cargo na extração de edital completo. */
+export type ExtractedCargoFicha = {
+  role: string
+  salaryBase?: string | null
+  vacancyCount?: number | null
+  hasReserveList?: boolean | null
+  workload?: string | null
+  registrationFee?: string | null
+  minPassingGradeNonQuota?: string | null
+  requirements?: string | null
+  /** A IA só preenche para cargos de enfermagem. */
+  description?: string | null
+  isNursingRelevant?: boolean | null
+  /** Quadro de matérias — a IA só preenche para cargos de enfermagem. */
+  syllabusGroups?: Array<ExtractedSyllabusGroup>
+}
+
+/** Etapa/fase do certame (ex.: Prova Objetiva, Títulos, TAF). */
+export type ConcursoEtapa = {
+  name: string
+  description?: string | null
+  date?: string | null
+}
+
+/** Extração de edital completo: dados do concurso + TODOS os cargos. */
+export type ExtractedEditalConcurso = {
+  name?: string | null
+  governmentScope?: 'MUNICIPAL' | 'STATE' | 'FEDERAL'
+  examDate?: string | null
+  institution?: string | null
+  state?: string | null
+  city?: string | null
+  examBoardName?: string | null
+  examBoardAlias?: string | null
+  editalUrl?: string | null
+  registrationStart?: string | null
+  registrationEnd?: string | null
+  resultDate?: string | null
+  etapas?: Array<ConcursoEtapa>
+  cargos?: Array<ExtractedCargoFicha>
 }
 
 export type UpdateExamBaseInput = {

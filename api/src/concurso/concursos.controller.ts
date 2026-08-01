@@ -1,8 +1,24 @@
-import { Controller, Get, Param, Query, Req } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+  Req,
+} from '@nestjs/common';
 import { GovernmentScope } from '@prisma/client';
 import { ConcursoService } from './concurso.service';
+import { ConcursoAdminService } from './concurso-admin.service';
+import {
+  CreateConcursoDto,
+  UpdateConcursoDto,
+} from './dto/create-concurso.dto';
 import type { ConcursoStatus } from './concurso-status';
 import { OptionalAuth } from '../common/decorators/optional-auth.decorator';
+import { Roles } from '../common/decorators/roles.decorator';
 
 const SCOPES = new Set<GovernmentScope>([
   GovernmentScope.MUNICIPAL,
@@ -13,7 +29,39 @@ const STATUSES = new Set<ConcursoStatus>(['open', 'future', 'past']);
 
 @Controller('concursos')
 export class ConcursosController {
-  constructor(private readonly concursos: ConcursoService) {}
+  constructor(
+    private readonly concursos: ConcursoService,
+    private readonly concursoAdmin: ConcursoAdminService,
+  ) {}
+
+  /**
+   * Criação admin de concurso a partir do edital (fluxo do scraper de
+   * documentos): Concurso + ficha do Cargo, sem prova — a ExamBase entra
+   * depois pelo wizard e reencontra este concurso via find-or-create.
+   * Idempotente: mesma tupla reusa o concurso; mesmo role atualiza a ficha.
+   */
+  @Roles('ADMIN')
+  @Post()
+  createConcurso(@Body() dto: CreateConcursoDto) {
+    return this.concursoAdmin.createFromEdital(dto);
+  }
+
+  /** Payload de edição (ADMIN): concurso + todos os cargos com ficha completa. */
+  @Roles('ADMIN')
+  @Get(':id/edit')
+  getConcursoForEdit(@Param('id', ParseUUIDPipe) id: string) {
+    return this.concursoAdmin.getForEdit(id);
+  }
+
+  /** Edita um concurso já criado (ADMIN): concurso + etapas + cargos. */
+  @Roles('ADMIN')
+  @Patch(':id')
+  updateConcurso(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateConcursoDto,
+  ) {
+    return this.concursoAdmin.updateConcurso(id, dto);
+  }
 
   /**
    * Discovery listing (MAX-28, nova porta de entrada): one card per concurso,

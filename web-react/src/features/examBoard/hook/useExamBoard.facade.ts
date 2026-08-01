@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react"
-import type { ExamBoard } from "../domain/examBoard.types"
 import { useExamBoardStore } from "../stores/examBoard.store"
 import { useExamBoardQueries } from "../queries/examBoard.queries"
+import type { ExamBoard } from "../domain/examBoard.types"
 
 export function useExamBoardFacade() {
     // UI State

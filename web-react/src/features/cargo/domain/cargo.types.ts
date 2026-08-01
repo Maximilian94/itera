@@ -37,7 +37,7 @@ export type AdminCargo = {
   actualCutScore: string | null
   isNursingRelevant: boolean
   concursoId: string
-  provas: AdminCargoProvaLink[]
+  provas: Array<AdminCargoProvaLink>
 }
 
 /** Ficha editável (PATCH /cargos/:id). */

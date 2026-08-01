@@ -1,5 +1,6 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
+import { useQuery } from '@tanstack/react-query'
 import {
   ArrowPathIcon,
   ArrowRightIcon,
@@ -34,10 +35,13 @@ import {
 import {
   VerticalTimeline,
   buildConcursoTimelineSteps,
+  buildEtapaTimelineSteps,
 } from '@/features/concurso/components/VerticalTimeline'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
+import { ConcursoNews } from '@/features/concurso/components/ConcursoNews'
 import { useStartSimuladoMutation } from '@/features/concurso/hooks/useStartSimulado'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
+import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
 import { formatBRL } from '@/lib/utils'
 
@@ -145,8 +149,17 @@ function ConcursosBackRow() {
 
 function ConcursoContent({ data }: { data: ConcursoDetail }) {
   const { concurso, cargos } = data
+  const documents = data.documents ?? []
   const meters = useMeters()
   const { status, timeline, summary } = concurso
+  // Aba ativa da coluna principal: cargos (padrão) ou a timeline de Notícias.
+  const [tab, setTab] = useState<'cargos' | 'noticias'>('cargos')
+  // Admin vê os controles de manutenção da timeline de Notícias.
+  const { data: profileData } = useQuery({
+    queryKey: ['auth', 'profile'],
+    queryFn: () => authService.getProfile(),
+  })
+  const isAdmin = profileData?.user?.role === 'ADMIN'
 
   /* "Começar" no card inicia o simulado da prova do cargo (MAX-24). Só é
    * possível quando a prova tem questões e banca — senão o card continua
@@ -205,8 +218,15 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
     },
   ]
 
-  const timelineSteps = buildConcursoTimelineSteps(timeline, status)
-  const hasTimeline = timelineSteps.some((s) => s.date != null)
+  // Cronograma: as ETAPAS do edital são a fonte (mesmo sem data — mostradas
+  // como "A definir"); só sem NENHUMA etapa cai no derivado (inscrições/prova/
+  // resultado, a partir das datas estruturadas).
+  const etapas = concurso.etapas ?? []
+  const hasEtapas = etapas.length > 0
+  const timelineSteps = hasEtapas
+    ? buildEtapaTimelineSteps(etapas)
+    : buildConcursoTimelineSteps(timeline, status)
+  const hasTimeline = hasEtapas || timelineSteps.some((s) => s.date != null)
   const registrationDaysLeft = daysUntil(timeline.registrationEnd)
 
   return (
@@ -236,11 +256,37 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                   Concurso {concurso.institution} {concurso.year}
                 </h1>
                 <StatusPill status={status} label={statusLabel(status, timeline)} />
+                {isAdmin && (
+                  <Link
+                    to="/admin/editar-concurso/$concursoId"
+                    params={{ concursoId: concurso.id }}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 no-underline transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700"
+                  >
+                    <PencilSquareIcon className="h-3.5 w-3.5" />
+                    Editar
+                  </Link>
+                )}
               </div>
             </div>
           </header>
 
-          {cargos.length === 0 ? (
+          {/* Abas: Cargos (prontidão/treino) × Notícias (documentos do edital) */}
+          <ConcursoTabs
+            tab={tab}
+            onTab={setTab}
+            newsCount={documents.length}
+          />
+
+          {tab === 'noticias' ? (
+            <ConcursoNews
+              documents={documents}
+              isAdmin={isAdmin}
+              concursoId={concurso.id}
+              sourceUrl={concurso.documentsSourceUrl ?? null}
+              checkedAt={concurso.documentsCheckedAt ?? null}
+              enterIdx={1}
+            />
+          ) : cargos.length === 0 ? (
             <EmptyCargos />
           ) : (
             <section
@@ -274,7 +320,10 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
             title="Ficha do concurso"
             hero={fichaHero}
             rows={ficha}
-            editalUrl={concurso.editalUrl}
+            // Link da ORGANIZADORA (página de origem raspada), não do edital —
+            // sem ela, o botão some (o edital fica na timeline de Notícias).
+            editalUrl={concurso.documentsSourceUrl ?? null}
+            editalLabel="Link oficial da organizadora"
             enterIdx={2}
             viewTransitionName="ficha-card"
           />
@@ -298,12 +347,69 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                     </span>
                   )}
               </div>
-              <VerticalTimeline steps={timelineSteps} />
+              {/* Etapas do edital são o cronograma (sem data → "A definir");
+                  sem etapas, o derivado (inscrições/prova/resultado). */}
+              <VerticalTimeline steps={timelineSteps} keepUndated={hasEtapas} />
             </section>
           )}
         </aside>
       </div>
     </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Abas da coluna principal: Cargos × Notícias                        */
+/* ------------------------------------------------------------------ */
+
+function ConcursoTabs(props: {
+  tab: 'cargos' | 'noticias'
+  onTab: (tab: 'cargos' | 'noticias') => void
+  newsCount: number
+}) {
+  const { tab, onTab, newsCount } = props
+  const tabClass = (active: boolean) =>
+    `-mb-px inline-flex items-center gap-2 border-b-2 px-1 pb-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${
+      active
+        ? 'border-cyan-600 text-cyan-700'
+        : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
+    }`
+  return (
+    <div
+      role="tablist"
+      aria-label="Seções do concurso"
+      className="flex items-center gap-6 border-b border-slate-200"
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'cargos'}
+        onClick={() => onTab('cargos')}
+        className={tabClass(tab === 'cargos')}
+      >
+        Cargos
+      </button>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={tab === 'noticias'}
+        onClick={() => onTab('noticias')}
+        className={tabClass(tab === 'noticias')}
+      >
+        Notícias
+        {newsCount > 0 && (
+          <span
+            className={`inline-flex min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-bold tabular-nums ${
+              tab === 'noticias'
+                ? 'bg-cyan-100 text-cyan-800'
+                : 'bg-slate-100 text-slate-600'
+            }`}
+          >
+            {newsCount}
+          </span>
+        )}
+      </button>
+    </div>
   )
 }
 
@@ -322,6 +428,10 @@ function CargoCard(props: {
   enterIdx: number
 }) {
   const { cargo, concursoSlug, canStart, isStarting, onStart, meters, enterIdx } = props
+  /* Cargo criado direto do edital (scraper admin): ainda sem prova — o card
+   * navega normalmente (a página do cargo mostra ficha + edições anteriores +
+   * provas relacionadas para estudar); só o CTA de treino muda de copy. */
+  const hasProva = cargo.provaCount > 0
   const score =
     cargo.userStats.bestScore != null ? Math.round(cargo.userStats.bestScore) : null
   const cut =
@@ -394,7 +504,16 @@ function CargoCard(props: {
       </div>
 
       <div className="mt-4 border-t border-slate-100 pt-3.5">
-        {score != null ? (
+        {!hasProva ? (
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-slate-500">
+              Prova ainda não cadastrada — estude pela ficha e edições anteriores
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700">
+              Ver cargo
+            </span>
+          </div>
+        ) : score != null ? (
           <div className="flex items-center gap-4">
             {/* emerald-700: texto pequeno precisa de ≥4.5:1 sobre branco (AA);
                 emerald-600 fica em ~3.7. */}

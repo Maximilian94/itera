@@ -16,7 +16,6 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material'
-import type { AdminCargo } from '../domain/cargo.types'
 import {
   useCargosQuery,
   useCreateCargoMutation,
@@ -26,6 +25,7 @@ import {
   useUpdateProvaLinkMutation,
 } from '../queries/cargo.queries'
 import { CargoFichaDialog } from './CargoFichaDialog'
+import type { AdminCargo } from '../domain/cargo.types'
 
 const NEW_CARGO = '__new__'
 
@@ -84,7 +84,7 @@ export function CargoLinksSection(props: {
     (linkProva.error ??
       unlinkProva.error ??
       setOficial.error ??
-      createCargo.error) as Error | null
+      createCargo.error)
 
   const handleShare = async () => {
     if (shareTarget === NEW_CARGO) {

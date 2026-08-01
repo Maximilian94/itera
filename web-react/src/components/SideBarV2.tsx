@@ -1,18 +1,20 @@
 import { useRef, useState } from 'react'
 import { useUser } from '@clerk/clerk-react'
+import { useQuery } from '@tanstack/react-query'
+import { DocumentMagnifyingGlassIcon, DocumentTextIcon, HomeIcon, MagnifyingGlassCircleIcon, RectangleStackIcon, UsersIcon } from '@heroicons/react/24/solid'
+import { ArrowRightOnRectangleIcon, Cog6ToothIcon, DocumentMagnifyingGlassIcon as DocumentMagnifyingGlassIconOutline, DocumentTextIcon as DocumentTextIconOutline, HomeIcon as HomeIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, RectangleStackIcon as RectangleStackIconOutline, UsersIcon as UsersIconOutline } from '@heroicons/react/24/outline'
+import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
+import { Menu, MenuItem } from '@mui/material'
 import { useClerkAuth } from '@/auth/clerk'
 import { Route as DashboardRoute } from '@/routes/_authenticated/dashboard'
 import { Route as ConcursosRoute } from '@/routes/_authenticated/concursos/index'
 import { Route as AccountRoute } from '@/routes/_authenticated/account'
 import { Route as AdminUsersRoute } from '@/routes/_authenticated/admin/users'
 import { Route as AdminPciScraperRoute } from '@/routes/_authenticated/admin/pci-scraper'
+import { Route as AdminDocumentScraperRoute } from '@/routes/_authenticated/admin/document-scraper'
+import { Route as AdminGerenciarConcursosRoute } from '@/routes/_authenticated/admin/gerenciar-concursos'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
-import { useQuery } from '@tanstack/react-query'
 import { authService } from '@/features/auth/services/auth.service'
-import { HomeIcon, DocumentTextIcon, UsersIcon, MagnifyingGlassCircleIcon } from '@heroicons/react/24/solid'
-import { HomeIcon as HomeIconOutline, DocumentTextIcon as DocumentTextIconOutline, UsersIcon as UsersIconOutline, MagnifyingGlassCircleIcon as MagnifyingGlassCircleIconOutline, Cog6ToothIcon, ArrowRightOnRectangleIcon } from '@heroicons/react/24/outline'
-import { Link, useMatchRoute, useNavigate } from '@tanstack/react-router'
-import { Menu, MenuItem } from '@mui/material'
 
 const PLAN_NAMES: Record<string, string> = {
     ESSENCIAL: 'Essencial',
@@ -82,6 +84,12 @@ export const SideBarV2 = () => {
 
     const adminPages: typeof pages = [
         {
+            label: 'Concursos',
+            href: AdminGerenciarConcursosRoute.to,
+            icon: RectangleStackIconOutline,
+            activeIcon: RectangleStackIcon,
+        },
+        {
             label: 'Usuários',
             href: AdminUsersRoute.to,
             icon: UsersIconOutline,
@@ -92,6 +100,12 @@ export const SideBarV2 = () => {
             href: AdminPciScraperRoute.to,
             icon: MagnifyingGlassCircleIconOutline,
             activeIcon: MagnifyingGlassCircleIcon,
+        },
+        {
+            label: 'Documentos',
+            href: AdminDocumentScraperRoute.to,
+            icon: DocumentMagnifyingGlassIconOutline,
+            activeIcon: DocumentMagnifyingGlassIcon,
         },
     ]
 

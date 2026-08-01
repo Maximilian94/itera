@@ -335,13 +335,13 @@ export class ConcursoService {
       // Esta listagem é READ-ONLY (não roda o heal), então provas legadas sem
       // vínculo caem no agrupamento antigo (cargoGroupId ?? id, ficha da
       // primária) até alguma leitura de detalhe healá-las.
-      type CargoAgg = {
+      interface CargoAgg {
         salaryBase: unknown;
         vacancyCount: number | null;
         hasReserveList: boolean;
         provaIds: string[];
         fichaFromPrimary: boolean;
-      };
+      }
       const cargoMap = new Map<string, CargoAgg>();
       for (const p of bucket) {
         if (p.cargoProvas.length > 0) {
@@ -397,7 +397,7 @@ export class ConcursoService {
       return {
         id: linked?.id ?? null,
         slug: linked?.slug ?? head.id,
-        institution: head.institution as string,
+        institution: head.institution!,
         year: head.examDate.getUTCFullYear(),
         governmentScope: head.governmentScope,
         state: head.state,
@@ -439,6 +439,94 @@ export class ConcursoService {
         },
       };
     });
+
+    // Concursos ainda sem NENHUMA prova (criados direto do edital pelo fluxo
+    // admin do scraper): a agregação acima parte de ExamBase e não os vê, então
+    // entram aqui a partir do próprio model — timeline dos campos que o
+    // Concurso é dono (janela de inscrição/resultado; sem examDate).
+    const provalessConcursos = await this.prisma.concurso.findMany({
+      where: {
+        examBases: { none: {} },
+        cargos: { some: { isNursingRelevant: true } },
+        ...(filters.scope ? { governmentScope: filters.scope } : {}),
+        ...(filters.state ? { state: filters.state } : {}),
+        ...(filters.city ? { city: filters.city } : {}),
+        ...(filters.examBoardId ? { examBoardId: filters.examBoardId } : {}),
+      },
+      select: {
+        id: true,
+        slug: true,
+        institution: true,
+        year: true,
+        governmentScope: true,
+        state: true,
+        city: true,
+        registrationStart: true,
+        registrationEnd: true,
+        examDate: true,
+        resultDate: true,
+        examBoard: { select: { id: true, name: true, alias: true } },
+        cargos: {
+          where: { isNursingRelevant: true },
+          select: {
+            salaryBase: true,
+            vacancyCount: true,
+            hasReserveList: true,
+          },
+        },
+      },
+    });
+    items = items.concat(
+      provalessConcursos.map((c) => {
+        const timeline = {
+          registrationStart: c.registrationStart,
+          registrationEnd: c.registrationEnd,
+          examDate: c.examDate,
+          resultDate: c.resultDate,
+        };
+        const salaries = c.cargos
+          .map((g) => g.salaryBase)
+          .filter((s): s is NonNullable<typeof s> => s != null);
+        return {
+          id: c.id,
+          slug: c.slug ?? c.id,
+          institution: c.institution,
+          year: c.year,
+          governmentScope: c.governmentScope,
+          state: c.state,
+          city: c.city,
+          examBoard: c.examBoard
+            ? {
+                id: c.examBoard.id,
+                name: c.examBoard.name,
+                alias: c.examBoard.alias,
+              }
+            : null,
+          status: deriveConcursoStatus(timeline),
+          timeline: {
+            registrationStart:
+              timeline.registrationStart?.toISOString() ?? null,
+            registrationEnd: timeline.registrationEnd?.toISOString() ?? null,
+            examDate: timeline.examDate?.toISOString() ?? null,
+            resultDate: timeline.resultDate?.toISOString() ?? null,
+          },
+          cargoCount: c.cargos.length,
+          vacancyTotal: c.cargos.reduce(
+            (acc, g) => acc + (g.vacancyCount ?? 0),
+            0,
+          ),
+          hasCR: c.cargos.some((g) => g.hasReserveList),
+          salaryMin: salaries.length
+            ? String(salaries.reduce((a, b) => (Number(b) < Number(a) ? b : a)))
+            : null,
+          salaryMax: salaries.length
+            ? String(salaries.reduce((a, b) => (Number(b) > Number(a) ? b : a)))
+            : null,
+          questionCount: 0,
+          userStats: { attemptedCargos: 0, bestScore: null },
+        };
+      }),
+    );
 
     if (filters.status) {
       items = items.filter((it) => it.status === filters.status);
@@ -574,7 +662,23 @@ export class ConcursoService {
     // Timeline still derives from all siblings when nothing is relevant, so
     // the status stays meaningful for an (edge-case) empty concurso page.
     const timelineSource = relevantProvas.length > 0 ? relevantProvas : provas;
-    const timeline = aggregateConcursoTimeline(timelineSource);
+    // Concurso ainda sem prova (criado direto do edital): a timeline vem dos
+    // campos que o próprio Concurso é dono — janela de inscrição/resultado/data
+    // da prova. Com provas, a data delas tem prioridade; a do concurso preenche
+    // a lacuna (nenhuma prova com examDate).
+    const aggregated =
+      timelineSource.length > 0
+        ? aggregateConcursoTimeline(timelineSource)
+        : {
+            registrationStart: concurso.registrationStart,
+            registrationEnd: concurso.registrationEnd,
+            examDate: null,
+            resultDate: concurso.resultDate,
+          };
+    const timeline = {
+      ...aggregated,
+      examDate: aggregated.examDate ?? concurso.examDate,
+    };
     const status = deriveConcursoStatus(timeline);
 
     const statsByExamBaseId = await this.getUserStatsByExamBase(
@@ -613,17 +717,40 @@ export class ConcursoService {
       },
     });
     // Visibilidade como antes: usuário comum só conta provas publicadas;
-    // cargo sem nenhuma prova visível fica fora do payload.
+    // cargo com provas todas invisíveis fica fora do payload. Exceção: cargo
+    // SEM nenhum vínculo (concurso criado do edital, prova ainda não
+    // cadastrada) aparece com a ficha — `oficial` fica null e o front
+    // desabilita o link de treino via provaCount 0.
     const cargoGroups = cargoRows
       .map((c) => ({
         cargo: c,
         links: c.provas.filter((l) => showUnpublished || l.examBase.published),
       }))
-      .filter((g) => g.links.length > 0)
+      .filter((g) => g.links.length > 0 || g.cargo.provas.length === 0)
       .map((g) => ({
         ...g,
-        oficial: g.links.find((l) => l.isOficial) ?? g.links[0],
+        oficial: g.links.find((l) => l.isOficial) ?? g.links[0] ?? null,
       }));
+
+    // Documentos do concurso → timeline de Notícias (mais recente primeiro).
+    // Sem data conhecida cai para o fim, desempatando pela ordem de cadastro.
+    const documents = await this.prisma.concursoDocument.findMany({
+      where: { concursoId: concurso.id },
+      orderBy: [
+        { publishedAt: { sort: 'desc', nulls: 'last' } },
+        { createdAt: 'desc' },
+      ],
+      select: {
+        id: true,
+        title: true,
+        summary: true,
+        url: true,
+        kind: true,
+        publishedAt: true,
+        analyzedAt: true,
+        changesAppliedAt: true,
+      },
+    });
 
     // Cargo cards sorted by salary desc (Enfermeiro before Técnico), nulls last.
     const sortedCargos = [...cargoGroups].sort((a, b) => {
@@ -664,6 +791,18 @@ export class ConcursoService {
             }
           : null,
         editalUrl: concurso.editalUrl,
+        // Página de origem dos documentos → "verificar novas publicações".
+        documentsSourceUrl: concurso.documentsSourceUrl,
+        documentsCheckedAt: concurso.documentsCheckedAt?.toISOString() ?? null,
+        // Etapas do certame (criar-concurso admin); [] quando não preenchidas.
+        etapas:
+          (concurso.etapas as
+            | {
+                name: string;
+                description: string | null;
+                date: string | null;
+              }[]
+            | null) ?? [],
         status,
         timeline: {
           registrationStart: timeline.registrationStart?.toISOString() ?? null,
@@ -698,8 +837,10 @@ export class ConcursoService {
           .filter((s): s is number => s != null);
         return {
           // Contrato: o id do card continua sendo um id de PROVA (a oficial)
-          // — deep links e stats do front são examBaseId-keyed.
-          id: g.oficial.examBase.id,
+          // — deep links e stats do front são examBaseId-keyed. Cargo ainda
+          // sem prova cai no id do próprio Cargo (o front não linka:
+          // provaCount 0).
+          id: g.oficial?.examBase.id ?? g.cargo.id,
           slug: g.cargo.slug,
           role: g.cargo.role,
           vacancyCount: g.cargo.vacancyCount,
@@ -716,13 +857,28 @@ export class ConcursoService {
             g.cargo.minPassingGradeNonQuota != null
               ? String(g.cargo.minPassingGradeNonQuota)
               : null,
-          published: g.oficial.examBase.published,
+          published: g.oficial?.examBase.published ?? true,
           userStats: {
-            attemptCount: groupStats.reduce((acc, s) => acc + s.attemptCount, 0),
+            attemptCount: groupStats.reduce(
+              (acc, s) => acc + s.attemptCount,
+              0,
+            ),
             bestScore: bestScores.length ? Math.max(...bestScores) : null,
           },
         };
       }),
+      documents: documents.map((d) => ({
+        id: d.id,
+        title: d.title,
+        summary: d.summary,
+        url: d.url,
+        kind: d.kind,
+        publishedAt: d.publishedAt?.toISOString() ?? null,
+        // Estado da leitura de conteúdo (Fase 2): não analisado → analisado →
+        // aplicado. Fica em 'pending' até a análise de PDF existir.
+        analyzedAt: d.analyzedAt?.toISOString() ?? null,
+        changesAppliedAt: d.changesAppliedAt?.toISOString() ?? null,
+      })),
     };
   }
 
@@ -738,7 +894,7 @@ export class ConcursoService {
    */
   private async getStudyPlansBatch(
     userId: string | undefined,
-    targets: Array<{ id: string; planIds: string[] }>,
+    targets: { id: string; planIds: string[] }[],
     passingGrade: number,
   ): Promise<
     Map<
@@ -752,13 +908,13 @@ export class ConcursoService {
       }
     >
   > {
-    type Plan = {
+    interface Plan {
       currentStep: StudyPlanStep;
       attemptCount: number;
       bestScore: number | null;
       scoreDelta: number | null;
       weakSubjects: { subject: string; accuracy: number }[];
-    };
+    }
     const empty = (): Plan => ({
       currentStep: 'diagnostico',
       attemptCount: 0,
@@ -913,7 +1069,14 @@ export class ConcursoService {
       minPassingGradeNonQuota: true,
       syllabusGroups: {
         orderBy: { order: 'asc' as const },
-        select: { name: true, topics: true, order: true },
+        select: {
+          name: true,
+          topics: true,
+          order: true,
+          questionCount: true,
+          weight: true,
+          maxScore: true,
+        },
       },
       provas: {
         orderBy: { order: 'asc' as const },
@@ -971,23 +1134,29 @@ export class ConcursoService {
     if (!cargoRow) throw new NotFoundException('cargo not found');
 
     // Visibilidade por prova como antes: usuário comum só enxerga provas
-    // publicadas; cargo sem NENHUMA prova visível → 404 (era o 404 da prova
-    // não publicada no modelo antigo).
+    // publicadas; cargo com provas todas invisíveis → 404 (era o 404 da prova
+    // não publicada no modelo antigo). Exceção: cargo SEM NENHUM vínculo
+    // (concurso criado direto do edital) tem página — ficha + edições
+    // anteriores + provas relacionadas para estudar; a prova entra depois.
     const visibleLinks = cargoRow.provas.filter(
       (l) => showUnpublished || l.examBase.published,
     );
-    if (visibleLinks.length === 0) throw new NotFoundException('cargo not found');
+    if (visibleLinks.length === 0 && cargoRow.provas.length > 0)
+      throw new NotFoundException('cargo not found');
     // A oficial representa o cargo no payload (id/examDate/published) — o
     // contrato mantém cargo.id como um id de PROVA (o front consome
     // /exam-bases/:id/subject-distribution e /competition-history com ele).
-    const oficial = visibleLinks.find((l) => l.isOficial) ?? visibleLinks[0];
+    // Cargo sem prova cai no id do próprio Cargo (o front não chama esses
+    // endpoints quando `provas` vem vazio) e examDate null.
+    const oficial =
+      visibleLinks.find((l) => l.isOficial) ?? visibleLinks[0] ?? null;
     const cargo = {
       ...cargoRow,
-      id: oficial.examBase.id,
-      examDate: oficial.examBase.examDate,
-      editalUrl: oficial.examBase.editalUrl,
-      published: oficial.examBase.published,
-      _count: oficial.examBase._count,
+      id: oficial?.examBase.id ?? cargoRow.id,
+      examDate: oficial?.examBase.examDate ?? null,
+      editalUrl: oficial?.examBase.editalUrl ?? null,
+      published: oficial?.examBase.published ?? true,
+      _count: oficial?.examBase._count ?? { questions: 0 },
     };
 
     // Status do concurso agregado dos siblings, como no nível 1; a leitura
@@ -1116,6 +1285,11 @@ export class ConcursoService {
         planIds:
           l.examBase._count.questions > 0 ? [l.examBase.id] : previousIds,
       })),
+      // Cargo sem prova: o plano top-level computa sobre as edições
+      // anteriores (mesma regra da prova futura sem questões).
+      ...(visibleLinks.length === 0
+        ? [{ id: cargo.id, planIds: previousIds }]
+        : []),
       // Relacionadas sempre têm questões → plano sobre elas mesmas.
       ...related.map((p) => ({ id: p.id, planIds: [p.id] })),
     ];
@@ -1129,7 +1303,9 @@ export class ConcursoService {
 
     // Conteúdo programático só faz sentido para prova ainda não aplicada;
     // para prova passada a página foca nas provas anteriores e no treino.
+    // Sem prova (examDate null) o cargo é "futuro" por definição.
     const cargoIsPast =
+      cargo.examDate != null &&
       deriveConcursoStatus({
         registrationStart: null,
         registrationEnd: null,
@@ -1169,11 +1345,20 @@ export class ConcursoService {
             ? String(cargo.minPassingGradeNonQuota)
             : null,
         questionCount: cargo._count.questions,
-        examDate: cargo.examDate.toISOString(),
+        examDate: cargo.examDate?.toISOString() ?? null,
         editalUrl: cargo.editalUrl ?? concurso.editalUrl,
         published: cargo.published,
       },
-      syllabusGroups: cargoIsPast ? [] : cargo.syllabusGroups,
+      syllabusGroups: cargoIsPast
+        ? []
+        : cargo.syllabusGroups.map((g) => ({
+            name: g.name,
+            topics: g.topics,
+            order: g.order,
+            questionCount: g.questionCount,
+            weight: g.weight != null ? String(g.weight) : null,
+            maxScore: g.maxScore != null ? String(g.maxScore) : null,
+          })),
       // Provas do cargo (vínculos CargoProva). Oficial primeiro, depois pela
       // ordem do vínculo. `isPrimary` deriva de `isOficial` (contrato externo
       // inalterado). Cargo de 1 prova → array de 1.

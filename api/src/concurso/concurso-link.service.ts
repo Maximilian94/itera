@@ -181,6 +181,50 @@ export class ConcursoLinkService {
     const rep = members[0];
     const cargoId = prova.cargoGroupId ?? prova.id;
 
+    // Concurso criado direto do edital (scraper admin): se o concurso já tem
+    // um Cargo do mesmo role ainda SEM provas, a primeira prova liga-se a ele
+    // (a ficha dele, vinda do edital, é mais rica que o espelho legado da
+    // prova) em vez de criar um cargo duplicado.
+    if (!prova.cargoGroupId) {
+      const orphan = await this.prisma.cargo.findFirst({
+        where: {
+          concursoId,
+          role: { equals: rep.role, mode: 'insensitive' },
+          provas: { none: {} },
+        },
+        select: { id: true, slug: true },
+      });
+      if (orphan) {
+        try {
+          await this.prisma.cargoProva.create({
+            data: {
+              cargoId: orphan.id,
+              examBaseId: prova.id,
+              provaLabel: rep.provaLabel,
+              isOficial: true,
+              order: 0,
+            },
+          });
+          // O slug do cargo vem da prova (preserva /concursos/:slug/cargos/:cargoSlug).
+          if (!orphan.slug && rep.slug) {
+            await this.prisma.cargo
+              .update({ where: { id: orphan.id }, data: { slug: rep.slug } })
+              .catch(() => undefined); // clash de slug → heal depois
+          }
+          return orphan.id;
+        } catch (err) {
+          // Corrida (outra prova ganhou o vínculo oficial) → segue o caminho
+          // padrão, que já resolve races com o P2002 próprio.
+          if (
+            !(err instanceof Prisma.PrismaClientKnownRequestError) ||
+            err.code !== 'P2002'
+          ) {
+            throw err;
+          }
+        }
+      }
+    }
+
     const create = (slug: string | null) =>
       this.prisma.$transaction(async (tx) => {
         await tx.cargo.create({

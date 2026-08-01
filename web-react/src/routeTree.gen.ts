@@ -28,10 +28,14 @@ import { Route as AuthenticatedTreinoSplatRouteImport } from './routes/_authenti
 import { Route as AuthenticatedExamsEditarRouteImport } from './routes/_authenticated/exams/editar'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin/users'
 import { Route as AuthenticatedAdminPciScraperRouteImport } from './routes/_authenticated/admin/pci-scraper'
+import { Route as AuthenticatedAdminGerenciarConcursosRouteImport } from './routes/_authenticated/admin/gerenciar-concursos'
+import { Route as AuthenticatedAdminDocumentScraperRouteImport } from './routes/_authenticated/admin/document-scraper'
+import { Route as AuthenticatedAdminCriarConcursoRouteImport } from './routes/_authenticated/admin/criar-concurso'
 import { Route as AuthenticatedConcursosConcursoSlugIndexRouteImport } from './routes/_authenticated/concursos/$concursoSlug/index'
 import { Route as AuthenticatedExamsEditarExamBaseIdRouteImport } from './routes/_authenticated/exams/editar/$examBaseId'
 import { Route as AuthenticatedExamsExamBoardExamIdRouteImport } from './routes/_authenticated/exams/$examBoard/$examId'
 import { Route as AuthenticatedConcursosConcursoSlugCargoSlugRouteImport } from './routes/_authenticated/concursos/$concursoSlug/$cargoSlug'
+import { Route as AuthenticatedAdminEditarConcursoConcursoIdRouteImport } from './routes/_authenticated/admin/editar-concurso.$concursoId'
 import { Route as AuthenticatedExamsExamBoardExamIdIndexRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/index'
 import { Route as AuthenticatedExamsExamBoardExamIdQuestoesV2RouteImport } from './routes/_authenticated/exams/$examBoard/$examId/questoes-v2'
 import { Route as AuthenticatedExamsExamBoardExamIdQuestoesRouteImport } from './routes/_authenticated/exams/$examBoard/$examId/questoes'
@@ -139,6 +143,24 @@ const AuthenticatedAdminPciScraperRoute =
     path: '/admin/pci-scraper',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedAdminGerenciarConcursosRoute =
+  AuthenticatedAdminGerenciarConcursosRouteImport.update({
+    id: '/admin/gerenciar-concursos',
+    path: '/admin/gerenciar-concursos',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminDocumentScraperRoute =
+  AuthenticatedAdminDocumentScraperRouteImport.update({
+    id: '/admin/document-scraper',
+    path: '/admin/document-scraper',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminCriarConcursoRoute =
+  AuthenticatedAdminCriarConcursoRouteImport.update({
+    id: '/admin/criar-concurso',
+    path: '/admin/criar-concurso',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedConcursosConcursoSlugIndexRoute =
   AuthenticatedConcursosConcursoSlugIndexRouteImport.update({
     id: '/concursos/$concursoSlug/',
@@ -161,6 +183,12 @@ const AuthenticatedConcursosConcursoSlugCargoSlugRoute =
   AuthenticatedConcursosConcursoSlugCargoSlugRouteImport.update({
     id: '/concursos/$concursoSlug/$cargoSlug',
     path: '/concursos/$concursoSlug/$cargoSlug',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedAdminEditarConcursoConcursoIdRoute =
+  AuthenticatedAdminEditarConcursoConcursoIdRouteImport.update({
+    id: '/admin/editar-concurso/$concursoId',
+    path: '/admin/editar-concurso/$concursoId',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedExamsExamBoardExamIdIndexRoute =
@@ -206,6 +234,9 @@ export interface FileRoutesByFullPath {
   '/exams': typeof AuthenticatedExamsRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
+  '/admin/criar-concurso': typeof AuthenticatedAdminCriarConcursoRoute
+  '/admin/document-scraper': typeof AuthenticatedAdminDocumentScraperRoute
+  '/admin/gerenciar-concursos': typeof AuthenticatedAdminGerenciarConcursosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
@@ -213,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/concursos/': typeof AuthenticatedConcursosIndexRoute
   '/exams/': typeof AuthenticatedExamsIndexRoute
   '/treino/': typeof AuthenticatedTreinoIndexRoute
+  '/admin/editar-concurso/$concursoId': typeof AuthenticatedAdminEditarConcursoConcursoIdRoute
   '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
@@ -234,6 +266,9 @@ export interface FileRoutesByTo {
   '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
+  '/admin/criar-concurso': typeof AuthenticatedAdminCriarConcursoRoute
+  '/admin/document-scraper': typeof AuthenticatedAdminDocumentScraperRoute
+  '/admin/gerenciar-concursos': typeof AuthenticatedAdminGerenciarConcursosRoute
   '/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/admin/users': typeof AuthenticatedAdminUsersRoute
   '/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
@@ -241,6 +276,7 @@ export interface FileRoutesByTo {
   '/concursos': typeof AuthenticatedConcursosIndexRoute
   '/exams': typeof AuthenticatedExamsIndexRoute
   '/treino': typeof AuthenticatedTreinoIndexRoute
+  '/admin/editar-concurso/$concursoId': typeof AuthenticatedAdminEditarConcursoConcursoIdRoute
   '/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
   '/concursos/$concursoSlug': typeof AuthenticatedConcursosConcursoSlugIndexRoute
@@ -264,6 +300,9 @@ export interface FileRoutesById {
   '/_authenticated/exams': typeof AuthenticatedExamsRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
+  '/_authenticated/admin/criar-concurso': typeof AuthenticatedAdminCriarConcursoRoute
+  '/_authenticated/admin/document-scraper': typeof AuthenticatedAdminDocumentScraperRoute
+  '/_authenticated/admin/gerenciar-concursos': typeof AuthenticatedAdminGerenciarConcursosRoute
   '/_authenticated/admin/pci-scraper': typeof AuthenticatedAdminPciScraperRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRoute
   '/_authenticated/exams/editar': typeof AuthenticatedExamsEditarRouteWithChildren
@@ -271,6 +310,7 @@ export interface FileRoutesById {
   '/_authenticated/concursos/': typeof AuthenticatedConcursosIndexRoute
   '/_authenticated/exams/': typeof AuthenticatedExamsIndexRoute
   '/_authenticated/treino/': typeof AuthenticatedTreinoIndexRoute
+  '/_authenticated/admin/editar-concurso/$concursoId': typeof AuthenticatedAdminEditarConcursoConcursoIdRoute
   '/_authenticated/concursos/$concursoSlug/$cargoSlug': typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   '/_authenticated/exams/$examBoard/$examId': typeof AuthenticatedExamsExamBoardExamIdRouteWithChildren
   '/_authenticated/exams/editar/$examBaseId': typeof AuthenticatedExamsEditarExamBaseIdRoute
@@ -295,6 +335,9 @@ export interface FileRouteTypes {
     | '/exams'
     | '/onboarding'
     | '/planos'
+    | '/admin/criar-concurso'
+    | '/admin/document-scraper'
+    | '/admin/gerenciar-concursos'
     | '/admin/pci-scraper'
     | '/admin/users'
     | '/exams/editar'
@@ -302,6 +345,7 @@ export interface FileRouteTypes {
     | '/concursos/'
     | '/exams/'
     | '/treino/'
+    | '/admin/editar-concurso/$concursoId'
     | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/$examBoard/$examId'
     | '/exams/editar/$examBaseId'
@@ -323,6 +367,9 @@ export interface FileRouteTypes {
     | '/evolucao-como-funciona'
     | '/onboarding'
     | '/planos'
+    | '/admin/criar-concurso'
+    | '/admin/document-scraper'
+    | '/admin/gerenciar-concursos'
     | '/admin/pci-scraper'
     | '/admin/users'
     | '/exams/editar'
@@ -330,6 +377,7 @@ export interface FileRouteTypes {
     | '/concursos'
     | '/exams'
     | '/treino'
+    | '/admin/editar-concurso/$concursoId'
     | '/concursos/$concursoSlug/$cargoSlug'
     | '/exams/editar/$examBaseId'
     | '/concursos/$concursoSlug'
@@ -352,6 +400,9 @@ export interface FileRouteTypes {
     | '/_authenticated/exams'
     | '/_authenticated/onboarding'
     | '/_authenticated/planos'
+    | '/_authenticated/admin/criar-concurso'
+    | '/_authenticated/admin/document-scraper'
+    | '/_authenticated/admin/gerenciar-concursos'
     | '/_authenticated/admin/pci-scraper'
     | '/_authenticated/admin/users'
     | '/_authenticated/exams/editar'
@@ -359,6 +410,7 @@ export interface FileRouteTypes {
     | '/_authenticated/concursos/'
     | '/_authenticated/exams/'
     | '/_authenticated/treino/'
+    | '/_authenticated/admin/editar-concurso/$concursoId'
     | '/_authenticated/concursos/$concursoSlug/$cargoSlug'
     | '/_authenticated/exams/$examBoard/$examId'
     | '/_authenticated/exams/editar/$examBaseId'
@@ -513,6 +565,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminPciScraperRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin/gerenciar-concursos': {
+      id: '/_authenticated/admin/gerenciar-concursos'
+      path: '/admin/gerenciar-concursos'
+      fullPath: '/admin/gerenciar-concursos'
+      preLoaderRoute: typeof AuthenticatedAdminGerenciarConcursosRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/document-scraper': {
+      id: '/_authenticated/admin/document-scraper'
+      path: '/admin/document-scraper'
+      fullPath: '/admin/document-scraper'
+      preLoaderRoute: typeof AuthenticatedAdminDocumentScraperRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/criar-concurso': {
+      id: '/_authenticated/admin/criar-concurso'
+      path: '/admin/criar-concurso'
+      fullPath: '/admin/criar-concurso'
+      preLoaderRoute: typeof AuthenticatedAdminCriarConcursoRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/concursos/$concursoSlug/': {
       id: '/_authenticated/concursos/$concursoSlug/'
       path: '/concursos/$concursoSlug'
@@ -539,6 +612,13 @@ declare module '@tanstack/react-router' {
       path: '/concursos/$concursoSlug/$cargoSlug'
       fullPath: '/concursos/$concursoSlug/$cargoSlug'
       preLoaderRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/admin/editar-concurso/$concursoId': {
+      id: '/_authenticated/admin/editar-concurso/$concursoId'
+      path: '/admin/editar-concurso/$concursoId'
+      fullPath: '/admin/editar-concurso/$concursoId'
+      preLoaderRoute: typeof AuthenticatedAdminEditarConcursoConcursoIdRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/exams/$examBoard/$examId/': {
@@ -645,11 +725,15 @@ interface AuthenticatedRouteChildren {
   AuthenticatedExamsRoute: typeof AuthenticatedExamsRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
+  AuthenticatedAdminCriarConcursoRoute: typeof AuthenticatedAdminCriarConcursoRoute
+  AuthenticatedAdminDocumentScraperRoute: typeof AuthenticatedAdminDocumentScraperRoute
+  AuthenticatedAdminGerenciarConcursosRoute: typeof AuthenticatedAdminGerenciarConcursosRoute
   AuthenticatedAdminPciScraperRoute: typeof AuthenticatedAdminPciScraperRoute
   AuthenticatedAdminUsersRoute: typeof AuthenticatedAdminUsersRoute
   AuthenticatedTreinoSplatRoute: typeof AuthenticatedTreinoSplatRoute
   AuthenticatedConcursosIndexRoute: typeof AuthenticatedConcursosIndexRoute
   AuthenticatedTreinoIndexRoute: typeof AuthenticatedTreinoIndexRoute
+  AuthenticatedAdminEditarConcursoConcursoIdRoute: typeof AuthenticatedAdminEditarConcursoConcursoIdRoute
   AuthenticatedConcursosConcursoSlugCargoSlugRoute: typeof AuthenticatedConcursosConcursoSlugCargoSlugRoute
   AuthenticatedConcursosConcursoSlugIndexRoute: typeof AuthenticatedConcursosConcursoSlugIndexRoute
 }
@@ -663,11 +747,18 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedExamsRoute: AuthenticatedExamsRouteWithChildren,
   AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
+  AuthenticatedAdminCriarConcursoRoute: AuthenticatedAdminCriarConcursoRoute,
+  AuthenticatedAdminDocumentScraperRoute:
+    AuthenticatedAdminDocumentScraperRoute,
+  AuthenticatedAdminGerenciarConcursosRoute:
+    AuthenticatedAdminGerenciarConcursosRoute,
   AuthenticatedAdminPciScraperRoute: AuthenticatedAdminPciScraperRoute,
   AuthenticatedAdminUsersRoute: AuthenticatedAdminUsersRoute,
   AuthenticatedTreinoSplatRoute: AuthenticatedTreinoSplatRoute,
   AuthenticatedConcursosIndexRoute: AuthenticatedConcursosIndexRoute,
   AuthenticatedTreinoIndexRoute: AuthenticatedTreinoIndexRoute,
+  AuthenticatedAdminEditarConcursoConcursoIdRoute:
+    AuthenticatedAdminEditarConcursoConcursoIdRoute,
   AuthenticatedConcursosConcursoSlugCargoSlugRoute:
     AuthenticatedConcursosConcursoSlugCargoSlugRoute,
   AuthenticatedConcursosConcursoSlugIndexRoute:

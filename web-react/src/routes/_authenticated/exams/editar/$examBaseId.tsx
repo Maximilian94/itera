@@ -65,7 +65,16 @@ import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { formatExamBaseTitle } from '@/lib/utils'
 import { useEffect, useRef, useState } from 'react'
 
+// Search param opcional: ?editalUrl=... pré-preenche a URL do edital na fase
+// EDITAL (o admin clica "Extrair metadados" — sem auto-disparo, ver nota no
+// MetadataStep).
 export const Route = createFileRoute('/_authenticated/exams/editar/$examBaseId')({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { editalUrl?: string } => ({
+    editalUrl:
+      typeof search.editalUrl === 'string' && search.editalUrl ? search.editalUrl : undefined,
+  }),
   component: ExamEditPage,
 })
 
@@ -296,9 +305,11 @@ function NewExamBoardForm({
 
 function MetadataStep({
   examBaseId,
+  initialEditalUrl,
   onNext,
 }: {
   examBaseId: string
+  initialEditalUrl?: string
   onNext: () => void
 }) {
   const { data: examBase } = useExamBaseQuery(examBaseId)
@@ -329,7 +340,7 @@ function MetadataStep({
       salaryBase: examBase.salaryBase ?? '',
       minPassingGradeNonQuota: examBase.minPassingGradeNonQuota ?? '',
       examBoardId: examBase.examBoardId ?? '',
-      editalUrl: examBase.editalUrl ?? '',
+      editalUrl: examBase.editalUrl ?? initialEditalUrl ?? '',
       vacancyCount: examBase.vacancyCount != null ? String(examBase.vacancyCount) : '',
       applicantCount: examBase.applicantCount != null ? String(examBase.applicantCount) : '',
       registrationFee: examBase.registrationFee ?? '',
@@ -364,13 +375,20 @@ function MetadataStep({
     setDuplicates(matches)
   }
 
-  async function handleExtract() {
-    if (!pdfFile) return
+  // Ref com o form mais recente: a auto-extração dispara de um useEffect e o
+  // closure capturaria um form desatualizado (ex.: antes do populate do draft).
+  const formRef = useRef(form)
+  formRef.current = form
+
+  async function runExtract(source: { pdfFile?: File | null; url?: string }) {
     const data = await extractMutation.mutateAsync({
-      role: form.role.trim() || undefined,
-      pdfFile,
+      role: formRef.current.role.trim() || undefined,
+      pdfFile: source.pdfFile ?? undefined,
+      url: source.pdfFile ? undefined : source.url,
     })
-    const newForm = applyExtracted(form, data)
+    const newForm = applyExtracted(formRef.current, data)
+    // Extração via URL: se a IA não devolveu editalUrl, a própria URL é o edital.
+    if (!newForm.editalUrl && source.url) newForm.editalUrl = source.url
     setForm(newForm)
     checkDuplicatesForForm(newForm)
     if (data.examBoardName) {
@@ -388,6 +406,11 @@ function MetadataStep({
       }
     }
   }
+
+  // Nota: NÃO auto-disparar runExtract via useEffect — mutate() dentro de
+  // effect sob StrictMode perde a atualização e o pending nunca resolve
+  // (bug reproduzido em criar-concurso-page.test.tsx). Chegando com
+  // ?editalUrl=..., o campo vem preenchido e o admin clica "Extrair".
 
   function buildPayload() {
     return {
@@ -427,7 +450,7 @@ function MetadataStep({
   }
 
   const canAdvance = form.name.trim() !== '' && form.role.trim() !== '' && form.examDate.trim() !== '' && form.editalUrl.trim() !== ''
-  const canExtract = pdfFile != null && !extractMutation.isPending
+  const canExtract = (pdfFile != null || form.editalUrl.trim() !== '') && !extractMutation.isPending
 
   return (
     <>
@@ -439,7 +462,8 @@ function MetadataStep({
             Extrair com IA
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Faça upload do PDF do edital. A IA preencherá os campos automaticamente.
+            Faça upload do PDF do edital ou preencha a "URL do edital" ao lado. A IA
+            preencherá os campos automaticamente.
           </Typography>
         </div>
 
@@ -474,7 +498,9 @@ function MetadataStep({
           variant="contained"
           startIcon={extractMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeIcon />}
           disabled={!canExtract}
-          onClick={handleExtract}
+          onClick={() =>
+            runExtract({ pdfFile, url: pdfFile ? undefined : form.editalUrl.trim() })
+          }
           sx={{ bgcolor: 'violet.600', '&:hover': { bgcolor: 'violet.700' }, alignSelf: 'flex-start' }}
         >
           {extractMutation.isPending ? 'Extraindo...' : 'Extrair metadados'}
@@ -2486,6 +2512,7 @@ function ExplanationQuestionCard({
 
 function ExamEditPage() {
   const { examBaseId } = Route.useParams()
+  const { editalUrl: searchEditalUrl } = Route.useSearch()
   const navigate = useNavigate()
   const { data: examBase } = useExamBaseQuery(examBaseId)
   const updateMutation = useUpdateExamBaseMutation(examBaseId)
@@ -2547,7 +2574,11 @@ function ExamEditPage() {
       <StepIndicator step={step} onStepClick={(s) => handleStepChange(s as 1 | 2 | 3 | 4 | 5)} />
 
       {step === 1 && (
-        <MetadataStep examBaseId={examBaseId} onNext={() => handleStepChange(2)} />
+        <MetadataStep
+          examBaseId={examBaseId}
+          initialEditalUrl={searchEditalUrl}
+          onNext={() => handleStepChange(2)}
+        />
       )}
       {step === 2 && (
         <ExamPdfStep

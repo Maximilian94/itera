@@ -5,4 +5,3 @@ export class GetExamBasesQueryDto {
   @IsUUID()
   examBoardId?: string;
 }
-

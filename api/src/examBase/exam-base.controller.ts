@@ -14,7 +14,10 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Roles } from '../common/decorators/roles.decorator';
 import { CreateExamBaseDto } from './dto/create-exam-base.dto';
-import { ExtractMetadataDto } from './dto/extract-metadata.dto';
+import {
+  ExtractEditalDto,
+  ExtractMetadataDto,
+} from './dto/extract-metadata.dto';
 import { GetExamBasesQueryDto } from './dto/get-exam-bases.query';
 import {
   CreateSyllabusGroupDto,
@@ -46,10 +49,7 @@ export class ExamBaseController {
   }
 
   @Get(':id')
-  getOne(
-    @Param('id') id: string,
-    @Req() req: { user?: { userId: string } },
-  ) {
+  getOne(@Param('id') id: string, @Req() req: { user?: { userId: string } }) {
     return this.examBases.getOne(id, req.user?.userId);
   }
 
@@ -79,6 +79,16 @@ export class ExamBaseController {
     });
   }
 
+  /**
+   * Extração de edital COMPLETO (fluxo criar-concurso do admin): dados do
+   * concurso + a lista de todos os cargos ofertados. Admin only.
+   */
+  @Post('extract-edital')
+  @Roles('ADMIN')
+  extractEdital(@Body() dto: ExtractEditalDto) {
+    return this.examBaseAi.extractEditalConcurso(dto.url);
+  }
+
   /** Creates a new exam base. Admin only. */
   @Post()
   @Roles('ADMIN')
@@ -96,10 +106,7 @@ export class ExamBaseController {
   /** Publishes or unpublishes an exam. Admin only. Unpublished exams are not visible to non-admin users. */
   @Patch(':id/publish')
   @Roles('ADMIN')
-  setPublished(
-    @Param('id') id: string,
-    @Body() body: { published: boolean },
-  ) {
+  setPublished(@Param('id') id: string, @Body() body: { published: boolean }) {
     return this.examBases.setPublished(id, body.published);
   }
 

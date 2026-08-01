@@ -3,6 +3,7 @@ import type {
   CreateExamBaseInput,
   ExamBase,
   ExamSyllabusGroup,
+  ExtractedEditalConcurso,
   ExtractedExamMetadata,
   UpdateExamBaseInput,
 } from '../domain/examBase.types'
@@ -93,8 +94,8 @@ class ExamBaseService {
   }
 
   /** Reordena todos os grupos: `ids` deve conter todos os grupos da prova, na nova ordem. */
-  async reorderSyllabusGroups(examBaseId: string, ids: string[]) {
-    return await apiFetch<ExamSyllabusGroup[]>(
+  async reorderSyllabusGroups(examBaseId: string, ids: Array<string>) {
+    return await apiFetch<Array<ExamSyllabusGroup>>(
       `${this.urlPath}/${examBaseId}/syllabus-groups/order`,
       { method: 'PATCH', body: JSON.stringify({ ids }) },
     )
@@ -115,6 +116,14 @@ class ExamBaseService {
     return await apiFetch<ExtractedExamMetadata>(`${this.urlPath}/extract-metadata`, {
       method: 'POST',
       body: formData,
+    })
+  }
+
+  /** Extração de edital completo: dados do concurso + todos os cargos. */
+  async extractEdital(url: string): Promise<ExtractedEditalConcurso> {
+    return await apiFetch<ExtractedEditalConcurso>(`${this.urlPath}/extract-edital`, {
+      method: 'POST',
+      body: JSON.stringify({ url }),
     })
   }
 }

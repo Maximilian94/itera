@@ -13,8 +13,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material'
-import type { AdminCargo } from '../domain/cargo.types'
 import { useUpdateCargoMutation } from '../queries/cargo.queries'
+import type { AdminCargo } from '../domain/cargo.types'
 
 type FichaForm = {
   role: string
@@ -201,7 +201,7 @@ export function CargoFichaDialog(props: {
           />
           {update.isError && (
             <Alert severity="error">
-              {(update.error as Error)?.message ?? 'Erro ao salvar a ficha'}
+              {(update.error)?.message ?? 'Erro ao salvar a ficha'}
             </Alert>
           )}
         </Stack>

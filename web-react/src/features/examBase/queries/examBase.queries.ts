@@ -6,6 +6,24 @@ export const examBaseKeys = {
   list: (examBoardId?: string) => ['examBases', examBoardId ?? 'all'] as const,
   one: (id: string) => ['examBase', id] as const,
   concurso: (id: string) => ['examBase', id, 'concurso'] as const,
+  extractEdital: (url: string) => ['examBase', 'extract-edital', url] as const,
+}
+
+/**
+ * Extração de edital COMPLETO (concurso + todos os cargos) como QUERY (não
+ * mutation): dispara declarativamente quando `url` existe — imune ao
+ * double-effect do StrictMode (mutate() em useEffect perde a atualização e o
+ * pending nunca resolve) — e cacheada por URL (repetir a mesma extração não
+ * paga OpenAI de novo).
+ */
+export function useExtractEditalQuery(url: string | null) {
+  return useQuery({
+    queryKey: examBaseKeys.extractEdital(url ?? ''),
+    queryFn: () => examBaseService.extractEdital(url!),
+    enabled: Boolean(url),
+    staleTime: Infinity,
+    retry: false,
+  })
 }
 
 export function useExamConcursoProvasQuery(examBaseId: string | undefined) {
@@ -114,7 +132,7 @@ export function useUpdateSyllabusGroupMutation(examBaseId: string) {
 export function useReorderSyllabusGroupsMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (ids: string[]) =>
+    mutationFn: (ids: Array<string>) =>
       examBaseService.reorderSyllabusGroups(examBaseId, ids),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: examBaseKeys.one(examBaseId) })

@@ -41,7 +41,7 @@ export function useExamBaseAttemptsQuery(examBaseId: string | undefined) {
 export function useCreateExamBaseAttemptMutation(examBaseId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (subjectFilter?: string[]) =>
+    mutationFn: (subjectFilter?: Array<string>) =>
       examBaseAttemptService.create(examBaseId, subjectFilter),
     onSuccess: () => {
       if (examBaseId) {
@@ -84,7 +84,7 @@ export function useUpsertExamBaseAttemptAnswerMutation(
       await queryClient.cancelQueries({ queryKey })
       const previous = queryClient.getQueryData<{
         attempt: unknown
-        questions: unknown[]
+        questions: Array<unknown>
         answers: Record<string, string | null>
       }>(queryKey)
       queryClient.setQueryData(queryKey, (old: typeof previous) => {

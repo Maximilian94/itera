@@ -89,7 +89,4 @@ export class CreateExamBaseDto {
   @IsOptional()
   @IsBoolean()
   isNursingRelevant?: boolean;
-
-
-
 }
