@@ -166,6 +166,8 @@ export interface AdminConcursoRow {
   status: ConcursoStatus
   provaCount: number
   needsSourceUrl: boolean
+  /** true quando encerrado manualmente (closedAt) — vai para "Concluídos". */
+  closed: boolean
   registrationEnd: string | null
   createdAt: string
 }
@@ -175,4 +177,26 @@ export interface DiscoveryReextractResult {
   processed: number
   updated: number
   stillMissing: number
+}
+
+/** Uma mudança de campo aplicada no "Atualizar" (para o relatório). */
+export interface UpdateChange {
+  docTitle: string
+  target: 'concurso' | 'cargo'
+  cargoRole: string | null
+  label: string
+  oldValue: string | null
+  newValue: string | null
+}
+
+/** Relatório do "Atualizar" de UM concurso (espelha ConcursoUpdateReport). */
+export interface ConcursoUpdateReport {
+  concursoId: string
+  institution: string
+  skipped?: 'encerrado' | 'sem-origem'
+  error?: string
+  docsAdded: number
+  docsAnalyzed: number
+  itemsApplied: number
+  changes: Array<UpdateChange>
 }

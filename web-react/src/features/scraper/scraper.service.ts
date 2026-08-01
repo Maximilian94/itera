@@ -2,6 +2,7 @@ import type {
   AdminConcursoRow,
   AnalyzeDocumentResult,
   CheckConcursoDocumentsResult,
+  ConcursoUpdateReport,
   DiscoveryAddInput,
   DiscoveryAddResult,
   DiscoveryReextractResult,
@@ -156,5 +157,24 @@ export const scraperService = {
       method: 'POST',
       body: JSON.stringify({}),
     })
+  },
+
+  /** "Atualizar": roda Fase 1 + Fase 2 de UM concurso (o front chama em loop). */
+  updateConcurso(concursoId: string): Promise<ConcursoUpdateReport> {
+    return apiFetch<ConcursoUpdateReport>(
+      `${BASE}/concursos/${concursoId}/update`,
+      { method: 'POST', body: JSON.stringify({}) },
+    )
+  },
+
+  /** Encerra/reabre um concurso (botão Fechar/Reabrir). */
+  setConcursoClosed(
+    concursoId: string,
+    closed: boolean,
+  ): Promise<{ id: string; closed: boolean }> {
+    return apiFetch<{ id: string; closed: boolean }>(
+      `${BASE}/concursos/${concursoId}/closed`,
+      { method: 'PATCH', body: JSON.stringify({ closed }) },
+    )
   },
 }

@@ -12,6 +12,7 @@ import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
+  IsBoolean,
   IsEnum,
   IsInt,
   IsOptional,
@@ -25,6 +26,7 @@ import { ScraperService } from './scraper.service';
 import { DocumentScraperService } from './document-scraper.service';
 import { ConcursoDocumentAnalysisService } from './concurso-document-analysis.service';
 import { ConcursoDiscoveryService } from './concurso-discovery.service';
+import { ConcursoUpdateService } from './concurso-update.service';
 
 class TriggerRunDto {
   @IsOptional()
@@ -233,6 +235,12 @@ class DiscoveryAddDto {
   newsUrl: string;
 }
 
+/** Encerra/reabre um concurso (botão Fechar/Reabrir). */
+class SetClosedDto {
+  @IsBoolean()
+  closed: boolean;
+}
+
 @Controller('admin/scraper')
 @Roles('ADMIN')
 export class ScraperController {
@@ -241,7 +249,23 @@ export class ScraperController {
     private readonly documentScraper: DocumentScraperService,
     private readonly documentAnalysis: ConcursoDocumentAnalysisService,
     private readonly discovery: ConcursoDiscoveryService,
+    private readonly concursoUpdate: ConcursoUpdateService,
   ) {}
+
+  /** "Atualizar concursos": roda Fase 1 + Fase 2 em massa (1 concurso/request). */
+  @Post('concursos/:concursoId/update')
+  updateConcurso(@Param('concursoId', ParseUUIDPipe) concursoId: string) {
+    return this.concursoUpdate.updateOne(concursoId);
+  }
+
+  /** Encerra ou reabre um concurso (sai/volta da lista de manutenção). */
+  @Patch('concursos/:concursoId/closed')
+  setConcursoClosed(
+    @Param('concursoId', ParseUUIDPipe) concursoId: string,
+    @Body() dto: SetClosedDto,
+  ) {
+    return this.discovery.setClosed(concursoId, dto.closed);
+  }
 
   /** Listagem admin de todos os concursos (com status e alerta de link). */
   @Get('concursos')

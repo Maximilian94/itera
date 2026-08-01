@@ -53,6 +53,17 @@ export function useDiscoveryReextractMutation() {
   })
 }
 
+export function useSetConcursoClosedMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, closed }: { id: string; closed: boolean }) =>
+      scraperService.setConcursoClosed(id, closed),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+    },
+  })
+}
+
 export function useScraperEntriesQuery() {
   return useQuery({
     queryKey: scraperKeys.entries(),

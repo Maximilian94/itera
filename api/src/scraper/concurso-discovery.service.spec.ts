@@ -1,5 +1,6 @@
 import {
   classifyCandidates,
+  cleanConcursoUrl,
   normalizeInstitution,
   parseCandidates,
   type ExistingConcursoRef,
@@ -64,6 +65,42 @@ describe('normalizeInstitution', () => {
     expect(normalizeInstitution('  Câmara  Municipal- ')).toBe(
       'camara municipal',
     );
+  });
+});
+
+describe('cleanConcursoUrl', () => {
+  it('aceita a página específica do concurso na banca (com caminho)', () => {
+    expect(cleanConcursoUrl('https://www.vunesp.com.br/PMJU2301')).toBe(
+      'https://www.vunesp.com.br/PMJU2301',
+    );
+    expect(
+      cleanConcursoUrl(
+        'https://www.ibamsp-concursos.org.br/site/concursos/municipio/476',
+      ),
+    ).toBe('https://www.ibamsp-concursos.org.br/site/concursos/municipio/476');
+  });
+
+  it('rejeita home "pelada" (prefeitura ou banca) — não tem os editais', () => {
+    expect(cleanConcursoUrl('https://www.vunesp.com.br/')).toBeNull();
+    expect(cleanConcursoUrl('https://www.jundiai.sp.gov.br')).toBeNull();
+    expect(cleanConcursoUrl('https://prefeitura.sp.gov.br/')).toBeNull();
+  });
+
+  it('rejeita agregadores/cursinhos e NOT_FOUND', () => {
+    expect(
+      cleanConcursoUrl('https://www.pciconcursos.com.br/noticias/x'),
+    ).toBeNull();
+    expect(
+      cleanConcursoUrl('https://www.grancursosonline.com.br/x'),
+    ).toBeNull();
+    expect(cleanConcursoUrl('NOT_FOUND')).toBeNull();
+    expect(cleanConcursoUrl(null)).toBeNull();
+  });
+
+  it('tira parâmetros de rastreamento (utm/fbclid)', () => {
+    expect(
+      cleanConcursoUrl('https://banca.org.br/concurso/1?utm_source=x&fbclid=y'),
+    ).toBe('https://banca.org.br/concurso/1');
   });
 });
 

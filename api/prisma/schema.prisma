@@ -236,6 +236,10 @@ model Concurso {
   /// novos concursos" em /admin/gerenciar-concursos). Chave de dedupe idempotente
   /// da busca e do futuro "atualizar concursos".
   pciListingUrl   String?         @unique
+  /// Concurso encerrado/arquivado manualmente pelo admin (botão Fechar em
+  /// /admin/gerenciar-concursos). null = ativo. O "Atualizar concursos" pula os
+  /// fechados, e eles saem da seção "Precisam de atenção".
+  closedAt        DateTime?
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid

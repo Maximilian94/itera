@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { GovernmentScope } from '@prisma/client';
 import * as cheerio from 'cheerio';
@@ -54,6 +59,8 @@ export interface AdminConcursoRow {
   provaCount: number;
   /** true quando não há link oficial nem edital — precisa de captura manual. */
   needsSourceUrl: boolean;
+  /** true quando encerrado manualmente (closedAt) — sai da "atenção". */
+  closed: boolean;
   registrationEnd: string | null;
   createdAt: string;
 }
@@ -105,35 +112,62 @@ Retorne SOMENTE um JSON válido, sem markdown: {"concursoUrl":"..."} (ou {"concu
 - Se a página não tiver um link claramente específico para ESTE concurso (só listas genéricas ou nada que bata), retorne null. NÃO invente URL; use apenas links presentes na página.
 `.trim();
 
-/** Busca web (Responses API + tool web_search) da página oficial do concurso. */
+/** Busca web (Responses API + tool web_search) da PÁGINA DE DOCUMENTOS do concurso. */
 const WEBSEARCH_SYSTEM_PROMPT = `
-Você é um agente especializado em localizar páginas oficiais de concursos públicos brasileiros.
+Você localiza a PÁGINA DE DOCUMENTOS de um concurso público brasileiro específico.
 
-Sua tarefa é encontrar a URL oficial na qual estão publicados o edital, as inscrições, as retificações, os comunicados, os resultados e demais documentos do concurso informado.
+O alvo é UMA URL: a página onde estão PUBLICADOS OS DOCUMENTOS deste concurso — edital de abertura, retificações, anexos, convocações, gabaritos e resultados. É a página de onde um candidato BAIXA os editais.
 
-Objetivo — encontre, NESTA ordem de preferência:
-1. A página específica do concurso no site oficial da BANCA organizadora;
-2. A página específica do concurso no site oficial do ÓRGÃO responsável, quando não houver banca externa;
-3. A página institucional oficial de concursos/processos seletivos/transparência do órgão, somente quando não existir uma página específica identificável.
+O ERRO MAIS COMUM é devolver uma HOME (da prefeitura ou da banca) — EVITE isso a todo custo:
+- Essa página quase SEMPRE fica no site da BANCA ORGANIZADORA (ex.: institutoaocp.org.br, ibfc.org.br, vunesp.com.br, cebraspe.org.br, fgv.br, quadrix.org.br, fundatec.org.br, idecan.org.br, consulplan.net, objetivas.com.br, ibam...), e é uma página ESPECÍFICA daquele concurso (o caminho da URL costuma ter o nome/cidade do órgão, o ano, ou o número do edital).
+- NÃO retorne a HOME da prefeitura/órgão (ex.: "https://www.cidade.sp.gov.br/") — lá NÃO ficam os editais.
+- NÃO retorne a HOME da banca (ex.: "https://www.vunesp.com.br/") — tem que ser a página DAQUELE concurso.
+- NÃO retorne página de notícia, de login, de inscrição genérica, agregador (PCI Concursos, Gran, Estratégia, QConcursos etc.) nem o PDF solto do edital.
+- Uma URL de domínio "pelado" (só o domínio, sem um caminho específico do concurso) é QUASE SEMPRE ERRADA.
+- Só use uma página do site do ÓRGÃO/prefeitura se o próprio órgão for a organizadora E existir ali uma página específica desse concurso com a LISTA de documentos.
 
-Regras obrigatórias:
-- PESQUISE na internet antes de responder.
-- NÃO retorne agregadores, blogs ou portais de notícias como link oficial. NÃO aceite PCI Concursos, Ache Concursos, Concursos no Brasil, Gran Cursos, Estratégia Concursos, Folha Dirigida, JC Concursos, QConcursos, Tec Concursos ou similares (um agregador serve só para descobrir o nome da banca).
-- Prefira domínios da banca organizadora, do órgão público ou portais governamentais.
-- Verifique se a página menciona explicitamente o nome do órgão, o concurso e o ano pesquisado.
-- Não retorne apenas o PDF do edital quando existir uma página principal do concurso.
-- Remova parâmetros de rastreamento (utm_source, utm_campaign, fbclid e semelhantes).
-- NÃO invente uma URL. Se não houver evidência suficiente, use "NOT_FOUND".
-- officialContestUrl deve ser a página que CENTRALIZA as publicações do concurso. Se a banca for externa, organizerUrl aponta para o site oficial da banca; se o próprio órgão organiza, organizerUrl pode ser o domínio institucional do órgão.
+Como agir:
+- PESQUISE na internet. Descubra a banca organizadora e ache a página do concurso no site dela.
+- Confirme que a página menciona o órgão, o concurso e o ano, e que ela LISTA documentos/editais.
+- Remova parâmetros de rastreamento (utm_*, fbclid...).
+- Se você só encontrar HOMEs, ou não achar a página específica que LISTA os documentos, é MELHOR retornar "NOT_FOUND" do que devolver uma home errada. NÃO invente URL.
 
-Responda SOMENTE com um JSON válido, sem markdown, no formato:
+Responda SOMENTE com um JSON válido, sem markdown:
 {"officialContestUrl":"https://...","organizerUrl":"https://..."}
-Use "NOT_FOUND" em qualquer campo sem evidência suficiente.
+- officialContestUrl: a PÁGINA DE DOCUMENTOS específica do concurso na organizadora (resposta principal). "NOT_FOUND" se não achar.
+- organizerUrl: a HOME do site da banca organizadora, se você a identificou (só referência/fallback). "NOT_FOUND" se não souber.
 `.trim();
 
 /** Domínios de agregadores/cursinhos que NUNCA valem como link oficial. */
 const AGGREGATOR_HOST =
   /(pciconcursos|acheconcursos|concursosnobrasil|grancursos|granconcursos|estrategiaconcursos|estrategia|folhadirigida|jcconcursos|qconcursos|tecconcursos|direcaoconcursos|beabadoconcurso|pcimarcas|concursos\.com)/i;
+
+/**
+ * Normaliza um candidato a URL de documentos do concurso: exige http, rejeita
+ * agregadores, tira parâmetros de rastreamento e REJEITA home "pelada" (domínio
+ * sem caminho) — a home da prefeitura/banca não tem os editais. null = descarta.
+ * Função pura (testável).
+ */
+export function cleanConcursoUrl(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!s || s.toUpperCase() === 'NOT_FOUND') return null;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  if (AGGREGATOR_HOST.test(u.hostname)) return null;
+  // Home sem caminho específico do concurso → quase sempre errada.
+  if (u.pathname.replace(/\/+$/, '') === '' && !u.search) return null;
+  for (const key of [...u.searchParams.keys()]) {
+    if (/^(utm_|fbclid$|gclid$|mc_|ref$|ref_)/i.test(key))
+      u.searchParams.delete(key);
+  }
+  return u.toString();
+}
 
 /**
  * Normaliza o nome de uma instituição para casar candidato × base:
@@ -452,10 +486,10 @@ export class ConcursoDiscoveryService {
 
   /**
    * Recorrige EM MASSA o link do concurso de todos os concursos vindos do
-   * pciconcursos (com `pciListingUrl`): faz a BUSCA WEB por concurso (usando os
-   * dados já salvos — órgão/UF/cidade/ano) e regrava `documentsSourceUrl` com a
-   * página oficial (ou null → fica destacado p/ captura manual). É o "corrigir
-   * tudo de uma vez". Sequencial: cada busca web leva alguns segundos.
+   * pciconcursos (com `pciListingUrl`): faz BUSCA WEB + VERIFICAÇÃO por concurso
+   * (usando órgão/UF/cidade/ano salvos) e só regrava `documentsSourceUrl` com um
+   * link CONFIRMADO (que lista documentos); senão limpa p/ captura manual. É o
+   * "corrigir tudo de uma vez". Sequencial e pesado (busca web + raspagem).
    */
   async reextractLinks(): Promise<{
     processed: number;
@@ -476,29 +510,26 @@ export class ConcursoDiscoveryService {
     let updated = 0;
     let stillMissing = 0;
     for (const c of concursos) {
-      const concursoUrl = await this.webSearchConcursoUrl({
+      const found = await this.findVerifiedConcursoLink({
         institution: c.institution,
         uf: c.state,
         city: c.city,
         year: c.year,
       }).catch((err) => {
         this.logger.warn(
-          `reextract busca web falhou (${c.institution}): ${(err as Error).message?.slice(0, 160)}`,
+          `reextract falhou (${c.institution}): ${(err as Error).message?.slice(0, 160)}`,
         );
         return null;
       });
       await this.prisma.concurso.update({
         where: { id: c.id },
         data: {
-          documentsSourceUrl: concursoUrl,
+          documentsSourceUrl: found?.url ?? null,
           documentsCheckedAt: new Date(),
         },
       });
-      if (concursoUrl) updated++;
+      if (found) updated++;
       else stillMissing++;
-      this.logger.log(
-        `reextract ${c.institution}: ${concursoUrl ?? 'sem link do concurso'}`,
-      );
     }
     return { processed: concursos.length, updated, stillMissing };
   }
@@ -518,6 +549,7 @@ export class ConcursoDiscoveryService {
         resultDate: true,
         documentsSourceUrl: true,
         editalUrl: true,
+        closedAt: true,
         createdAt: true,
         _count: { select: { examBases: true } },
       },
@@ -530,30 +562,52 @@ export class ConcursoDiscoveryService {
       past: 2,
     };
 
-    return concursos
-      .map<AdminConcursoRow>((c) => ({
-        id: c.id,
-        slug: c.slug,
-        institution: c.institution,
-        state: c.state,
-        year: c.year,
-        status: deriveConcursoStatus({
-          registrationStart: c.registrationStart,
-          registrationEnd: c.registrationEnd,
-          examDate: c.examDate,
-        }),
-        provaCount: c._count.examBases,
-        // "Sem link do concurso" = falta a página específica na organizadora
-        // (documentsSourceUrl); o edital em PDF sozinho não conta.
-        needsSourceUrl: !c.documentsSourceUrl,
-        registrationEnd: iso(c.registrationEnd),
-        createdAt: c.createdAt.toISOString(),
-      }))
-      .sort(
-        (a, b) =>
-          rank[a.status] - rank[b.status] ||
-          a.institution.localeCompare(b.institution, 'pt-BR'),
-      );
+    return (
+      concursos
+        .map<AdminConcursoRow>((c) => ({
+          id: c.id,
+          slug: c.slug,
+          institution: c.institution,
+          state: c.state,
+          year: c.year,
+          status: deriveConcursoStatus({
+            registrationStart: c.registrationStart,
+            registrationEnd: c.registrationEnd,
+            examDate: c.examDate,
+          }),
+          provaCount: c._count.examBases,
+          // "Sem link do concurso" = falta a página específica na organizadora
+          // (documentsSourceUrl); o edital em PDF sozinho não conta.
+          needsSourceUrl: !c.documentsSourceUrl,
+          closed: c.closedAt != null,
+          registrationEnd: iso(c.registrationEnd),
+          createdAt: c.createdAt.toISOString(),
+        }))
+        // Encerrados vão para o fim; entre os ativos, ordena por status temporal.
+        .sort(
+          (a, b) =>
+            Number(a.closed) - Number(b.closed) ||
+            rank[a.status] - rank[b.status] ||
+            a.institution.localeCompare(b.institution, 'pt-BR'),
+        )
+    );
+  }
+
+  /** Encerra (arquiva) ou reabre um concurso — botão Fechar/Reabrir na lista. */
+  async setClosed(
+    concursoId: string,
+    closed: boolean,
+  ): Promise<{ id: string; closed: boolean }> {
+    const existing = await this.prisma.concurso.findUnique({
+      where: { id: concursoId },
+      select: { id: true },
+    });
+    if (!existing) throw new NotFoundException('concurso não encontrado');
+    await this.prisma.concurso.update({
+      where: { id: concursoId },
+      data: { closedAt: closed ? new Date() : null },
+    });
+    return { id: concursoId, closed };
   }
 
   // ---- helpers ----
@@ -588,32 +642,62 @@ export class ConcursoDiscoveryService {
   }
 
   /**
-   * Acha a página oficial do concurso. Estratégia:
-   *  1) BUSCA WEB (Responses API + tool web_search) — como o ChatGPT faz: acha
-   *     a página específica do concurso na banca/órgão pesquisando na internet;
-   *  2) fallback: se a busca não achar e tivermos o site da banca (do 1º salto),
-   *     raspa o site da banca e a IA procura o link ali dentro.
-   * Best-effort — null quando nada é achado (fica destacado p/ captura manual).
+   * Acha E CONFIRMA a página de documentos do concurso. Só devolve uma URL que
+   * realmente lista documentos do concurso (senão null → captura manual — evita
+   * salvar home de prefeitura/banca, que quebra a Fase 1 do "Atualizar").
    */
   private async resolveConcursoLink(
     extracted: ExtractedNews | null,
     identity: ConcursoIdentity,
   ): Promise<string | null> {
-    const viaWeb = await this.webSearchConcursoUrl(identity).catch((err) => {
-      this.logger.warn(
-        `busca web falhou (${identity.institution}): ${(err as Error).message?.slice(0, 160)}`,
-      );
-      return null;
-    });
-    if (viaWeb) return viaWeb;
-
-    return this.findConcursoLinkOnBanca(extracted?.bancaUrl ?? null, identity);
+    const found = await this.findVerifiedConcursoLink(identity, extracted);
+    return found?.url ?? null;
   }
 
-  /** Busca web da página oficial (OpenAI Responses API + web_search_preview). */
-  private async webSearchConcursoUrl(
+  /**
+   * Busca web (várias candidatas) + VERIFICAÇÃO: raspa cada candidata e só
+   * aceita a que de fato lista documentos do concurso. Ordem: página específica
+   * (officialContestUrl) → home da banca (organizerUrl) → link achado no site da
+   * banca (1º salto). Devolve a 1ª confirmada, ou null.
+   */
+  private async findVerifiedConcursoLink(
     identity: ConcursoIdentity,
-  ): Promise<string | null> {
+    extracted: ExtractedNews | null = null,
+  ): Promise<{ url: string; docCount: number } | null> {
+    const candidates = await this.webSearchConcursoCandidates(identity).catch(
+      (err) => {
+        this.logger.warn(
+          `busca web falhou (${identity.institution}): ${(err as Error).message?.slice(0, 160)}`,
+        );
+        return [] as string[];
+      },
+    );
+    // Fallback: a página do concurso achada raspando o site da banca (1º salto).
+    const viaBanca = await this.findConcursoLinkOnBanca(
+      extracted?.bancaUrl ?? null,
+      identity,
+    );
+    if (viaBanca && !candidates.includes(viaBanca)) candidates.push(viaBanca);
+
+    for (const url of candidates) {
+      const docCount = await this.countConcursoDocsAt(url);
+      if (docCount > 0) {
+        this.logger.log(
+          `link confirmado (${identity.institution}): ${url} — ${docCount} doc(s)`,
+        );
+        return { url, docCount };
+      }
+      this.logger.log(
+        `link rejeitado — sem documentos (${identity.institution}): ${url}`,
+      );
+    }
+    return null;
+  }
+
+  /** Busca web → candidatas (página do concurso + home da banca), limpas/dedup. */
+  private async webSearchConcursoCandidates(
+    identity: ConcursoIdentity,
+  ): Promise<string[]> {
     const local =
       [identity.city, identity.uf].filter(Boolean).join(' / ') ||
       'não informado';
@@ -626,13 +710,32 @@ export class ConcursoDiscoveryService {
     ].join('\n');
 
     const text = await this.callOpenAiWebSearch(WEBSEARCH_SYSTEM_PROMPT, input);
-    if (!text) return null;
+    if (!text) return [];
     const raw = parseJsonLoose(text);
-    if (!raw) return null;
-    return (
-      this.cleanOfficialUrl(raw.officialContestUrl) ??
-      this.cleanOfficialUrl(raw.organizerUrl)
-    );
+    if (!raw) return [];
+    const out: string[] = [];
+    const primary = this.cleanOfficialUrl(raw.officialContestUrl);
+    if (primary) out.push(primary);
+    const fallback = this.cleanOfficialUrl(raw.organizerUrl);
+    if (fallback && !out.includes(fallback)) out.push(fallback);
+    return out;
+  }
+
+  /**
+   * Confirma que a URL é uma PÁGINA DE DOCUMENTOS do concurso: raspa a página e
+   * conta os documentos (a IA do scraper já descarta navegação/menu). Home de
+   * prefeitura/banca → ~0. Best-effort (bloqueio/erro → 0 = rejeita).
+   */
+  private async countConcursoDocsAt(url: string): Promise<number> {
+    try {
+      const res = await this.docScraper.scrapeDocuments(url);
+      return res.documents.filter((d) => d.url).length;
+    } catch (err) {
+      this.logger.warn(
+        `verificação do link falhou (${url}): ${(err as Error).message?.slice(0, 120)}`,
+      );
+      return 0;
+    }
   }
 
   /** Fallback do 1º salto: raspa o site da banca e procura o link ali dentro. */
@@ -656,24 +759,8 @@ export class ConcursoDiscoveryService {
     return this.resolveExternalUrl(raw.concursoUrl, bancaUrl);
   }
 
-  /** Normaliza um candidato a URL oficial: http, não-agregador, sem tracking. */
   private cleanOfficialUrl(v: unknown): string | null {
-    if (typeof v !== 'string') return null;
-    const s = v.trim();
-    if (!s || s.toUpperCase() === 'NOT_FOUND') return null;
-    let u: URL;
-    try {
-      u = new URL(s);
-    } catch {
-      return null;
-    }
-    if (!/^https?:$/.test(u.protocol)) return null;
-    if (AGGREGATOR_HOST.test(u.hostname)) return null;
-    for (const key of [...u.searchParams.keys()]) {
-      if (/^(utm_|fbclid$|gclid$|mc_|ref$|ref_)/i.test(key))
-        u.searchParams.delete(key);
-    }
-    return u.toString();
+    return cleanConcursoUrl(v);
   }
 
   /**

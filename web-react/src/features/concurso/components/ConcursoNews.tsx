@@ -2,6 +2,7 @@ import { useState } from 'react'
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  ClipboardDocumentIcon,
   NewspaperIcon,
 } from '@heroicons/react/24/outline'
 import { CARD } from './card'
@@ -288,18 +289,80 @@ function NewsAdminBar({
               : 'Nunca verificado.'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => runCheck()}
-          disabled={busy}
-          className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
-        >
-          <ArrowPathIcon
-            className={`h-4 w-4 ${check.isPending ? 'animate-spin' : ''}`}
-          />
-          {check.isPending ? 'Verificando…' : 'Verificar novas publicações'}
-        </button>
+        {/* Dois caminhos sempre à mão: raspar a origem (padrão) ou colar o HTML.
+         *  Sites com Cloudflare barram a raspagem — o admin que já sabe disso
+         *  pula direto a cascata anti-bot em vez de esperar ela falhar. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowPaste((v) => !v)}
+            aria-expanded={showPaste}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
+          >
+            <ClipboardDocumentIcon className="h-4 w-4" />
+            Colar HTML
+          </button>
+          <button
+            type="button"
+            onClick={() => runCheck()}
+            disabled={busy}
+            className="inline-flex items-center gap-2 rounded-lg bg-cyan-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 disabled:cursor-wait disabled:opacity-70"
+          >
+            <ArrowPathIcon
+              className={`h-4 w-4 ${check.isPending ? 'animate-spin' : ''}`}
+            />
+            {check.isPending ? 'Verificando…' : 'Verificar novas publicações'}
+          </button>
+        </div>
       </div>
+
+      {/* Caminho alternativo permanente: a IA extrai do HTML colado igual. */}
+      {showPaste && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm font-semibold text-slate-800">
+            Verificar pelo HTML da página
+          </p>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Use quando o site bloqueia o acesso automático (Cloudflare e afins).
+          </p>
+          <div className="mt-2 flex flex-col gap-2">
+            <ol className="ml-4 list-decimal space-y-0.5 text-xs text-slate-600">
+              <li>
+                Abra a página oficial da organizadora e passe o desafio
+                anti-robô.
+              </li>
+              <li>Veja o código-fonte (Ctrl+U / Cmd+Opt+U) e copie tudo.</li>
+              <li>Cole abaixo e verifique.</li>
+            </ol>
+            {sourceUrl != null && (
+              <a
+                href={sourceUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 no-underline hover:bg-slate-100"
+              >
+                <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
+                Abrir página oficial em nova aba
+              </a>
+            )}
+            <textarea
+              value={html}
+              onChange={(ev) => setHtml(ev.target.value)}
+              placeholder="Cole aqui o código-fonte da página (Ctrl+U → Ctrl+A → Ctrl+C)"
+              rows={5}
+              className="w-full rounded-lg border border-slate-300 p-2 font-mono text-xs text-slate-700 focus:border-cyan-500 focus:outline-none"
+            />
+            <button
+              type="button"
+              onClick={() => runCheck({ html })}
+              disabled={busy || html.trim() === ''}
+              className="self-end rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
+            >
+              Verificar pelo HTML colado
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Sucesso ao adicionar */}
       {add.isSuccess && (
@@ -312,54 +375,18 @@ function NewsAdminBar({
         </p>
       )}
 
-      {/* Erro na verificação → oferece colar HTML (Cloudflare) */}
+      {/* Erro na verificação → aponta para o painel de colar HTML (Cloudflare) */}
       {checkError != null && (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
           <p className="text-sm text-amber-800">{checkError}</p>
-          <button
-            type="button"
-            onClick={() => setShowPaste((v) => !v)}
-            className="mt-1 text-xs font-semibold text-amber-900 underline"
-          >
-            {showPaste ? 'Ocultar' : 'A página bloqueou? Cole o HTML manualmente'}
-          </button>
-          {showPaste && (
-            <div className="mt-2 flex flex-col gap-2">
-              <ol className="ml-4 list-decimal text-xs text-amber-800 space-y-0.5">
-                <li>
-                  Abra a página oficial da organizadora e passe o desafio
-                  anti-robô.
-                </li>
-                <li>Veja o código-fonte (Ctrl+U / Cmd+Opt+U) e copie tudo.</li>
-                <li>Cole abaixo e verifique.</li>
-              </ol>
-              {sourceUrl != null && (
-                <a
-                  href={sourceUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900 no-underline hover:bg-amber-100"
-                >
-                  <ArrowTopRightOnSquareIcon className="h-3.5 w-3.5" />
-                  Abrir página oficial em nova aba
-                </a>
-              )}
-              <textarea
-                value={html}
-                onChange={(ev) => setHtml(ev.target.value)}
-                placeholder="Cole aqui o código-fonte da página (Ctrl+U → Ctrl+A → Ctrl+C)"
-                rows={5}
-                className="w-full rounded-lg border border-slate-300 p-2 text-xs font-mono text-slate-700 focus:border-cyan-500 focus:outline-none"
-              />
-              <button
-                type="button"
-                onClick={() => runCheck({ html })}
-                disabled={busy || html.trim() === ''}
-                className="self-end rounded-lg bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-900 disabled:opacity-50"
-              >
-                Verificar pelo HTML colado
-              </button>
-            </div>
+          {!showPaste && (
+            <button
+              type="button"
+              onClick={() => setShowPaste(true)}
+              className="mt-1 text-xs font-semibold text-amber-900 underline"
+            >
+              A página bloqueou? Cole o HTML manualmente
+            </button>
           )}
         </div>
       )}

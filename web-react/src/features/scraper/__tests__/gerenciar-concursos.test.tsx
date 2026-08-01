@@ -25,6 +25,7 @@ import { Route as GerenciarRouteImport } from '@/routes/_authenticated/admin/ger
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   document.body.innerHTML = ''
 })
 
@@ -75,6 +76,7 @@ const ROWS: Array<AdminConcursoRow> = [
     status: 'open',
     provaCount: 0,
     needsSourceUrl: true,
+    closed: false,
     registrationEnd: '2026-08-01',
     createdAt: '2026-07-10T00:00:00.000Z',
   },
@@ -87,6 +89,7 @@ const ROWS: Array<AdminConcursoRow> = [
     status: 'past',
     provaCount: 2,
     needsSourceUrl: false,
+    closed: false,
     registrationEnd: null,
     createdAt: '2023-01-10T00:00:00.000Z',
   },
@@ -168,6 +171,80 @@ describe('gerenciar concursos (admin)', () => {
     // Add lazy sem link oficial → destaque para captura manual.
     expect(
       await screen.findByText(/sem link oficial — pegar manual/),
+    ).toBeTruthy()
+  })
+
+  it('Atualizar concursos: roda o loop e mostra o relatório', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockAll({
+      '/admin/scraper/concursos/c-santos/update': {
+        body: {
+          concursoId: 'c-santos',
+          institution: 'Prefeitura de Santos',
+          docsAdded: 2,
+          docsAnalyzed: 1,
+          itemsApplied: 1,
+          changes: [
+            {
+              docTitle: 'Retificação 1',
+              target: 'concurso',
+              cargoRole: null,
+              label: 'Fim das inscrições',
+              oldValue: '2026-08-01',
+              newValue: '2026-08-15',
+            },
+          ],
+        },
+      },
+      '/admin/scraper/concursos/c-govsp/update': {
+        body: {
+          concursoId: 'c-govsp',
+          institution: 'Governo de São Paulo',
+          docsAdded: 0,
+          docsAnalyzed: 0,
+          itemsApplied: 0,
+          changes: [],
+        },
+      },
+    })
+    renderPage()
+
+    // Espera a listagem carregar (o loop lê concursosQuery.data no clique).
+    await screen.findByText('Prefeitura de Santos')
+    fireEvent.click(screen.getByRole('button', { name: /Atualizar concursos/ }))
+
+    // Relatório final: Santos com +2 docs e a mudança antigo → novo.
+    expect(await screen.findByText(/\+2 doc/)).toBeTruthy()
+    expect(screen.getByText(/Fim das inscrições:/)).toBeTruthy()
+    expect(screen.getByText('2026-08-15')).toBeTruthy()
+  })
+
+  it('concurso encerrado mostra "Encerrado" e botão Reabrir, em Concluídos', async () => {
+    mockAll({
+      [LIST]: {
+        body: [
+          {
+            id: 'c-closed',
+            slug: null,
+            institution: 'Prefeitura Fechada',
+            state: 'BA',
+            year: 2026,
+            status: 'open',
+            provaCount: 0,
+            needsSourceUrl: false,
+            closed: true,
+            registrationEnd: null,
+            createdAt: '2026-07-01T00:00:00.000Z',
+          },
+        ] satisfies Array<AdminConcursoRow>,
+      },
+    })
+    renderPage()
+
+    expect(await screen.findByText('Prefeitura Fechada')).toBeTruthy()
+    expect(screen.getByText('Encerrado')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /Reabrir Prefeitura Fechada/ }),
     ).toBeTruthy()
   })
 })

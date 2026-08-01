@@ -1,9 +1,13 @@
 import { Link, createFileRoute, redirect } from '@tanstack/react-router'
 import { useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@mui/material'
 import {
+  ArchiveBoxIcon,
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowUturnLeftIcon,
+  CloudArrowDownIcon,
   ExclamationTriangleIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
@@ -11,15 +15,19 @@ import {
 import type {
   AdminConcursoRow,
   ConcursoStatus,
+  ConcursoUpdateReport,
   DiscoveryCandidate,
 } from '@/features/scraper/scraper.types'
 import { authService } from '@/features/auth/services/auth.service'
 import {
+  scraperKeys,
   useAdminConcursosQuery,
   useDiscoveryAddMutation,
   useDiscoveryReextractMutation,
   useDiscoverySearchMutation,
+  useSetConcursoClosedMutation,
 } from '@/features/scraper/scraper.queries'
+import { scraperService } from '@/features/scraper/scraper.service'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { ApiError } from '@/lib/api'
 
@@ -44,7 +52,16 @@ const STATUS_LABEL: Record<ConcursoStatus, string> = {
 /** Estado do add por candidato (chaveado pela URL da notícia). */
 type AddState = 'adding' | 'done' | 'done-nolink' | 'error'
 
+/** Progresso do "Atualizar concursos" em massa (loop sequencial no front). */
+type UpdatePhase = {
+  running: boolean
+  done: number
+  total: number
+  current: string | null
+}
+
 function GerenciarConcursosPage() {
+  const queryClient = useQueryClient()
   const concursosQuery = useAdminConcursosQuery()
   const searchMutation = useDiscoverySearchMutation()
   const addMutation = useDiscoveryAddMutation()
@@ -54,6 +71,16 @@ function GerenciarConcursosPage() {
   const [addState, setAddState] = useState<
     Record<string, AddState | undefined>
   >({})
+
+  const [updatePhase, setUpdatePhase] = useState<UpdatePhase>({
+    running: false,
+    done: 0,
+    total: 0,
+    current: null,
+  })
+  const [updateReports, setUpdateReports] = useState<Array<ConcursoUpdateReport>>(
+    [],
+  )
 
   const candidates = searchMutation.data?.candidates ?? []
 
@@ -108,6 +135,47 @@ function GerenciarConcursosPage() {
     }
   }
 
+  const handleUpdate = async () => {
+    if (updatePhase.running) return
+    const targets = (concursosQuery.data ?? []).filter((r) => !r.closed)
+    if (targets.length === 0) {
+      window.alert('Nenhum concurso ativo para atualizar.')
+      return
+    }
+    if (
+      !window.confirm(
+        `Atualizar ${targets.length} concursos ativos? Para cada um: adiciona os documentos novos nas Notícias e aplica automaticamente as mudanças detectadas (Fase 1 + Fase 2). Pode levar bastante tempo.`,
+      )
+    )
+      return
+
+    setUpdateReports([])
+    setUpdatePhase({ running: true, done: 0, total: targets.length, current: null })
+    const reports: Array<ConcursoUpdateReport> = []
+    for (const t of targets) {
+      // Sequencial, 1 request por concurso (cada um raspa + lê PDFs com IA).
+      setUpdatePhase((p) => ({ ...p, current: t.institution }))
+      try {
+        reports.push(await scraperService.updateConcurso(t.id))
+      } catch (err) {
+        reports.push({
+          concursoId: t.id,
+          institution: t.institution,
+          docsAdded: 0,
+          docsAnalyzed: 0,
+          itemsApplied: 0,
+          changes: [],
+          error: err instanceof ApiError ? err.message : 'Erro inesperado.',
+        })
+      }
+      setUpdatePhase((p) => ({ ...p, done: p.done + 1 }))
+    }
+    setUpdateReports(reports)
+    setUpdatePhase((p) => ({ ...p, running: false, current: null }))
+    void queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+    void queryClient.invalidateQueries({ queryKey: ['concurso'] })
+  }
+
   const searchError = searchMutation.error
     ? searchMutation.error instanceof ApiError
       ? searchMutation.error.message
@@ -117,8 +185,13 @@ function GerenciarConcursosPage() {
   const { attention, concluded } = useMemo(() => {
     const rows = concursosQuery.data ?? []
     return {
-      attention: rows.filter((r) => r.status !== 'past' || r.needsSourceUrl),
-      concluded: rows.filter((r) => r.status === 'past' && !r.needsSourceUrl),
+      // Encerrados (closed) saem da atenção e vão para "Concluídos".
+      attention: rows.filter(
+        (r) => !r.closed && (r.status !== 'past' || r.needsSourceUrl),
+      ),
+      concluded: rows.filter(
+        (r) => r.closed || (r.status === 'past' && !r.needsSourceUrl),
+      ),
     }
   }, [concursosQuery.data])
 
@@ -158,14 +231,30 @@ function GerenciarConcursosPage() {
           </Button>
           <Button
             variant="outlined"
-            disabled
-            title="Em breve"
-            aria-label="Atualizar concursos (em breve)"
+            startIcon={<CloudArrowDownIcon className="size-4" />}
+            onClick={handleUpdate}
+            disabled={updatePhase.running}
+            title="Para cada concurso ativo: adiciona documentos novos nas Notícias e aplica as mudanças detectadas (Fase 1 + 2)"
           >
-            Atualizar concursos
+            {updatePhase.running ? 'Atualizando...' : 'Atualizar concursos'}
           </Button>
         </div>
       </div>
+
+      {/* Progresso + relatório do "Atualizar concursos" */}
+      {updatePhase.running && (
+        <div className="animate-pulse rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-700">
+          Atualizando {updatePhase.done + 1}/{updatePhase.total}
+          {updatePhase.current ? ` — ${updatePhase.current}` : ''}: adicionando
+          documentos novos e aplicando mudanças...
+        </div>
+      )}
+      {!updatePhase.running && updateReports.length > 0 && (
+        <UpdateReportPanel
+          reports={updateReports}
+          onClose={() => setUpdateReports([])}
+        />
+      )}
 
       {/* Feedback do "recorrigir links" em massa */}
       {reextractMutation.isPending && (
@@ -441,8 +530,13 @@ function ConcursoSection({
 }
 
 function ConcursoRow({ row }: { row: AdminConcursoRow }) {
+  const closeMutation = useSetConcursoClosedMutation()
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50">
+    <li
+      className={`flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 hover:bg-slate-50 ${
+        row.closed ? 'opacity-60' : ''
+      }`}
+    >
       <div className="flex min-w-0 items-center gap-2">
         <Link
           to="/concursos/$concursoSlug"
@@ -465,13 +559,19 @@ function ConcursoRow({ row }: { row: AdminConcursoRow }) {
       </div>
 
       <div className="flex shrink-0 items-center gap-3">
-        {row.needsSourceUrl && (
+        {!row.closed && row.needsSourceUrl && (
           <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
             <ExclamationTriangleIcon className="size-3.5" />
             sem link oficial
           </span>
         )}
-        <StatusPill status={row.status} label={STATUS_LABEL[row.status]} />
+        {row.closed ? (
+          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
+            Encerrado
+          </span>
+        ) : (
+          <StatusPill status={row.status} label={STATUS_LABEL[row.status]} />
+        )}
         <Link
           to="/admin/editar-concurso/$concursoId"
           params={{ concursoId: row.id }}
@@ -481,7 +581,111 @@ function ConcursoRow({ row }: { row: AdminConcursoRow }) {
           <PencilSquareIcon className="size-4" />
           Editar
         </Link>
+        <button
+          type="button"
+          onClick={() =>
+            closeMutation.mutate({ id: row.id, closed: !row.closed })
+          }
+          disabled={closeMutation.isPending}
+          aria-label={`${row.closed ? 'Reabrir' : 'Fechar'} ${row.institution}`}
+          className="inline-flex items-center gap-1 text-xs text-slate-500 hover:text-cyan-700 disabled:opacity-50"
+        >
+          {row.closed ? (
+            <>
+              <ArrowUturnLeftIcon className="size-4" />
+              Reabrir
+            </>
+          ) : (
+            <>
+              <ArchiveBoxIcon className="size-4" />
+              Fechar
+            </>
+          )}
+        </button>
       </div>
     </li>
+  )
+}
+
+/** Relatório do "Atualizar concursos": totais + concursos com mudanças/erros. */
+function UpdateReportPanel({
+  reports,
+  onClose,
+}: {
+  reports: Array<ConcursoUpdateReport>
+  onClose: () => void
+}) {
+  const totalDocs = reports.reduce((s, r) => s + r.docsAdded, 0)
+  const totalChanges = reports.reduce((s, r) => s + r.changes.length, 0)
+  // Só mostra os concursos que tiveram algo (doc novo, mudança, erro ou skip).
+  const notable = reports.filter(
+    (r) => r.docsAdded > 0 || r.changes.length > 0 || r.error || r.skipped,
+  )
+
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-4">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium text-emerald-900">
+          Atualização concluída: <strong>{reports.length}</strong> concursos ·{' '}
+          <strong>{totalDocs}</strong> documentos adicionados ·{' '}
+          <strong>{totalChanges}</strong> campos alterados
+        </p>
+        <button
+          type="button"
+          onClick={onClose}
+          className="text-xs text-slate-400 hover:text-slate-600"
+        >
+          fechar
+        </button>
+      </div>
+      {notable.length > 0 && (
+        <ul className="mt-3 flex flex-col gap-2">
+          {notable.map((r) => (
+            <li
+              key={r.concursoId}
+              className="rounded-md border border-emerald-100 bg-white px-3 py-2 text-sm"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-slate-800">
+                  {r.institution}
+                </span>
+                {r.docsAdded > 0 && (
+                  <span className="rounded bg-cyan-50 px-1.5 py-0.5 text-xs text-cyan-700">
+                    +{r.docsAdded} doc{r.docsAdded > 1 ? 's' : ''}
+                  </span>
+                )}
+                {r.skipped && (
+                  <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
+                    {r.skipped === 'encerrado' ? 'encerrado' : 'sem página de origem'}
+                  </span>
+                )}
+                {r.error && (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-700">
+                    <ExclamationTriangleIcon className="size-3.5" />
+                    {r.error}
+                  </span>
+                )}
+              </div>
+              {r.changes.length > 0 && (
+                <ul className="mt-1 flex flex-col gap-0.5">
+                  {r.changes.map((c, i) => (
+                    <li key={i} className="text-xs text-slate-600">
+                      <span className="text-slate-400">
+                        {c.cargoRole ? `${c.cargoRole} · ` : ''}
+                        {c.label}:
+                      </span>{' '}
+                      <span className="text-slate-400 line-through">
+                        {c.oldValue ?? '—'}
+                      </span>{' '}
+                      → <span className="font-medium">{c.newValue ?? '—'}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
