@@ -221,7 +221,7 @@ export class ConcursoDocumentAnalysisService {
   ): Promise<AnalyzeResult> {
     const doc = await this.prisma.concursoDocument.findFirst({
       where: { id: documentId, concursoId },
-      select: { id: true, url: true, title: true },
+      select: { id: true, url: true, title: true, kind: true },
     });
     if (!doc) throw new NotFoundException('documento não encontrado');
 
@@ -230,6 +230,17 @@ export class ConcursoDocumentAnalysisService {
 
     const parsed = await this.callOpenAI(text, concurso.snapshotJson);
     const changes = this.buildChanges(parsed, concurso);
+
+    // Edital de abertura → análise COMPLETA da ficha: o prompt de diff só
+    // reporta "alterações explícitas" (linguagem de retificação) e não
+    // transcreve textos longos, então um edital de abertura analisado pela
+    // timeline (concurso criado via descoberta, sem extração do edital) nunca
+    // preenchia requisitos/atribuições. Aqui a transcrição literal roda pelo
+    // MESMO extrator focado da criação do concurso e entra como mudança
+    // proposta normal (sobrescrita passa pela revisão do admin como as demais).
+    if (doc.kind === 'EDITAL_ABERTURA') {
+      await this.proposeFichasFromEdital(text, concurso, changes);
+    }
 
     // Cronograma proposto: etapas datadas extraídas do PDF. Só entra quando o
     // documento traz um cronograma E ele difere do atual.
@@ -348,6 +359,55 @@ export class ConcursoDocumentAnalysisService {
   }
 
   // ── internals ──────────────────────────────────────────────────────────
+
+  /**
+   * Análise completa da ficha (só p/ EDITAL_ABERTURA): transcreve requisitos e
+   * atribuições dos cargos de enfermagem com o extrator literal da criação do
+   * concurso e mescla o resultado em `changes` (a transcrição literal vence a
+   * versão que o prompt de diff porventura tenha emitido p/ o mesmo campo).
+   */
+  private async proposeFichasFromEdital(
+    text: string,
+    ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
+    changes: ProposedChange[],
+  ): Promise<void> {
+    const nursing = [...ctx.cargosByRole.values()].filter(
+      (c) => c.isNursingRelevant,
+    );
+    if (nursing.length === 0) return;
+    const fichas = await this.examBaseAi
+      .extractFichasLiterais(
+        text,
+        nursing.map((c) => c.role),
+      )
+      .catch(() => []);
+    const FIELDS = ['requirements', 'description'] as const;
+    for (const ficha of fichas) {
+      const cargo = ctx.cargosByRole.get(ficha.role.toLowerCase());
+      if (!cargo?.isNursingRelevant) continue;
+      for (const field of FIELDS) {
+        const newValue = ficha[field];
+        if (!newValue) continue;
+        const current = cargo[field] ?? null;
+        if (newValue === current) continue;
+        const id = `cargo:${cargo.id}:${field}`;
+        const change: ProposedChange = {
+          id,
+          target: 'cargo',
+          cargoId: cargo.id,
+          cargoRole: cargo.role,
+          field,
+          label: CARGO_FIELDS[field].label,
+          currentValue: current,
+          newValue,
+          evidence: 'Transcrição literal do edital de abertura.',
+        };
+        const existing = changes.findIndex((c) => c.id === id);
+        if (existing >= 0) changes[existing] = change;
+        else changes.push(change);
+      }
+    }
+  }
 
   private async applyOne(
     concursoId: string,
