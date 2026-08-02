@@ -8,7 +8,6 @@ import {
   BuildingLibraryIcon,
   CalendarDaysIcon,
   ChevronLeftIcon,
-  ClockIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
   PencilSquareIcon,
@@ -226,8 +225,7 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
   const timelineSteps = hasEtapas
     ? buildEtapaTimelineSteps(etapas)
     : buildConcursoTimelineSteps(timeline, status)
-  const hasTimeline = hasEtapas || timelineSteps.some((s) => s.date != null)
-  const registrationDaysLeft = daysUntil(timeline.registrationEnd)
+  const hasTimeline = hasEtapas || timelineSteps.some((s) => s.startIso != null)
 
   return (
     <>
@@ -334,21 +332,12 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
               {...{ style: enter(3).style }}
               className={`${enter(3).className} ${CARD} p-5`}
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 id="cronograma-heading" className="text-sm font-bold text-slate-900">
-                  Cronograma
-                </h2>
-                {status === 'open' &&
-                  registrationDaysLeft != null &&
-                  registrationDaysLeft >= 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                      <ClockIcon className="h-3.5 w-3.5" />
-                      {registrationDaysLeft === 0 ? 'hoje' : dias(registrationDaysLeft)}
-                    </span>
-                  )}
-              </div>
+              <h2 id="cronograma-heading" className="text-sm font-bold text-slate-900">
+                Cronograma
+              </h2>
               {/* Etapas do edital são o cronograma (sem data → "A definir");
-                  sem etapas, o derivado (inscrições/prova/resultado). */}
+                  sem etapas, o derivado (inscrições/prova/resultado). A
+                  contagem regressiva mora no marco corrente da timeline. */}
               <VerticalTimeline steps={timelineSteps} keepUndated={hasEtapas} />
             </section>
           )}

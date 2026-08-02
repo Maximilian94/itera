@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AcademicCapIcon, BanknotesIcon } from '@heroicons/react/24/outline'
 import { FichaCard } from './FichaCard'
 import { ReadinessBar } from './ReadinessBar'
@@ -10,6 +10,9 @@ import { SubjectDistribution, accuracyChipClass } from './SubjectDistribution'
 import {
   VerticalTimeline,
   buildConcursoTimelineSteps,
+  buildEtapaTimelineSteps,
+  condenseEtapas,
+  isEtapaMajor,
 } from './VerticalTimeline'
 import type { SubjectDistribution as SubjectDistributionData } from '../domain/concurso.types'
 
@@ -126,18 +129,251 @@ describe('FichaCard', () => {
 })
 
 describe('VerticalTimeline', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('esconde etapas com data null', () => {
     const { container } = render(
       <VerticalTimeline
         steps={[
-          { label: 'Inscrições', date: '02/06 a 30/06', state: 'done' },
-          { label: 'Prova objetiva', date: null, state: 'upcoming' },
-          { label: 'Resultado final', date: '30/09/2026', state: 'upcoming' },
+          {
+            label: 'Inscrições',
+            startIso: '2026-06-02',
+            endIso: '2026-06-30',
+            state: 'done',
+          },
+          { label: 'Prova objetiva', startIso: null, state: 'upcoming' },
+          { label: 'Resultado final', startIso: '2026-09-30', state: 'upcoming' },
         ]}
       />,
     )
     expect(container.querySelectorAll('ol li')).toHaveLength(2)
     expect(screen.queryByText('Prova objetiva')).toBeNull()
+  })
+
+  it('colapsa etapas burocráticas atrás de "Ver cronograma completo"', () => {
+    const { container } = render(
+      <VerticalTimeline
+        steps={[
+          {
+            label: 'Inscrições',
+            startIso: '2026-07-27',
+            endIso: '2026-08-17',
+            state: 'current',
+          },
+          {
+            label: 'Data limite para pagamento do boleto',
+            startIso: '2026-08-17',
+            state: 'upcoming',
+            major: false,
+          },
+          { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'upcoming' },
+        ]}
+        keepUndated
+      />,
+    )
+    // Colapsado: só os marcos.
+    expect(container.querySelectorAll('ol li')).toHaveLength(2)
+    expect(screen.queryByText('Data limite para pagamento do boleto')).toBeNull()
+
+    const toggle = screen.getByRole('button', {
+      name: 'Ver cronograma completo (3 etapas)',
+    })
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    fireEvent.click(toggle)
+
+    expect(container.querySelectorAll('ol li')).toHaveLength(3)
+    expect(screen.getByText('Data limite para pagamento do boleto')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Mostrar só os marcos' })).toBeTruthy()
+  })
+
+  it('etapa corrente aparece mesmo sendo burocrática; sem escondidas não há botão', () => {
+    render(
+      <VerticalTimeline
+        steps={[
+          {
+            label: 'Prazo de recursos do gabarito',
+            startIso: '2026-09-08',
+            state: 'current',
+            major: false,
+          },
+          { label: 'Prova Prática', startIso: '2026-10-04', state: 'upcoming' },
+        ]}
+        keepUndated
+      />,
+    )
+    expect(screen.getByText('Prazo de recursos do gabarito')).toBeTruthy()
+    expect(screen.queryByRole('button')).toBeNull()
+  })
+
+  it('bloco-calendário ancora a data e o marco corrente mostra a contagem regressiva', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-02T12:00:00Z'))
+    render(
+      <VerticalTimeline
+        steps={[
+          {
+            label: 'Publicação do edital',
+            startIso: '2026-07-20',
+            state: 'done',
+          },
+          {
+            label: 'Inscrições',
+            startIso: '2026-07-27',
+            endIso: '2026-08-17',
+            state: 'current',
+          },
+          { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'upcoming' },
+        ]}
+      />,
+    )
+    // Bloco-calendário: dia + mês abreviado do início da etapa.
+    expect(screen.getByText('27')).toBeTruthy()
+    expect(screen.getAllByText('jul')).toHaveLength(2) // 20/jul e 27/jul
+    expect(screen.getByText('06')).toBeTruthy()
+    expect(screen.getByText('set')).toBeTruthy()
+    // Intervalo: o fim aparece como meta abaixo do rótulo.
+    expect(screen.getByText('até 17/08/2026')).toBeTruthy()
+    // Contagem regressiva só no marco corrente (17/08 - 02/08 = 15 dias).
+    expect(screen.getByText('termina em 15 dias')).toBeTruthy()
+  })
+
+  it('sem contagem regressiva fora do corrente; pontual corrente usa "em N dias"', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-01T12:00:00Z'))
+    render(
+      <VerticalTimeline
+        steps={[
+          { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'current' },
+          { label: 'Resultado final', startIso: '2026-10-23', state: 'upcoming' },
+        ]}
+      />,
+    )
+    expect(screen.getByText('em 5 dias')).toBeTruthy()
+    expect(screen.queryByText(/em 52 dias/)).toBeNull()
+  })
+})
+
+describe('isEtapaMajor', () => {
+  it('marca os marcos do certame', () => {
+    expect(isEtapaMajor('Inscrições')).toBe(true)
+    expect(isEtapaMajor('Prova Objetiva')).toBe(true)
+    expect(isEtapaMajor('Realização da prova prática')).toBe(true)
+    expect(isEtapaMajor('Divulgação de gabarito das provas objetivas')).toBe(true)
+    // Homologação final vence a regra de "retificação".
+    expect(
+      isEtapaMajor(
+        'Publicação da retificação e/ou homologação da classificação final e HOMOLOGAÇÃO do Concurso Público',
+      ),
+    ).toBe(true)
+  })
+
+  it('rebaixa a burocracia (recursos, boletos, retificações, notas)', () => {
+    expect(isEtapaMajor('Publicação do Edital')).toBe(false)
+    expect(
+      isEtapaMajor('Data limite para pagamento do boleto da taxa de inscrição'),
+    ).toBe(false)
+    expect(isEtapaMajor('Divulgação da relação de candidatos inscritos')).toBe(false)
+    expect(
+      isEtapaMajor('Prazo de recursos em relação ao gabarito das provas objetivas'),
+    ).toBe(false)
+    expect(isEtapaMajor('Divulgação da Nota da Prova Prática')).toBe(false)
+    expect(
+      isEtapaMajor(
+        'Homologação da nota da prova objetiva e dos títulos e convocação para a prova prática',
+      ),
+    ).toBe(false)
+  })
+})
+
+describe('condenseEtapas', () => {
+  it('funde pares "— início"/"— fim" num intervalo único', () => {
+    const out = condenseEtapas([
+      { name: 'Inscrições — início', description: null, date: '2026-07-27' },
+      { name: 'Inscrições — fim', description: null, date: '2026-08-17' },
+      { name: 'Prova Objetiva', description: 'Manhã.', date: '2026-09-06' },
+    ])
+    expect(out).toEqual([
+      {
+        name: 'Inscrições',
+        description: null,
+        dateStart: '2026-07-27',
+        dateEnd: '2026-08-17',
+      },
+      {
+        name: 'Prova Objetiva',
+        description: 'Manhã.',
+        dateStart: '2026-09-06',
+        dateEnd: null,
+      },
+    ])
+  })
+
+  it('metade sem par mantém a data que tiver', () => {
+    const out = condenseEtapas([
+      { name: 'Prazo de recursos - fim', description: null, date: '2026-09-10' },
+    ])
+    expect(out).toEqual([
+      {
+        name: 'Prazo de recursos',
+        description: null,
+        dateStart: '2026-09-10',
+        dateEnd: null,
+      },
+    ])
+  })
+})
+
+describe('buildEtapaTimelineSteps', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('ordena, funde intervalos e deriva estados de hoje (intervalo aberto = current)', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-02T12:00:00Z'))
+    const steps = buildEtapaTimelineSteps([
+      { name: 'Prova Objetiva', description: null, date: '2026-09-06' },
+      { name: 'Publicação do Edital', description: null, date: '2026-07-20' },
+      { name: 'Inscrições — início', description: null, date: '2026-07-27' },
+      { name: 'Inscrições — fim', description: null, date: '2026-08-17' },
+      { name: 'Homologação do Concurso', description: null, date: null },
+    ])
+    expect(steps).toEqual([
+      {
+        label: 'Publicação do Edital',
+        description: null,
+        startIso: '2026-07-20',
+        endIso: null,
+        major: false,
+        state: 'done',
+      },
+      {
+        label: 'Inscrições',
+        description: null,
+        startIso: '2026-07-27',
+        endIso: '2026-08-17',
+        major: true,
+        state: 'current',
+      },
+      {
+        label: 'Prova Objetiva',
+        description: null,
+        startIso: '2026-09-06',
+        endIso: null,
+        major: true,
+        state: 'upcoming',
+      },
+      {
+        label: 'Homologação do Concurso',
+        description: null,
+        startIso: null,
+        endIso: null,
+        major: true,
+        state: 'upcoming',
+      },
+    ])
   })
 })
 
@@ -149,12 +385,22 @@ describe('buildConcursoTimelineSteps', () => {
     resultDate: null,
   }
 
-  it('formata datas em pt-BR e deriva estados do status', () => {
+  it('repassa as datas ISO e deriva estados do status', () => {
     const steps = buildConcursoTimelineSteps(timeline, 'open')
     expect(steps).toEqual([
-      { label: 'Inscrições', date: '02/06 a 30/06', state: 'current' },
-      { label: 'Prova objetiva', date: '23/08/2026', state: 'upcoming' },
-      { label: 'Resultado final', date: null, state: 'upcoming' },
+      {
+        label: 'Inscrições',
+        startIso: '2026-06-02T00:00:00.000Z',
+        endIso: '2026-06-30T00:00:00.000Z',
+        state: 'current',
+      },
+      {
+        label: 'Prova objetiva',
+        startIso: '2026-08-23T00:00:00.000Z',
+        endIso: null,
+        state: 'upcoming',
+      },
+      { label: 'Resultado final', startIso: null, endIso: null, state: 'upcoming' },
     ])
   })
 
