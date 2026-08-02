@@ -376,8 +376,12 @@ export class ExamBaseAiService {
   /**
    * Fase 2 da extração de edital: para um LOTE de cargos, transcreve do texto
    * do edital os requisitos e as atribuições EXATAMENTE como escritos.
+   *
+   * Público: a análise de documentos (Fase 2 do monitoramento) reusa este
+   * extrator quando o documento é um EDITAL_ABERTURA — o prompt de diff não
+   * transcreve textos longos, então a ficha literal vem daqui.
    */
-  private async extractFichasLiterais(
+  async extractFichasLiterais(
     editalText: string,
     roles: string[],
   ): Promise<
