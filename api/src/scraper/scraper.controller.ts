@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -6,7 +7,10 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express/multer';
 import { PciEntryStatus } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
@@ -331,13 +335,20 @@ export class ScraperController {
     return this.documentScraper.addConcursoDocuments(concursoId, dto.documents);
   }
 
-  /** Fase 2: lê o PDF do documento e propõe as mudanças (sem aplicar). */
+  /** Fase 2: lê o PDF do documento e propõe as mudanças (sem aplicar).
+   *  Aceita opcionalmente o PDF via multipart (`file`) — fallback p/ quando o
+   *  site bloqueia o download automático (403); sem arquivo, baixa da URL. */
   @Post('concursos/:concursoId/documents/:documentId/analyze')
+  @UseInterceptors(FileInterceptor('file'))
   analyzeDocument(
     @Param('concursoId', ParseUUIDPipe) concursoId: string,
     @Param('documentId', ParseUUIDPipe) documentId: string,
+    @UploadedFile() file: { buffer: Buffer; mimetype: string } | undefined,
   ) {
-    return this.documentAnalysis.analyze(concursoId, documentId);
+    if (file && file.mimetype !== 'application/pdf') {
+      throw new BadRequestException('Apenas arquivos PDF são aceitos.');
+    }
+    return this.documentAnalysis.analyze(concursoId, documentId, file?.buffer);
   }
 
   /** Fase 2: aplica ao concurso/cargos as mudanças aprovadas pelo admin. */
