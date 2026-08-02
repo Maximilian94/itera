@@ -6,6 +6,7 @@ import {
   ArrowRightIcon,
   BanknotesIcon,
   ChartBarIcon,
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
@@ -462,11 +463,9 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
                 O que o edital diz sobre o trabalho deste cargo
               </p>
               {cargo.description != null && cargo.description.trim() !== '' ? (
-                <p className="mt-3 max-w-prose whitespace-pre-line text-sm leading-6 text-slate-600">
-                  {cargo.description}
-                </p>
+                <DescriptionBlock text={cargo.description} />
               ) : (
-                <p className="mt-3 text-sm text-slate-400">
+                <p className="mt-3 text-sm text-slate-500">
                   A descrição das atribuições desta vaga ainda não foi cadastrada
                   no edital.
                 </p>
@@ -481,9 +480,7 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
                       Requisitos para assumir
                     </h3>
                   </div>
-                  <p className="mt-1.5 max-w-prose whitespace-pre-line text-sm leading-6 text-cyan-900">
-                    {cargo.requirements}
-                  </p>
+                  <RequirementsBody text={cargo.requirements} />
                 </div>
               )}
             </section>
@@ -534,6 +531,152 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
         </div>
       )}
     </>
+  )
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sobre a vaga — texto literal do edital em formato escaneável       */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Quebra o texto literal do edital (atribuições/requisitos, em geral uma
+ * enumeração separada por ";") em itens de lista, tirando marcadores de
+ * enumeração ("I -", "a)", "1.", "•") e pontuação final.
+ */
+function splitEditalItems(text: string): Array<string> {
+  return text
+    .split(/;|\n|•/)
+    .map((t) =>
+      t
+        .trim()
+        .replace(/^(?:[-–—]|\d{1,2}\s*[.)]|[a-z]\s*[.)]|[IVXLCDM]{1,6}\s*[-–—.)])\s*/i, '')
+        .trim()
+        .replace(/[.;,]+$/, '')
+        .trim(),
+    )
+    .filter((t) => t !== '')
+    .map((t) => t.charAt(0).toUpperCase() + t.slice(1))
+}
+
+/** Quantos itens de lista ficam visíveis antes do "ver todas". */
+const DESCRIPTION_PREVIEW = 8
+/** Texto corrido acima disso colapsa em 6 linhas (~450 chars visíveis). */
+const PROSE_CLAMP_CHARS = 600
+
+/** Botão "Ver mais / Mostrar menos" compartilhado pelos dois formatos. */
+function ToggleMore(props: {
+  expanded: boolean
+  moreLabel: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      aria-expanded={props.expanded}
+      onClick={props.onToggle}
+      className="mt-2.5 inline-flex items-center gap-1 rounded text-sm font-semibold text-cyan-700 transition-colors hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+    >
+      {props.expanded ? 'Mostrar menos' : props.moreLabel}
+      <ChevronDownIcon
+        className={`h-4 w-4 transition-transform duration-200 ${props.expanded ? 'rotate-180' : ''}`}
+      />
+    </button>
+  )
+}
+
+/**
+ * Atribuições do cargo: o edital lista dezenas de itens num texto corrido —
+ * aqui viram lista escaneável (mesmo vocabulário dos tópicos do conteúdo
+ * programático), colapsada quando longa. Texto realmente corrido (sem
+ * enumeração) permanece parágrafo — mas, quando muito grande, colapsa em
+ * 6 linhas com "Ver mais".
+ */
+function DescriptionBlock(props: { text: string }) {
+  const [expanded, setExpanded] = useState(false)
+  const items = splitEditalItems(props.text)
+
+  if (items.length < 3) {
+    const clampable = props.text.length > PROSE_CLAMP_CHARS
+    return (
+      <>
+        <p
+          className={`mt-3 max-w-prose whitespace-pre-line text-pretty text-sm leading-6 text-slate-700 ${
+            clampable && !expanded ? 'line-clamp-6' : ''
+          }`}
+        >
+          {props.text}
+        </p>
+        {clampable && (
+          <ToggleMore
+            expanded={expanded}
+            moreLabel="Ver mais"
+            onToggle={() => setExpanded((v) => !v)}
+          />
+        )}
+      </>
+    )
+  }
+
+  /* Só colapsa quando esconde de verdade (≥3 itens a mais que o preview). */
+  const collapsible = items.length > DESCRIPTION_PREVIEW + 2
+  const shown = collapsible && !expanded ? items.slice(0, DESCRIPTION_PREVIEW) : items
+
+  return (
+    <>
+      <ul className="mt-3 flex max-w-prose flex-col gap-1.5">
+        {shown.map((item, idx) => (
+          <li
+            key={idx}
+            className="flex items-start gap-2.5 text-sm leading-6 text-slate-700"
+          >
+            <span
+              aria-hidden
+              className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-400"
+            />
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+      {collapsible && (
+        <ToggleMore
+          expanded={expanded}
+          moreLabel={`Ver todas as ${items.length} atribuições`}
+          onToggle={() => setExpanded((v) => !v)}
+        />
+      )}
+    </>
+  )
+}
+
+/**
+ * Requisitos dentro do callout: lista quando o edital enumera (2+ itens),
+ * parágrafo caso contrário. O conteúdo alinha com o título (pl-7 = ícone
+ * h-5 + gap-2), em vez de encostar na borda do callout.
+ */
+function RequirementsBody(props: { text: string }) {
+  const items = splitEditalItems(props.text)
+  if (items.length < 2) {
+    return (
+      <p className="mt-1.5 max-w-prose whitespace-pre-line text-pretty pl-7 text-sm leading-6 text-cyan-900">
+        {props.text}
+      </p>
+    )
+  }
+  return (
+    <ul className="mt-2 flex max-w-prose flex-col gap-1.5 pl-7">
+      {items.map((item, idx) => (
+        <li
+          key={idx}
+          className="flex items-start gap-2.5 text-sm leading-6 text-cyan-900"
+        >
+          <span
+            aria-hidden
+            className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-cyan-500"
+          />
+          <span>{item}</span>
+        </li>
+      ))}
+    </ul>
   )
 }
 
