@@ -95,15 +95,27 @@ export const scraperService = {
     )
   },
 
-  /** Fase 2: lê o PDF do documento e propõe mudanças (sem aplicar). */
+  /** Fase 2: lê o PDF do documento e propõe mudanças (sem aplicar).
+   *  Com `file`, envia o PDF por upload (fallback p/ site que bloqueia o
+   *  download automático); sem, o backend baixa da URL do documento. */
   analyzeDocument(
     concursoId: string,
     documentId: string,
+    file?: File,
   ): Promise<AnalyzeDocumentResult> {
-    return apiFetch<AnalyzeDocumentResult>(
-      `${BASE}/concursos/${concursoId}/documents/${documentId}/analyze`,
-      { method: 'POST', body: JSON.stringify({}) },
-    )
+    const path = `${BASE}/concursos/${concursoId}/documents/${documentId}/analyze`
+    if (file != null) {
+      const form = new FormData()
+      form.append('file', file)
+      return apiFetch<AnalyzeDocumentResult>(path, {
+        method: 'POST',
+        body: form,
+      })
+    }
+    return apiFetch<AnalyzeDocumentResult>(path, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    })
   },
 
   /** Fase 2: aplica as mudanças aprovadas ao concurso/cargos (+ cronograma + quadro). */

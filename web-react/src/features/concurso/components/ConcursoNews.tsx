@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
+  ArrowUpTrayIcon,
   ClipboardDocumentIcon,
   NewspaperIcon,
 } from '@heroicons/react/24/outline'
@@ -516,6 +517,7 @@ function DocAnalysis({
 }) {
   const analyze = useAnalyzeDocumentMutation(concursoId)
   const apply = useApplyDocumentChangesMutation(concursoId)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [deselected, setDeselected] = useState<Set<string>>(new Set())
   const [includeCronograma, setIncludeCronograma] = useState(true)
   const [deselectedCargos, setDeselectedCargos] = useState<Set<string>>(
@@ -533,13 +535,13 @@ function DocAnalysis({
     selected.length + (applyCronograma ? 1 : 0) + selectedSyllabus.length
   const applied = document.changesAppliedAt != null
 
-  const runAnalyze = () => {
+  const runAnalyze = (file?: File) => {
     if (analyze.isPending) return
     setDeselected(new Set())
     setIncludeCronograma(true)
     setDeselectedCargos(new Set())
     apply.reset()
-    analyze.mutate(document.id)
+    analyze.mutate({ documentId: document.id, file })
   }
 
   const toggle = (id: string) =>
@@ -577,18 +579,45 @@ function DocAnalysis({
 
   return (
     <div className="mt-2">
-      <button
-        type="button"
-        onClick={runAnalyze}
-        disabled={analyze.isPending}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:cursor-wait disabled:opacity-60"
-      >
-        {analyze.isPending
-          ? 'Lendo o documento…'
-          : analyze.isSuccess || applied
-            ? 'Analisar novamente'
-            : 'Analisar alterações'}
-      </button>
+      {/* Dois caminhos sempre à mão (como no colar-HTML): analisar baixando da
+       *  URL (padrão) ou enviar o PDF baixado à mão — sites com WAF/Cloudflare
+       *  devolvem 403 ao download automático do PDF. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => runAnalyze()}
+          disabled={analyze.isPending}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:cursor-wait disabled:opacity-60"
+        >
+          {analyze.isPending
+            ? 'Lendo o documento…'
+            : analyze.isSuccess || applied
+              ? 'Analisar novamente'
+              : 'Analisar alterações'}
+        </button>
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={analyze.isPending}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-600 transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 disabled:cursor-wait disabled:opacity-60"
+        >
+          <ArrowUpTrayIcon className="h-3.5 w-3.5" />
+          Analisar de um PDF
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/pdf,.pdf"
+          className="hidden"
+          aria-label={`Enviar PDF para analisar: ${document.title}`}
+          onChange={(ev) => {
+            const file = ev.target.files?.[0]
+            // Permite reescolher o mesmo arquivo depois de um erro.
+            ev.target.value = ''
+            if (file != null) runAnalyze(file)
+          }}
+        />
+      </div>
 
       {analyzeError != null && (
         <p className="mt-1 text-xs text-rose-600">
@@ -599,8 +628,9 @@ function DocAnalysis({
             rel="noreferrer"
             className="font-semibold text-cyan-700 underline"
           >
-            Abrir o documento e revisar manualmente
-          </a>
+            Baixe o PDF no navegador
+          </a>{' '}
+          e use “Analisar de um PDF”.
         </p>
       )}
 

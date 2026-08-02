@@ -218,6 +218,7 @@ export class ConcursoDocumentAnalysisService {
   async analyze(
     concursoId: string,
     documentId: string,
+    uploadedPdf?: Buffer,
   ): Promise<AnalyzeResult> {
     const doc = await this.prisma.concursoDocument.findFirst({
       where: { id: documentId, concursoId },
@@ -226,7 +227,13 @@ export class ConcursoDocumentAnalysisService {
     if (!doc) throw new NotFoundException('documento não encontrado');
 
     const concurso = await this.loadSnapshot(concursoId);
-    const text = await this.fetchDocumentText(doc.url);
+    // Upload manual do PDF: fallback permanente p/ quando o site bloqueia o
+    // download automático (403/Cloudflare) — o admin baixa no próprio navegador
+    // e envia o arquivo; a análise segue idêntica.
+    const text =
+      uploadedPdf != null
+        ? await this.uploadedPdfToText(uploadedPdf)
+        : await this.fetchDocumentText(doc.url);
 
     const parsed = await this.callOpenAI(text, concurso.snapshotJson);
     const changes = this.buildChanges(parsed, concurso);
@@ -738,6 +745,21 @@ export class ConcursoDocumentAnalysisService {
         'O documento não é um PDF legível — a análise automática só cobre PDFs por enquanto.',
       );
     }
+    return this.pdfBufferToText(buffer);
+  }
+
+  /** PDF enviado pelo admin (upload manual): valida a assinatura e extrai. */
+  private async uploadedPdfToText(buffer: Buffer): Promise<string> {
+    if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
+      throw new BadRequestException(
+        'O arquivo enviado não parece ser um PDF válido.',
+      );
+    }
+    return this.pdfBufferToText(buffer);
+  }
+
+  /** Buffer de PDF → texto via OCR (Mistral com fallback pdf-parse). */
+  private async pdfBufferToText(buffer: Buffer): Promise<string> {
     try {
       // Mistral OCR (com fallback pdf-parse): preserva as TABELAS do documento
       // como markdown — essencial para cronograma e quadro de matérias, que o

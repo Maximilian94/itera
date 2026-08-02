@@ -71,12 +71,18 @@ function build(opts: {
     examBaseAi,
     {} as PdfOcrService,
   );
-  jest
+  const fetchDocumentText = jest
     .spyOn(
       service as unknown as { fetchDocumentText: () => Promise<string> },
       'fetchDocumentText',
     )
     .mockResolvedValue('EDITAL Nº 1/2026 ...');
+  const pdfBufferToText = jest
+    .spyOn(
+      service as unknown as { pdfBufferToText: () => Promise<string> },
+      'pdfBufferToText',
+    )
+    .mockResolvedValue('EDITAL Nº 1/2026 (upload) ...');
   jest
     .spyOn(
       service as unknown as { callOpenAI: () => Promise<unknown> },
@@ -86,7 +92,7 @@ function build(opts: {
       opts.diff ?? { changes: [], cronograma: [], syllabusCargos: [] },
     );
 
-  return { service, extractFichasLiterais };
+  return { service, extractFichasLiterais, fetchDocumentText, pdfBufferToText };
 }
 
 describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertura', () => {
@@ -179,6 +185,31 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
       'Enfermeiro',
     ]);
     expect(r.changes).toEqual([]);
+  });
+
+  it('PDF enviado por upload é analisado sem baixar da URL', async () => {
+    const { service, fetchDocumentText, pdfBufferToText } = build({
+      docKind: 'RETIFICACAO',
+    });
+
+    const r = await service.analyze(
+      'c1',
+      'doc-1',
+      Buffer.from('%PDF-1.7 conteúdo'),
+    );
+
+    expect(fetchDocumentText).not.toHaveBeenCalled();
+    expect(pdfBufferToText).toHaveBeenCalledTimes(1);
+    expect(r.documentId).toBe('doc-1');
+  });
+
+  it('upload que não é PDF é rejeitado', async () => {
+    const { service, pdfBufferToText } = build({ docKind: 'RETIFICACAO' });
+
+    await expect(
+      service.analyze('c1', 'doc-1', Buffer.from('<html>não é pdf</html>')),
+    ).rejects.toThrow('não parece ser um PDF');
+    expect(pdfBufferToText).not.toHaveBeenCalled();
   });
 
   it('documento que não é edital de abertura não roda a transcrição', async () => {

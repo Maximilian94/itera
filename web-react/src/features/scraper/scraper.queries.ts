@@ -152,8 +152,8 @@ export function useAddConcursoDocumentsMutation(concursoId: string) {
 export function useAnalyzeDocumentMutation(concursoId: string) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (documentId: string) =>
-      scraperService.analyzeDocument(concursoId, documentId),
+    mutationFn: ({ documentId, file }: { documentId: string; file?: File }) =>
+      scraperService.analyzeDocument(concursoId, documentId, file),
     // analyzedAt muda → refresca a timeline (selo "Lido").
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['concurso'] }),
   })
