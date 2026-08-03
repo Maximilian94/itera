@@ -26,6 +26,7 @@ import type {
   ConcursoListResponse,
   SubjectDistribution,
 } from '../domain/concurso.types'
+import type { UserPreference } from '@/features/preference/domain/preference.types'
 import { Route as ConcursosListRouteImport } from '@/routes/_authenticated/concursos/index'
 import { Route as ConcursoRouteImport } from '@/routes/_authenticated/concursos/$concursoSlug/index'
 import { Route as CargoRouteImport } from '@/routes/_authenticated/concursos/$concursoSlug/$cargoSlug'
@@ -191,6 +192,23 @@ export function makeConcursoListItem(
     salaryMax: '8500',
     questionCount: 80,
     userStats: { attemptedCargos: 0, bestScore: null },
+    match: null,
+    ...overrides,
+  }
+}
+
+/** Perfil de preferências preenchido (GET /preferences). */
+export function makePreference(
+  overrides: Partial<UserPreference> = {},
+): UserPreference {
+  return {
+    state: 'SP',
+    city: 'Campinas',
+    mobility: 'MAX_1H',
+    careerStage: 'COREN_REGISTERED',
+    minSalary: '3000.00',
+    horizon: 'ASAP',
+    updatedAt: '2026-08-01T00:00:00.000Z',
     ...overrides,
   }
 }

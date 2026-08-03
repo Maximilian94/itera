@@ -1,10 +1,14 @@
 import {
+  CareerStage,
   ExamBase,
   ExamBoard,
+  ExamHorizon,
   GovernmentScope,
+  PreferenceMobility,
   Prisma,
   PrismaClient,
   User,
+  UserPreference,
   UserRole,
 } from '@prisma/client';
 
@@ -18,6 +22,7 @@ type Db = Pick<
   PrismaClient,
   | '$executeRawUnsafe'
   | 'user'
+  | 'userPreference'
   | 'examBoard'
   | 'examBase'
   | 'examSyllabusGroup'
@@ -48,6 +53,24 @@ export function createUser(
     data: {
       email: `e2e-user-${nextId()}@test.local`,
       role: UserRole.USER,
+      ...overrides,
+    },
+  });
+}
+
+export function createUserPreference(
+  db: Db,
+  userId: string,
+  overrides: Partial<Prisma.UserPreferenceUncheckedCreateInput> = {},
+): Promise<UserPreference> {
+  return db.userPreference.create({
+    data: {
+      userId,
+      state: 'SP',
+      city: 'Itera',
+      mobility: PreferenceMobility.MAX_1H,
+      careerStage: CareerStage.COREN_REGISTERED,
+      horizon: ExamHorizon.ASAP,
       ...overrides,
     },
   });

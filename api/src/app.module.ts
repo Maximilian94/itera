@@ -20,6 +20,7 @@ import { CargoModule } from './cargo/cargo.module';
 import { ExamBaseQuestionModule } from './examBaseQuestion/exam-base-question.module';
 import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.module';
 import { TrainingModule } from './training/training.module';
+import { PreferenceModule } from './preference/preference.module';
 import { StorageModule } from './storage/storage.module';
 import { StripeModule } from './stripe/stripe.module';
 import { StripeWebhookModule } from './stripe-webhook/stripe-webhook.module';
@@ -53,6 +54,7 @@ import { ScraperModule } from './scraper/scraper.module';
     ExamBaseQuestionModule,
     ExamBaseAttemptModule,
     TrainingModule,
+    PreferenceModule,
     StorageModule,
     StripeModule,
     StripeWebhookModule,

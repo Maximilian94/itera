@@ -11,6 +11,7 @@ import {
   createFinishedAttempt,
   createSyllabusGroups,
   createUser,
+  createUserPreference,
   truncateAll,
   SeededQuestion,
 } from './factories';
@@ -367,6 +368,102 @@ describe('Concurso endpoints (e2e)', () => {
         .get('/concursos?q=instituicao-inexistente')
         .expect(200);
       expect(miss.body.concursos).toHaveLength(0);
+    });
+
+    // Anotação de recomendação (perfil de preferências): usuário dedicado
+    // para não interferir nos userStats dos testes acima.
+    describe('match (perfil de preferências)', () => {
+      let prefUser: { id: string };
+      const asPrefUser = (req: request.Test) =>
+        req.set(TEST_USER_HEADER, prefUser.id);
+
+      beforeAll(async () => {
+        prefUser = await createUser(prisma);
+      });
+
+      it('anônimo e logado sem perfil → match: null em todos os cards', async () => {
+        for (const res of [
+          await request(http).get('/concursos').expect(200),
+          await asPrefUser(request(http).get('/concursos')).expect(200),
+        ]) {
+          for (const c of res.body.concursos) expect(c.match).toBeNull();
+        }
+      });
+
+      it('com perfil: aberto na cidade recomenda (CITY/SALARY/REGISTRATION_OPEN); past nunca', async () => {
+        // Mesma cidade não depende de geocodificação ("Itera" não é IBGE).
+        await createUserPreference(prisma, prefUser.id, {
+          state: 'SP',
+          city: 'Itera',
+          mobility: 'MAX_30MIN',
+          minSalary: 5000,
+          horizon: 'ASAP',
+        });
+
+        const res = await asPrefUser(request(http).get('/concursos')).expect(200);
+        const open = res.body.concursos.find(
+          (c: { status: string }) => c.status === 'open',
+        );
+        // Futuro/open: mesma cidade, salário 9000 >= 5000, inscrições abertas.
+        expect(open.match).toEqual({
+          recommended: true,
+          reasons: ['CITY', 'SALARY', 'REGISTRATION_OPEN'],
+        });
+
+        for (const c of res.body.concursos.filter(
+          (c: { status: string }) => c.status === 'past',
+        )) {
+          expect(c.match).toEqual({ recommended: false, reasons: [] });
+        }
+      });
+
+      it('cidade não-geocodificável fora do orçamento de viagem → não recomenda (conservador)', async () => {
+        // Perfil em Niterói/RJ (real); o concurso fica em "Itera"/SP, que não
+        // existe na base IBGE → sem distância medível → vai para "Outros".
+        await prisma.userPreference.update({
+          where: { userId: prefUser.id },
+          data: { state: 'RJ', city: 'Niterói', mobility: 'MAX_2H' },
+        });
+        const res = await asPrefUser(request(http).get('/concursos')).expect(200);
+        const open = res.body.concursos.find(
+          (c: { status: string }) => c.status === 'open',
+        );
+        expect(open.match).toEqual({ recommended: false, reasons: [] });
+      });
+
+      it('concurso prova-less (bloco do model Concurso) também recebe match, com tempo de viagem', async () => {
+        const board = await createExamBoard(prisma, { name: 'Banca Prova-less' });
+        // São Gonçalo é vizinha de Niterói (perfil) → NEARBY dentro de 2h.
+        const provaless = await prisma.concurso.create({
+          data: {
+            institution: 'Prefeitura Prova-less',
+            year: 2027,
+            governmentScope: 'MUNICIPAL',
+            state: 'RJ',
+            city: 'São Gonçalo',
+            examBoardId: board.id,
+            examDate: daysFromNow(120),
+            cargos: { create: { role: 'Enfermeiro', isNursingRelevant: true } },
+          },
+        });
+
+        await prisma.userPreference.update({
+          where: { userId: prefUser.id },
+          data: { horizon: 'LONG_TERM' },
+        });
+        const res = await asPrefUser(request(http).get('/concursos')).expect(200);
+        const card = res.body.concursos.find(
+          (c: { id: string | null }) => c.id === provaless.id,
+        );
+        // Futuro perto do perfil, sem janela → future + NEARBY/UPCOMING.
+        expect(card.match.recommended).toBe(true);
+        expect(card.match.reasons).toEqual(['NEARBY', 'UPCOMING']);
+        expect(card.match.travelMinutes).toBeGreaterThan(0);
+        expect(card.match.travelMinutes).toBeLessThanOrEqual(30);
+
+        // Limpeza: o card extra não deve vazar para os describes seguintes.
+        await prisma.concurso.delete({ where: { id: provaless.id } });
+      });
     });
   });
 

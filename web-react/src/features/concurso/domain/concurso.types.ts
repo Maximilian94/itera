@@ -15,6 +15,25 @@ export type ConcursoStatus = 'open' | 'future' | 'past'
 
 export type GovernmentScope = 'MUNICIPAL' | 'STATE' | 'FEDERAL'
 
+/** Motivo do match perfil × concurso (códigos; a copy vive em match-copy.ts). */
+export type MatchReason =
+  | 'CITY'
+  | 'NEARBY'
+  | 'STATE'
+  | 'NATIONWIDE'
+  | 'SALARY'
+  | 'REGISTRATION_OPEN'
+  | 'UPCOMING'
+
+/** Anotação de recomendação derivada do perfil de preferências (backend). */
+export type ConcursoMatch = {
+  recommended: boolean
+  /** Populado só quando `recommended` — alimenta os chips de motivo. */
+  reasons: Array<MatchReason>
+  /** Minutos estimados de viagem; presente só junto do motivo NEARBY. */
+  travelMinutes?: number
+}
+
 // ── Listagem/descoberta (nível 0, MAX-28) ────────────────────────────────────
 
 /** Card de concurso na listagem; `slug` aceita UUID de prova (fallback lazy). */
@@ -43,6 +62,8 @@ export type ConcursoListItem = {
     /** Melhor nota entre os cargos; null sem tentativa. */
     bestScore: number | null
   }
+  /** Null para anônimo/sem perfil. Opcional: payload em cache anterior ao campo. */
+  match?: ConcursoMatch | null
 }
 
 export type ConcursoListResponse = { concursos: Array<ConcursoListItem> }
