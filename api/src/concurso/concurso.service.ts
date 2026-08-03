@@ -7,6 +7,8 @@ import {
   deriveConcursoStatus,
   type ConcursoStatus,
 } from './concurso-status';
+import { matchConcurso, type ConcursoMatch } from './concurso-match';
+import { estimateTravelMinutes } from '../geo/city-distance';
 import { previousEditionsWhere } from './previous-editions';
 
 const UUID_RE =
@@ -528,12 +530,39 @@ export class ConcursoService {
       }),
     );
 
+    // Recommendation annotation (both blocks share the card shape). Anonymous
+    // or profile-less users get `match: null` on every card. Travel time is
+    // estimated once per distinct city (memoized within the request).
+    const preference = userId
+      ? await this.prisma.userPreference.findUnique({ where: { userId } })
+      : null;
+    const travelCache = new Map<string, number | null>();
+    const travelTo = (card: { state: string | null; city: string | null }) => {
+      const key = `${card.state ?? ''}|${card.city ?? ''}`;
+      if (!travelCache.has(key)) {
+        travelCache.set(
+          key,
+          estimateTravelMinutes(
+            { state: preference!.state, city: preference!.city },
+            card,
+          ),
+        );
+      }
+      return travelCache.get(key) ?? null;
+    };
+    let annotated = items.map((it) => ({
+      ...it,
+      match: (preference
+        ? matchConcurso(preference, it, travelTo(it))
+        : null) as ConcursoMatch | null,
+    }));
+
     if (filters.status) {
-      items = items.filter((it) => it.status === filters.status);
+      annotated = annotated.filter((it) => it.status === filters.status);
     }
     if (filters.q?.trim()) {
       const q = filters.q.trim().toLowerCase();
-      items = items.filter(
+      annotated = annotated.filter(
         (it) =>
           it.institution.toLowerCase().includes(q) ||
           (it.examBoard?.name ?? '').toLowerCase().includes(q) ||
@@ -543,7 +572,7 @@ export class ConcursoService {
 
     // Discovery order: actionable first (open → future → past); inside a bucket
     // the most time-relevant exam date leads — soonest upcoming, most recent past.
-    items.sort((a, b) => {
+    annotated.sort((a, b) => {
       if (a.status !== b.status) {
         return STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
       }
@@ -552,7 +581,7 @@ export class ConcursoService {
       return a.status === 'past' ? db - da : da - db;
     });
 
-    return { concursos: items };
+    return { concursos: annotated };
   }
 
   /**

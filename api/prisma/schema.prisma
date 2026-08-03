@@ -53,6 +53,30 @@ enum PciEntryStatus {
   UNAVAILABLE
 }
 
+/// Search scope of the preference profile: estimated travel time from the
+/// anchor city (MAX_* buckets), a whole state (STATE — any city within the
+/// chosen UF) or nationwide (ANYWHERE = willing to relocate).
+enum PreferenceMobility {
+  MAX_30MIN
+  MAX_1H
+  MAX_2H
+  STATE
+  ANYWHERE
+}
+
+/// Career stage. v1: NOT used in matching — reserved for future copy/eligibility personalization.
+enum CareerStage {
+  STUDENT
+  RECENT_GRAD
+  COREN_REGISTERED
+}
+
+/// How soon the user wants to take an exam. ASAP → only `open` concursos match; LONG_TERM → `open` and `future`.
+enum ExamHorizon {
+  ASAP
+  LONG_TERM
+}
+
 model User {
   id               String    @id @default(uuid()) @db.Uuid
   email            String    @unique
@@ -74,8 +98,33 @@ model User {
   trainingSessions  TrainingSession[]
   createdQuestions  ExamBaseQuestion[] @relation("questionCreator")
   questionReviews  ExamBaseQuestionReview[] @relation("questionReviewer")
+  preference        UserPreference?
 
   @@map("users")
+}
+
+/// Preference profile used to recommend concursos on the discovery listing (GET /concursos).
+/// Filled via the mandatory gate on /concursos; one row per user (upsert via PUT /preferences).
+model UserPreference {
+  id          String             @id @default(uuid()) @db.Uuid
+  userId      String             @unique @db.Uuid
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// UF (sigla, ex.: "SP") — same format as ExamBase.state. Null only when
+  /// mobility = ANYWHERE (nationwide scope has no anchor).
+  state       String?
+  /// Municipality name (IBGE) — the SEARCH ANCHOR (where the user lives or
+  /// plans to move to), same format as ExamBase.city. Null when mobility =
+  /// STATE or ANYWHERE.
+  city        String?
+  mobility    PreferenceMobility
+  careerStage CareerStage
+  /// Minimum acceptable salary (BRL). Null = no salary constraint.
+  minSalary   Decimal?           @db.Decimal(10, 2)
+  horizon     ExamHorizon
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@map("user_preferences")
 }
 
 model Skill {

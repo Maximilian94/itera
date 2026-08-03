@@ -26,6 +26,10 @@ import { useConcursosQuery } from '@/features/concurso/queries/concurso.queries'
 import { CARD } from '@/features/concurso/components/card'
 import { enter } from '@/features/concurso/components/motion'
 import { authService } from '@/features/auth/services/auth.service'
+import { usePreferenceQuery } from '@/features/preference/queries/preference.queries'
+import { PreferenceGate } from '@/features/preference/components/PreferenceGate'
+import { PreferenceBar } from '@/features/preference/components/PreferenceBar'
+import { matchReasonLabel } from '@/features/preference/components/match-copy'
 import { ApiError } from '@/lib/api'
 
 export const Route = createFileRoute('/_authenticated/concursos/')({
@@ -210,6 +214,12 @@ function ConcursosListPage() {
   })
   const isAdmin = profileData?.user?.role === 'ADMIN'
 
+  /* Gate de preferências: sem perfil, o form ocupa o lugar da lista. Erro na
+   * query → fail-open (lista normal) — falha transitória não tranca a página. */
+  const prefQuery = usePreferenceQuery()
+  const preference = prefQuery.data?.preference ?? null
+  const showGate = prefQuery.data != null && preference == null
+
   const [search, setSearch] = useState('')
   /* Local: stateUf é uma UF, '' (todos) ou FEDERAL (concursos sem estado).
    * city só vale quando uma UF real está escolhida (cascata). */
@@ -330,6 +340,20 @@ function ConcursosListPage() {
     [filtered, activeTab],
   )
 
+  /* Seções dentro da aba ativa: recomendados (perfil) primeiro, resto depois.
+   * A paginação "Ver mais" corre sobre o array concatenado. */
+  const recommended = useMemo(
+    () => displayed.filter((c) => c.match?.recommended),
+    [displayed],
+  )
+  const ordered = useMemo(
+    () =>
+      recommended.length > 0
+        ? [...recommended, ...displayed.filter((c) => !c.match?.recommended)]
+        : displayed,
+    [displayed, recommended],
+  )
+
   /* Volta a paginação ao topo quando a aba/filtros mudam. */
   useEffect(() => {
     setLimit(PAGE_SIZE)
@@ -345,6 +369,27 @@ function ConcursosListPage() {
   }
 
   const openCount = all.filter((c) => c.status === 'open').length
+
+  /* Janela paginada; recomendados vêm primeiro no `ordered`, então a página
+   * visível se divide limpa entre as duas seções. */
+  const visible = ordered.slice(0, limit)
+  const hasSections = recommended.length > 0
+  const visibleRecommended = hasSections
+    ? visible.filter((c) => c.match?.recommended)
+    : []
+  const visibleOthers = hasSections
+    ? visible.filter((c) => !c.match?.recommended)
+    : visible
+
+  /* Gate em tela cheia focada: sem o header da lista (chrome de uma lista que
+   * o usuário ainda não pode ver), o wizard centralizado no espaço da rota. */
+  if (showGate) {
+    return (
+      <div {...enter(0)} className="flex flex-1 flex-col">
+        <PreferenceGate />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4 pb-6">
@@ -377,8 +422,11 @@ function ConcursosListPage() {
         )}
       </header>
 
-      {/* ░░ Filtros ░░ */}
-      <div {...enter(1)} className="flex flex-col gap-3">
+      <>
+          {preference != null && <PreferenceBar preference={preference} />}
+
+          {/* ░░ Filtros ░░ */}
+          <div {...enter(1)} className="flex flex-col gap-3">
         <div className="relative">
           <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
           <input
@@ -447,7 +495,7 @@ function ConcursosListPage() {
       </div>
 
       {/* ░░ Lista ░░ */}
-      {isPending ? (
+      {isPending || prefQuery.isPending ? (
         <ListSkeleton />
       ) : error != null ? (
         <ListErrorState error={error} onRetry={() => refetch()} />
@@ -457,21 +505,40 @@ function ConcursosListPage() {
         <TabEmpty tab={activeTab} />
       ) : (
         <section aria-label="Concursos" className="flex flex-col gap-2.5">
-          {displayed.slice(0, limit).map((item, i) => (
+          {/* Com recomendados na aba, a lista vira 2 seções; sem, fica plana. */}
+          {visibleRecommended.length > 0 && (
+            <h2 className="mt-1 text-sm font-bold text-cyan-700">
+              Recomendados para você
+            </h2>
+          )}
+          {visibleRecommended.map((item, i) => (
             <ConcursoCard key={item.slug} item={item} enterIdx={Math.min(i, 6) + 2} />
           ))}
-          {displayed.length > limit && (
+          {hasSections && visibleOthers.length > 0 && (
+            <h2 className="mt-3 text-sm font-bold text-slate-500">
+              Outros concursos
+            </h2>
+          )}
+          {visibleOthers.map((item, i) => (
+            <ConcursoCard
+              key={item.slug}
+              item={item}
+              enterIdx={Math.min(visibleRecommended.length + i, 6) + 2}
+            />
+          ))}
+          {ordered.length > limit && (
             <button
               type="button"
               onClick={() => setLimit((l) => l + PAGE_SIZE)}
               className="mt-1 inline-flex items-center justify-center gap-1 self-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
             >
               <ChevronDownIcon className="h-4 w-4" />
-              Ver mais ({displayed.length - limit})
+              Ver mais ({ordered.length - limit})
             </button>
           )}
         </section>
       )}
+      </>
     </div>
   )
 }
@@ -720,6 +787,22 @@ function ConcursoCard({ item, enterIdx }: { item: ConcursoListItem; enterIdx: nu
         >
           {temporal.text}
         </p>
+        {/* Linha 3 (só recomendados): o porquê do match, em chips. */}
+        {item.match?.recommended === true && item.match.reasons.length > 0 && (
+          <ul
+            aria-label="Por que recomendamos"
+            className="mt-1.5 flex flex-wrap gap-1"
+          >
+            {item.match.reasons.map((reason) => (
+              <li
+                key={reason}
+                className="inline-flex items-center rounded-full bg-cyan-50 px-2 py-0.5 text-xs font-semibold text-cyan-700 ring-1 ring-inset ring-cyan-100"
+              >
+                {matchReasonLabel(reason, item.match)}
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-500" />

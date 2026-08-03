@@ -20,6 +20,8 @@ export type StateCitySelectProps = {
   onCityChange: (city: string) => void
   size?: 'small' | 'medium'
   fullWidth?: boolean
+  /** Omite o campo Cidade (em vez de mostrá-lo desabilitado) — usado quando a seleção é só de UF. */
+  hideCity?: boolean
   sx?: SxProps<Theme>
 }
 
@@ -60,6 +62,7 @@ export function StateCitySelect({
   onCityChange,
   size = 'medium',
   fullWidth = true,
+  hideCity = false,
   sx,
 }: StateCitySelectProps) {
   const stateDisabled = governmentScope === 'FEDERAL'
@@ -94,7 +97,10 @@ export function StateCitySelect({
   }
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4" style={{ width: fullWidth ? '100%' : undefined }}>
+    <div
+      className={`grid grid-cols-1 gap-4 ${hideCity ? '' : 'sm:grid-cols-2'}`}
+      style={{ width: fullWidth ? '100%' : undefined }}
+    >
       <Autocomplete<IbgeEstado>
         options={estados}
         getOptionLabel={(opt) => `${opt.sigla} - ${opt.nome}`}
@@ -113,7 +119,11 @@ export function StateCitySelect({
               endAdornment: (
                 <>
                   {isLoadingEstados ? (
-                    <CircularProgress color="inherit" size={20} />
+                    <CircularProgress
+                      aria-label="Carregando estados"
+                      color="inherit"
+                      size={20}
+                    />
                   ) : null}
                   {params.InputProps.endAdornment}
                 </>
@@ -124,6 +134,7 @@ export function StateCitySelect({
         )}
         sx={{ minWidth: 0 }}
       />
+      {!hideCity && (
       <Autocomplete<IbgeMunicipio>
         options={municipios}
         getOptionLabel={(opt) => opt.nome}
@@ -142,7 +153,11 @@ export function StateCitySelect({
               endAdornment: (
                 <>
                   {isLoadingMunicipios ? (
-                    <CircularProgress color="inherit" size={20} />
+                    <CircularProgress
+                      aria-label="Carregando cidades"
+                      color="inherit"
+                      size={20}
+                    />
                   ) : null}
                   {params.InputProps.endAdornment}
                 </>
@@ -153,6 +168,7 @@ export function StateCitySelect({
         )}
         sx={{ minWidth: 0 }}
       />
+      )}
     </div>
   )
 }

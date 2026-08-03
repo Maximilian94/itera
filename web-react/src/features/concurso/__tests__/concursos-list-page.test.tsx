@@ -9,6 +9,7 @@ import {
   installFetchMock,
   makeConcursoList,
   makeConcursoListItem,
+  makePreference,
   renderPage,
 } from './page-test-utils'
 
@@ -20,10 +21,16 @@ afterEach(() => {
 const LIST_PATH = '/concursos'
 const API = '/concursos'
 const PROFILE = '/auth/me'
+const PREFERENCES = '/preferences'
 
-/** Mock de listagem + perfil (não-admin por padrão). */
+/** Mock de listagem + perfil (não-admin por padrão) + preferências
+ *  preenchidas (sem gate — o gate tem suíte própria). */
 function mockList(body: unknown, profile: unknown = { user: null }) {
-  installFetchMock({ [API]: { body }, [PROFILE]: { body: profile } })
+  installFetchMock({
+    [API]: { body },
+    [PROFILE]: { body: profile },
+    [PREFERENCES]: { body: { preference: makePreference() } },
+  })
 }
 
 describe('listagem de concursos (nível 0)', () => {
