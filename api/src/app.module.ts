@@ -21,6 +21,7 @@ import { ExamBaseQuestionModule } from './examBaseQuestion/exam-base-question.mo
 import { ExamBaseAttemptModule } from './examBaseAttempt/exam-base-attempt.module';
 import { TrainingModule } from './training/training.module';
 import { PreferenceModule } from './preference/preference.module';
+import { GoalModule } from './goal/goal.module';
 import { StorageModule } from './storage/storage.module';
 import { StripeModule } from './stripe/stripe.module';
 import { StripeWebhookModule } from './stripe-webhook/stripe-webhook.module';
@@ -55,6 +56,7 @@ import { ScraperModule } from './scraper/scraper.module';
     ExamBaseAttemptModule,
     TrainingModule,
     PreferenceModule,
+    GoalModule,
     StorageModule,
     StripeModule,
     StripeWebhookModule,

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#0891b2" />
+<title>Protótipo · Home "Mesa do dia" — Maximize Enfermagem</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    /* Momentum Cyan — o único acento (DESIGN.md) */
+    --primary:#0891b2; --primary-deep:#0e7490; --primary-tint:#ecfeff;
+    --ink:#0f172a; --body:#334155; --muted:#64748b;
+    --border:#cbd5e1; --border-soft:#e2e8f0;
+    --surface:#ffffff; --surface-muted:#f1f5f9; --field:#f8fafc;
+    /* verde/vermelho/âmbar: SÓ feedback de desempenho / tempo acabando */
+    --success:#047857; --success-bg:#ecfdf5;
+    --error:#dc2626; --error-bg:#fef2f2;
+    --warning:#b45309; --warning-bg:#fffbeb; --warning-border:#fde68a;
+    --r-md:6px; --r-lg:8px; --r-xl:12px; --r-2xl:16px; --r-full:9999px;
+    /* Soft layered ambient shadows (DESIGN.md §4) */
+    --sh-rest:0 1px 3px rgba(15,23,42,.08), 0 1px 2px rgba(15,23,42,.06);
+    --sh-raised:0 6px 16px -4px rgba(15,23,42,.12);
+    --ease:cubic-bezier(.22,1,.36,1);
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{margin:0;font-family:Manrope,ui-sans-serif,system-ui,sans-serif;color:var(--body);
+    background:
+      radial-gradient(120% 60% at 50% -10%, #ffffff 0%, rgba(255,255,255,0) 55%),
+      var(--surface-muted);
+    line-height:1.6;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  a{color:inherit}h1,h2,h3,h4,p{margin:0}
+  button{font-family:inherit}
+  .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px;border-radius:var(--r-md)}
+
+  .shell{max-width:980px;margin:0 auto;padding:26px 20px 90px}
+
+  /* ── Controles do protótipo (não fazem parte do design) ───── */
+  .proto{position:fixed;right:14px;bottom:14px;z-index:50;display:flex;gap:6px;
+    background:var(--ink);border-radius:var(--r-full);padding:5px;box-shadow:var(--sh-raised)}
+  .proto button{border:0;background:transparent;color:#94a3b8;font-weight:700;font-size:.72rem;
+    padding:6px 12px;border-radius:var(--r-full);cursor:pointer;transition:background .15s var(--ease),color .15s var(--ease)}
+  .proto button[aria-pressed="true"]{background:var(--primary);color:#fff}
+
+  /* ── Saudação ───────────────────────────────────────────── */
+  .greet{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+  .greet h1{font-size:1.875rem;font-weight:800;letter-spacing:-.01em;line-height:1.15;color:var(--ink)}
+  .greet .hi{font-size:.9rem;color:var(--muted);font-weight:600}
+  .greet .date{font-size:.82rem;color:var(--muted)}
+
+  /* ── HERÓI: bloco da meta ───────────────────────────────── */
+  .goal{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);
+    box-shadow:var(--sh-rest);overflow:hidden}
+  .goal-head{padding:20px 24px 0;display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap}
+  .goal-id{display:flex;gap:14px;min-width:0;align-items:center}
+  .goal-id .mark{width:46px;height:46px;border-radius:var(--r-xl);background:var(--primary-tint);color:var(--primary-deep);
+    border:1px solid #bae9f2;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.85rem;flex-shrink:0}
+  .goal-id .lbl{font-size:.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .goal-id .t{font-size:1.28rem;font-weight:800;letter-spacing:-.015em;color:var(--ink);line-height:1.25}
+  .goal-id .s{font-size:.82rem;color:var(--muted)}
+  .countdown{text-align:right;flex-shrink:0}
+  .countdown .n{font-size:1.28rem;font-weight:800;letter-spacing:-.015em;color:var(--ink);line-height:1.2}
+  .countdown .c{font-size:.78rem;color:var(--muted)}
+
+  /* prontidão vs corte */
+  .ready{padding:18px 24px 0}
+  .ready-row{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+  .ready-row .k{font-size:.8rem;font-weight:700;color:var(--body)}
+  .ready-row .v{font-size:.8rem;color:var(--muted)}
+  .ready-row .v b{color:var(--success);font-weight:700}
+  .bar{position:relative;margin-top:8px;height:10px;border-radius:var(--r-full);background:var(--surface-muted);overflow:visible}
+  .bar .fill{position:absolute;inset:0;border-radius:var(--r-full);
+    background:linear-gradient(90deg,#22d3ee,var(--primary));
+    transform:scaleX(.62);transform-origin:left;transition:transform .6s var(--ease)}
+  .bar .cut{position:absolute;top:-5px;bottom:-5px;left:60%;width:2px;background:var(--ink);border-radius:1px}
+  .bar .cut::after{content:"corte 60";position:absolute;top:-19px;left:50%;transform:translateX(-50%);
+    font-size:.62rem;font-weight:800;color:var(--ink);white-space:nowrap;letter-spacing:.02em}
+  .bar-legend{display:flex;justify-content:space-between;font-size:.68rem;color:var(--muted);margin-top:6px}
+
+  /* onde parou + CTA */
+  .resume{margin-top:18px;border-top:1px solid var(--border-soft);background:var(--field);
+    padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .resume .where{min-width:0}
+  .resume .stage{display:inline-flex;align-items:center;gap:6px;font-size:.7rem;font-weight:800;letter-spacing:.04em;
+    text-transform:uppercase;color:var(--primary-deep)}
+  .resume .stage .dot{width:7px;height:7px;border-radius:50%;background:var(--primary)}
+  .resume .what{margin-top:2px;font-size:.95rem;font-weight:700;color:var(--ink)}
+  .resume .sub{font-size:.8rem;color:var(--muted)}
+  .cta{display:inline-flex;align-items:center;gap:9px;background:var(--primary);color:#fff;border:0;cursor:pointer;
+    font-weight:700;font-size:.95rem;padding:12px 22px;border-radius:var(--r-lg);text-decoration:none;white-space:nowrap;
+    box-shadow:var(--sh-rest);transition:background .16s var(--ease),transform .16s var(--ease),box-shadow .16s var(--ease)}
+  .cta:hover{background:var(--primary-deep);box-shadow:var(--sh-raised)}
+  .cta:active{transform:translateY(1px);box-shadow:none}
+  .cta svg{width:16px;height:16px}
+  .quota{padding:10px 24px;border-top:1px solid var(--border-soft);display:flex;align-items:center;gap:8px;
+    font-size:.75rem;color:var(--muted)}
+  .quota .pills{display:inline-flex;gap:3px}
+  .quota .pill{width:14px;height:5px;border-radius:var(--r-full);background:var(--border-soft)}
+  .quota .pill.used{background:var(--primary)}
+
+  /* ── HERÓI alternativo: sem treino ativo ────────────────── */
+  .goal-empty{margin-top:18px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);
+    box-shadow:var(--sh-rest);padding:26px 24px}
+  .goal-empty .lbl{font-size:.68rem;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+  .goal-empty .t{margin-top:4px;font-size:1.28rem;font-weight:800;letter-spacing:-.015em;color:var(--ink)}
+  .goal-empty .s{margin-top:4px;font-size:.9rem;color:var(--muted);max-width:52ch}
+  .goal-empty .cta{margin-top:16px}
+
+  /* ── Aviso do edital (mora DENTRO do bloco da meta) ─────── */
+  .goal-note{margin:16px 24px 0;display:flex;align-items:center;gap:11px;flex-wrap:wrap;
+    padding:10px 14px;background:var(--field);border:1px solid var(--border-soft);border-radius:var(--r-lg)}
+  .goal-note .badge{flex-shrink:0;font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;
+    color:var(--primary-deep);background:var(--primary-tint);border:1px solid #bae9f2;padding:3px 9px;border-radius:var(--r-full)}
+  .goal-note .txt{min-width:0;flex:1;font-size:.82rem;color:var(--body)}
+  .goal-note .txt b{color:var(--ink)}
+  .goal-note a{flex-shrink:0;font-size:.78rem;font-weight:700;color:var(--primary-deep);text-decoration:none;white-space:nowrap}
+  .goal-note a:hover{text-decoration:underline}
+
+  /* ── Segunda meta (linha compacta abaixo do herói) ──────── */
+  .goal2{margin-top:18px}
+  .goal2 h2{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+  .goal2-row{margin-top:9px;display:flex;align-items:center;gap:14px;background:var(--surface);
+    border:1px solid var(--border);border-radius:var(--r-xl);padding:13px 16px;box-shadow:var(--sh-rest);
+    text-decoration:none;transition:box-shadow .16s var(--ease)}
+  .goal2-row:hover{box-shadow:var(--sh-raised)}
+  .goal2-row .mark{width:40px;height:40px;border-radius:var(--r-lg);background:var(--primary-tint);color:var(--primary-deep);
+    border:1px solid #bae9f2;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.76rem;flex-shrink:0}
+  .goal2-row .info{min-width:0;flex:1}
+  .goal2-row .t{font-size:.92rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .goal2-row .s{font-size:.78rem;color:var(--muted)}
+  .goal2-row .mini{width:180px;flex-shrink:0}
+  .mini .cap{display:flex;justify-content:space-between;font-size:.7rem;color:var(--muted)}
+  .mini .cap b{color:var(--ink)}
+  .mini .bar2{position:relative;height:6px;border-radius:var(--r-full);background:var(--surface-muted);margin-top:4px}
+  .mini .fill2{position:absolute;inset:0;border-radius:var(--r-full);background:var(--primary);
+    transform:scaleX(.48);transform-origin:left}
+  .mini .cut2{position:absolute;top:-3px;bottom:-3px;left:50%;width:2px;background:var(--ink);border-radius:1px}
+  .btn-ghost{display:inline-flex;align-items:center;gap:8px;flex-shrink:0;font-weight:700;font-size:.85rem;
+    color:var(--primary-deep);border:1px solid var(--border);background:var(--surface);padding:9px 16px;
+    border-radius:var(--r-lg);text-decoration:none;white-space:nowrap;
+    transition:background .16s var(--ease),border-color .16s var(--ease)}
+  .btn-ghost:hover{background:var(--primary-tint);border-color:#a5e8f2}
+
+  /* ── Faixa 2 col: constância + evolução ─────────────────── */
+  .grid2{margin-top:22px;display:grid;grid-template-columns:5fr 7fr;gap:14px}
+  .panel{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-2xl);
+    box-shadow:var(--sh-rest);padding:18px 20px}
+  .panel .ph{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .panel .ph h2{font-size:.95rem;font-weight:700;color:var(--ink);letter-spacing:-.005em}
+  .panel .ph a{font-size:.78rem;font-weight:700;color:var(--primary-deep);text-decoration:none;white-space:nowrap}
+  .panel .ph a:hover{text-decoration:underline}
+
+  /* constância */
+  .week{margin-top:14px;display:flex;justify-content:space-between;gap:6px}
+  .day{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:.66rem;font-weight:700;color:var(--muted)}
+  .day .b{width:32px;height:32px;border-radius:var(--r-lg);display:flex;align-items:center;justify-content:center;
+    border:1px solid var(--border-soft);background:var(--field);color:var(--border)}
+  .day.done .b{background:var(--primary-tint);border-color:#a5e8f2;color:var(--primary-deep)}
+  .day.today .b{border:2px solid var(--primary);color:var(--primary-deep);background:var(--surface)}
+  .day .b svg{width:14px;height:14px}
+  .week-note{margin-top:12px;font-size:.82rem;color:var(--body)}
+  .week-note b{color:var(--ink)}
+  .week-sub{font-size:.75rem;color:var(--muted);margin-top:2px}
+
+  /* evolução */
+  .evo-line{margin-top:10px;font-size:.86rem;color:var(--body)}
+  .evo-line b.up{color:var(--success);font-weight:700}
+  .evo-spark{margin-top:10px;position:relative}
+  .evo-spark svg{display:block;width:100%;height:74px}
+  .evo-legend{display:flex;justify-content:space-between;margin-top:4px;font-size:.68rem;color:var(--muted)}
+  .evo-last{position:absolute;right:0;top:-4px;text-align:right}
+  .evo-last .n{font-size:1.05rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;line-height:1.1}
+  .evo-last .c{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+
+  /* ── Recomendados ───────────────────────────────────────── */
+  .reco{margin-top:26px}
+  .reco-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .reco-head h2{font-size:1.05rem;font-weight:800;color:var(--ink);letter-spacing:-.01em}
+  .reco-head .why{font-size:.78rem;color:var(--muted)}
+  .reco-head a{font-size:.8rem;font-weight:700;color:var(--primary-deep);text-decoration:none;white-space:nowrap}
+  .reco-head a:hover{text-decoration:underline}
+  .reco-list{margin-top:12px;display:flex;flex-direction:column;gap:8px}
+  .reco-item{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--r-xl);padding:13px 16px;box-shadow:var(--sh-rest);text-decoration:none;
+    transition:box-shadow .16s var(--ease),transform .16s var(--ease)}
+  .reco-item:hover{box-shadow:var(--sh-raised);transform:translateY(-1px)}
+  .reco-item .mark{width:40px;height:40px;border-radius:var(--r-lg);background:var(--surface-muted);color:var(--body);
+    border:1px solid var(--border-soft);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.76rem;flex-shrink:0}
+  .reco-item .info{min-width:0;flex:1}
+  .reco-item .t{font-size:.92rem;font-weight:700;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .reco-item .s{font-size:.78rem;color:var(--muted)}
+  .reco-item .chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+  .chip{font-size:.7rem;font-weight:700;padding:3px 10px;border-radius:var(--r-full);
+    background:var(--surface-muted);color:var(--body);white-space:nowrap}
+  .chip.match{background:var(--primary-tint);color:var(--primary-deep);border:1px solid #bae9f2}
+  .chip.time{background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border)}
+  .reco-item .go{color:var(--muted);display:flex;flex-shrink:0}
+  .reco-item .go svg{width:15px;height:15px;transition:transform .16s var(--ease)}
+  .reco-item:hover .go svg{transform:translateX(2px)}
+
+  /* ── Notas do protótipo ─────────────────────────────────── */
+  .notes{margin-top:44px;border-top:1px dashed var(--border);padding-top:16px;font-size:.75rem;color:var(--muted);line-height:1.7}
+  .notes b{color:var(--body)}
+
+  /* ── Menu de opções da meta (trocar prova, parar) ───────── */
+  .kebab{align-self:flex-start;flex-shrink:0;width:32px;height:32px;border:0;background:none;cursor:pointer;
+    border-radius:var(--r-lg);color:var(--muted);display:flex;align-items:center;justify-content:center;
+    transition:background .15s var(--ease),color .15s var(--ease)}
+  .kebab:hover{background:var(--surface-muted);color:var(--body)}
+  .kebab svg{width:18px;height:18px}
+
+  /* ── Estados do protótipo ───────────────────────────────── */
+  body[data-state="empty"] :is(.only-active,.only-multi,.only-goalonly){display:none}
+  body[data-state="active"] :is(.only-empty,.only-multi,.only-goalonly){display:none}
+  body[data-state="multi"] :is(.only-empty,.only-goalonly,.hide-multi){display:none}
+  body[data-state="goalonly"] :is(.only-empty,.only-active,.only-multi){display:none}
+  .fadein{animation:fadein .35s var(--ease) both}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ── Mobile ─────────────────────────────────────────────── */
+  @media (max-width:720px){
+    .shell{padding:20px 14px 110px}
+    .greet h1{font-size:1.5rem}
+    .goal-head{padding:16px 16px 0}
+    .goal-id .t{font-size:1.05rem}
+    .countdown{text-align:left;order:-1;width:100%}
+    .countdown .n{font-size:1rem}
+    .ready{padding:14px 16px 0}
+    .resume{padding:14px 16px}
+    .resume .cta{width:100%;justify-content:center}
+    .quota{padding:10px 16px}
+    .grid2{grid-template-columns:1fr}
+    .goal-note{margin:14px 16px 0}
+    .goal2-row{flex-wrap:wrap}
+    .goal2-row .mini{width:100%;order:4}
+    .goal2-row .btn-ghost{margin-left:auto}
+    .reco-item .chips{display:none}
+    .reco-item .s .chip-inline{display:inline}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body data-state="active">
+
+<div class="shell">
+
+  <!-- ══ Saudação ══════════════════════════════════════════ -->
+  <header class="greet">
+    <div>
+      <p class="hi">Boa tarde,</p>
+      <h1>Mariana</h1>
+    </div>
+    <p class="date">sexta-feira, 8 de agosto</p>
+  </header>
+
+  <!-- ══ HERÓI · estado COM treino ativo ═══════════════════ -->
+  <section class="goal only-active" aria-labelledby="goal-title">
+    <div class="goal-head">
+      <div class="goal-id">
+        <div class="mark" aria-hidden="true">NIT</div>
+        <div>
+          <p class="lbl">Sua meta</p>
+          <h2 class="t" id="goal-title">Enfermeiro — Prefeitura de Niterói</h2>
+          <p class="s">COSEAC · Prova em 20/09/2026 · Edital nº 01/2026</p>
+        </div>
+      </div>
+      <div class="countdown">
+        <p class="n">47 dias</p>
+        <p class="c">até a prova</p>
+      </div>
+      <button type="button" class="kebab" aria-label="Opções da meta: trocar prova, parar de treinar">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+      </button>
+    </div>
+
+    <div class="ready">
+      <div class="ready-row">
+        <p class="k">Prontidão para o corte</p>
+        <p class="v">Você está <b>2 p.p. acima</b> da nota de corte</p>
+      </div>
+      <div class="bar" role="img" aria-label="Prontidão 62%, nota de corte 60%">
+        <div class="fill"></div>
+        <div class="cut"></div>
+      </div>
+      <div class="bar-legend"><span>0</span><span>Prontidão: <strong style="color:var(--ink)">62%</strong></span><span>100</span></div>
+    </div>
+
+    <div class="goal-note">
+      <span class="badge">Novo no edital</span>
+      <span class="txt"><b>A data desta prova pode ter mudado:</b> retificação publicada ontem.</span>
+      <a href="#">Ver o que mudou</a>
+    </div>
+
+    <div class="resume">
+      <div class="where">
+        <p class="stage"><span class="dot"></span>Fase de Estudo · ponto 3 de 8</p>
+        <p class="what">SAE — Sistematização da Assistência de Enfermagem</p>
+        <p class="sub">Você parou aqui ontem · faltam 5 pontos para a re-tentativa</p>
+      </div>
+      <a class="cta" href="#">
+        Continuar treino
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+
+    <div class="quota">
+      <span class="pills" aria-hidden="true">
+        <span class="pill used"></span><span class="pill used"></span><span class="pill"></span><span class="pill"></span><span class="pill"></span>
+      </span>
+      2 de 5 treinos usados este mês · renova em 01/09
+    </div>
+  </section>
+
+  <!-- ══ HERÓI · meta definida, treino ainda não começado ══ -->
+  <section class="goal only-goalonly" aria-labelledby="goalonly-title">
+    <div class="goal-head">
+      <div class="goal-id">
+        <div class="mark" aria-hidden="true">NIT</div>
+        <div>
+          <p class="lbl">Sua meta</p>
+          <h2 class="t" id="goalonly-title">Enfermeiro — Prefeitura de Niterói</h2>
+          <p class="s">COSEAC · Prova em 20/09/2026 · Edital nº 01/2026</p>
+        </div>
+      </div>
+      <div class="countdown">
+        <p class="n">47 dias</p>
+        <p class="c">até a prova</p>
+      </div>
+      <button type="button" class="kebab" aria-label="Opções da meta: trocar prova, deixar de acompanhar">
+        <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg>
+      </button>
+    </div>
+
+    <div class="ready">
+      <div class="ready-row">
+        <p class="k">Prontidão para o corte</p>
+        <p class="v">Aparece depois da sua prova-diagnóstico</p>
+      </div>
+      <div class="bar" role="img" aria-label="Prontidão ainda não medida, nota de corte 60%">
+        <div class="cut"></div>
+      </div>
+      <div class="bar-legend"><span>0</span><span>Prontidão: <strong style="color:var(--ink)">—</strong></span><span>100</span></div>
+    </div>
+
+    <div class="resume">
+      <div class="where">
+        <p class="stage"><span class="dot"></span>Primeiro passo · Diagnóstico</p>
+        <p class="what">Faça a prova-diagnóstico para medir onde você está</p>
+        <p class="sub">Usa 1 dos seus 5 treinos do mês · cerca de 40 questões</p>
+      </div>
+      <a class="cta" href="#">
+        Começar treino
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+
+    <div class="quota">
+      <span class="pills" aria-hidden="true">
+        <span class="pill"></span><span class="pill"></span><span class="pill"></span><span class="pill"></span><span class="pill"></span>
+      </span>
+      0 de 5 treinos usados este mês · renova em 01/09
+    </div>
+  </section>
+
+  <!-- ══ HERÓI · estado SEM meta ═══════════════════════════ -->
+  <section class="goal-empty only-empty" aria-labelledby="goal-empty-title">
+    <p class="lbl">Sua próxima meta</p>
+    <h2 class="t" id="goal-empty-title">Escolha seu próximo concurso</h2>
+    <p class="s">Você concluiu o treino de Maricá com <strong style="color:var(--ink)">+9 p.p.</strong> de evolução.
+      Separamos 3 concursos abertos que combinam com o seu perfil. Escolha um e comece o diagnóstico.</p>
+    <a class="cta" href="#">
+      Explorar concursos
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </a>
+  </section>
+
+  <!-- ══ Segunda meta (só quando há 2 treinos ativos) ══════ -->
+  <section class="goal2 only-multi" aria-labelledby="goal2-title">
+    <h2 id="goal2-title">Você também está treinando para</h2>
+    <a class="goal2-row" href="#">
+      <span class="mark" aria-hidden="true">EBS</span>
+      <span class="info">
+        <span class="t">Enfermeiro Assistencial — EBSERH</span>
+        <span class="s">IBFC · Prova em 30/10/2026 · faltam 82 dias · fase de Diagnóstico</span>
+      </span>
+      <span class="mini" role="img" aria-label="Prontidão 48%, nota de corte 50%">
+        <span class="cap"><span>Prontidão <b>48%</b></span><span>corte 50</span></span>
+        <span class="bar2"><span class="fill2"></span><span class="cut2"></span></span>
+      </span>
+      <span class="btn-ghost">Continuar</span>
+    </a>
+  </section>
+
+  <!-- ══ Constância + Evolução ═════════════════════════════ -->
+  <div class="grid2">
+    <section class="panel" aria-labelledby="week-title">
+      <div class="ph"><h2 id="week-title">Sua semana</h2></div>
+      <div class="week">
+        <div class="day done"><span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>seg</div>
+        <div class="day"><span class="b">·</span>ter</div>
+        <div class="day done"><span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>qua</div>
+        <div class="day done"><span class="b"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg></span>qui</div>
+        <div class="day today"><span class="b">hoje</span>sex</div>
+        <div class="day"><span class="b">·</span>sáb</div>
+        <div class="day"><span class="b">·</span>dom</div>
+      </div>
+      <p class="week-note"><b>3 sessões</b> nesta semana.</p>
+      <p class="week-sub">Seu ritmo no último mês foi de 4 por semana. Uma sessão hoje mantém o padrão.</p>
+    </section>
+
+    <section class="panel" aria-labelledby="evo-title">
+      <div class="ph">
+        <h2 id="evo-title">Evolução</h2>
+        <a href="#">Ver evolução completa</a>
+      </div>
+      <p class="evo-line">Sua média <b class="up">subiu 4,2 p.p.</b> em relação a julho.</p>
+      <div class="evo-spark">
+        <div class="evo-last"><p class="n">71%</p><p class="c">última prova</p></div>
+        <svg viewBox="0 0 300 74" preserveAspectRatio="none" role="img" aria-label="Notas das últimas 9 provas, de 58% a 71%">
+          <defs>
+            <linearGradient id="sparkfill" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0" stop-color="#0891b2" stop-opacity=".18"/>
+              <stop offset="1" stop-color="#0891b2" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <path d="M0,45 L37.5,52 L75,38 L112.5,42 L150,30 L187.5,34 L225,22 L262.5,26 L300,14 L300,74 L0,74 Z" fill="url(#sparkfill)"/>
+          <path d="M0,45 L37.5,52 L75,38 L112.5,42 L150,30 L187.5,34 L225,22 L262.5,26 L300,14"
+            fill="none" stroke="#0891b2" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
+          <circle cx="300" cy="14" r="4" fill="#0891b2" stroke="#fff" stroke-width="2"/>
+        </svg>
+        <div class="evo-legend"><span>mai</span><span>jun</span><span>jul</span><span>ago</span></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ══ Recomendados para você ════════════════════════════ -->
+  <section class="reco" aria-labelledby="reco-title">
+    <div class="reco-head">
+      <div>
+        <h2 id="reco-title">Recomendados para você</h2>
+        <p class="why">Com base no seu perfil: até 1h de Niterói · a partir de R$ 4.500</p>
+      </div>
+      <a href="#">Ver todos os concursos</a>
+    </div>
+    <div class="reco-list">
+      <a class="reco-item hide-multi" href="#">
+        <span class="mark" aria-hidden="true">EBS</span>
+        <span class="info">
+          <span class="t">EBSERH — Enfermeiro Assistencial</span>
+          <span class="s">Nacional · IBFC · R$ 5.874 · 120 vagas</span>
+        </span>
+        <span class="chips">
+          <span class="chip time">Inscrições fecham em 3 dias</span>
+          <span class="chip match">vale para todo o Brasil</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="reco-item" href="#">
+        <span class="mark" aria-hidden="true">SG</span>
+        <span class="info">
+          <span class="t">Prefeitura de São Gonçalo — Enfermeiro ESF</span>
+          <span class="s">São Gonçalo/RJ · AOCP · R$ 4.820 · 35 vagas</span>
+        </span>
+        <span class="chips">
+          <span class="chip match">~40 min de você</span>
+          <span class="chip">Inscrições abertas</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+      <a class="reco-item" href="#">
+        <span class="mark" aria-hidden="true">UFF</span>
+        <span class="info">
+          <span class="t">UFF — Enfermeiro / Área Hospitalar</span>
+          <span class="s">Niterói/RJ · COSEAC · R$ 4.556 · 12 vagas</span>
+        </span>
+        <span class="chips">
+          <span class="chip match">na sua cidade</span>
+          <span class="chip">Prova em outubro</span>
+        </span>
+        <span class="go"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </a>
+    </div>
+  </section>
+
+  <!-- ══ Notas ═════════════════════════════════════════════ -->
+  <section class="notes">
+    <p><b>Notas do protótipo.</b>
+      Herói = treino ativo mais recente (<code>useTrainingsQuery</code>) + prontidão/corte do payload do cargo + countdown da timeline do concurso.
+      A cota de treinos virou a linha discreta no rodapé do herói (era um card inteiro).
+      <b>Regra de dono:</b> cada aviso mora junto do seu assunto: retificação/mudança do SEU concurso aparece dentro do bloco da meta ("Novo no edital");
+      prazo de inscrição de concurso recomendado aparece como chip âmbar no card dele em Recomendados. Não existe seção de avisos avulsa.
+      <b>Duas metas ativas:</b> a mais recente é o herói; as demais viram linhas compactas ("Você também está treinando para") com prontidão, data e Continuar.
+      Um concurso que vira meta sai da lista de Recomendados.
+      <b>Ciclo da meta (conceito novo, hoje implícito no backend):</b> "Treinar para este concurso" na página do cargo cria a meta (grátis, não gasta cota);
+      começar um treino dentro dela consome a cota como hoje; "Parar de treinar / trocar prova" vive no menu ⋯ do bloco da meta (e na página do cargo) e
+      arquiva a meta, devolvendo o concurso aos Recomendados. Estado "Meta sem treino": herói com countdown e corte, prontidão vazia, CTA "Começar treino".
+      Usuário novo sem meta vê o mesmo estado "Sem meta" com copy de primeira vez (sem a linha de evolução do treino anterior).
+      <b>Evolução</b> comprime os dois gráficos atuais em 1 sparkline + frase interpretada; os LineCharts completos migram para "Ver evolução completa".
+      <b>Recomendados</b> = <code>listConcursos</code> com <code>match.recommended</code> e chips de motivo já existentes.
+      Sem perfil de preferências → a seção vira 1 linha-convite. Âmbar aparece só em prazo apertado (regra "tempo acabando" do DESIGN.md); verde só em delta positivo de desempenho.</p>
+  </section>
+</div>
+
+<!-- Controles do protótipo -->
+<div class="proto" role="group" aria-label="Estado do protótipo">
+  <button type="button" data-set="active" aria-pressed="true">Treinando</button>
+  <button type="button" data-set="multi" aria-pressed="false">2 metas</button>
+  <button type="button" data-set="goalonly" aria-pressed="false">Meta sem treino</button>
+  <button type="button" data-set="empty" aria-pressed="false">Sem meta</button>
+</div>
+
+<script>
+  const btns = document.querySelectorAll('.proto button')
+  btns.forEach(b => b.addEventListener('click', () => {
+    document.body.dataset.state = b.dataset.set
+    btns.forEach(x => x.setAttribute('aria-pressed', String(x === b)))
+    document.querySelectorAll('.only-active,.only-multi,.only-empty,.only-goalonly').forEach(el => {
+      el.classList.remove('fadein'); void el.offsetWidth; el.classList.add('fadein')
+    })
+  }))
+</script>
+</body>
+</html>

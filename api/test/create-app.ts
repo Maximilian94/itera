@@ -14,6 +14,7 @@ import { CargoModule } from '../src/cargo/cargo.module';
 import { ConcursoModule } from '../src/concurso/concurso.module';
 import { ExamBaseModule } from '../src/examBase/exam-base.module';
 import { PreferenceModule } from '../src/preference/preference.module';
+import { GoalModule } from '../src/goal/goal.module';
 import { PrismaModule } from '../src/prisma/prisma.module';
 import { IS_OPTIONAL_AUTH_KEY } from '../src/common/decorators/optional-auth.decorator';
 import { IS_PUBLIC_KEY } from '../src/common/decorators/public.decorator';
@@ -78,6 +79,7 @@ export async function createTestApp(): Promise<INestApplication> {
       CargoModule,
       ExamBaseModule,
       PreferenceModule,
+      GoalModule,
     ],
     providers: [
       { provide: APP_GUARD, useClass: TestAuthGuard },

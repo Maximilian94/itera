@@ -5,6 +5,7 @@ import { TrainingService } from './training.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamBaseAttemptService } from '../examBaseAttempt/exam-base-attempt.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { GoalService } from '../goal/goal.service';
 
 const USER_ID = 'user-1';
 const EXAM_BASE_ID = 'eb-1';
@@ -53,6 +54,10 @@ describe('TrainingService.create (idempotência por prova, T2.1)', () => {
         { provide: ConfigService, useValue: { get: jest.fn() } },
         { provide: ExamBaseAttemptService, useValue: {} },
         { provide: AnalyticsService, useValue: analytics },
+        {
+          provide: GoalService,
+          useValue: { ensureForExamBase: jest.fn().mockResolvedValue(undefined) },
+        },
       ],
     }).compile();
 

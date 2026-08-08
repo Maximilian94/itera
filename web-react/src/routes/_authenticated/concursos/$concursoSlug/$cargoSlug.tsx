@@ -42,6 +42,7 @@ import { CARD } from '@/features/concurso/components/card'
 import { enter, useMeters, withViewTransition } from '@/features/concurso/components/motion'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
+import { GoalToggle } from '@/features/goal/components/GoalToggle'
 import { BACK_SQUARE, BackSquare } from '@/features/concurso/components/BackSquare'
 import { FichaCard } from '@/features/concurso/components/FichaCard'
 import { SubjectDistribution } from '@/features/concurso/components/SubjectDistribution'
@@ -396,6 +397,12 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
                 <StatusPill
                   status={concurso.status}
                   label={statusLabel(concurso.status, examDate)}
+                />
+                {/* Entrada/saída da meta da home: definir/parar de treinar. */}
+                <GoalToggle
+                  cargoId={cargo.id}
+                  cargoSlug={cargo.slug}
+                  provaExamBaseIds={data.provas.map((p) => p.examBaseId)}
                 />
               </div>
             </div>
