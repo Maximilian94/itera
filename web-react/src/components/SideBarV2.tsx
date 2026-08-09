@@ -112,15 +112,16 @@ export const SideBarV2 = () => {
     return (
         <div className="hidden h-full md:block">
             <div
-                className={'w-13 bg-linear-to-b from-cyan-600 to-sky-900 h-full rounded-lg flex flex-col items-center justify-between py-2 gap-2'}
+                className={'w-[74px] bg-white border border-slate-200 shadow-sm h-full rounded-xl flex flex-col items-center justify-between py-2.5 gap-2'}
             >
-                <div className='flex flex-col items-center justify-center gap-2'>
+                <div className='flex flex-col items-center justify-center gap-1.5'>
+                    <img src="/logo.svg" alt="Maximize Enfermagem" className="w-8 h-8 mb-1 shrink-0" />
                     {pages.map((page) => (
                         <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} alsoMatch={page.alsoMatch} />
                     ))}
                     {isAdmin && (
                         <>
-                            <div className="w-6 h-px bg-white/20 my-1" />
+                            <div className="w-8 h-px bg-slate-200 my-1" />
                             {adminPages.map((page) => (
                                 <NavItem key={page.label} href={page.href} icon={page.icon} activeIcon={page.activeIcon} label={page.label} fuzzy={page.fuzzy} />
                             ))}
@@ -128,12 +129,12 @@ export const SideBarV2 = () => {
                     )}
                 </div>
 
-                <div className="flex flex-col items-center justify-center gap-0.5">
+                <div className="flex flex-col items-center justify-center gap-1">
                     <button
                         ref={avatarRef}
                         type="button"
                         onClick={handleAvatarClick}
-                        className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border-2 border-white/30 hover:border-white/60 transition-all cursor-pointer bg-white/10 shrink-0"
+                        className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center border border-slate-200 hover:border-cyan-400 transition-all cursor-pointer bg-cyan-600 shrink-0"
                         aria-label="Menu do usuário"
                     >
                         {user?.imageUrl ? (
@@ -148,7 +149,7 @@ export const SideBarV2 = () => {
                             </span>
                         )}
                     </button>
-                    <span className="text-[10px] text-white font-bold text-center">Perfil</span>
+                    <span className="text-[10px] text-slate-500 font-semibold text-center">Perfil</span>
                 </div>
 
                 <Menu
@@ -192,15 +193,11 @@ const NavItem = ({ href, icon: Icon, activeIcon: ActiveIcon, label, fuzzy, alsoM
     )
     return (
         <Link to={href}>
-            <div className="cursor-pointer flex flex-col items-center justify-center gap-0.5">
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ease-in-out duration-200 ${isActive ? 'bg-white text-cyan-600' : 'bg-inherit text-white hover:bg-white/10'}`}>
-                    {isActive ? <ActiveIcon className='size-4' strokeWidth={2} /> : <Icon className='size-5' strokeWidth={1.5} />}
-                </div>
-                <div className='text-[10px] text-white flex items-center justify-center font-bold'>
-                    <span className='text-wrap text-center'>
-                        {label}
-                    </span>
-                </div>
+            <div className={`cursor-pointer flex flex-col items-center justify-center gap-1 w-16 py-2 rounded-lg transition-colors ease-in-out duration-200 ${isActive ? 'bg-cyan-50 text-cyan-700' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'}`}>
+                {isActive ? <ActiveIcon className='size-5' /> : <Icon className='size-5' strokeWidth={1.7} />}
+                <span className='text-[10px] font-semibold text-center whitespace-nowrap leading-none'>
+                    {label}
+                </span>
             </div>
         </Link>
     )
