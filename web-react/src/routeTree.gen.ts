@@ -18,6 +18,7 @@ import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedExamsRouteImport } from './routes/_authenticated/exams'
 import { Route as AuthenticatedEvolucaoComoFuncionaRouteImport } from './routes/_authenticated/evolucao-como-funciona'
+import { Route as AuthenticatedEvolucaoRouteImport } from './routes/_authenticated/evolucao'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedCheckoutSuccessRouteImport } from './routes/_authenticated/checkout-success'
 import { Route as AuthenticatedAccountRouteImport } from './routes/_authenticated/account'
@@ -87,6 +88,11 @@ const AuthenticatedEvolucaoComoFuncionaRoute =
     path: '/evolucao-como-funciona',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedEvolucaoRoute = AuthenticatedEvolucaoRouteImport.update({
+  id: '/evolucao',
+  path: '/evolucao',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -230,6 +236,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AuthenticatedAccountRoute
   '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/evolucao': typeof AuthenticatedEvolucaoRoute
   '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/exams': typeof AuthenticatedExamsRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
@@ -263,6 +270,7 @@ export interface FileRoutesByTo {
   '/account': typeof AuthenticatedAccountRoute
   '/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/evolucao': typeof AuthenticatedEvolucaoRoute
   '/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/planos': typeof AuthenticatedPlanosRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/_authenticated/account': typeof AuthenticatedAccountRoute
   '/_authenticated/checkout-success': typeof AuthenticatedCheckoutSuccessRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/evolucao': typeof AuthenticatedEvolucaoRoute
   '/_authenticated/evolucao-como-funciona': typeof AuthenticatedEvolucaoComoFuncionaRoute
   '/_authenticated/exams': typeof AuthenticatedExamsRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
@@ -331,6 +340,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/checkout-success'
     | '/dashboard'
+    | '/evolucao'
     | '/evolucao-como-funciona'
     | '/exams'
     | '/onboarding'
@@ -364,6 +374,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/checkout-success'
     | '/dashboard'
+    | '/evolucao'
     | '/evolucao-como-funciona'
     | '/onboarding'
     | '/planos'
@@ -396,6 +407,7 @@ export interface FileRouteTypes {
     | '/_authenticated/account'
     | '/_authenticated/checkout-success'
     | '/_authenticated/dashboard'
+    | '/_authenticated/evolucao'
     | '/_authenticated/evolucao-como-funciona'
     | '/_authenticated/exams'
     | '/_authenticated/onboarding'
@@ -493,6 +505,13 @@ declare module '@tanstack/react-router' {
       path: '/evolucao-como-funciona'
       fullPath: '/evolucao-como-funciona'
       preLoaderRoute: typeof AuthenticatedEvolucaoComoFuncionaRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/evolucao': {
+      id: '/_authenticated/evolucao'
+      path: '/evolucao'
+      fullPath: '/evolucao'
+      preLoaderRoute: typeof AuthenticatedEvolucaoRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -721,6 +740,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedAccountRoute: typeof AuthenticatedAccountRoute
   AuthenticatedCheckoutSuccessRoute: typeof AuthenticatedCheckoutSuccessRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEvolucaoRoute: typeof AuthenticatedEvolucaoRoute
   AuthenticatedEvolucaoComoFuncionaRoute: typeof AuthenticatedEvolucaoComoFuncionaRoute
   AuthenticatedExamsRoute: typeof AuthenticatedExamsRouteWithChildren
   AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
@@ -742,6 +762,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAccountRoute: AuthenticatedAccountRoute,
   AuthenticatedCheckoutSuccessRoute: AuthenticatedCheckoutSuccessRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEvolucaoRoute: AuthenticatedEvolucaoRoute,
   AuthenticatedEvolucaoComoFuncionaRoute:
     AuthenticatedEvolucaoComoFuncionaRoute,
   AuthenticatedExamsRoute: AuthenticatedExamsRouteWithChildren,

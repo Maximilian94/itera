@@ -11,6 +11,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamBaseAttemptService } from '../examBaseAttempt/exam-base-attempt.service';
 import { AnalyticsService } from '../analytics/analytics.service';
+import { GoalService } from '../goal/goal.service';
 import { UpdateStageDto } from './dto/update-stage.dto';
 import { UpdateStudyDto } from './dto/update-study.dto';
 import { UpsertRetryAnswerDto } from './dto/upsert-retry-answer.dto';
@@ -55,6 +56,7 @@ export class TrainingService {
     private readonly config: ConfigService,
     private readonly examBaseAttemptService: ExamBaseAttemptService,
     private readonly analytics: AnalyticsService,
+    private readonly goalService: GoalService,
   ) {}
 
   private async getSessionForUser(trainingId: string, userId: string) {
@@ -468,6 +470,9 @@ export class TrainingService {
       },
       select: { id: true },
     });
+
+    // Treinar uma prova cria/desarquiva a meta do cargo dela (nunca falha o treino).
+    await this.goalService.ensureForExamBase(userId, examBaseId);
 
     this.analytics.capture({
       userId,

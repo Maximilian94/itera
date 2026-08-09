@@ -99,6 +99,7 @@ model User {
   createdQuestions  ExamBaseQuestion[] @relation("questionCreator")
   questionReviews  ExamBaseQuestionReview[] @relation("questionReviewer")
   preference        UserPreference?
+  goals             UserGoal[]
 
   @@map("users")
 }
@@ -371,10 +372,34 @@ model Cargo {
 
   provas         CargoProva[]
   syllabusGroups ExamSyllabusGroup[]
+  userGoals      UserGoal[]
 
   @@index([concursoId])
   @@index([role])
   @@map("cargos")
+}
+
+/// Meta de estudo do usuário: o cargo (vaga) que ele acompanha/treina — âncora
+/// do herói da home. Criada explicitamente ("Treinar para este concurso") ou
+/// implicitamente ao começar um treino numa prova do cargo (e por backfill lazy
+/// no GET /goals a partir dos treinos em andamento). `archivedAt` = "parou de
+/// treinar": preserva o histórico e impede o backfill de recriar a meta;
+/// começar um treino no cargo desarquiva.
+model UserGoal {
+  id         String    @id @default(uuid()) @db.Uuid
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  archivedAt DateTime?
+
+  userId String @db.Uuid
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  cargoId String @db.Uuid
+  cargo   Cargo  @relation(fields: [cargoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cargoId])
+  @@index([userId])
+  @@map("user_goals")
 }
 
 /// Join M:N Cargo↔Prova. O rótulo ("Amarela"/"Tipo 1") é DO VÍNCULO, não da

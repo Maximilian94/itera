@@ -57,6 +57,8 @@ export function useCreateTrainingMutation() {
       // detalhe tem staleTime de 5 min — sem invalidar, a prontidão fica
       // stale (paridade com useStartSimuladoMutation, T2.3).
       queryClient.invalidateQueries({ queryKey: concursoKeys.all })
+      // O backend cria/desarquiva a meta do cargo ao começar o treino.
+      queryClient.invalidateQueries({ queryKey: ['goals'] })
     },
   })
 }
