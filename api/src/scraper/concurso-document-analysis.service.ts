@@ -48,6 +48,45 @@ export interface ProposedChange {
   evidence: string | null;
 }
 
+/** Campos de um cargo NOVO que um documento pode adicionar (inclusão de cargo).
+ *  Espelha os CARGO_FIELDS + role/isNursingRelevant (usados só na criação). */
+const NEW_CARGO_FIELDS = {
+  salaryBase: { type: 'decimal' },
+  vacancyCount: { type: 'int' },
+  registrationFee: { type: 'decimal' },
+  minPassingGradeNonQuota: { type: 'decimal' },
+  workload: { type: 'string' },
+  requirements: { type: 'string' },
+  hasReserveList: { type: 'boolean' },
+} as const;
+
+/** Cargo que o documento ADICIONA ao certame (não existe no estado atual). */
+export interface ProposedNewCargo {
+  role: string;
+  salaryBase: string | null;
+  vacancyCount: number | null;
+  registrationFee: string | null;
+  minPassingGradeNonQuota: string | null;
+  workload: string | null;
+  requirements: string | null;
+  hasReserveList: boolean | null;
+  isNursingRelevant: boolean;
+  evidence: string | null;
+}
+
+/** Cargo novo aprovado como chega do front (validado/normalizado no apply). */
+export interface NewCargoInput {
+  role: string;
+  salaryBase?: string | null;
+  vacancyCount?: number | null;
+  registrationFee?: string | null;
+  minPassingGradeNonQuota?: string | null;
+  workload?: string | null;
+  requirements?: string | null;
+  hasReserveList?: boolean | null;
+  isNursingRelevant?: boolean | null;
+}
+
 /** Etapa do cronograma (nome + descrição + data date-only). `type` (não
  *  `interface`) p/ ganhar index signature e ser aceito como Json do Prisma. */
 export interface Etapa {
@@ -151,6 +190,43 @@ function normalizeEtapas(raw: unknown): Etapa[] {
     .filter((e) => e.name !== '');
 }
 
+/** Normaliza os cargos novos que a IA propôs para a forma canônica. */
+function normalizeNewCargos(raw: unknown): ProposedNewCargo[] {
+  const arr = Array.isArray(raw) ? raw : [];
+  const decimal = (v: unknown): string | null => {
+    if (typeof v === 'number' && Number.isFinite(v)) return v.toFixed(2);
+    if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)))
+      return Number(v).toFixed(2);
+    return null;
+  };
+  const str = (v: unknown): string | null =>
+    typeof v === 'string' && v.trim() !== '' ? v.trim() : null;
+  return arr
+    .filter(
+      (c): c is Record<string, unknown> => typeof c === 'object' && c != null,
+    )
+    .map((c) => ({
+      role: typeof c.role === 'string' ? c.role.trim() : '',
+      salaryBase: decimal(c.salaryBase),
+      vacancyCount:
+        typeof c.vacancyCount === 'number' && Number.isFinite(c.vacancyCount)
+          ? Math.round(c.vacancyCount)
+          : typeof c.vacancyCount === 'string' &&
+              c.vacancyCount.trim() !== '' &&
+              Number.isFinite(Number(c.vacancyCount))
+            ? Math.round(Number(c.vacancyCount))
+            : null,
+      registrationFee: decimal(c.registrationFee),
+      minPassingGradeNonQuota: decimal(c.minPassingGradeNonQuota),
+      workload: str(c.workload),
+      requirements: str(c.requirements),
+      hasReserveList: typeof c.hasReserveList === 'boolean' ? c.hasReserveList : null,
+      isNursingRelevant: c.isNursingRelevant === true,
+      evidence: str(c.evidence),
+    }))
+    .filter((c) => c.role !== '');
+}
+
 export interface AnalyzeResult {
   documentId: string;
   analyzedAt: string;
@@ -161,6 +237,9 @@ export interface AnalyzeResult {
   /** Quadro de matérias proposto por cargo (só os cargos cujo quadro o
    *  documento determina E difere do atual); null se nenhum. */
   syllabus: ProposedCargoSyllabus[] | null;
+  /** Cargos que o documento ADICIONA (inclusão de cargo) e que ainda não
+   *  existem no concurso; null se o documento não adiciona nenhum. */
+  newCargos: ProposedNewCargo[] | null;
 }
 
 /** Só o que o apply precisa de cada mudança aprovada (espelha o DTO). */
@@ -176,17 +255,23 @@ Você compara um DOCUMENTO de concurso público (retificação, errata, comunica
 
 Você receberá o texto do documento e, em JSON, o estado atual do concurso e de seus cargos.
 
+O documento pode ser de DOIS tipos — trate os dois:
+1) RETIFICAÇÃO/errata: muda campos com linguagem de emenda ("onde se lê X, leia-se Y", "ficam prorrogadas as inscrições até DD/MM", "altera-se o número de vagas do cargo Z para N").
+2) ANEXO com TABELA DE DADOS (ex.: "ANEXO — REQUISITOS", "QUADRO DE VAGAS", tabela de cargos com salário/vagas/requisitos): NÃO tem linguagem de emenda, mas TRAZ os valores oficiais de cada cargo. Nesse caso, LEIA a tabela e proponha os valores dela como mudanças para os cargos existentes (salário, vagas, requisitos etc.), mesmo sem "onde se lê".
+
 Regras rígidas:
-- Liste SOMENTE mudanças que o documento EXPLICITAMENTE determina (ex.: "onde se lê X, leia-se Y", "ficam prorrogadas as inscrições até DD/MM", "altera-se o número de vagas do cargo Z para N"). NÃO invente, NÃO deduza o que "provavelmente" mudou.
-- Só inclua uma mudança se o novo valor for DIFERENTE do valor atual informado.
-- Se o documento não altera nada dos campos abaixo, retorne uma lista vazia.
-- Para cargo, use em cargoRole o nome EXATO do cargo como está no estado atual.
+- Liste mudanças que o documento determina (tipo 1) OU que constam na tabela de dados do documento (tipo 2). NÃO invente nem deduza o que "provavelmente" mudou — só o que está escrito no documento.
+- Só inclua uma mudança se o novo valor for DIFERENTE do valor atual informado no estado atual.
+- Se o documento não traz nenhum dos campos abaixo, retorne uma lista vazia.
+- Para cargo, use em cargoRole o nome EXATO do cargo como está no estado atual. Se a tabela traz um cargo que NÃO existe no estado atual, NÃO o coloque em "changes" — ele vai em "novosCargos" (abaixo).
 - Datas em ISO "YYYY-MM-DD". Dinheiro como string decimal com 2 casas ("1600.00"). Vagas como número inteiro. hasReserveList como booleano.
-- evidence: a frase do documento que justifica a mudança (curta).
+- evidence: a frase/linha do documento que justifica a mudança (curta).
 
 Campos válidos (ignore qualquer outro):
 - target "concurso": registrationStart, registrationEnd, examDate, resultDate, editalUrl
 - target "cargo": vacancyCount, salaryBase, registrationFee, minPassingGradeNonQuota, workload, requirements, description, hasReserveList
+
+Em "novosCargos", liste os cargos que este documento ADICIONA ao certame e que NÃO constam no estado atual — seja uma retificação que INCLUI um cargo ("fica incluído o cargo de ..."), seja um quadro de vagas/anexo que lista um cargo ausente do estado atual. Compare pelo nome (role) com os cargos do estado atual: se o cargo JÁ existe lá, NÃO o repita aqui (use "changes"). Para cada cargo novo: role (nome EXATO do edital), salaryBase (string decimal 2 casas ou null), vacancyCount (inteiro ou null), registrationFee (string decimal ou null), minPassingGradeNonQuota (string decimal ou null), workload (string ou null), requirements (string ou null), hasReserveList (booleano ou null), isNursingRelevant (true SÓ para cargos de enfermagem — Enfermeiro e especialidades, Técnico de Enfermagem, Auxiliar de Enfermagem — false para os demais) e evidence (frase curta). Se o documento não adiciona cargo, retorne "novosCargos": [].
 
 Além das mudanças de campo, extraia o CRONOGRAMA COMPLETO do documento em "cronograma": TODAS as etapas/eventos com data do calendário do certame, do primeiro ao último. O cronograma costuma estar numa TABELA (ex.: "ANEXO — CRONOGRAMA", colunas Evento/Atividade e Data).
 ATENÇÃO CRÍTICA: no texto extraído do PDF a tabela quase sempre vem DESALINHADA — as datas podem aparecer separadas dos eventos, em blocos, ou em outra ordem. Reconstrua com cuidado a associação de CADA evento à sua data; não invente, mas também não deixe de fora uma linha que existe na tabela.
@@ -196,7 +281,7 @@ Regras: extraia a tabela INTEIRA (não pare nas primeiras linhas). Datas do edit
 Por fim, em "syllabusCargos" liste apenas os NOMES dos cargos (cargoRole EXATO do estado atual) para os quais este documento APRESENTA ou ALTERA o quadro de matérias / conteúdo programático (a tabela "Disciplina | nº de questões | peso" e/ou a lista de conteúdo programático daquele cargo). Só inclua o cargo se o documento realmente traz o quadro dele. NÃO transcreva as matérias aqui — só os nomes dos cargos (a transcrição do quadro é feita depois, numa etapa separada). Se o documento não traz quadro de matérias de nenhum cargo, retorne "syllabusCargos": [].
 
 Retorne SOMENTE JSON, sem markdown:
-{"changes":[{"target":"concurso","field":"registrationEnd","newValue":"2026-07-20","evidence":"..."},{"target":"cargo","cargoRole":"Enfermeiro","field":"vacancyCount","newValue":15,"evidence":"..."}],"cronograma":[{"name":"Inscrições","description":null,"date":"2026-07-07"},{"name":"Prova Objetiva","description":"Caráter eliminatório e classificatório.","date":"2026-09-27"}],"syllabusCargos":["Enfermeiro"]}
+{"changes":[{"target":"concurso","field":"registrationEnd","newValue":"2026-07-20","evidence":"..."},{"target":"cargo","cargoRole":"Enfermeiro","field":"vacancyCount","newValue":15,"evidence":"..."}],"novosCargos":[{"role":"Enfermeiro do Trabalho","salaryBase":"4750.00","vacancyCount":2,"registrationFee":"110.00","minPassingGradeNonQuota":"60.00","workload":"40 horas semanais","requirements":"Superior em Enfermagem, especialização em Enfermagem do Trabalho e registro no COREN","hasReserveList":true,"isNursingRelevant":true,"evidence":"Fica incluído o cargo de Enfermeiro do Trabalho."}],"cronograma":[{"name":"Inscrições","description":null,"date":"2026-07-07"},{"name":"Prova Objetiva","description":"Caráter eliminatório e classificatório.","date":"2026-09-27"}],"syllabusCargos":["Enfermeiro"]}
 `.trim();
 
 /**
@@ -294,13 +379,27 @@ export class ConcursoDocumentAnalysisService {
     }
     const syllabus = proposedSyllabus.length > 0 ? proposedSyllabus : null;
 
+    // Cargos NOVOS que o documento adiciona (inclusão de cargo). Descarta os que
+    // já existem no estado atual (por role, case-insensitive) — esses são diff,
+    // não inclusão — e dedupe interno por role.
+    const seenNewRole = new Set<string>();
+    const newCargosList = normalizeNewCargos(
+      (parsed as { novosCargos?: unknown }).novosCargos,
+    ).filter((c) => {
+      const key = c.role.toLowerCase();
+      if (concurso.cargosByRole.has(key) || seenNewRole.has(key)) return false;
+      seenNewRole.add(key);
+      return true;
+    });
+    const newCargos = newCargosList.length > 0 ? newCargosList : null;
+
     const analyzedAt = new Date();
     await this.prisma.concursoDocument.update({
       where: { id: doc.id },
       data: { analyzedAt },
     });
     this.logger.log(
-      `analyze doc ${doc.id} (${doc.title}): ${text.length} chars lidos do PDF → ${changes.length} mudança(s) + cronograma ${cronograma ? `${cronograma.length} etapa(s)` : 'sem mudança'} + quadro ${syllabus ? `${syllabus.length} cargo(s)` : 'sem mudança'}`,
+      `analyze doc ${doc.id} (${doc.title}): ${text.length} chars lidos do PDF → ${changes.length} mudança(s) + cronograma ${cronograma ? `${cronograma.length} etapa(s)` : 'sem mudança'} + quadro ${syllabus ? `${syllabus.length} cargo(s)` : 'sem mudança'} + ${newCargos ? `${newCargos.length} cargo(s) novo(s)` : 'sem cargo novo'}`,
     );
 
     return {
@@ -309,6 +408,7 @@ export class ConcursoDocumentAnalysisService {
       changes,
       cronograma,
       syllabus,
+      newCargos,
     };
   }
 
@@ -323,6 +423,7 @@ export class ConcursoDocumentAnalysisService {
     changes: ApplyChangeInput[],
     cronograma?: EtapaInput[] | null,
     syllabus?: SyllabusInput[] | null,
+    newCargos?: NewCargoInput[] | null,
   ): Promise<{ appliedCount: number }> {
     const doc = await this.prisma.concursoDocument.findFirst({
       where: { id: documentId, concursoId },
@@ -334,6 +435,14 @@ export class ConcursoDocumentAnalysisService {
     for (const change of changes) {
       const applied = await this.applyOne(concursoId, change);
       if (applied) appliedCount++;
+    }
+
+    // Cargos novos aprovados: cria a ficha do cargo (idempotente por
+    // concursoId+role, mesma semântica do createFromEdital — cargo sem prova
+    // ainda, examBaseId null).
+    for (const cargo of newCargos ?? []) {
+      const created = await this.createNewCargo(concursoId, cargo);
+      if (created) appliedCount++;
     }
 
     // Cronograma aprovado: substitui as etapas do concurso pelas propostas.
@@ -449,6 +558,57 @@ export class ConcursoDocumentAnalysisService {
       return true;
     }
     return false;
+  }
+
+  /** Cria um cargo NOVO no concurso (inclusão de cargo por retificação/anexo).
+   *  Idempotente por (concursoId, role) case-insensitive: se já existe, não
+   *  recria (retorna false). Cargo sem prova ainda — slug null, como no
+   *  createFromEdital. */
+  private async createNewCargo(
+    concursoId: string,
+    input: NewCargoInput,
+  ): Promise<boolean> {
+    const role = input.role?.trim();
+    if (!role) return false;
+    const existing = await this.prisma.cargo.findFirst({
+      where: { concursoId, role: { equals: role, mode: 'insensitive' } },
+      select: { id: true },
+    });
+    if (existing) return false;
+    await this.prisma.cargo.create({
+      data: {
+        concursoId,
+        role,
+        salaryBase: this.coerce(
+          input.salaryBase ?? null,
+          NEW_CARGO_FIELDS.salaryBase.type,
+        ) as string | null,
+        vacancyCount: this.coerce(
+          input.vacancyCount != null ? String(input.vacancyCount) : null,
+          NEW_CARGO_FIELDS.vacancyCount.type,
+        ) as number | null,
+        registrationFee: this.coerce(
+          input.registrationFee ?? null,
+          NEW_CARGO_FIELDS.registrationFee.type,
+        ) as string | null,
+        minPassingGradeNonQuota: this.coerce(
+          input.minPassingGradeNonQuota ?? null,
+          NEW_CARGO_FIELDS.minPassingGradeNonQuota.type,
+        ) as string | null,
+        workload:
+          typeof input.workload === 'string' && input.workload.trim() !== ''
+            ? input.workload.trim()
+            : null,
+        requirements:
+          typeof input.requirements === 'string' &&
+          input.requirements.trim() !== ''
+            ? input.requirements.trim()
+            : null,
+        hasReserveList: input.hasReserveList === true,
+        isNursingRelevant: input.isNursingRelevant === true,
+      },
+    });
+    return true;
   }
 
   /** Replace total do quadro de matérias de UM cargo (valida o dono). */
@@ -791,6 +951,7 @@ export class ConcursoDocumentAnalysisService {
     changes?: unknown;
     cronograma?: unknown;
     syllabusCargos?: unknown;
+    novosCargos?: unknown;
   }> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {

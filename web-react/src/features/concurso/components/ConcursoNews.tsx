@@ -12,6 +12,7 @@ import type { ConcursoDocument } from '@/features/concurso/domain/concurso.types
 import type {
   CheckedDocument,
   ProposedChange,
+  ProposedNewCargo,
 } from '@/features/scraper/scraper.types'
 import {
   useAddConcursoDocumentsMutation,
@@ -523,6 +524,9 @@ function DocAnalysis({
   const [deselectedCargos, setDeselectedCargos] = useState<Set<string>>(
     new Set(),
   )
+  const [deselectedNewCargos, setDeselectedNewCargos] = useState<Set<string>>(
+    new Set(),
+  )
 
   const changes: Array<ProposedChange> = analyze.data?.changes ?? []
   const selected = changes.filter((c) => !deselected.has(c.id))
@@ -531,8 +535,15 @@ function DocAnalysis({
   const syllabus = analyze.data?.syllabus ?? null
   const selectedSyllabus =
     syllabus?.filter((s) => !deselectedCargos.has(s.cargoId)) ?? []
+  const newCargos: Array<ProposedNewCargo> = analyze.data?.newCargos ?? []
+  const selectedNewCargos = newCargos.filter(
+    (c) => !deselectedNewCargos.has(c.role),
+  )
   const totalToApply =
-    selected.length + (applyCronograma ? 1 : 0) + selectedSyllabus.length
+    selected.length +
+    (applyCronograma ? 1 : 0) +
+    selectedSyllabus.length +
+    selectedNewCargos.length
   const applied = document.changesAppliedAt != null
 
   const runAnalyze = (file?: File) => {
@@ -540,6 +551,7 @@ function DocAnalysis({
     setDeselected(new Set())
     setIncludeCronograma(true)
     setDeselectedCargos(new Set())
+    setDeselectedNewCargos(new Set())
     apply.reset()
     analyze.mutate({ documentId: document.id, file })
   }
@@ -560,6 +572,14 @@ function DocAnalysis({
       return next
     })
 
+  const toggleNewCargo = (role: string) =>
+    setDeselectedNewCargos((prev) => {
+      const next = new Set(prev)
+      if (next.has(role)) next.delete(role)
+      else next.add(role)
+      return next
+    })
+
   const runApply = () => {
     if (apply.isPending || totalToApply === 0) return
     apply.mutate({
@@ -567,6 +587,7 @@ function DocAnalysis({
       changes: selected,
       cronograma: applyCronograma ? cronograma : null,
       syllabus: selectedSyllabus.length > 0 ? selectedSyllabus : null,
+      newCargos: selectedNewCargos.length > 0 ? selectedNewCargos : null,
     })
   }
 
@@ -646,7 +667,10 @@ function DocAnalysis({
 
       {analyze.isSuccess && !apply.isSuccess && (
         <div className="mt-2">
-          {changes.length === 0 && cronograma == null && syllabus == null ? (
+          {changes.length === 0 &&
+          cronograma == null &&
+          syllabus == null &&
+          newCargos.length === 0 ? (
             <p className="text-xs text-slate-500">
               Nenhuma alteração detectada neste documento.
             </p>
@@ -793,6 +817,68 @@ function DocAnalysis({
                     </div>
                   )
                 })}
+
+              {/* Cargos NOVOS que o documento adiciona (inclusão de cargo) */}
+              {newCargos.length > 0 && (
+                <div
+                  className={
+                    changes.length > 0 || cronograma != null || syllabus != null
+                      ? 'mt-3 border-t border-slate-200 pt-3'
+                      : ''
+                  }
+                >
+                  <p className="text-xs font-semibold text-slate-700">
+                    {newCargos.length}{' '}
+                    {newCargos.length === 1
+                      ? 'cargo incluído'
+                      : 'cargos incluídos'}{' '}
+                    — cria um cargo novo no concurso
+                  </p>
+                  <ul className="mt-2 flex flex-col gap-2">
+                    {newCargos.map((c) => {
+                      const included = !deselectedNewCargos.has(c.role)
+                      const numbers = [
+                        c.salaryBase != null ? `R$ ${c.salaryBase}` : null,
+                        c.vacancyCount != null
+                          ? `${c.vacancyCount} ${c.vacancyCount === 1 ? 'vaga' : 'vagas'}`
+                          : null,
+                        c.workload,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')
+                      return (
+                        <li key={c.role} className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            checked={included}
+                            onChange={() => toggleNewCargo(c.role)}
+                            aria-label={`Incluir cargo: ${c.role}`}
+                            className="mt-0.5 h-3.5 w-3.5 shrink-0 accent-cyan-600"
+                          />
+                          <div className="min-w-0 flex-1 text-xs">
+                            <p className="font-semibold text-slate-800">
+                              {c.role}
+                              {c.isNursingRelevant && (
+                                <span className="ml-1.5 rounded bg-cyan-50 px-1 py-0.5 text-[11px] font-semibold text-cyan-700">
+                                  enfermagem
+                                </span>
+                              )}
+                            </p>
+                            {numbers !== '' && (
+                              <p className="text-slate-500">{numbers}</p>
+                            )}
+                            {c.evidence != null && c.evidence !== '' && (
+                              <p className="mt-0.5 italic text-slate-400">
+                                “{c.evidence}”
+                              </p>
+                            )}
+                          </div>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                </div>
+              )}
 
               <div className="mt-2 flex items-center justify-end gap-3">
                 {apply.isError && (

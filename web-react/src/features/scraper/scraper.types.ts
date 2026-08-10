@@ -112,6 +112,20 @@ export interface ProposedCargoSyllabus {
   groups: Array<ProposedSyllabusGroup>
 }
 
+/** Cargo que o documento ADICIONA ao certame (inclusão de cargo). */
+export interface ProposedNewCargo {
+  role: string
+  salaryBase: string | null
+  vacancyCount: number | null
+  registrationFee: string | null
+  minPassingGradeNonQuota: string | null
+  workload: string | null
+  requirements: string | null
+  hasReserveList: boolean | null
+  isNursingRelevant: boolean
+  evidence: string | null
+}
+
 export interface AnalyzeDocumentResult {
   documentId: string
   analyzedAt: string
@@ -120,6 +134,8 @@ export interface AnalyzeDocumentResult {
   cronograma: Array<ProposedEtapa> | null
   /** Quadros de matérias propostos por cargo; null se o documento não mexe. */
   syllabus: Array<ProposedCargoSyllabus> | null
+  /** Cargos que o documento adiciona (inclusão de cargo); null se nenhum. */
+  newCargos: Array<ProposedNewCargo> | null
 }
 
 // ---- Descoberta de concursos (/admin/gerenciar-concursos) ----
