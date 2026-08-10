@@ -4,6 +4,7 @@ import { jsonrepair } from 'jsonrepair';
 import { decodeHtmlBody } from '../common/decode-body';
 import { PdfOcrService } from '../pdf/pdf-ocr.service';
 import type {
+  ExtractedCargoFicha,
   ExtractedEditalConcurso,
   ExtractedExamMetadata,
   ExtractedSyllabusGroup,
@@ -113,6 +114,26 @@ Se o edital só traz o conteúdo programático (sem o quadro de questões), reto
 
 Retorne SOMENTE um JSON válido, sem markdown, no formato:
 {"syllabusGroups":[{"name":"Língua Portuguesa","questionCount":10,"weight":"1","maxScore":"10.00","topics":"Interpretação de texto; ortografia; crase; concordância"},{"name":"Conhecimentos Específicos","questionCount":30,"weight":"2","maxScore":"60.00","topics":"SUS; PNAB; SAE; ..."}]}
+`.trim();
+
+const CARGOS_DOC_PROMPT = `
+Você extrai a FICHA DOS CARGOS de um documento de concurso público brasileiro (edital, retificação, anexo de requisitos, quadro de vagas). Retorne SOMENTE um JSON válido, sem markdown, sem explicações.
+
+Liste TODOS os cargos que o documento apresenta ou menciona com dados próprios (uma retificação pode incluir/alterar poucos cargos; um anexo/quadro de vagas costuma listar vários). Para CADA cargo, transcreva o que CONSTAR no documento — não invente, deixe null o que não aparecer:
+- role: nome EXATO do cargo como no documento
+- salaryBase: salário/remuneração base como string decimal com 2 casas (ex.: "4750.00"), null se não constar
+- vacancyCount: nº de vagas (inteiro), null se não constar
+- registrationFee: taxa de inscrição como string decimal, null se não constar
+- minPassingGradeNonQuota: nota mínima de aprovação (ampla concorrência) como string decimal, null se não constar
+- workload: carga horária (ex.: "40 horas semanais"), null se não constar
+- requirements: requisitos/escolaridade EXATAMENTE como escritos, null se não constar
+- hasReserveList: true se há cadastro de reserva para o cargo, false se explicitamente não, null se não dá para saber
+- isNursingRelevant: true SÓ para cargos de enfermagem (Enfermeiro e especialidades, Técnico de Enfermagem, Auxiliar de Enfermagem); false para os demais
+
+ATENÇÃO ÀS TABELAS: no texto extraído do PDF o quadro de vagas/salários costuma vir DESALINHADO (colunas soltas, valores fora de ordem). Reconstrua com cuidado, associando cada cargo ao seu salário/vagas/requisito. Se o documento não traz nenhum cargo com dados, retorne "cargos": [].
+
+Retorne apenas o JSON, no formato:
+{"cargos":[{"role":"Enfermeiro","salaryBase":"4750.00","vacancyCount":12,"registrationFee":"110.00","minPassingGradeNonQuota":"60.00","workload":"40 horas semanais","requirements":"Superior em Enfermagem e registro no COREN","hasReserveList":true,"isNursingRelevant":true}]}
 `.trim();
 
 @Injectable()
@@ -425,6 +446,61 @@ export class ExamBaseAiService {
           typeof c.description === 'string' && c.description.trim()
             ? c.description.trim()
             : null,
+      }));
+  }
+
+  /**
+   * Extrai a ficha dos cargos que um DOCUMENTO lista (salário, vagas,
+   * requisitos, isNursingRelevant), sem diff. A análise de documentos (Fase 2
+   * do monitoramento) usa isto para diferenciar em CÓDIGO o que o documento
+   * traz do estado atual — mais confiável do que pedir ao prompt de diff para
+   * "perceber" um cargo incluído ou um salário num anexo de dados. Retorna []
+   * quando o documento não traz cargos com dados próprios.
+   */
+  async extractCargosFromText(text: string): Promise<ExtractedCargoFicha[]> {
+    const parsed = await this.callOpenAI<{ cargos?: unknown }>(text, {
+      systemPrompt: CARGOS_DOC_PROMPT,
+      maxTokens: 16_384,
+      maxChars: 400_000,
+    });
+    const str = (v: unknown): string | null =>
+      typeof v === 'string' && v.trim() !== ''
+        ? v.trim()
+        : typeof v === 'number' && Number.isFinite(v)
+          ? String(v)
+          : null;
+    const decimal = (v: unknown): string | null => {
+      if (typeof v === 'number' && Number.isFinite(v)) return v.toFixed(2);
+      if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)))
+        return Number(v).toFixed(2);
+      return null;
+    };
+    return (Array.isArray(parsed.cargos) ? parsed.cargos : [])
+      .filter(
+        (c): c is Record<string, unknown> =>
+          typeof c === 'object' &&
+          c != null &&
+          typeof (c as { role?: unknown }).role === 'string' &&
+          (c as { role: string }).role.trim() !== '',
+      )
+      .map((c) => ({
+        role: (c.role as string).trim(),
+        salaryBase: decimal(c.salaryBase),
+        vacancyCount:
+          typeof c.vacancyCount === 'number' && Number.isFinite(c.vacancyCount)
+            ? Math.round(c.vacancyCount)
+            : typeof c.vacancyCount === 'string' &&
+                c.vacancyCount.trim() !== '' &&
+                Number.isFinite(Number(c.vacancyCount))
+              ? Math.round(Number(c.vacancyCount))
+              : null,
+        registrationFee: decimal(c.registrationFee),
+        minPassingGradeNonQuota: decimal(c.minPassingGradeNonQuota),
+        workload: str(c.workload),
+        requirements: str(c.requirements),
+        hasReserveList:
+          typeof c.hasReserveList === 'boolean' ? c.hasReserveList : null,
+        isNursingRelevant: c.isNursingRelevant === true,
       }));
   }
 
