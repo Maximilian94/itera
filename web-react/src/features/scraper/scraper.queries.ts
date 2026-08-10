@@ -6,6 +6,7 @@ import type {
   ProposedCargoSyllabus,
   ProposedChange,
   ProposedEtapa,
+  ProposedNewCargo,
 } from './scraper.types'
 
 export const scraperKeys = {
@@ -167,11 +168,13 @@ export function useApplyDocumentChangesMutation(concursoId: string) {
       changes,
       cronograma,
       syllabus,
+      newCargos,
     }: {
       documentId: string
       changes: Array<ProposedChange>
       cronograma?: Array<ProposedEtapa> | null
       syllabus?: Array<ProposedCargoSyllabus> | null
+      newCargos?: Array<ProposedNewCargo> | null
     }) =>
       scraperService.applyDocumentChanges(
         concursoId,
@@ -179,6 +182,7 @@ export function useApplyDocumentChangesMutation(concursoId: string) {
         changes,
         cronograma,
         syllabus,
+        newCargos,
       ),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['concurso'] }),
   })

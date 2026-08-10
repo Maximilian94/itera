@@ -194,6 +194,45 @@ class ApplyCargoSyllabusDto {
   groups: SyllabusGroupDto[];
 }
 
+/** Cargo novo aprovado pelo admin (inclusão de cargo por retificação/anexo). */
+class NewCargoDto {
+  @IsString()
+  @MinLength(1)
+  role: string;
+
+  @IsOptional()
+  @IsString()
+  salaryBase?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  vacancyCount?: number | null;
+
+  @IsOptional()
+  @IsString()
+  registrationFee?: string | null;
+
+  @IsOptional()
+  @IsString()
+  minPassingGradeNonQuota?: string | null;
+
+  @IsOptional()
+  @IsString()
+  workload?: string | null;
+
+  @IsOptional()
+  @IsString()
+  requirements?: string | null;
+
+  @IsOptional()
+  @IsBoolean()
+  hasReserveList?: boolean | null;
+
+  @IsOptional()
+  @IsBoolean()
+  isNursingRelevant?: boolean | null;
+}
+
 class ApplyChangesDto {
   @IsArray()
   @ValidateNested({ each: true })
@@ -213,6 +252,13 @@ class ApplyChangesDto {
   @ValidateNested({ each: true })
   @Type(() => ApplyCargoSyllabusDto)
   syllabus?: ApplyCargoSyllabusDto[] | null;
+
+  /** Cargos novos aprovados (inclusão de cargo). */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => NewCargoDto)
+  newCargos?: NewCargoDto[] | null;
 }
 
 /** "Procurar novos concursos": raspa a página de cargo do pciconcursos. */
@@ -364,6 +410,7 @@ export class ScraperController {
       dto.changes,
       dto.cronograma,
       dto.syllabus,
+      dto.newCargos,
     );
   }
 

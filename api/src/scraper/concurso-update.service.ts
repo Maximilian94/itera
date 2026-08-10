@@ -5,6 +5,7 @@ import {
   ConcursoDocumentAnalysisService,
   type ApplyChangeInput,
   type SyllabusInput,
+  type NewCargoInput,
 } from './concurso-document-analysis.service';
 
 /** Uma mudança aplicada num campo de cargo/concurso, para o relatório. */
@@ -123,12 +124,25 @@ export class ConcursoUpdateService {
         const syllabus: SyllabusInput[] | null =
           r.syllabus?.map((s) => ({ cargoId: s.cargoId, groups: s.groups })) ??
           null;
+        const newCargos: NewCargoInput[] | null =
+          r.newCargos?.map((c) => ({
+            role: c.role,
+            salaryBase: c.salaryBase,
+            vacancyCount: c.vacancyCount,
+            registrationFee: c.registrationFee,
+            minPassingGradeNonQuota: c.minPassingGradeNonQuota,
+            workload: c.workload,
+            requirements: c.requirements,
+            hasReserveList: c.hasReserveList,
+            isNursingRelevant: c.isNursingRelevant,
+          })) ?? null;
         const applied = await this.analysis.apply(
           concursoId,
           doc.id,
           changes,
           r.cronograma,
           syllabus,
+          newCargos,
         );
         report.docsAnalyzed++;
         report.itemsApplied += applied.appliedCount;
@@ -140,6 +154,16 @@ export class ConcursoUpdateService {
             label: c.label,
             oldValue: c.currentValue,
             newValue: c.newValue,
+          });
+        }
+        for (const c of r.newCargos ?? []) {
+          report.changes.push({
+            docTitle: doc.title,
+            target: 'cargo',
+            cargoRole: c.role,
+            label: 'Cargo incluído',
+            oldValue: null,
+            newValue: c.salaryBase != null ? `R$ ${c.salaryBase}` : c.role,
           });
         }
       } catch (err) {

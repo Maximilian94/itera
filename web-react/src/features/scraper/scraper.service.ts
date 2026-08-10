@@ -14,6 +14,7 @@ import type {
   ProposedCargoSyllabus,
   ProposedChange,
   ProposedEtapa,
+  ProposedNewCargo,
   ScraperRun,
 } from './scraper.types'
 import { apiFetch } from '@/lib/api'
@@ -125,10 +126,14 @@ export const scraperService = {
     changes: Array<ProposedChange>,
     cronograma?: Array<ProposedEtapa> | null,
     syllabus?: Array<ProposedCargoSyllabus> | null,
+    newCargos?: Array<ProposedNewCargo> | null,
   ): Promise<{ appliedCount: number }> {
     return apiFetch<{ appliedCount: number }>(
       `${BASE}/concursos/${concursoId}/documents/${documentId}/apply`,
-      { method: 'POST', body: JSON.stringify({ changes, cronograma, syllabus }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({ changes, cronograma, syllabus, newCargos }),
+      },
     )
   },
 

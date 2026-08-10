@@ -27,7 +27,12 @@ function cargo(over: Partial<Record<string, unknown>> = {}) {
 function build(opts: {
   docKind: string;
   cargos?: ReturnType<typeof cargo>[];
-  diff?: { changes?: unknown; cronograma?: unknown; syllabusCargos?: unknown };
+  diff?: {
+    changes?: unknown;
+    cronograma?: unknown;
+    syllabusCargos?: unknown;
+    novosCargos?: unknown;
+  };
   fichas?: {
     role: string;
     requirements: string | null;
@@ -56,6 +61,11 @@ function build(opts: {
         etapas: [],
         cargos: opts.cargos ?? [cargo()],
       }),
+    },
+    cargo: {
+      findFirst: jest.fn().mockResolvedValue(null),
+      create: jest.fn().mockResolvedValue({ id: 'novo-1' }),
+      update: jest.fn().mockResolvedValue({}),
     },
   } as unknown as PrismaService;
 
@@ -92,7 +102,13 @@ function build(opts: {
       opts.diff ?? { changes: [], cronograma: [], syllabusCargos: [] },
     );
 
-  return { service, extractFichasLiterais, fetchDocumentText, pdfBufferToText };
+  return {
+    service,
+    prisma,
+    extractFichasLiterais,
+    fetchDocumentText,
+    pdfBufferToText,
+  };
 }
 
 describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertura', () => {
@@ -224,5 +240,100 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
 
     expect(extractFichasLiterais).not.toHaveBeenCalled();
     expect(r.changes).toEqual([]);
+  });
+});
+
+describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)', () => {
+  it('propõe um cargo novo que a retificação adiciona e não existe no estado atual', async () => {
+    const { service } = build({
+      docKind: 'RETIFICACAO',
+      diff: {
+        changes: [],
+        cronograma: [],
+        syllabusCargos: [],
+        novosCargos: [
+          {
+            role: 'Enfermeiro do Trabalho',
+            salaryBase: '4750.00',
+            vacancyCount: 2,
+            registrationFee: '110.00',
+            minPassingGradeNonQuota: '60.00',
+            workload: '40 horas semanais',
+            requirements: 'Especialização em Enfermagem do Trabalho.',
+            hasReserveList: true,
+            isNursingRelevant: true,
+            evidence: 'Fica incluído o cargo de Enfermeiro do Trabalho.',
+          },
+        ],
+      },
+    });
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    expect(r.newCargos).toEqual([
+      expect.objectContaining({
+        role: 'Enfermeiro do Trabalho',
+        salaryBase: '4750.00',
+        vacancyCount: 2,
+        isNursingRelevant: true,
+      }),
+    ]);
+  });
+
+  it('descarta cargo novo cujo role já existe no estado atual (é diff, não inclusão)', async () => {
+    const { service } = build({
+      docKind: 'RETIFICACAO',
+      diff: {
+        changes: [],
+        cronograma: [],
+        syllabusCargos: [],
+        // "Enfermeiro" já existe no snapshot (cargo padrão) → não é novo.
+        novosCargos: [{ role: 'enfermeiro', salaryBase: '5000.00' }],
+      },
+    });
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    expect(r.newCargos).toBeNull();
+  });
+
+  it('apply cria o cargo novo (idempotente por role) e conta como item aplicado', async () => {
+    const { service, prisma } = build({ docKind: 'RETIFICACAO' });
+
+    const res = await service.apply('c1', 'doc-1', [], null, null, [
+      {
+        role: 'Enfermeiro do Trabalho',
+        salaryBase: '4750.00',
+        vacancyCount: 2,
+        isNursingRelevant: true,
+      },
+    ]);
+
+    expect(res.appliedCount).toBe(1);
+    expect((prisma.cargo as { create: jest.Mock }).create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          concursoId: 'c1',
+          role: 'Enfermeiro do Trabalho',
+          salaryBase: '4750.00',
+          vacancyCount: 2,
+          isNursingRelevant: true,
+        }),
+      }),
+    );
+  });
+
+  it('apply NÃO recria um cargo cujo role já existe (retorna 0)', async () => {
+    const { service, prisma } = build({ docKind: 'RETIFICACAO' });
+    (prisma.cargo as { findFirst: jest.Mock }).findFirst.mockResolvedValue({
+      id: 'cargo-1',
+    });
+
+    const res = await service.apply('c1', 'doc-1', [], null, null, [
+      { role: 'Enfermeiro' },
+    ]);
+
+    expect(res.appliedCount).toBe(0);
+    expect((prisma.cargo as { create: jest.Mock }).create).not.toHaveBeenCalled();
   });
 });
