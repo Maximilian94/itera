@@ -35,6 +35,23 @@ const CARGO_FIELDS = {
 type ConcursoField = keyof typeof CONCURSO_FIELDS;
 type CargoField = keyof typeof CARGO_FIELDS;
 
+/** Tipos de documento que NÃO carregam ficha de cargo — pulam a extração
+ *  determinística de cargos (economiza uma chamada de IA). */
+const SKIP_CARGO_EXTRACTION = new Set(['GABARITO', 'RESULTADO', 'CONVOCACAO']);
+
+/** Campos de cargo que a extração determinística compara com o estado atual
+ *  (subconjunto de CARGO_FIELDS presente na ficha extraída — sem description,
+ *  que vem da transcrição literal do edital de abertura). */
+const EXTRACTION_CARGO_FIELDS = [
+  'salaryBase',
+  'vacancyCount',
+  'registrationFee',
+  'minPassingGradeNonQuota',
+  'workload',
+  'requirements',
+  'hasReserveList',
+] as const satisfies readonly CargoField[];
+
 export interface ProposedChange {
   /** Id estável (target+cargo+field) p/ o front casar a seleção no apply. */
   id: string;
@@ -323,13 +340,21 @@ export class ConcursoDocumentAnalysisService {
     const parsed = await this.callOpenAI(text, concurso.snapshotJson);
     const changes = this.buildChanges(parsed, concurso);
 
-    // Edital de abertura → análise COMPLETA da ficha: o prompt de diff só
-    // reporta "alterações explícitas" (linguagem de retificação) e não
-    // transcreve textos longos, então um edital de abertura analisado pela
-    // timeline (concurso criado via descoberta, sem extração do edital) nunca
-    // preenchia requisitos/atribuições. Aqui a transcrição literal roda pelo
-    // MESMO extrator focado da criação do concurso e entra como mudança
-    // proposta normal (sobrescrita passa pela revisão do admin como as demais).
+    // Extração DETERMINÍSTICA de cargos do documento: em vez de confiar no
+    // prompt de diff para "perceber" um cargo incluído ou um salário num anexo
+    // de dados, extraímos a ficha dos cargos que o documento traz (o MESMO
+    // trabalho que o extrator de edital faz bem na criação) e comparamos com o
+    // estado atual EM CÓDIGO. Isso cobre (1) retificação que INCLUI um cargo e
+    // (2) salário/requisitos que moram num anexo (ANEXO — REQUISITOS), casos em
+    // que o modelo de diff sozinho não surfava a mudança. Não roda para
+    // documentos sem ficha de cargo (gabarito/resultado/convocação).
+    const extractionNewCargos = SKIP_CARGO_EXTRACTION.has(doc.kind)
+      ? []
+      : await this.proposeFromCargoExtraction(text, concurso, changes);
+
+    // Edital de abertura → transcrição LITERAL de requisitos/atribuições pelo
+    // extrator focado da criação. Roda DEPOIS da extração de cargos para que a
+    // versão literal (mais completa) vença no campo requirements/description.
     if (doc.kind === 'EDITAL_ABERTURA') {
       await this.proposeFichasFromEdital(text, concurso, changes);
     }
@@ -379,13 +404,15 @@ export class ConcursoDocumentAnalysisService {
     }
     const syllabus = proposedSyllabus.length > 0 ? proposedSyllabus : null;
 
-    // Cargos NOVOS que o documento adiciona (inclusão de cargo). Descarta os que
-    // já existem no estado atual (por role, case-insensitive) — esses são diff,
-    // não inclusão — e dedupe interno por role.
+    // Cargos NOVOS que o documento adiciona (inclusão de cargo), de DUAS fontes:
+    // a extração determinística (confiável) e o prompt de diff (rede extra).
+    // Descarta os que já existem no estado atual (por role) — esses são diff,
+    // não inclusão — e dedupe por role entre as fontes.
     const seenNewRole = new Set<string>();
-    const newCargosList = normalizeNewCargos(
-      (parsed as { novosCargos?: unknown }).novosCargos,
-    ).filter((c) => {
+    const newCargosList = [
+      ...extractionNewCargos,
+      ...normalizeNewCargos((parsed as { novosCargos?: unknown }).novosCargos),
+    ].filter((c) => {
       const key = c.role.toLowerCase();
       if (concurso.cargosByRole.has(key) || seenNewRole.has(key)) return false;
       seenNewRole.add(key);
@@ -523,6 +550,96 @@ export class ConcursoDocumentAnalysisService {
         else changes.push(change);
       }
     }
+  }
+
+  /**
+   * Extração determinística de cargos do documento → diff em código contra o
+   * estado atual. Para cargos EXISTENTES, propõe cada campo que o documento
+   * traz e difere (mescla em `changes`, vencendo o prompt de diff no mesmo id).
+   * Retorna os cargos NOVOS de enfermagem (ausentes do estado atual) — a
+   * plataforma só exibe enfermagem, então só esses viram inclusão de cargo.
+   */
+  private async proposeFromCargoExtraction(
+    text: string,
+    ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
+    changes: ProposedChange[],
+  ): Promise<ProposedNewCargo[]> {
+    const fichas = await this.examBaseAi
+      .extractCargosFromText(text)
+      .catch(() => []);
+    if (fichas.length === 0) return [];
+
+    const norm = (v: unknown, type: string): string | null => {
+      if (v == null || v === '') return null;
+      if (type === 'decimal') {
+        const n = Number(v);
+        return Number.isFinite(n) ? n.toFixed(2) : null;
+      }
+      if (type === 'int') {
+        const n = Number(v);
+        return Number.isFinite(n) ? String(Math.round(n)) : null;
+      }
+      if (type === 'boolean') return v === true || v === 'true' ? 'true' : 'false';
+      return String(v).trim() || null;
+    };
+
+    const newCargos: ProposedNewCargo[] = [];
+    const seenNew = new Set<string>();
+
+    for (const ficha of fichas) {
+      const existing = ctx.cargosByRole.get(ficha.role.toLowerCase());
+      if (!existing) {
+        // Cargo ausente do estado atual → inclusão. Só enfermagem (o que a
+        // plataforma exibe), como na criação do edital.
+        if (!ficha.isNursingRelevant) continue;
+        const key = ficha.role.toLowerCase();
+        if (seenNew.has(key)) continue;
+        seenNew.add(key);
+        newCargos.push({
+          role: ficha.role,
+          salaryBase: ficha.salaryBase ?? null,
+          vacancyCount: ficha.vacancyCount ?? null,
+          registrationFee: ficha.registrationFee ?? null,
+          minPassingGradeNonQuota: ficha.minPassingGradeNonQuota ?? null,
+          workload: ficha.workload ?? null,
+          requirements: ficha.requirements ?? null,
+          hasReserveList: ficha.hasReserveList ?? null,
+          isNursingRelevant: true,
+          evidence: 'Cargo listado no documento e ausente do concurso.',
+        });
+        continue;
+      }
+      // Cargo existente → propõe cada campo que o documento traz e difere.
+      const snap = ctx.snapshot.cargos.find(
+        (x) => x.role.toLowerCase() === ficha.role.toLowerCase(),
+      ) as Record<string, unknown> | undefined;
+      for (const field of EXTRACTION_CARGO_FIELDS) {
+        const meta = CARGO_FIELDS[field];
+        const newValue = norm(
+          (ficha as unknown as Record<string, unknown>)[field],
+          meta.type,
+        );
+        if (newValue == null) continue; // documento não traz o campo → não mexe
+        const current = norm(snap?.[field], meta.type);
+        if (newValue === current) continue;
+        const id = `cargo:${existing.id}:${field}`;
+        const change: ProposedChange = {
+          id,
+          target: 'cargo',
+          cargoId: existing.id,
+          cargoRole: existing.role,
+          field,
+          label: meta.label,
+          currentValue: current,
+          newValue,
+          evidence: 'Extraído da ficha/tabela do documento.',
+        };
+        const idx = changes.findIndex((c) => c.id === id);
+        if (idx >= 0) changes[idx] = change;
+        else changes.push(change);
+      }
+    }
+    return newCargos;
   }
 
   private async applyOne(

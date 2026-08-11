@@ -38,6 +38,8 @@ function build(opts: {
     requirements: string | null;
     description: string | null;
   }[];
+  /** Cargos que a extração determinística (extractCargosFromText) devolve. */
+  fichaCargos?: Array<Record<string, unknown>>;
 }) {
   const prisma = {
     concursoDocument: {
@@ -70,8 +72,12 @@ function build(opts: {
   } as unknown as PrismaService;
 
   const extractFichasLiterais = jest.fn().mockResolvedValue(opts.fichas ?? []);
+  const extractCargosFromText = jest
+    .fn()
+    .mockResolvedValue(opts.fichaCargos ?? []);
   const examBaseAi = {
     extractFichasLiterais,
+    extractCargosFromText,
     extractSyllabusForCargo: jest.fn().mockResolvedValue([]),
   } as unknown as ExamBaseAiService;
 
@@ -106,6 +112,7 @@ function build(opts: {
     service,
     prisma,
     extractFichasLiterais,
+    extractCargosFromText,
     fetchDocumentText,
     pdfBufferToText,
   };
@@ -280,6 +287,55 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     ]);
   });
 
+  it('extração determinística: propõe salário do anexo para cargo existente (sem linguagem de diff)', async () => {
+    const { service } = build({
+      docKind: 'OUTRO', // ANEXO I — Requisitos costuma cair aqui
+      // O prompt de diff não achou nada; a extração de cargos é que traz o dado.
+      diff: { changes: [], cronograma: [], syllabusCargos: [], novosCargos: [] },
+      fichaCargos: [
+        { role: 'Enfermeiro', salaryBase: '4750.00', isNursingRelevant: true },
+      ],
+    });
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    expect(r.changes).toEqual([
+      expect.objectContaining({
+        id: 'cargo:cargo-1:salaryBase',
+        field: 'salaryBase',
+        cargoRole: 'Enfermeiro',
+        currentValue: null,
+        newValue: '4750.00',
+      }),
+    ]);
+  });
+
+  it('extração determinística: cargo de enfermagem ausente vira inclusão; não-enfermagem é ignorado', async () => {
+    const { service } = build({
+      docKind: 'RETIFICACAO',
+      fichaCargos: [
+        {
+          role: 'Enfermeiro do Trabalho',
+          salaryBase: '5000.00',
+          vacancyCount: 1,
+          isNursingRelevant: true,
+        },
+        { role: 'Motorista', salaryBase: '1600.00', isNursingRelevant: false },
+      ],
+    });
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    expect(r.newCargos).toEqual([
+      expect.objectContaining({
+        role: 'Enfermeiro do Trabalho',
+        salaryBase: '5000.00',
+        vacancyCount: 1,
+        isNursingRelevant: true,
+      }),
+    ]);
+  });
+
   it('descarta cargo novo cujo role já existe no estado atual (é diff, não inclusão)', async () => {
     const { service } = build({
       docKind: 'RETIFICACAO',
@@ -310,7 +366,7 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     ]);
 
     expect(res.appliedCount).toBe(1);
-    expect((prisma.cargo as { create: jest.Mock }).create).toHaveBeenCalledWith(
+    expect((prisma.cargo as unknown as { create: jest.Mock }).create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           concursoId: 'c1',
@@ -325,7 +381,7 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
 
   it('apply NÃO recria um cargo cujo role já existe (retorna 0)', async () => {
     const { service, prisma } = build({ docKind: 'RETIFICACAO' });
-    (prisma.cargo as { findFirst: jest.Mock }).findFirst.mockResolvedValue({
+    (prisma.cargo as unknown as { findFirst: jest.Mock }).findFirst.mockResolvedValue({
       id: 'cargo-1',
     });
 
@@ -334,6 +390,6 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     ]);
 
     expect(res.appliedCount).toBe(0);
-    expect((prisma.cargo as { create: jest.Mock }).create).not.toHaveBeenCalled();
+    expect((prisma.cargo as unknown as { create: jest.Mock }).create).not.toHaveBeenCalled();
   });
 });
