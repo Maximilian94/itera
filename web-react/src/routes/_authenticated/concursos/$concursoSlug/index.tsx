@@ -27,6 +27,7 @@ import { CARD, CARD_RAISE } from '@/features/concurso/components/card'
 import { enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { BACK_SQUARE } from '@/features/concurso/components/BackSquare'
+import { ConcursoGoalToggle } from '@/features/goal/components/ConcursoGoalToggle'
 import {
   FichaCard
   
@@ -254,6 +255,14 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                   Concurso {concurso.institution} {concurso.year}
                 </h1>
                 <StatusPill status={status} label={statusLabel(status, timeline)} />
+                {cargos.length > 0 && (
+                  <ConcursoGoalToggle
+                    concursoId={concurso.id}
+                    concursoSlug={concurso.slug}
+                    target={concurso.slug ?? concurso.id}
+                    name={`${concurso.institution} ${concurso.year}`}
+                  />
+                )}
                 {isAdmin && (
                   <Link
                     to="/admin/editar-concurso/$concursoId"

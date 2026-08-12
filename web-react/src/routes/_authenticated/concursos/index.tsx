@@ -30,6 +30,9 @@ import { usePreferenceQuery } from '@/features/preference/queries/preference.que
 import { PreferenceGate } from '@/features/preference/components/PreferenceGate'
 import { PreferenceBar } from '@/features/preference/components/PreferenceBar'
 import { matchReasonLabel } from '@/features/preference/components/match-copy'
+import { useOnboarding } from '@/features/onboarding/useOnboarding'
+import { ProfileReview } from '@/features/onboarding/components/ProfileReview'
+import { ConcursoGoalToggle } from '@/features/goal/components/ConcursoGoalToggle'
 import { ApiError } from '@/lib/api'
 
 export const Route = createFileRoute('/_authenticated/concursos/')({
@@ -220,6 +223,11 @@ function ConcursosListPage() {
   const preference = prefQuery.data?.preference ?? null
   const showGate = prefQuery.data != null && preference == null
 
+  /* Tour manual: quando o perfil já existe, o Passo 1 é revisá-lo (não
+   * re-perguntar). A revisão toma a página, como o gate. */
+  const onboarding = useOnboarding()
+  const showReview = onboarding.reviewPending && preference != null
+
   const [search, setSearch] = useState('')
   /* Local: stateUf é uma UF, '' (todos) ou FEDERAL (concursos sem estado).
    * city só vale quando uma UF real está escolhida (cascata). */
@@ -387,6 +395,14 @@ function ConcursosListPage() {
     return (
       <div {...enter(0)} className="flex flex-1 flex-col">
         <PreferenceGate />
+      </div>
+    )
+  }
+
+  if (showReview) {
+    return (
+      <div {...enter(0)} className="flex flex-1 flex-col">
+        <ProfileReview preference={preference} />
       </div>
     )
   }
@@ -803,6 +819,18 @@ function ConcursoCard({ item, enterIdx }: { item: ConcursoListItem; enterIdx: nu
             ))}
           </ul>
         )}
+      </div>
+
+      {/* Pin de meta: acima do <Link> de área cheia (z-10) para ser clicável
+          sem navegar. Concurso-level, resolve pro cargo representante. */}
+      <div className="relative z-10">
+        <ConcursoGoalToggle
+          concursoId={item.id}
+          concursoSlug={item.slug}
+          target={item.slug}
+          name={`${item.institution} ${item.year}`}
+          variant="pin"
+        />
       </div>
 
       <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-300 transition-all group-hover:translate-x-0.5 group-hover:text-slate-500" />

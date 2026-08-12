@@ -117,6 +117,21 @@ describe('Goal endpoints (e2e)', () => {
     expect(list.body.goals).toHaveLength(1);
   });
 
+  it('POST por Concurso.slug/id cria a meta no cargo representante (meta a partir do concurso)', async () => {
+    const bySlug = await asUser(request(http).post('/goals'))
+      .send({ cargoSlug: 'pref-itera-2026' })
+      .expect(201);
+    expect(bySlug.body.goal.cargo.id).toBe(cargoId);
+    expect(bySlug.body.goal.concurso.slug).toBe('pref-itera-2026');
+
+    // Mesmo cargo representante por Concurso.id → mesma meta (idempotente).
+    const byId = await asUser(request(http).post('/goals'))
+      .send({ cargoSlug: concursoId })
+      .expect(201);
+    expect(byId.body.goal.id).toBe(bySlug.body.goal.id);
+    expect(byId.body.goal.cargo.id).toBe(cargoId);
+  });
+
   it('POST com cargo inexistente → 404', async () => {
     await asUser(request(http).post('/goals'))
       .send({ cargoSlug: 'nao-existe' })
