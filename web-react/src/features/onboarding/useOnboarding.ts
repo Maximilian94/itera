@@ -1,5 +1,6 @@
 import { deriveOnboardingStep } from './domain/onboarding'
 import {
+  ackListTour,
   ackReview,
   dismissTour,
   startTour,
@@ -20,10 +21,14 @@ export type OnboardingState = {
   isManualTour: boolean
   /** Passo 1 do tour manual pendente: perfil já existe e ainda não foi revisado. */
   reviewPending: boolean
+  /** Walkthrough progressivo da lista já concluído nesta volta do tour. */
+  listSeen: boolean
   /** Reinicia o tour a partir da dashboard. */
   start: () => void
   /** Marca o Passo 1 (revisão do perfil) como concluído. */
   ackReview: () => void
+  /** Marca o walkthrough progressivo da lista como concluído. */
+  ackListTour: () => void
   /** Pula/conclui o tour. */
   dismiss: () => void
   hasGoal: boolean
@@ -39,7 +44,7 @@ export type OnboardingState = {
 export function useOnboarding(): OnboardingState {
   const prefQuery = usePreferenceQuery()
   const goalsQuery = useGoalsQuery()
-  const { override, reviewed } = useTourState()
+  const { override, reviewed, listSeen } = useTourState()
 
   const ready =
     (prefQuery.isSuccess || prefQuery.isError) &&
@@ -68,8 +73,10 @@ export function useOnboarding(): OnboardingState {
     isActive,
     isManualTour,
     reviewPending,
+    listSeen,
     start: startTour,
     ackReview,
+    ackListTour,
     dismiss: dismissTour,
     hasGoal,
     firstGoal: goals[0] ?? null,

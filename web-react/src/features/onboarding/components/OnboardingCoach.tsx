@@ -91,6 +91,9 @@ export function OnboardingCoach() {
   if (!isActive || step === 'profile' || reviewPending) return null
 
   const context = coachContext(pathname)
+  // Na lista, o walkthrough progressivo (na própria página) assume o Ato 1 —
+  // o banner do coach não aparece; ele só guia nos níveis concurso/cargo.
+  if (context === 'list') return null
   const copy = coachCopy(context)
 
   return (

@@ -17,7 +17,7 @@ import {
   PencilSquareIcon,
   XMarkIcon,
 } from '@heroicons/react/24/outline'
-import type { ComponentType, SVGProps } from 'react'
+import type { ComponentType, Ref, SVGProps } from 'react'
 import type {
   ConcursoListItem,
   ConcursoStatus,
@@ -33,6 +33,12 @@ import { matchReasonLabel } from '@/features/preference/components/match-copy'
 import { useOnboarding } from '@/features/onboarding/useOnboarding'
 import { ProfileReview } from '@/features/onboarding/components/ProfileReview'
 import { ConcursoGoalToggle } from '@/features/goal/components/ConcursoGoalToggle'
+import {
+  LIST_TOUR_COPY,
+  LIST_TOUR_TOTAL,
+  ListTourIntro,
+} from '@/features/onboarding/components/ListTour'
+import { Coachmark } from '@/features/onboarding/components/Coachmark'
 import { ApiError } from '@/lib/api'
 
 export const Route = createFileRoute('/_authenticated/concursos/')({
@@ -164,42 +170,41 @@ function StateToggle({
   counts: Record<StateTab, number>
 }) {
   return (
-    <div className="flex flex-col gap-1.5">
-      <span className="px-0.5 text-xs font-semibold text-slate-500">Mostrar</span>
-      <div className="-mx-1 overflow-x-auto px-1">
-        <div
-          role="group"
-          aria-label="Filtrar por estado do concurso"
-          className="inline-flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"
-        >
-          {TAB_OPTIONS.map((o) => {
-            const active = value === o.value
-            const Icon = o.icon
-            return (
-              <button
-                key={o.value}
-                type="button"
-                aria-pressed={active}
-                onClick={() => onChange(o.value)}
-                className={`inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
-                  active
-                    ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200'
-                    : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'
-                }`}
+    // Eixo primário de navegação da lista (situação) — segmented control que
+    // rola no mobile. O rótulo "Mostrar" saiu: os próprios rótulos bastam.
+    <div className="-mx-1 overflow-x-auto px-1">
+      <div
+        role="group"
+        aria-label="Filtrar por situação do concurso"
+        className="inline-flex min-w-max gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"
+      >
+        {TAB_OPTIONS.map((o) => {
+          const active = value === o.value
+          const Icon = o.icon
+          return (
+            <button
+              key={o.value}
+              type="button"
+              aria-pressed={active}
+              onClick={() => onChange(o.value)}
+              className={`inline-flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
+                active
+                  ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200'
+                  : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'
+              }`}
+            >
+              <Icon
+                className={`h-4 w-4 shrink-0 ${active ? 'text-cyan-600' : 'text-slate-400'}`}
+              />
+              {o.label}
+              <span
+                className={`tabular-nums text-sm font-semibold ${active ? 'text-cyan-600' : 'text-slate-400'}`}
               >
-                <Icon
-                  className={`h-4 w-4 shrink-0 ${active ? 'text-cyan-600' : 'text-slate-400'}`}
-                />
-                {o.label}
-                <span
-                  className={`text-xs font-bold tabular-nums ${active ? 'text-cyan-600' : 'text-slate-400'}`}
-                >
-                  {counts[o.value]}
-                </span>
-              </button>
-            )
-          })}
-        </div>
+                {counts[o.value]}
+              </span>
+            </button>
+          )
+        })}
       </div>
     </div>
   )
@@ -227,6 +232,20 @@ function ConcursosListPage() {
    * re-perguntar). A revisão toma a página, como o gate. */
   const onboarding = useOnboarding()
   const showReview = onboarding.reviewPending && preference != null
+
+  /* Walkthrough do Ato 1 (nível 0): a página começa em branco (intro) e depois
+   * um coach-mark ancorado passa por cada peça (preferências → filtros → lista),
+   * destacando-a e explicando ao lado. O índice mora aqui; refs abaixo dão o
+   * alvo do realce a cada passo. */
+  const listTourActive =
+    onboarding.isActive && !onboarding.reviewPending && !onboarding.listSeen
+  const [tourStep, setTourStep] = useState(0)
+  const prefsRef = useRef<HTMLDivElement>(null)
+  const filtersRef = useRef<HTMLDivElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  // O realce da lista mira UMA linha (o 1º card), não a lista inteira — senão o
+  // alvo é quase a tela toda e o card do coach-mark é empurrado pra fora.
+  const firstRowRef = useRef<HTMLElement>(null)
 
   const [search, setSearch] = useState('')
   /* Local: stateUf é uma UF, '' (todos) ou FEDERAL (concursos sem estado).
@@ -407,6 +426,18 @@ function ConcursosListPage() {
     )
   }
 
+  /* Passo 2, tela 1: a página em branco só com a mensagem + "Avançar". */
+  if (listTourActive && tourStep === 0) {
+    return (
+      <div {...enter(0)} className="flex flex-1 flex-col">
+        <ListTourIntro
+          onNext={() => setTourStep(1)}
+          onSkip={onboarding.ackListTour}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-4 pb-6">
       {/* ░░ Cabeçalho ░░ */}
@@ -438,79 +469,115 @@ function ConcursosListPage() {
         )}
       </header>
 
+      {listTourActive && tourStep >= 1 && (
+        <Coachmark
+          targetRef={
+            tourStep === 1
+              ? prefsRef
+              : tourStep === 2
+                ? filtersRef
+                : visibleRecommended.length + visibleOthers.length > 0
+                  ? firstRowRef
+                  : listRef
+          }
+          index={tourStep}
+          count={LIST_TOUR_TOTAL - 1}
+          title={LIST_TOUR_COPY[tourStep]?.title ?? ''}
+          body={LIST_TOUR_COPY[tourStep]?.body ?? ''}
+          nextLabel={tourStep >= LIST_TOUR_TOTAL - 1 ? 'Entendi!' : 'Avançar'}
+          onPrev={() => setTourStep((s) => Math.max(0, s - 1))}
+          onNext={() =>
+            tourStep >= LIST_TOUR_TOTAL - 1
+              ? onboarding.ackListTour()
+              : setTourStep((s) => s + 1)
+          }
+          onSkip={onboarding.ackListTour}
+        />
+      )}
+
       <>
-          {preference != null && <PreferenceBar preference={preference} />}
+          {preference != null && (
+            <div ref={prefsRef}>
+              <PreferenceBar preference={preference} />
+            </div>
+          )}
 
-          {/* ░░ Filtros ░░ */}
-          <div {...enter(1)} className="flex flex-col gap-3">
-        <div className="relative">
-          <MagnifyingGlassIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar por instituição, banca ou cidade…"
-            aria-label="Buscar concursos"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200"
-          />
-          {search && (
-            <button
-              type="button"
-              onClick={() => setSearch('')}
-              aria-label="Limpar busca"
-              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-            >
-              <XMarkIcon className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+          {/* ░░ Situação (eixo primário) + toolbar de busca/facetas ░░ */}
+          <div ref={filtersRef} {...enter(1)} className="flex flex-col gap-3">
+            <StateToggle
+              value={activeTab}
+              onChange={setStateTab}
+              counts={counts}
+            />
 
-        <div className="flex flex-wrap items-center gap-2">
-          {stateOptions.length > 0 && (
-            <FilterDropdown
-              label="Estado"
-              value={stateUf}
-              options={stateOptions}
-              onChange={changeState}
-              allLabel="Todos os estados"
-            />
-          )}
-          {cityOptions.length > 0 && (
-            <FilterDropdown
-              label="Cidade"
-              value={city}
-              options={cityOptions}
-              onChange={setCity}
-              allLabel="Todas as cidades"
-            />
-          )}
-          {boardOptions.length > 0 && (
-            <FilterDropdown
-              label="Banca"
-              value={boardId}
-              options={boardOptions}
-              onChange={setBoardId}
-              allLabel="Todas as bancas"
-              searchable
-            />
-          )}
-          {hasActiveFilters && (
-            <button
-              type="button"
-              onClick={clearFilters}
-              className="ml-auto inline-flex cursor-pointer items-center gap-1 text-sm font-semibold text-slate-500 transition-colors hover:text-rose-600"
-            >
-              <XMarkIcon className="h-4 w-4" />
-              Limpar
-            </button>
-          )}
-        </div>
+            {/* Toolbar: busca cresce, facetas e "Limpar" à direita; alturas
+                iguais (h-9) para ler como um só instrumento. */}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative w-full sm:w-auto sm:flex-1">
+                <MagnifyingGlassIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Buscar por instituição, banca ou cidade…"
+                  aria-label="Buscar concursos"
+                  className="h-9 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-9 text-sm text-slate-800 placeholder:text-slate-400 transition-all focus:border-cyan-300 focus:outline-none focus:ring-2 focus:ring-cyan-200"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch('')}
+                    aria-label="Limpar busca"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  >
+                    <XMarkIcon className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
 
-        {/* Seletor de estado por último, logo antes da lista. */}
-        <StateToggle value={activeTab} onChange={setStateTab} counts={counts} />
-      </div>
+              {stateOptions.length > 0 && (
+                <FilterDropdown
+                  label="Estado"
+                  value={stateUf}
+                  options={stateOptions}
+                  onChange={changeState}
+                  allLabel="Todos os estados"
+                />
+              )}
+              {cityOptions.length > 0 && (
+                <FilterDropdown
+                  label="Cidade"
+                  value={city}
+                  options={cityOptions}
+                  onChange={setCity}
+                  allLabel="Todas as cidades"
+                />
+              )}
+              {boardOptions.length > 0 && (
+                <FilterDropdown
+                  label="Banca"
+                  value={boardId}
+                  options={boardOptions}
+                  onChange={setBoardId}
+                  allLabel="Todas as bancas"
+                  searchable
+                />
+              )}
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="inline-flex h-9 cursor-pointer items-center gap-1 rounded-lg px-2.5 text-sm font-semibold text-slate-500 transition-colors hover:bg-rose-50 hover:text-rose-600"
+                >
+                  <XMarkIcon className="h-4 w-4" />
+                  Limpar
+                </button>
+              )}
+            </div>
+          </div>
 
       {/* ░░ Lista ░░ */}
+      <div ref={listRef}>
       {isPending || prefQuery.isPending ? (
         <ListSkeleton />
       ) : error != null ? (
@@ -528,7 +595,12 @@ function ConcursosListPage() {
             </h2>
           )}
           {visibleRecommended.map((item, i) => (
-            <ConcursoCard key={item.slug} item={item} enterIdx={Math.min(i, 6) + 2} />
+            <ConcursoCard
+              key={item.slug}
+              item={item}
+              enterIdx={Math.min(i, 6) + 2}
+              rowRef={i === 0 ? firstRowRef : undefined}
+            />
           ))}
           {hasSections && visibleOthers.length > 0 && (
             <h2 className="mt-3 text-sm font-bold text-slate-500">
@@ -540,6 +612,11 @@ function ConcursosListPage() {
               key={item.slug}
               item={item}
               enterIdx={Math.min(visibleRecommended.length + i, 6) + 2}
+              rowRef={
+                visibleRecommended.length === 0 && i === 0
+                  ? firstRowRef
+                  : undefined
+              }
             />
           ))}
           {ordered.length > limit && (
@@ -554,6 +631,7 @@ function ConcursosListPage() {
           )}
         </section>
       )}
+      </div>
       </>
     </div>
   )
@@ -652,7 +730,7 @@ function FilterDropdown({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex cursor-pointer items-center gap-1.5 rounded-lg border bg-white py-1.5 pl-3 pr-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
+        className={`inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg border bg-white pl-3 pr-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
           value
             ? 'border-cyan-300 text-cyan-700'
             : 'border-slate-200 text-slate-600 hover:border-slate-300'
@@ -753,7 +831,16 @@ function DropdownOption({
 /*  Card de concurso — o card inteiro navega para o nível 1            */
 /* ------------------------------------------------------------------ */
 
-function ConcursoCard({ item, enterIdx }: { item: ConcursoListItem; enterIdx: number }) {
+function ConcursoCard({
+  item,
+  enterIdx,
+  rowRef,
+}: {
+  item: ConcursoListItem
+  enterIdx: number
+  /** Só no 1º card: alvo do realce da lista no tour (uma linha, não a lista toda). */
+  rowRef?: Ref<HTMLElement>
+}) {
   const location = locationLabel(item)
   const salary = salaryRange(item.salaryMin, item.salaryMax)
   const temporal = temporalText(item)
@@ -764,6 +851,7 @@ function ConcursoCard({ item, enterIdx }: { item: ConcursoListItem; enterIdx: nu
    * O <Link> cobre a linha inteira. */
   return (
     <article
+      ref={rowRef}
       style={e.style}
       className={`${e.className} group relative flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-all duration-200 hover:border-slate-300 hover:shadow-[0_6px_16px_-6px_rgba(15,23,42,0.12)] focus-within:ring-2 focus-within:ring-cyan-500 focus-within:ring-offset-2`}
     >
