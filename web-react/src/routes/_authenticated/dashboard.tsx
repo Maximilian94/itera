@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
-import { PlayIcon } from '@heroicons/react/24/outline'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { AcademicCapIcon, PlayIcon } from '@heroicons/react/24/outline'
 import dayjs from 'dayjs'
-import { useClerkAuth } from '@/auth/clerk'
 import type { UserResource } from '@clerk/types'
+import { useClerkAuth } from '@/auth/clerk'
 import { useAccessState } from '@/features/stripe/hooks/useAccessState'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { useOpenPortal } from '@/features/stripe/hooks/useOpenPortal'
@@ -12,6 +12,7 @@ import { useTrainingsQuery } from '@/features/training/queries/training.queries'
 import { useGoalsQuery } from '@/features/goal/queries/goal.queries'
 import { useConcursosQuery } from '@/features/concurso/queries/concurso.queries'
 import { usePreferenceQuery } from '@/features/preference/queries/preference.queries'
+import { useOnboarding } from '@/features/onboarding/useOnboarding'
 import { GoalHero } from '@/features/home/components/GoalHero'
 import { SecondaryGoalRow } from '@/features/home/components/SecondaryGoalRow'
 import { NoGoalHero } from '@/features/home/components/NoGoalHero'
@@ -87,16 +88,28 @@ function Dashboard() {
   const canDoFreeTraining =
     access.status === 'inactive' && (access.canDoFreeTraining ?? false)
 
+  // Novo usuário (pode treinar grátis) que ainda não concluiu o onboarding
+  // (perfil + 1ª meta) é levado ao fluxo em /concursos — o gate/coach assumem.
+  // Substitui o redirect ao antigo slideshow /onboarding, que montava a href do
+  // treino na mão e caía em "Cargo não encontrado" (queimando a cota grátis).
+  // `isActive` já é false quando a meta existe → não trava quem já escolheu.
+  const onboarding = useOnboarding()
+  const redirecting = canDoFreeTraining && onboarding.isActive
+
   useEffect(() => {
-    if (accessLoading) return
-    if (canDoFreeTraining) {
-      navigate({ to: '/onboarding' })
+    if (accessLoading || !onboarding.ready) return
+    if (redirecting) {
+      navigate({ to: '/concursos' })
     }
-  }, [canDoFreeTraining, accessLoading, navigate])
+  }, [accessLoading, onboarding.ready, redirecting, navigate])
 
   const firstName = user ? getFirstName(user) : ''
   const loading =
-    accessLoading || canDoFreeTraining || loadingGoals || loadingTrainings
+    accessLoading ||
+    !onboarding.ready ||
+    redirecting ||
+    loadingGoals ||
+    loadingTrainings
 
   const goals = goalsData?.goals ?? []
   const { hero, others } = joinGoalsWithTrainings(goals, trainings)
@@ -172,7 +185,21 @@ function Dashboard() {
             {firstName || 'Bem-vindo'}
           </h1>
         </div>
-        <p className="text-xs text-slate-500">{todayLabel()}</p>
+        <div className="flex flex-col items-end gap-1.5">
+          <p className="text-xs text-slate-500">{todayLabel()}</p>
+          {/* (Re)inicia o tour guiado — leva a /concursos e o coach assume. */}
+          <button
+            type="button"
+            onClick={() => {
+              onboarding.start()
+              navigate({ to: '/concursos' })
+            }}
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-semibold text-cyan-700 transition-colors hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500"
+          >
+            <AcademicCapIcon className="h-3.5 w-3.5" />
+            {onboarding.hasGoal ? 'Refazer o tour' : 'Fazer o tour'}
+          </button>
+        </div>
       </header>
 
       {loading ? (

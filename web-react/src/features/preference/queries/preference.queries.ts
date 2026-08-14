@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { preferenceService } from '../services/preference.service'
-import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
 import type { UpsertPreferenceInput } from '../domain/preference.types'
+import { concursoKeys } from '@/features/concurso/queries/concurso.queries'
+import { ackReview } from '@/features/onboarding/tour-state'
 
 /** Perfil muda raramente — 5 min sem refetch (mesma janela dos concursos). */
 const PREFERENCE_STALE_TIME = 5 * 60 * 1000
@@ -28,6 +29,9 @@ export function useUpsertPreferenceMutation() {
       queryClient.setQueryData(preferenceKeys.me, data)
       // A listagem refetcha já anotada com o novo `match`.
       queryClient.invalidateQueries({ queryKey: concursoKeys.all })
+      // Salvar o perfil conclui o Passo 1 do tour (auto ou manual) — assim a
+      // revisão nunca reaparece logo após preencher/ajustar o radar.
+      ackReview()
     },
   })
 }

@@ -3,22 +3,32 @@
 /** Gate de preferências + seções "Recomendados para você" na listagem
  *  (nível 0): perfil obrigatório, fail-open, chips de motivo e edição. */
 import { fireEvent, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  
   expectNoSeriousAxeViolations,
   installFetchMock,
   makeConcursoList,
   makeConcursoListItem,
   makePreference,
-  renderPage,
-  type FetchHandler,
+  renderPage
 } from './page-test-utils'
+import type {FetchHandler} from './page-test-utils';
 import {
   fillStateCity,
   makeStateCityHandlers,
 } from '@/features/preference/__tests__/preference-test-utils'
+import { ackListTour, resetTour } from '@/features/onboarding/tour-state'
+
+// Estes testes exercitam gate/preferências, não o walkthrough progressivo da
+// lista: marcamos ele como já visto para que a lista apareça após salvar.
+beforeEach(() => {
+  resetTour()
+  ackListTour()
+})
 
 afterEach(() => {
+  resetTour()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
 })
@@ -216,7 +226,7 @@ describe('barra de preferências', () => {
       expect(screen.getByText('Suas preferências')).toBeTruthy(),
     )
     // Form pré-preenchido: salvar já habilitado.
-    const save = screen.getByRole('button', { name: 'Salvar' }) as HTMLButtonElement
+    const save = screen.getByRole('button', { name: 'Salvar' })
     expect(save.disabled).toBe(false)
 
     // Fecha o dialog antes do teardown (a transição do MUI agenda timers que

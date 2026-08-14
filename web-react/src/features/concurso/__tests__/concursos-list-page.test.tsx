@@ -3,7 +3,7 @@
 /** Listagem/descoberta de concursos (nível 0, MAX-28): payload mockado,
  *  filtros client-side, estados e axe. */
 import { fireEvent, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   expectNoSeriousAxeViolations,
   installFetchMock,
@@ -12,8 +12,17 @@ import {
   makePreference,
   renderPage,
 } from './page-test-utils'
+import { ackListTour, resetTour } from '@/features/onboarding/tour-state'
+
+// Estes testes exercitam a LISTA, não o onboarding: marcamos o walkthrough
+// progressivo de primeira-vez como já visto para não tomar a página.
+beforeEach(() => {
+  resetTour()
+  ackListTour()
+})
 
 afterEach(() => {
+  resetTour()
   vi.unstubAllGlobals()
   document.body.innerHTML = ''
 })

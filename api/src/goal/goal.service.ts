@@ -239,7 +239,13 @@ export class GoalService {
     });
   }
 
-  /** Cargo.slug → Cargo.id → ExamBase.slug → ExamBase.id (via CargoProva). */
+  /**
+   * Resolve a identidade recebida em `cargoSlug` para um Cargo.id, tentando, na
+   * ordem: Cargo (slug/id) → ExamBase (slug/id, via CargoProva) → Concurso
+   * (slug/id) → cargo de enfermagem representante do concurso. O último caminho
+   * habilita "Definir como meta" a partir do NÍVEL DO CONCURSO: a meta é a mesma
+   * (UserGoal por cargo), só criada um nível acima.
+   */
   private async resolveCargoId(slugOrId: string): Promise<string | null> {
     const cargo = await this.prisma.cargo.findFirst({
       where: UUID_RE.test(slugOrId)
@@ -254,6 +260,29 @@ export class GoalService {
         : { slug: slugOrId },
       select: { cargoProvas: { select: { cargoId: true }, take: 1 } },
     });
-    return examBase?.cargoProvas[0]?.cargoId ?? null;
+    if (examBase?.cargoProvas[0]?.cargoId) return examBase.cargoProvas[0].cargoId;
+    return this.resolveConcursoRepresentativeCargo(slugOrId);
+  }
+
+  /**
+   * Concurso (slug/id) → cargo de enfermagem representante — o de maior salário
+   * (mesma ordem do payload do nível 1), com o id como desempate determinístico.
+   */
+  private async resolveConcursoRepresentativeCargo(
+    slugOrId: string,
+  ): Promise<string | null> {
+    const concurso = await this.prisma.concurso.findFirst({
+      where: UUID_RE.test(slugOrId)
+        ? { OR: [{ id: slugOrId }, { slug: slugOrId }] }
+        : { slug: slugOrId },
+      select: { id: true },
+    });
+    if (!concurso) return null;
+    const cargo = await this.prisma.cargo.findFirst({
+      where: { concursoId: concurso.id, isNursingRelevant: true },
+      orderBy: [{ salaryBase: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
+      select: { id: true },
+    });
+    return cargo?.id ?? null;
   }
 }

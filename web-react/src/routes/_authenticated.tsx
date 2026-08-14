@@ -7,6 +7,7 @@ import {
 import { SideBarV2 } from '@/components/SideBarV2'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { BottomNav } from '@/ui/mobile'
+import { OnboardingCoach } from '@/features/onboarding/components/OnboardingCoach'
 
 export const Route = createFileRoute('/_authenticated')({
   beforeLoad: ({ context, location }) => {
@@ -47,6 +48,7 @@ function RouteComponent() {
             : 'pb-2'
         } md:pb-2`}
       >
+        <OnboardingCoach />
         <Outlet />
       </div>
       {/* Player embutido (prova/re-tentativa em /concursos/...) precisa da
