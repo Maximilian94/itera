@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from '@tanstack/react-router'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   AdjustmentsHorizontalIcon,
@@ -24,6 +24,12 @@ import type {
 } from '@/features/concurso/domain/concurso.types'
 import { useConcursosQuery } from '@/features/concurso/queries/concurso.queries'
 import { CARD } from '@/features/concurso/components/card'
+import {
+  locationLabel,
+  salaryRange,
+  temporalClass,
+  temporalText,
+} from '@/features/concurso/components/concurso-labels'
 import { enter } from '@/features/concurso/components/motion'
 import { authService } from '@/features/auth/services/auth.service'
 import { usePreferenceQuery } from '@/features/preference/queries/preference.queries'
@@ -41,104 +47,29 @@ import {
 import { Coachmark } from '@/features/onboarding/components/Coachmark'
 import { ApiError } from '@/lib/api'
 
+/* Leaflet + tiles + supercluster só entram no bundle de quem abre o mapa;
+ * a lista é a visão padrão e não deve pagar por eles. */
+const ConcursoMap = lazy(() =>
+  import('@/features/concurso/components/mapa/ConcursoMap').then((m) => ({
+    default: m.ConcursoMap,
+  })),
+)
+
+/** Lista × Mapa: a mesma seleção, duas leituras. Na URL para ser compartilhável. */
+export type ConcursoView = 'lista' | 'mapa'
+
+/* `view` é OPCIONAL de propósito: tipá-lo como obrigatório forçaria todo
+ * `<Link to="/concursos">` do app (dashboard, onboarding, nível 1…) a passar
+ * search. A ausência já significa "lista". */
 export const Route = createFileRoute('/_authenticated/concursos/')({
+  validateSearch: (search: Record<string, unknown>): { view?: ConcursoView } => ({
+    view: search.view === 'mapa' ? 'mapa' : undefined,
+  }),
   component: ConcursosListPage,
 })
 
-/* ------------------------------------------------------------------ */
-/*  Helpers de data/rótulo                                             */
-/* ------------------------------------------------------------------ */
-
-/* Datas do edital são date-only; formatamos em UTC (mesma convenção do
- * nível 1) para não derivar um dia pelo fuso. */
-const monthYear = new Intl.DateTimeFormat('pt-BR', {
-  month: 'short',
-  year: 'numeric',
-  timeZone: 'UTC',
-})
-const dayMonth = new Intl.DateTimeFormat('pt-BR', {
-  day: '2-digit',
-  month: '2-digit',
-  timeZone: 'UTC',
-})
-
-/** Dias de hoje (local) até a data UTC do edital; negativo = passado. */
-function daysUntil(iso: string | null): number | null {
-  if (iso == null) return null
-  const target = new Date(iso)
-  if (Number.isNaN(target.getTime())) return null
-  const now = new Date()
-  const ms =
-    Date.UTC(
-      target.getUTCFullYear(),
-      target.getUTCMonth(),
-      target.getUTCDate(),
-    ) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
-  return Math.round(ms / 86_400_000)
-}
-
-const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`
-
-/**
- * Linha temporal do card, específica do estado (a "Data" vive aqui):
- * - aberto  → prazo de inscrição (+ data da prova); `urgent` quando ≤7 dias;
- * - futuro  → contagem para a prova;
- * - passado → mês/ano de aplicação.
- */
-function temporalText(item: ConcursoListItem): { text: string; urgent: boolean } {
-  const { timeline: t } = item
-  if (item.status === 'open') {
-    const exam = t.examDate != null ? ` · prova ${dayMonth.format(new Date(t.examDate))}` : ''
-    const left = daysUntil(t.registrationEnd)
-    if (left == null || left < 0) return { text: `Inscrições abertas${exam}`, urgent: false }
-    if (left === 0) return { text: `Inscrições encerram hoje${exam}`, urgent: true }
-    return {
-      text: `Inscrições encerram em ${dias(left)}${exam}`,
-      urgent: left <= 7,
-    }
-  }
-  if (item.status === 'future') {
-    const exam = t.examDate != null ? ` · ${dayMonth.format(new Date(t.examDate))}` : ''
-    const left = daysUntil(t.examDate)
-    if (left == null || left < 0) return { text: 'Prova em breve', urgent: false }
-    if (left === 0) return { text: 'Prova hoje', urgent: true }
-    return { text: `Prova em ${dias(left)}${exam}`, urgent: false }
-  }
-  const applied = t.examDate != null ? monthYear.format(new Date(t.examDate)) : null
-  return { text: applied != null ? `Aplicada em ${applied}` : 'Prova aplicada', urgent: false }
-}
-
-/* Salário sem centavos, e a faixa larga sem repetir "R$" no segundo número:
- * "R$ 4.800 – 8.500" lê mais limpo que dois valores completos. */
-const compactCurrency = new Intl.NumberFormat('pt-BR', {
-  style: 'currency',
-  currency: 'BRL',
-  maximumFractionDigits: 0,
-})
-
-function salaryRange(min: string | null, max: string | null): string | null {
-  if (min == null || max == null) return null
-  if (min === max) return compactCurrency.format(Number(min))
-  const top = compactCurrency.format(Number(max)).replace(/^R\$\s?/, '')
-  return `${compactCurrency.format(Number(min))} – ${top}`
-}
-
-function locationLabel(item: ConcursoListItem): string | null {
-  if (item.city != null) {
-    return `${item.city}${item.state != null ? `/${item.state}` : ''}`
-  }
-  return item.state
-}
-
-/** Cor da linha temporal: cyan p/ aberto (ação), âmbar na urgência de prazo
- *  (regra "tempo acabando" do DESIGN), slate p/ futuro, slate apagado p/ passado. */
-function temporalClass(status: ConcursoStatus, urgent: boolean): string {
-  if (status === 'open') {
-    return urgent ? 'font-semibold text-amber-700' : 'font-semibold text-cyan-700'
-  }
-  if (status === 'future') return 'font-medium text-slate-600'
-  return 'text-slate-500'
-}
+/* Helpers de data/rótulo agora vivem em components/concurso-labels.ts —
+ * a lista e o mapa compartilham a mesma copy. */
 
 /* ------------------------------------------------------------------ */
 /*  Filtros                                                            */
@@ -159,6 +90,64 @@ const TAB_OPTIONS: Array<{ value: StateTab; label: string; icon: TabIcon }> = [
   { value: 'future', label: 'A caminho', icon: CalendarDaysIcon },
   { value: 'past', label: 'Aplicadas', icon: CheckCircleIcon },
 ]
+
+/**
+ * Lista × Mapa. Mesmo vocabulário do StateToggle (segmented control) porque é
+ * o mesmo tipo de escolha — só que sobre a forma de ler, não sobre o recorte.
+ * Fica ao lado dele, à direita, para não competir pelo eixo primário.
+ */
+function ViewToggle({
+  value,
+  onChange,
+}: {
+  value: ConcursoView
+  onChange: (v: ConcursoView) => void
+}) {
+  const options = [
+    { value: 'lista' as const, label: 'Lista', icon: ListBulletIcon },
+    { value: 'mapa' as const, label: 'Mapa', icon: MapPinIcon },
+  ]
+  return (
+    <div
+      role="group"
+      aria-label="Forma de visualizar os concursos"
+      className="inline-flex gap-1 rounded-xl border border-slate-200 bg-slate-100 p-1"
+    >
+      {options.map((o) => {
+        const active = value === o.value
+        const Icon = o.icon
+        return (
+          <button
+            key={o.value}
+            type="button"
+            aria-pressed={active}
+            onClick={() => onChange(o.value)}
+            className={`inline-flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 ${
+              active
+                ? 'bg-white text-cyan-700 shadow-sm ring-1 ring-slate-200'
+                : 'text-slate-600 hover:bg-white/70 hover:text-slate-900'
+            }`}
+          >
+            <Icon
+              className={`h-4 w-4 shrink-0 ${active ? 'text-cyan-600' : 'text-slate-400'}`}
+            />
+            {o.label}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Placeholder do mapa enquanto o chunk do Leaflet carrega. */
+function MapSkeleton() {
+  return (
+    <div
+      className="h-[clamp(420px,62vh,720px)] w-full animate-pulse rounded-2xl border border-slate-200 bg-slate-100"
+      aria-label="Carregando mapa"
+    />
+  )
+}
 
 function StateToggle({
   value,
@@ -215,6 +204,15 @@ function StateToggle({
 /* ------------------------------------------------------------------ */
 
 function ConcursosListPage() {
+  const view = Route.useSearch().view ?? 'lista'
+  const navigate = useNavigate({ from: Route.fullPath })
+  /* Voltar para a lista limpa o param em vez de gravar `view=lista`. */
+  const setView = (next: ConcursoView) =>
+    navigate({
+      search: { view: next === 'mapa' ? 'mapa' : undefined },
+      replace: true,
+    })
+
   const { data, isPending, error, refetch } = useConcursosQuery()
   const { data: profileData } = useQuery({
     queryKey: ['auth', 'profile'],
@@ -504,11 +502,14 @@ function ConcursosListPage() {
 
           {/* ░░ Situação (eixo primário) + toolbar de busca/facetas ░░ */}
           <div ref={filtersRef} {...enter(1)} className="flex flex-col gap-3">
-            <StateToggle
-              value={activeTab}
-              onChange={setStateTab}
-              counts={counts}
-            />
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <StateToggle
+                value={activeTab}
+                onChange={setStateTab}
+                counts={counts}
+              />
+              <ViewToggle value={view} onChange={setView} />
+            </div>
 
             {/* Toolbar: busca cresce, facetas e "Limpar" à direita; alturas
                 iguais (h-9) para ler como um só instrumento. */}
@@ -576,7 +577,7 @@ function ConcursosListPage() {
             </div>
           </div>
 
-      {/* ░░ Lista ░░ */}
+      {/* ░░ Lista ou Mapa — mesma seleção, leituras diferentes ░░ */}
       <div ref={listRef}>
       {isPending || prefQuery.isPending ? (
         <ListSkeleton />
@@ -586,6 +587,12 @@ function ConcursosListPage() {
         <EmptyState hasActiveFilters={hasActiveFilters} onClear={clearFilters} />
       ) : displayed.length === 0 ? (
         <TabEmpty tab={activeTab} />
+      ) : view === 'mapa' ? (
+        /* O mapa recebe `displayed`: exatamente o que a lista mostraria na aba
+         * ativa, sem a paginação (o mapa não pagina — ele enquadra). */
+        <Suspense fallback={<MapSkeleton />}>
+          <ConcursoMap items={displayed} />
+        </Suspense>
       ) : (
         <section aria-label="Concursos" className="flex flex-col gap-2.5">
           {/* Com recomendados na aba, a lista vira 2 seções; sem, fica plana. */}

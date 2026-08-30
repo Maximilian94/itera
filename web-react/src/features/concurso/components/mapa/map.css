@@ -1,0 +1,82 @@
+/*
+ * Ajustes do Leaflet para o sistema visual do app (DESIGN.md).
+ *
+ * O Leaflet traz sua própria caixa branca com borda cinza e fonte do sistema
+ * em tooltip, popup e marcador. Sem isto, o mapa parece colado de outro
+ * produto. Importado só pelo ConcursoMap, então não pesa nas outras rotas.
+ */
+
+/*
+ * Dessatura o basemap. O OSM padrão é o único gratuito sem chave de API, mas
+ * vem colorido (verde de mata, amarelo de rodovia) e disputa atenção com os
+ * marcadores. O filtro só atinge o painel de tiles — marcadores, tooltip e
+ * popup vivem em painéis irmãos e mantêm o cyan da marca.
+ */
+.leaflet-tile-pane {
+  filter: grayscale(0.9) brightness(1.07) contrast(0.92);
+}
+
+/* O divIcon vem com fundo branco e borda; nossas pílulas desenham a própria
+ * superfície, então o invólucro tem que ser transparente. */
+.concurso-pill,
+.concurso-cluster {
+  background: transparent;
+  border: 0;
+}
+
+/* Marcador de precisão de estado: borda tracejada diz "local aproximado"
+ * sem depender do texto do rodapé. */
+.concurso-pill--approx > div {
+  border-style: dashed;
+}
+
+/* ── Tooltip (hover) ─────────────────────────────────────────────────────── */
+.leaflet-tooltip.concurso-tooltip {
+  padding: 0.625rem 0.75rem;
+  border: 1px solid var(--color-slate-200, #e2e8f0);
+  border-radius: 0.75rem;
+  background: #fff;
+  box-shadow: 0 8px 24px -8px rgb(15 23 42 / 0.25);
+  font-family: inherit;
+  white-space: normal;
+}
+
+/* A setinha herda a cor da borda do tooltip padrão; realinhamos com a nossa. */
+.leaflet-tooltip.concurso-tooltip::before {
+  border-top-color: var(--color-slate-200, #e2e8f0);
+}
+
+/* ── Popup (clique/toque) ────────────────────────────────────────────────── */
+.leaflet-popup-content-wrapper {
+  border-radius: 0.875rem;
+  box-shadow: 0 12px 32px -8px rgb(15 23 42 / 0.3);
+  font-family: inherit;
+}
+
+.leaflet-popup-content {
+  margin: 0.75rem;
+  /* O Leaflet fixa 300px e força line-height 1.4; o conteúdo é nosso. */
+  width: auto !important;
+  line-height: inherit;
+}
+
+/* ── Controles ───────────────────────────────────────────────────────────── */
+.leaflet-control-zoom a {
+  border-radius: 0.5rem;
+  color: var(--color-slate-700, #334155);
+  font-weight: 700;
+}
+
+.leaflet-control-attribution {
+  border-radius: 0.5rem 0 0 0;
+  background: rgb(255 255 255 / 0.85);
+  font-size: 10px;
+}
+
+/* Foco visível no marcador: ele é focável por teclado e, sem isto, o anel
+ * padrão do browser fica escondido atrás dos vizinhos. */
+.leaflet-marker-icon:focus-visible {
+  outline: 2px solid var(--color-cyan-600, #0891b2);
+  outline-offset: 2px;
+  z-index: 1000;
+}

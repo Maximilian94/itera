@@ -1,4 +1,4 @@
-import { estimateTravelMinutes } from './city-distance';
+import { estimateTravelMinutes, resolveCoords } from './city-distance';
 
 describe('estimateTravelMinutes', () => {
   it('mesma cidade (normalizada, com acentos/caixa) → 0', () => {
@@ -64,5 +64,58 @@ describe('estimateTravelMinutes', () => {
     expect(rs).not.toBeNull();
     expect(pi).not.toBeNull();
     expect(pi!).toBeGreaterThan(rs!);
+  });
+
+  /* A grafia com hífen aparece nos editais; a base IBGE guarda com espaço.
+   * Antes da normalização simétrica isto era null e o concurso sumia do
+   * matching por proximidade. */
+  it('hífen na grafia não impede o match (São João del-Rei)', () => {
+    expect(
+      estimateTravelMinutes(
+        { state: 'MG', city: 'São João del-Rei' },
+        { state: 'MG', city: 'São João del Rei' },
+      ),
+    ).toBe(0);
+  });
+
+  /* O contrapeso do teste acima: tirar hífen dos dois lados não pode quebrar
+   * os municípios cujo nome oficial TEM hífen. */
+  it('município com hífen no nome oficial continua geocodificável', () => {
+    expect(resolveCoords({ state: 'MA', city: 'Apicum-Açu' })).not.toBeNull();
+    expect(
+      resolveCoords({ state: 'RO', city: "Alta Floresta d'Oeste" }),
+    ).not.toBeNull();
+    expect(resolveCoords({ state: 'SP', city: 'Biritiba-Mirim' })).not.toBeNull();
+  });
+});
+
+describe('resolveCoords', () => {
+  it('cidade conhecida → centroide do município', () => {
+    const p = resolveCoords({ state: 'SP', city: 'São Paulo' });
+    expect(p?.precision).toBe('city');
+    expect(p!.lat).toBeCloseTo(-23.55, 1);
+    expect(p!.lng).toBeCloseTo(-46.63, 1);
+  });
+
+  it('sem cidade → centroide da UF', () => {
+    const p = resolveCoords({ state: 'BA', city: null });
+    expect(p?.precision).toBe('state');
+    /* Dentro da caixa aproximada da Bahia. */
+    expect(p!.lat).toBeGreaterThan(-19);
+    expect(p!.lat).toBeLessThan(-8);
+    expect(p!.lng).toBeGreaterThan(-47);
+    expect(p!.lng).toBeLessThan(-37);
+  });
+
+  it('cidade que não existe cai no centroide da UF (não vira null)', () => {
+    /* "Oeste do Paraná" é região, não município: ainda assim o concurso
+     * merece um ponto no mapa, só que com precisão de estado. */
+    const p = resolveCoords({ state: 'PR', city: 'Oeste do Paraná' });
+    expect(p?.precision).toBe('state');
+  });
+
+  it('sem UF → null (fica fora do mapa, por decisão)', () => {
+    expect(resolveCoords({ state: null, city: 'Brasília' })).toBeNull();
+    expect(resolveCoords({ state: null, city: null })).toBeNull();
   });
 });

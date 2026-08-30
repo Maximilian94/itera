@@ -8,7 +8,7 @@ import {
   type ConcursoStatus,
 } from './concurso-status';
 import { matchConcurso, type ConcursoMatch } from './concurso-match';
-import { estimateTravelMinutes } from '../geo/city-distance';
+import { estimateTravelMinutes, resolveCoords } from '../geo/city-distance';
 import { previousEditionsWhere } from './previous-editions';
 
 const UUID_RE =
@@ -404,6 +404,10 @@ export class ConcursoService {
         governmentScope: head.governmentScope,
         state: head.state,
         city: head.city,
+        coords:
+          head.governmentScope === 'FEDERAL'
+            ? null
+            : resolveCoords({ state: head.state, city: head.city }),
         examBoard: head.examBoard
           ? {
               id: head.examBoard.id,
@@ -497,6 +501,10 @@ export class ConcursoService {
           governmentScope: c.governmentScope,
           state: c.state,
           city: c.city,
+          coords:
+            c.governmentScope === 'FEDERAL'
+              ? null
+              : resolveCoords({ state: c.state, city: c.city }),
           examBoard: c.examBoard
             ? {
                 id: c.examBoard.id,

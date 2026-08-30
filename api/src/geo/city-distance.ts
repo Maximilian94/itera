@@ -25,24 +25,44 @@ const ROAD_FACTOR = 1.3;
 const AVG_SPEED_KMH = 70;
 const EARTH_RADIUS_KM = 6371;
 
-/** Normalização de nome de cidade (texto livre → chave do índice). */
+/**
+ * Normalização de nome de cidade (texto livre → chave do índice).
+ *
+ * Hífen e apóstrofo viram espaço porque a grafia varia entre fontes: o edital
+ * escreve "São João del-Rei" e a base IBGE guarda "sao joao del rei". É
+ * aplicada nos DOIS lados (consulta e índice) — normalizar só a consulta
+ * quebraria os 72 municípios cujo nome oficial tem hífen/apóstrofo
+ * ("Apicum-Açu", "Alta Floresta d'Oeste"). Simétrica, não colide: as 5.571
+ * chaves continuam únicas dentro da UF.
+ */
 export function normalizeName(value: string): string {
   return value
-    .trim()
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '');
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/['’-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 let index: Map<string, Municipio> | null = null;
 
-function lookup(state: string, city: string): Municipio | undefined {
+function getIndex(): Map<string, Municipio> {
   if (index == null) {
     index = new Map(
-      (municipios as Municipio[]).map((m) => [`${m.u}|${m.n}`, m]),
+      (municipios as Municipio[]).map((m) => [
+        `${m.u}|${normalizeName(m.n)}`,
+        m,
+      ]),
     );
   }
-  return index.get(`${state.trim().toUpperCase()}|${normalizeName(city)}`);
+  return index;
+}
+
+function lookup(state: string, city: string): Municipio | undefined {
+  return getIndex().get(
+    `${state.trim().toUpperCase()}|${normalizeName(city)}`,
+  );
 }
 
 function haversineKm(a: Municipio, b: Municipio): number {
@@ -82,4 +102,61 @@ export function estimateTravelMinutes(
   if (!a || !b) return null;
   const km = haversineKm(a, b) * ROAD_FACTOR;
   return Math.round((km / AVG_SPEED_KMH) * 60);
+}
+
+/**
+ * Ponto no mapa. `precision` diz o quanto se pode confiar nele: `city` é o
+ * centroide do próprio município; `state` é o centroide da UF (usado quando o
+ * concurso é estadual e não tem cidade) — o front sinaliza os dois de forma
+ * diferente para não fingir precisão que não existe.
+ */
+export interface GeoPoint {
+  lat: number;
+  lng: number;
+  precision: 'city' | 'state';
+}
+
+let stateCentroids: Map<string, GeoPoint> | null = null;
+
+/**
+ * Centroide da UF = média dos centroides dos seus municípios. É uma âncora
+ * grosseira ("algum lugar no meio do estado"), suficiente para posicionar um
+ * concurso estadual sem cidade definida. Memoizado no 1º uso.
+ */
+function stateCentroid(state: string): GeoPoint | undefined {
+  if (stateCentroids == null) {
+    const acc = new Map<string, { lat: number; lng: number; n: number }>();
+    for (const m of municipios as Municipio[]) {
+      const cur = acc.get(m.u) ?? { lat: 0, lng: 0, n: 0 };
+      cur.lat += m.lat;
+      cur.lng += m.lng;
+      cur.n += 1;
+      acc.set(m.u, cur);
+    }
+    stateCentroids = new Map(
+      [...acc].map(([uf, s]) => [
+        uf,
+        { lat: s.lat / s.n, lng: s.lng / s.n, precision: 'state' as const },
+      ]),
+    );
+  }
+  return stateCentroids.get(state.trim().toUpperCase());
+}
+
+/**
+ * Resolve a coordenada de um concurso para o mapa: centroide do município
+ * quando cidade+UF batem na base IBGE, senão centroide da UF, senão `null`.
+ *
+ * `null` é um resultado legítimo e esperado — concurso FEDERAL (é nacional,
+ * fixá-lo numa capital seria mentira), sem UF, ou com "cidade" que na verdade
+ * é uma região ("Oeste do Paraná"). O front lista esses fora do mapa em vez de
+ * escondê-los.
+ */
+export function resolveCoords(ref: CityRef): GeoPoint | null {
+  if (!ref.state) return null;
+  if (ref.city) {
+    const m = lookup(ref.state, ref.city);
+    if (m) return { lat: m.lat, lng: m.lng, precision: 'city' };
+  }
+  return stateCentroid(ref.state) ?? null;
 }
