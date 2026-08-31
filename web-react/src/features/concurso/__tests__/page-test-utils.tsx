@@ -177,6 +177,8 @@ export function makeConcursoListItem(
     governmentScope: 'MUNICIPAL',
     state: 'SP',
     city: 'Campinas',
+    /* Centroide IBGE de Campinas, como o backend resolve em resolveCoords. */
+    coords: { lat: -22.9099, lng: -47.0626, precision: 'city' },
     examBoard: { id: 'board-1', name: 'Fundação VUNESP', alias: 'VUNESP' },
     status: 'open',
     timeline: {

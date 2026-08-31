@@ -34,6 +34,17 @@ export type ConcursoMatch = {
   travelMinutes?: number
 }
 
+/**
+ * Ponto do concurso no mapa, resolvido no backend a partir dos centroides IBGE
+ * (`api/src/geo/city-distance.ts#resolveCoords`). `precision: 'state'` é o
+ * centroide da UF — âncora grosseira para concurso estadual sem cidade.
+ */
+export type GeoPoint = {
+  lat: number
+  lng: number
+  precision: 'city' | 'state'
+}
+
 // ── Listagem/descoberta (nível 0, MAX-28) ────────────────────────────────────
 
 /** Card de concurso na listagem; `slug` aceita UUID de prova (fallback lazy). */
@@ -47,6 +58,11 @@ export type ConcursoListItem = {
   governmentScope: GovernmentScope
   state: string | null
   city: string | null
+  /**
+   * Ponto no mapa; `null` quando o concurso não é mapeável (FEDERAL, sem UF).
+   * Opcional para tolerar payload em cache anterior ao campo.
+   */
+  coords?: GeoPoint | null
   examBoard: ExamBoardRef | null
   status: ConcursoStatus
   timeline: ConcursoTimeline
