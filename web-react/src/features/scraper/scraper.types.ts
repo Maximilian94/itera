@@ -190,11 +190,49 @@ export interface AdminConcursoRow {
   createdAt: string
 }
 
-/** Resultado do "recorrigir links" em massa. */
+/** Uma chamada de IA já precificada (detalhe do custo da operação). */
+export interface CostEntry {
+  label: string
+  model: string
+  inputTokens: number
+  outputTokens: number
+  usd: number
+}
+
+/** Custo de IA de UMA operação — soma das chamadas que ela disparou. */
+export interface CostReport {
+  usd: number
+  entries: Array<CostEntry>
+}
+
+/** Resultado do "buscar links faltantes" em massa. */
 export interface DiscoveryReextractResult {
   processed: number
   updated: number
   stillMissing: number
+  cost: CostReport
+}
+
+/** Candidato que a busca achou mas NÃO conseguiu confirmar. Não foi salvo. */
+export interface LinkSuggestion {
+  url: string
+  origin: 'site da banca' | 'busca web' | 'plataforma da organizadora'
+}
+
+/** Busca do link oficial de UM concurso (aba Admin da página do concurso). */
+export interface FindConcursoLinkResult {
+  /** true quando a busca achou um link (e o gravou). */
+  found: boolean
+  /** O link atual depois da busca — o novo, ou o que já estava salvo. */
+  url: string | null
+  /** true = página raspada e lista documentos; false = a origem bloqueou. */
+  verified: boolean
+  docCount: number
+  previousUrl: string | null
+  /** Candidato não confirmado — o admin abre e decide (não foi gravado). */
+  suggestion: LinkSuggestion | null
+  /** Quanto essa busca custou em chamadas de IA. */
+  cost: CostReport
 }
 
 /** Uma mudança de campo aplicada no "Atualizar" (para o relatório). */

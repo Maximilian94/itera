@@ -8,6 +8,7 @@ import type {
   DiscoveryReextractResult,
   DiscoverySearchResult,
   DocumentScrapeResult,
+  FindConcursoLinkResult,
   NewConcursoDocument,
   PciEntryStatus,
   PciExamEntry,
@@ -47,10 +48,7 @@ export const scraperService = {
     })
   },
 
-  updateEntryStatus(
-    id: string,
-    status: PciEntryStatus,
-  ): Promise<PciExamEntry> {
+  updateEntryStatus(id: string, status: PciEntryStatus): Promise<PciExamEntry> {
     return apiFetch<PciExamEntry>(`${BASE}/entries/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ status }),
@@ -137,9 +135,10 @@ export const scraperService = {
     )
   },
 
-  promoteEntry(
-    id: string,
-  ): Promise<{ examBase: { id: string }; pciEntry: { id: string; status: string } }> {
+  promoteEntry(id: string): Promise<{
+    examBase: { id: string }
+    pciEntry: { id: string; status: string }
+  }> {
     return apiFetch(`${BASE}/entries/${id}/promote`, { method: 'POST' })
   },
 
@@ -168,12 +167,31 @@ export const scraperService = {
     })
   },
 
-  /** Recorrige em massa o link do concurso de todos os concursos vindos do pci. */
+  /** "Buscar links faltantes": só os concursos ativos que estão sem link. */
   discoveryReextract(): Promise<DiscoveryReextractResult> {
     return apiFetch<DiscoveryReextractResult>(`${BASE}/discovery/reextract`, {
       method: 'POST',
       body: JSON.stringify({}),
     })
+  },
+
+  /** Define/limpa o link de documentos na mão (saída quando a busca erra). */
+  setConcursoSourceUrl(
+    concursoId: string,
+    url: string | null,
+  ): Promise<{ id: string; documentsSourceUrl: string | null }> {
+    return apiFetch(`${BASE}/concursos/${concursoId}/source-url`, {
+      method: 'PATCH',
+      body: JSON.stringify({ url }),
+    })
+  },
+
+  /** Aba Admin do concurso: procura (e salva) o link oficial DESTE concurso. */
+  findConcursoLink(concursoId: string): Promise<FindConcursoLinkResult> {
+    return apiFetch<FindConcursoLinkResult>(
+      `${BASE}/concursos/${concursoId}/find-link`,
+      { method: 'POST', body: JSON.stringify({}) },
+    )
   },
 
   /** "Atualizar": roda Fase 1 + Fase 2 de UM concurso (o front chama em loop). */

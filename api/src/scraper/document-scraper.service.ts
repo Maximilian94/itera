@@ -9,6 +9,7 @@ import * as cheerio from 'cheerio';
 import { jsonrepair } from 'jsonrepair';
 import { decodeHtmlBody } from '../common/decode-body';
 import { PrismaService } from '../prisma/prisma.service';
+import { AiUsageMeter } from './ai-cost';
 
 export const SCRAPED_DOCUMENT_KINDS = [
   'EDITAL_ABERTURA',
@@ -39,6 +40,80 @@ export interface DocumentScrapeResult {
   sourceUrl: string;
   fetchedAt: string;
   documents: ScrapedDocument[];
+}
+
+/** Quanto da página vai para a IA e quanto ela pode responder. */
+export interface ScrapeProfile {
+  maxChars: number;
+  maxOutputTokens: number;
+}
+
+/**
+ * Raspagem de VERDADE (aba Notícias, monitoramento): queremos a lista completa
+ * e fiel, então vale mandar a página inteira. ~200k chars ≈ 54k tokens.
+ */
+export const FULL_SCRAPE: ScrapeProfile = {
+  maxChars: 200_000,
+  maxOutputTokens: 16_384,
+};
+
+/**
+ * VERIFICAÇÃO de link (`countConcursoDocsAt`): a pergunta é só "esta página
+ * lista documentos?" — o que se decide no início da lista. Mandar 200k chars
+ * para responder isso custava ~$0,024 por candidata e era o item mais caro do
+ * fluxo de busca de link, acima da própria busca web. Com 25k chars a resposta
+ * é a mesma por ~1/8 do preço.
+ */
+export const VERIFY_SCRAPE: ScrapeProfile = {
+  maxChars: 25_000,
+  maxOutputTokens: 2_048,
+};
+
+/**
+ * Falha ao BAIXAR a página, carregando o status HTTP.
+ *
+ * Existe porque quem verifica um link precisa separar dois casos que antes
+ * viravam a mesma exceção genérica: **403/429** = a origem bloqueou o robô (a
+ * URL pode estar perfeita) e **404** = esta URL não existe. Tratar 404 como
+ * "bloqueado" fazia a verificação aceitar URLs inventadas pela IA.
+ *
+ * Continua sendo BadRequestException para não mudar a resposta HTTP das rotas.
+ */
+export class PageFetchError extends BadRequestException {
+  /** `status` já é usado pela BadRequestException — daí o nome próprio. */
+  constructor(
+    readonly httpStatus: number,
+    message: string,
+  ) {
+    super(message);
+  }
+
+  /** true quando o site barrou o acesso automatizado (não diz nada da URL). */
+  get blocked(): boolean {
+    return this.httpStatus === 403 || this.httpStatus === 429;
+  }
+}
+
+/**
+ * A página é o DESAFIO do Cloudflare (ou similar), não o conteúdo.
+ *
+ * ⚠️ Sem isso, o desafio passa por página válida: ele vem com ~5–27 KB de HTML,
+ * então a heurística de "HTML substancial" o aceita, a IA não acha documentos
+ * nele e o link é REJEITADO como "página lida, sem documentos" — quando na
+ * verdade nunca conseguimos ler nada. Foi o que descartou o link CORRETO do
+ * concurso de Mondaí (ameosc.selecao.net.br, atrás de Cloudflare).
+ */
+export function looksLikeChallenge(html: string): boolean {
+  const head = html.slice(0, 4_000).toLowerCase();
+  return (
+    /<title>\s*(just a moment|um momento|attention required|verificando)/.test(
+      head,
+    ) ||
+    head.includes('cf-browser-verification') ||
+    head.includes('/cdn-cgi/challenge-platform') ||
+    head.includes('__cf_chl') ||
+    head.includes('cf-please-wait')
+  );
 }
 
 /** Página baixada, normalizada entre o fetch nativo e o fallback got-scraping. */
@@ -96,8 +171,18 @@ export class DocumentScraperService {
    * cascata anti-bot (fetch → cookie warm-up → got-scraping → Playwright).
    * Best-effort: qualquer bloqueio/erro vira null em vez de lançar.
    */
-  async fetchPageHtml(url: string): Promise<string | null> {
+  async fetchPageHtml(
+    url: string,
+    opts: { render?: boolean } = {},
+  ): Promise<string | null> {
     try {
+      // `render`: força o Chromium mesmo com HTTP 200. Muitos sites de banca
+      // servem a LISTA de concursos por JS — o HTML estático vem completo (200,
+      // 100kB) mas sem nenhum link de concurso, e o 2º salto não acha nada.
+      if (opts.render) {
+        const rendered = await this.renderWithBrowser(url);
+        return rendered?.html?.trim() ? rendered.html : null;
+      }
       return (await this.fetchHtml(url)).html;
     } catch (err) {
       this.logger.warn(
@@ -215,9 +300,13 @@ export class DocumentScraperService {
     return { addedCount };
   }
 
-  async scrapeDocuments(url: string): Promise<DocumentScrapeResult> {
+  async scrapeDocuments(
+    url: string,
+    profile: ScrapeProfile = FULL_SCRAPE,
+    meter?: AiUsageMeter,
+  ): Promise<DocumentScrapeResult> {
     const { html, viaBrowser } = await this.fetchHtml(url);
-    let documents = await this.extractDocuments(html);
+    let documents = await this.extractDocuments(html, profile, meter);
     this.logger.log(
       `scrape ${url}: ${documents.length} doc(s) no HTML ${viaBrowser ? 'renderizado' : 'estático'} (${html.length} chars)`,
     );
@@ -229,7 +318,7 @@ export class DocumentScraperService {
     if (documents.length === 0 && !viaBrowser) {
       const rendered = await this.renderWithBrowser(url);
       if (rendered?.html.trim()) {
-        documents = await this.extractDocuments(rendered.html);
+        documents = await this.extractDocuments(rendered.html, profile, meter);
         this.logger.log(
           `scrape ${url}: re-extração com navegador → ${documents.length} doc(s) (${rendered.html.length} chars)`,
         );
@@ -270,10 +359,14 @@ export class DocumentScraperService {
   }
 
   /** Simplifica o HTML e extrai a lista com a IA ([] se não sobrar conteúdo). */
-  private async extractDocuments(html: string): Promise<ScrapedDocument[]> {
-    const simplified = this.simplifyHtml(html);
+  private async extractDocuments(
+    html: string,
+    profile: ScrapeProfile = FULL_SCRAPE,
+    meter?: AiUsageMeter,
+  ): Promise<ScrapedDocument[]> {
+    const simplified = this.simplifyHtml(html, profile.maxChars);
     if (!simplified.trim()) return [];
-    return this.extractWithAi(simplified);
+    return this.extractWithAi(simplified, profile.maxOutputTokens, meter);
   }
 
   /**
@@ -344,7 +437,11 @@ export class DocumentScraperService {
     }
 
     if (!page.ok) {
-      throw new BadRequestException(
+      // O status importa a quem chama: 403/429 é "não consegui ler" (a página
+      // pode estar ótima); 404 é "esta URL não existe". Quem verifica link
+      // precisa distinguir os dois — ver PageFetchError.
+      throw new PageFetchError(
+        page.status,
         page.status === 403 || page.status === 429
           ? `O site bloqueou o acesso automatizado (HTTP ${page.status}). Esse órgão provavelmente exige navegação humana (proteção anti-robô forte). Baixe o edital em PDF e crie o concurso direto em /admin/criar-concurso colando a URL do PDF.`
           : `Falha ao buscar a URL (HTTP ${page.status}).`,
@@ -359,7 +456,16 @@ export class DocumentScraperService {
 
     // Decodificação charset-aware: páginas de órgãos em ISO-8859-1 viravam
     // mojibake ("P�BLICO") quando lidas como UTF-8.
-    return { html: decodeHtmlBody(page.buffer, page.contentType), viaBrowser };
+    const html = decodeHtmlBody(page.buffer, page.contentType);
+    // Desafio anti-bot que nem o Chromium venceu: é BLOQUEIO, não conteúdo.
+    if (looksLikeChallenge(html)) {
+      throw new PageFetchError(
+        403,
+        'O site exibiu o desafio anti-robô (Cloudflare) e não liberou a página. ' +
+          'Abra no seu navegador e use o link/HTML na mão.',
+      );
+    }
+    return { html, viaBrowser };
   }
 
   /** Normaliza uma Response do fetch numa forma comum ao fallback got-scraping. */
@@ -610,7 +716,7 @@ export class DocumentScraperService {
    * estilos e atributos irrelevantes (mantendo href), cortando o custo de
    * tokens sem perder a estrutura de links/datas.
    */
-  private simplifyHtml(html: string): string {
+  private simplifyHtml(html: string, maxChars = FULL_SCRAPE.maxChars): string {
     const $ = cheerio.load(html);
 
     $(
@@ -636,12 +742,13 @@ export class DocumentScraperService {
     // Colapsa whitespace excessivo (páginas de órgãos costumam vir cheias de indentação)
     const compact = body.replace(/\s+/g, ' ').replace(/> </g, '><').trim();
 
-    // ~200k chars ≈ 50k tokens — folga no contexto do modelo, mas evita páginas patológicas
-    return compact.slice(0, 200_000);
+    return compact.slice(0, maxChars);
   }
 
   private async extractWithAi(
     simplifiedHtml: string,
+    maxOutputTokens = FULL_SCRAPE.maxOutputTokens,
+    meter?: AiUsageMeter,
   ): Promise<ScrapedDocument[]> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -660,7 +767,7 @@ export class DocumentScraperService {
       },
       body: JSON.stringify({
         model: 'gpt-4.1-mini',
-        max_tokens: 16_384,
+        max_tokens: maxOutputTokens,
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: simplifiedHtml },
@@ -678,6 +785,7 @@ export class DocumentScraperService {
     const dataRes = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
     };
+    meter?.record('raspagem da página', 'gpt-4.1-mini', dataRes);
     const content = dataRes.choices?.[0]?.message?.content?.trim() ?? '';
 
     let jsonStr = content
