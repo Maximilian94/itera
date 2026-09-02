@@ -13,10 +13,7 @@ import {
 } from '@tanstack/react-router'
 import { fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type {
-  AdminConcursoRow,
-  DiscoverySearchResult,
-} from '../scraper.types'
+import type { AdminConcursoRow, DiscoverySearchResult } from '../scraper.types'
 import {
   expectNoSeriousAxeViolations,
   installFetchMock,
@@ -34,6 +31,7 @@ const PROFILE = '/auth/me'
 const LIST = '/admin/scraper/concursos'
 const SEARCH = '/admin/scraper/discovery/search'
 const ADD = '/admin/scraper/discovery/add'
+const REEXTRACT = '/admin/scraper/discovery/reextract'
 
 /** Re-parenta a rota admin num root de teste (pula o layout _authenticated). */
 const rootRoute = createRootRoute()
@@ -141,7 +139,10 @@ describe('gerenciar concursos (admin)', () => {
     const { container } = renderPage()
 
     expect(
-      await screen.findByRole('heading', { level: 1, name: 'Gerenciar concursos' }),
+      await screen.findByRole('heading', {
+        level: 1,
+        name: 'Gerenciar concursos',
+      }),
     ).toBeTruthy()
 
     // Santos (aberto, sem link) na seção de atenção com o badge; Governo (past) concluído.
@@ -159,7 +160,11 @@ describe('gerenciar concursos (admin)', () => {
       [SEARCH]: { body: SEARCH_RESULT },
       [ADD]: {
         body: {
-          concurso: { id: 'novo', slug: 'hospital-2026', institution: 'Hospital Odilon Behrens' },
+          concurso: {
+            id: 'novo',
+            slug: 'hospital-2026',
+            institution: 'Hospital Odilon Behrens',
+          },
           officialUrlFound: false,
           created: true,
         },
@@ -181,6 +186,81 @@ describe('gerenciar concursos (admin)', () => {
     expect(
       await screen.findByText(/sem link oficial — pegar manual/),
     ).toBeTruthy()
+  })
+
+  it('Buscar links faltantes: conta os sem link e avisa do custo antes', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    mockAll({
+      [REEXTRACT]: {
+        body: {
+          processed: 1,
+          updated: 1,
+          stillMissing: 0,
+          cost: {
+            usd: 0.0312,
+            entries: [
+              {
+                label: 'busca web (tokens)',
+                model: 'gpt-4.1-mini',
+                inputTokens: 5000,
+                outputTokens: 100,
+                usd: 0.0062,
+              },
+              {
+                label: 'busca web (taxa por chamada)',
+                model: 'web_search_preview',
+                inputTokens: 0,
+                outputTokens: 0,
+                usd: 0.025,
+              },
+            ],
+          },
+        },
+      },
+    })
+    renderPage()
+
+    // Só Santos está sem link entre os ativos → contador (1).
+    const button = await screen.findByRole('button', {
+      name: /Buscar links faltantes \(1\)/,
+    })
+    fireEvent.click(button)
+
+    // O confirm diz quantos e que consome créditos — o clique é caro.
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/1 concursos sem link/)
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/cr[ée]ditos/i)
+    expect(
+      await screen.findByText(/Processados/, {}, { timeout: 3000 }),
+    ).toBeTruthy()
+
+    // O gasto da rodada aparece na hora, e abre o detalhe por chamada.
+    const badge = screen.getByRole('button', { name: /Custo: US\$ 0,0312/ })
+    fireEvent.click(badge)
+    expect(screen.getByText('busca web (taxa por chamada)')).toBeTruthy()
+  })
+
+  it('não existe mais o botão que revalidava TODOS os concursos', async () => {
+    mockAll()
+    renderPage()
+
+    await screen.findByRole('heading', { level: 1 })
+    // Guarda de custo: rodava busca web em ~100 concursos já resolvidos.
+    expect(
+      screen.queryByRole('button', { name: /Recorrigir links oficiais/ }),
+    ).toBeNull()
+  })
+
+  it('Buscar links faltantes fica desabilitado quando ninguém está sem link', async () => {
+    mockAll({
+      [LIST]: { body: [{ ...ROWS[0], needsSourceUrl: false }] },
+    })
+    renderPage()
+
+    expect(
+      (
+        await screen.findByRole('button', { name: /Buscar links faltantes/ })
+      ).hasAttribute('disabled'),
+    ).toBe(true)
   })
 
   it('Atualizar concursos: roda o loop e mostra o relatório', async () => {

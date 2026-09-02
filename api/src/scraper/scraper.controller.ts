@@ -29,8 +29,18 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { ScraperService } from './scraper.service';
 import { DocumentScraperService } from './document-scraper.service';
 import { ConcursoDocumentAnalysisService } from './concurso-document-analysis.service';
-import { ConcursoDiscoveryService } from './concurso-discovery.service';
+import {
+  ConcursoDiscoveryService,
+  OpenAiUnavailableError,
+} from './concurso-discovery.service';
 import { ConcursoUpdateService } from './concurso-update.service';
+
+class SetSourceUrlDto {
+  /** null/vazio limpa o link (volta a contar como "sem link"). */
+  @IsOptional()
+  @IsString()
+  url?: string | null;
+}
 
 class TriggerRunDto {
   @IsOptional()
@@ -143,7 +153,7 @@ class ProposedChangeDto {
 }
 
 /** Etapa do cronograma proposto, aprovada pelo admin. */
-class EtapaDto {
+export class EtapaDto {
   @IsString()
   name: string;
 
@@ -157,7 +167,7 @@ class EtapaDto {
 }
 
 /** Uma matéria do quadro de provas proposto, aprovada pelo admin. */
-class SyllabusGroupDto {
+export class SyllabusGroupDto {
   @IsString()
   name: string;
 
@@ -195,7 +205,7 @@ class ApplyCargoSyllabusDto {
 }
 
 /** Cargo novo aprovado pelo admin (inclusão de cargo por retificação/anexo). */
-class NewCargoDto {
+export class NewCargoDto {
   @IsString()
   @MinLength(1)
   role: string;
@@ -231,9 +241,16 @@ class NewCargoDto {
   @IsOptional()
   @IsBoolean()
   isNursingRelevant?: boolean | null;
+
+  /** Trecho do documento que justifica o cargo. O `analyze` devolve, o front
+   *  reenvia inteiro — sem declarar aqui, o `forbidNonWhitelisted` derruba o
+   *  apply com 400 ("property evidence should not exist"). */
+  @IsOptional()
+  @IsString()
+  evidence?: string | null;
 }
 
-class ApplyChangesDto {
+export class ApplyChangesDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ProposedChangeDto)
@@ -340,10 +357,41 @@ export class ScraperController {
     });
   }
 
-  /** Recorrige em massa o link do concurso de todos os concursos vindos do pci. */
+  /** Aba Admin do concurso: procura (e salva) o link oficial DESTE concurso. */
+  @Post('concursos/:concursoId/find-link')
+  async findConcursoLink(
+    @Param('concursoId', ParseUUIDPipe) concursoId: string,
+  ) {
+    try {
+      return await this.discovery.findLinkForConcurso(concursoId);
+    } catch (err) {
+      if (err instanceof OpenAiUnavailableError)
+        throw new BadRequestException(err.message);
+      throw err;
+    }
+  }
+
+  /** Define/limpa o link de documentos na mão (aba Admin do concurso). */
+  @Patch('concursos/:concursoId/source-url')
+  setConcursoSourceUrl(
+    @Param('concursoId', ParseUUIDPipe) concursoId: string,
+    @Body() dto: SetSourceUrlDto,
+  ) {
+    return this.discovery.setDocumentsSourceUrl(concursoId, dto.url ?? null);
+  }
+
+  /** "Buscar links faltantes": só os concursos ativos que estão sem link. */
   @Post('discovery/reextract')
-  discoveryReextract() {
-    return this.discovery.reextractLinks();
+  async discoveryReextract() {
+    try {
+      return await this.discovery.reextractLinks();
+    } catch (err) {
+      // Sem crédito/chave inválida vira 400 com a causa real, em vez de um
+      // resultado "0 encontrados" que parece falha de busca.
+      if (err instanceof OpenAiUnavailableError)
+        throw new BadRequestException(err.message);
+      throw err;
+    }
   }
 
   @Post('documents')

@@ -21,17 +21,14 @@ import type {
   ConcursoStatus,
   ConcursoTimeline,
 } from '@/features/concurso/domain/concurso.types'
-import type {FichaFact} from '@/features/concurso/components/FichaCard';
+import type { FichaFact } from '@/features/concurso/components/FichaCard'
 import { useConcursoQuery } from '@/features/concurso/queries/concurso.queries'
 import { CARD, CARD_RAISE } from '@/features/concurso/components/card'
 import { enter, useMeters } from '@/features/concurso/components/motion'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { BACK_SQUARE } from '@/features/concurso/components/BackSquare'
 import { ConcursoGoalToggle } from '@/features/goal/components/ConcursoGoalToggle'
-import {
-  FichaCard
-  
-} from '@/features/concurso/components/FichaCard'
+import { FichaCard } from '@/features/concurso/components/FichaCard'
 import {
   VerticalTimeline,
   buildConcursoTimelineSteps,
@@ -39,13 +36,16 @@ import {
 } from '@/features/concurso/components/VerticalTimeline'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import { ConcursoNews } from '@/features/concurso/components/ConcursoNews'
+import { ConcursoAdmin } from '@/features/concurso/components/ConcursoAdmin'
 import { useStartSimuladoMutation } from '@/features/concurso/hooks/useStartSimulado'
 import { useRequireAccess } from '@/features/stripe/hooks/useRequireAccess'
 import { authService } from '@/features/auth/services/auth.service'
 import { ApiError } from '@/lib/api'
 import { formatBRL } from '@/lib/utils'
 
-export const Route = createFileRoute('/_authenticated/concursos/$concursoSlug/')({
+export const Route = createFileRoute(
+  '/_authenticated/concursos/$concursoSlug/',
+)({
   component: ConcursoPage,
 })
 
@@ -77,15 +77,21 @@ function daysUntil(iso: string | null): number | null {
   if (Number.isNaN(target.getTime())) return null
   const now = new Date()
   const ms =
-    Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate()) -
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+    Date.UTC(
+      target.getUTCFullYear(),
+      target.getUTCMonth(),
+      target.getUTCDate(),
+    ) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
   return Math.round(ms / 86_400_000)
 }
 
 const dias = (n: number) => `${n} ${n === 1 ? 'dia' : 'dias'}`
 
 /** Texto da pill por status; o enquadramento temporal é da rota. */
-function statusLabel(status: ConcursoStatus, timeline: ConcursoTimeline): string {
+function statusLabel(
+  status: ConcursoStatus,
+  timeline: ConcursoTimeline,
+): string {
   if (status === 'open') {
     const left = daysUntil(timeline.registrationEnd)
     if (left == null || left < 0) return 'Inscrições abertas'
@@ -152,8 +158,8 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
   const documents = data.documents ?? []
   const meters = useMeters()
   const { status, timeline, summary } = concurso
-  // Aba ativa da coluna principal: cargos (padrão) ou a timeline de Notícias.
-  const [tab, setTab] = useState<'cargos' | 'noticias'>('cargos')
+  // Aba ativa da coluna principal: cargos (padrão), Notícias ou Admin.
+  const [tab, setTab] = useState<ConcursoTab>('cargos')
   // Admin vê os controles de manutenção da timeline de Notícias.
   const { data: profileData } = useQuery({
     queryKey: ['auth', 'profile'],
@@ -175,7 +181,8 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
     startSimulado.mutate({ examBoardId: boardId, examBaseId: cargo.id })
   }
 
-  const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
+  const bancaName =
+    concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const location =
     concurso.city != null
       ? `${concurso.city}${concurso.state != null ? ` / ${concurso.state}` : ''}`
@@ -203,7 +210,10 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
     {
       icon: TicketIcon,
       label: 'Taxa de inscrição',
-      value: summary.registrationFee != null ? formatBRL(summary.registrationFee) : null,
+      value:
+        summary.registrationFee != null
+          ? formatBRL(summary.registrationFee)
+          : null,
     },
     { icon: MapPinIcon, label: 'Cidade', value: location },
     {
@@ -246,7 +256,9 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
               <ChevronLeftIcon className="h-5 w-5 sm:h-6 sm:w-6" />
             </Link>
             <div className="min-w-0 flex-1">
-              <p className="w-fit text-sm font-medium text-slate-500">Concursos</p>
+              <p className="w-fit text-sm font-medium text-slate-500">
+                Concursos
+              </p>
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5">
                 <h1
                   style={{ viewTransitionName: 'concurso-heading' }}
@@ -254,7 +266,10 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
                 >
                   Concurso {concurso.institution} {concurso.year}
                 </h1>
-                <StatusPill status={status} label={statusLabel(status, timeline)} />
+                <StatusPill
+                  status={status}
+                  label={statusLabel(status, timeline)}
+                />
                 {cargos.length > 0 && (
                   <ConcursoGoalToggle
                     concursoId={concurso.id}
@@ -282,9 +297,17 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
             tab={tab}
             onTab={setTab}
             newsCount={documents.length}
+            isAdmin={isAdmin}
           />
 
-          {tab === 'noticias' ? (
+          {tab === 'admin' && isAdmin ? (
+            <ConcursoAdmin
+              concursoId={concurso.id}
+              sourceUrl={concurso.documentsSourceUrl ?? null}
+              checkedAt={concurso.documentsCheckedAt ?? null}
+              enterIdx={1}
+            />
+          ) : tab === 'noticias' ? (
             <ConcursoNews
               documents={documents}
               isAdmin={isAdmin}
@@ -341,7 +364,10 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
               {...{ style: enter(3).style }}
               className={`${enter(3).className} ${CARD} p-5`}
             >
-              <h2 id="cronograma-heading" className="text-sm font-bold text-slate-900">
+              <h2
+                id="cronograma-heading"
+                className="text-sm font-bold text-slate-900"
+              >
                 Cronograma
               </h2>
               {/* Etapas do edital são o cronograma (sem data → "A definir");
@@ -357,15 +383,19 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Abas da coluna principal: Cargos × Notícias                        */
+/*  Abas da coluna principal: Cargos × Notícias × Admin                */
 /* ------------------------------------------------------------------ */
 
+/** "admin" só existe para role ADMIN (a aba nem é renderizada aos demais). */
+type ConcursoTab = 'cargos' | 'noticias' | 'admin'
+
 function ConcursoTabs(props: {
-  tab: 'cargos' | 'noticias'
-  onTab: (tab: 'cargos' | 'noticias') => void
+  tab: ConcursoTab
+  onTab: (tab: ConcursoTab) => void
   newsCount: number
+  isAdmin: boolean
 }) {
-  const { tab, onTab, newsCount } = props
+  const { tab, onTab, newsCount, isAdmin } = props
   const tabClass = (active: boolean) =>
     `-mb-px inline-flex items-center gap-2 border-b-2 px-1 pb-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2 ${
       active
@@ -407,6 +437,18 @@ function ConcursoTabs(props: {
           </span>
         )}
       </button>
+      {/* Manutenção deste concurso — fora do caminho do usuário comum. */}
+      {isAdmin && (
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === 'admin'}
+          onClick={() => onTab('admin')}
+          className={tabClass(tab === 'admin')}
+        >
+          Admin
+        </button>
+      )}
     </div>
   )
 }
@@ -425,15 +467,26 @@ function CargoCard(props: {
   meters: boolean
   enterIdx: number
 }) {
-  const { cargo, concursoSlug, canStart, isStarting, onStart, meters, enterIdx } = props
+  const {
+    cargo,
+    concursoSlug,
+    canStart,
+    isStarting,
+    onStart,
+    meters,
+    enterIdx,
+  } = props
   /* Cargo criado direto do edital (scraper admin): ainda sem prova — o card
    * navega normalmente (a página do cargo mostra ficha + edições anteriores +
    * provas relacionadas para estudar); só o CTA de treino muda de copy. */
   const hasProva = cargo.provaCount > 0
   const score =
-    cargo.userStats.bestScore != null ? Math.round(cargo.userStats.bestScore) : null
+    cargo.userStats.bestScore != null
+      ? Math.round(cargo.userStats.bestScore)
+      : null
   const cut =
-    cargo.minPassingGrade != null && Number.isFinite(Number(cargo.minPassingGrade))
+    cargo.minPassingGrade != null &&
+    Number.isFinite(Number(cargo.minPassingGrade))
       ? Math.round(Number(cargo.minPassingGrade))
       : null
   const passing = score != null && cut != null && score >= cut
@@ -505,7 +558,8 @@ function CargoCard(props: {
         {!hasProva ? (
           <div className="flex items-center justify-between gap-3">
             <span className="text-sm text-slate-500">
-              Prova ainda não cadastrada — estude pela ficha e edições anteriores
+              Prova ainda não cadastrada — estude pela ficha e edições
+              anteriores
             </span>
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-cyan-700">
               Ver cargo
@@ -597,8 +651,8 @@ function EmptyCargos() {
           Ainda não temos as provas deste concurso
         </h2>
         <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
-          Assim que as provas de enfermagem forem adicionadas, elas aparecem aqui.
-          Enquanto isso, treine com outro concurso.
+          Assim que as provas de enfermagem forem adicionadas, elas aparecem
+          aqui. Enquanto isso, treine com outro concurso.
         </p>
       </div>
       <Link
@@ -657,7 +711,9 @@ function ConcursoErrorState(props: { error: unknown; onRetry: () => void }) {
       </span>
       <div>
         <h1 className="text-lg font-bold text-slate-900">
-          {notFound ? 'Concurso não encontrado' : 'Não foi possível carregar o concurso'}
+          {notFound
+            ? 'Concurso não encontrado'
+            : 'Não foi possível carregar o concurso'}
         </h1>
         <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
           {notFound

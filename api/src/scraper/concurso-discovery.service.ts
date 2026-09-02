@@ -12,7 +12,13 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ConcursoLinkService } from '../concurso/concurso-link.service';
 import { deriveConcursoStatus } from '../concurso/concurso-status';
 import type { ConcursoStatus } from '../concurso/concurso-status';
-import { DocumentScraperService } from './document-scraper.service';
+import {
+  DocumentScraperService,
+  PageFetchError,
+  VERIFY_SCRAPE,
+} from './document-scraper.service';
+import { AiUsageMeter } from './ai-cost';
+import type { CostReport } from './ai-cost';
 
 const PCI_BASE_URL = 'https://www.pciconcursos.com.br';
 
@@ -67,6 +73,27 @@ export interface AdminConcursoRow {
   createdAt: string;
 }
 
+/** Resultado do 2º salto: o link do concurso, ou a pista que não abrimos. */
+interface HopResult {
+  concursoUrl: string | null;
+  /** Página (listagem/plataforma) identificada mas ilegível — vira pista. */
+  deadEnd: string | null;
+}
+const NO_HOP: HopResult = { concursoUrl: null, deadEnd: null };
+
+/** Link que a busca achou mas NÃO conseguiu confirmar — vai para o admin. */
+export interface LinkSuggestion {
+  url: string;
+  /** De onde veio: link copiado do site da banca × composto pela busca web. */
+  origin: 'site da banca' | 'busca web' | 'plataforma da organizadora';
+}
+
+/** Resultado da procura: confirmado, ou uma sugestão para o admin decidir. */
+export interface LinkSearchOutcome {
+  confirmed: { url: string; docCount: number; verified: boolean } | null;
+  suggestion: LinkSuggestion | null;
+}
+
 /** Identidade do concurso usada para localizar sua página oficial. */
 interface ConcursoIdentity {
   institution: string;
@@ -75,6 +102,11 @@ interface ConcursoIdentity {
   year: number | null;
   /** Manchete/nome do concurso (dá contexto extra à busca), opcional. */
   headline?: string | null;
+  /** Cargo(s) de enfermagem do concurso — desempata quando o órgão tem mais de
+   *  um certame no mesmo ano (ex.: Mondaí 2026 tem o Concurso Público 039 SEM
+   *  enfermeiro e o Processo Seletivo 043 COM). Sem isso a busca escolhia o que
+   *  casava com "concurso público" e trazia o certame errado. */
+  targetRoles?: string[];
 }
 
 /** O que a IA extrai da página de notícia do concurso (tudo best-effort). */
@@ -108,41 +140,101 @@ Campos (use null quando a notícia não informar):
 const BANCA_SYSTEM_PROMPT = `
 Você recebe o texto e os links de uma PÁGINA de um site de banca/organizadora de concursos públicos. Sua tarefa é achar o link da PÁGINA ESPECÍFICA de UM concurso.
 
-Retorne SOMENTE um JSON válido, sem markdown: {"concursoUrl":"..."} (ou {"concursoUrl":null}).
+Retorne SOMENTE um JSON válido, sem markdown: {"concursoUrl":"...","listingUrl":"..."} (use null quando não houver).
 
 - concursoUrl: a URL da página DESTE concurso específico (a que tem o edital, cronograma e inscrição do órgão informado). O link costuma conter o nome do órgão/cidade, o ano, ou palavras como "concurso", "edital", "processo-seletivo", "inscricao". Escolha o link que MELHOR corresponde ao órgão/cidade/ano informados pelo usuário.
-- Se a página não tiver um link claramente específico para ESTE concurso (só listas genéricas ou nada que bata), retorne null. NÃO invente URL; use apenas links presentes na página.
+- listingUrl: só quando NÃO houver concursoUrl nesta página. É o link da página que LISTA os concursos da banca ("Concursos", "Próximos concursos", "Em andamento", "Inscrições abertas", "Processos seletivos"), onde o concurso procurado provavelmente aparece. A home da banca raramente lista os concursos — quase sempre há uma página dedicada.
+- NÃO invente URL: use apenas links presentes na página. Sem nada que sirva, retorne null nos dois campos.
 `.trim();
 
 /** Busca web (Responses API + tool web_search) da PÁGINA DE DOCUMENTOS do concurso. */
 const WEBSEARCH_SYSTEM_PROMPT = `
 Você localiza a PÁGINA DE DOCUMENTOS de um concurso público brasileiro específico.
 
-O alvo é UMA URL: a página onde estão PUBLICADOS OS DOCUMENTOS deste concurso — edital de abertura, retificações, anexos, convocações, gabaritos e resultados. É a página de onde um candidato BAIXA os editais.
+O alvo é UMA URL: a página onde estão PUBLICADOS OS DOCUMENTOS deste concurso — edital de abertura, retificações, anexos, convocações, gabaritos e resultados. É a página de onde um candidato BAIXA os editais e faz a inscrição.
 
-O ERRO MAIS COMUM é devolver uma HOME (da prefeitura ou da banca) — EVITE isso a todo custo:
-- Essa página quase SEMPRE fica no site da BANCA ORGANIZADORA (ex.: institutoaocp.org.br, ibfc.org.br, vunesp.com.br, cebraspe.org.br, fgv.br, quadrix.org.br, fundatec.org.br, idecan.org.br, consulplan.net, objetivas.com.br, ibam...), e é uma página ESPECÍFICA daquele concurso (o caminho da URL costuma ter o nome/cidade do órgão, o ano, ou o número do edital).
-- NÃO retorne a HOME da prefeitura/órgão (ex.: "https://www.cidade.sp.gov.br/") — lá NÃO ficam os editais.
-- NÃO retorne a HOME da banca (ex.: "https://www.vunesp.com.br/") — tem que ser a página DAQUELE concurso.
-- NÃO retorne página de notícia, de login, de inscrição genérica, agregador (PCI Concursos, Gran, Estratégia, QConcursos etc.) nem o PDF solto do edital.
-- Uma URL de domínio "pelado" (só o domínio, sem um caminho específico do concurso) é QUASE SEMPRE ERRADA.
-- Só use uma página do site do ÓRGÃO/prefeitura se o próprio órgão for a organizadora E existir ali uma página específica desse concurso com a LISTA de documentos.
+ONDE ELA PODE ESTAR — não presuma o domínio, SIGA a fonte:
+- no site da BANCA organizadora (institutoaocp.org.br, ibfc.org.br, vunesp.com.br, cebraspe.org.br, fgv.br, quadrix.org.br, fundatec.org.br, idecan.org.br, consulplan.net, objetivas.com.br...); OU
+- numa PLATAFORMA TERCEIRA de inscrições que a banca contrata — MUITO comum em bancas pequenas, institutos e associações de municípios. O endereço costuma ser um SUBDOMÍNIO da plataforma, por exemplo "<banca>.selecao.net.br", ou um portal tipo gestaodeconcursos.com.br. Nesses casos o site próprio da banca NÃO tem a página do concurso; OU
+- no site do próprio ÓRGÃO/prefeitura, quando ele mesmo organiza.
+
+REGRA CENTRAL: siga o link de "inscrição"/"edital" que a notícia ou o site da banca indicar, MESMO QUE ELE LEVE A OUTRO DOMÍNIO. O domínio do órgão ou da banca não é garantia de nada.
+
+NÃO retorne:
+- HOME "pelada" (só o domínio, sem caminho específico do concurso) — lá não ficam os editais;
+- página de notícia, de login, agregador (PCI Concursos, Gran, Estratégia, QConcursos etc.) nem o PDF solto do edital.
 
 Como agir:
-- PESQUISE na internet. Descubra a banca organizadora e ache a página do concurso no site dela.
-- Confirme que a página menciona o órgão, o concurso e o ano, e que ela LISTA documentos/editais.
+- PESQUISE na internet. Descubra quem organiza e ONDE as inscrições/documentos deste concurso realmente estão.
+- Confirme que a página é DESTE órgão e DESTE ano, e que ela lista documentos ou abre as inscrições.
+- Use um endereço que você VIU na fonte. NÃO deduza o padrão de URL do site nem componha um caminho "provável" — endereços inventados dão 404 e são o erro mais caro aqui.
 - Remova parâmetros de rastreamento (utm_*, fbclid...).
-- Se você só encontrar HOMEs, ou não achar a página específica que LISTA os documentos, é MELHOR retornar "NOT_FOUND" do que devolver uma home errada. NÃO invente URL.
+- Não achou a página específica? Responda "NOT_FOUND". É melhor que um palpite.
 
-Responda SOMENTE com um JSON válido, sem markdown:
+Responda SOMENTE com um JSON válido, sem markdown, sem texto antes ou depois:
 {"officialContestUrl":"https://...","organizerUrl":"https://..."}
-- officialContestUrl: a PÁGINA DE DOCUMENTOS específica do concurso na organizadora (resposta principal). "NOT_FOUND" se não achar.
-- organizerUrl: a HOME do site da banca organizadora, se você a identificou (só referência/fallback). "NOT_FOUND" se não souber.
+- officialContestUrl: a PÁGINA DE DOCUMENTOS/INSCRIÇÃO específica deste concurso, no domínio em que ela de fato estiver (resposta principal). "NOT_FOUND" se não achar.
+- organizerUrl: a HOME do site da organizadora OU da plataforma de inscrições, se você a identificou (referência para uma segunda busca). "NOT_FOUND" se não souber.
 `.trim();
 
-/** Domínios de agregadores/cursinhos que NUNCA valem como link oficial. */
-const AGGREGATOR_HOST =
-  /(pciconcursos|acheconcursos|concursosnobrasil|grancursos|granconcursos|estrategiaconcursos|estrategia|folhadirigida|jcconcursos|qconcursos|tecconcursos|direcaoconcursos|beabadoconcurso|pcimarcas|concursos\.com)/i;
+/**
+ * A OpenAI recusou a chamada por conta/chave (401 sem autorização, 429 sem
+ * crédito), não por causa do conteúdo. Erro de INFRAESTRUTURA — precisa subir
+ * até a tela: tratá-lo como "não achei o link" fazia a plataforma degradar em
+ * silêncio para "pegar manual" em TODOS os concursos, e a causa real (crédito
+ * acabado) só aparecia no log do servidor.
+ */
+export class OpenAiUnavailableError extends Error {
+  constructor(
+    readonly status: number,
+    detail: string,
+  ) {
+    super(
+      `A busca por IA não rodou: a OpenAI recusou a chamada (HTTP ${status}). ` +
+        (status === 429
+          ? 'Provavelmente a conta está sem créditos. '
+          : status === 401
+            ? 'Verifique a OPENAI_API_KEY. '
+            : '') +
+        detail.slice(0, 200),
+    );
+    this.name = 'OpenAiUnavailableError';
+  }
+}
+
+/**
+ * Domínios de agregadores/cursinhos que NUNCA valem como link oficial.
+ *
+ * ⚠️ São comparados por DOMÍNIO (igual ou subdomínio), não por "contém". A
+ * versão anterior usava um regex de substring com entradas como `concursos.com`
+ * e `estrategia`, que casavam dentro do domínio de BANCAS legítimas —
+ * `ibgpconcursos.com.br` e `seleconcursos.com.br` eram descartados como
+ * agregadores, e com eles o link oficial de todo concurso dessas bancas.
+ */
+const AGGREGATOR_DOMAINS = [
+  'pciconcursos.com.br',
+  'acheconcursos.com.br',
+  'concursosnobrasil.com.br',
+  'grancursos.com.br',
+  'grancursosonline.com.br',
+  'granconcursos.com.br',
+  'estrategiaconcursos.com.br',
+  'folhadirigida.com.br',
+  'jcconcursos.com.br',
+  'qconcursos.com',
+  'tecconcursos.com.br',
+  'direcaoconcursos.com.br',
+  'beabadoconcurso.com.br',
+  'pcimarcas.com.br',
+  'concursos.com.br',
+  'acertaquestoes.com.br',
+];
+
+/** true quando o host É um agregador ou subdomínio de um. */
+export function isAggregatorHost(hostname: string): boolean {
+  const host = hostname.toLowerCase().replace(/^www\./, '');
+  return AGGREGATOR_DOMAINS.some((d) => host === d || host.endsWith(`.${d}`));
+}
 
 /**
  * Normaliza um candidato a URL de documentos do concurso: exige http, rejeita
@@ -161,7 +253,7 @@ export function cleanConcursoUrl(v: unknown): string | null {
     return null;
   }
   if (!/^https?:$/.test(u.protocol)) return null;
-  if (AGGREGATOR_HOST.test(u.hostname)) return null;
+  if (isAggregatorHost(u.hostname)) return null;
   // Home sem caminho específico do concurso → quase sempre errada.
   if (u.pathname.replace(/\/+$/, '') === '' && !u.search) return null;
   for (const key of [...u.searchParams.keys()]) {
@@ -169,6 +261,70 @@ export function cleanConcursoUrl(v: unknown): string | null {
       u.searchParams.delete(key);
   }
   return u.toString();
+}
+
+/**
+ * Chave de comparação entre URLs (host sem "www" + caminho sem barra final,
+ * minúsculo, sem query). Serve para checar se a URL que o MODELO escreveu é
+ * uma das que a busca realmente devolveu. Função pura (testável).
+ */
+export function urlKey(v: string): string {
+  try {
+    const u = new URL(v);
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    const path = u.pathname.replace(/\/+$/, '').toLowerCase();
+    return host + path;
+  } catch {
+    return v.trim().toLowerCase();
+  }
+}
+
+/**
+ * URLs REAIS que a busca web devolveu (`url_citation` das annotations). São o
+ * antídoto para a alucinação de endereço: o modelo COMPÕE caminhos plausíveis
+ * (medimos 3 URLs diferentes e todas 404 para o mesmo concurso), mas as
+ * citações vêm do índice de busca. Função pura (testável).
+ */
+export function extractCitations(data: unknown): string[] {
+  const d = data as {
+    output?: {
+      type?: string;
+      content?: { annotations?: { type?: string; url?: unknown }[] }[];
+    }[];
+  };
+  const out: string[] = [];
+  for (const item of d.output ?? []) {
+    if (item.type !== 'message') continue;
+    for (const c of item.content ?? []) {
+      for (const a of c.annotations ?? []) {
+        if (a.type === 'url_citation' && typeof a.url === 'string')
+          out.push(a.url);
+      }
+    }
+  }
+  return [...new Set(out)];
+}
+
+/**
+ * Normaliza uma SEMENTE do 2º salto (o site da banca). Diferente de
+ * `cleanConcursoUrl`, **aceita home "pelada"**: como resposta final a home é
+ * inútil, mas como ponto de partida para raspar o site da organizadora é
+ * exatamente o que queremos. Reduz ao ORIGEM (tira caminho/query) porque o
+ * salto começa do topo do site. Função pura (testável).
+ */
+export function cleanSeedUrl(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const s = v.trim();
+  if (!s || s.toUpperCase() === 'NOT_FOUND') return null;
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    return null;
+  }
+  if (!/^https?:$/.test(u.protocol)) return null;
+  if (isAggregatorHost(u.hostname)) return null;
+  return u.origin;
 }
 
 /**
@@ -423,6 +579,9 @@ export class ConcursoDiscoveryService {
     // Visita a notícia e extrai o site da banca + metadados (best-effort).
     const extracted = await this.extractFromNews(candidate.newsUrl).catch(
       (err) => {
+        // Sem IA disponível o "add" inteiro sai errado (sem banca, sem link):
+        // melhor falhar visível do que criar um stub vazio em silêncio.
+        if (err instanceof OpenAiUnavailableError) throw err;
         this.logger.warn(
           `extração da notícia falhou (${candidate.newsUrl}): ${(err as Error).message?.slice(0, 160)}`,
         );
@@ -496,53 +655,207 @@ export class ConcursoDiscoveryService {
   }
 
   /**
-   * Recorrige EM MASSA o link do concurso de todos os concursos vindos do
-   * pciconcursos (com `pciListingUrl`): faz BUSCA WEB + VERIFICAÇÃO por concurso
-   * (usando órgão/UF/cidade/ano salvos) e só regrava `documentsSourceUrl` com um
-   * link CONFIRMADO (que lista documentos); senão limpa p/ captura manual. É o
-   * "corrigir tudo de uma vez". Sequencial e pesado (busca web + raspagem).
+   * Define (ou limpa, com null) o link de documentos NA MÃO — a saída quando a
+   * busca automática erra ou a origem bloqueia tudo. É caminho definitivo, não
+   * afordância de erro: em site com WAF agressivo o admin abre no próprio
+   * navegador, copia a URL certa e cola aqui.
    */
-  async reextractLinks(): Promise<{
-    processed: number;
-    updated: number;
-    stillMissing: number;
+  async setDocumentsSourceUrl(
+    concursoId: string,
+    url: string | null,
+  ): Promise<{ id: string; documentsSourceUrl: string | null }> {
+    const trimmed = url?.trim() ?? '';
+    let clean: string | null = null;
+    if (trimmed) {
+      try {
+        const u = new URL(trimmed);
+        if (!/^https?:$/.test(u.protocol)) throw new Error('protocolo');
+        clean = u.toString();
+      } catch {
+        throw new BadRequestException(
+          'URL inválida — precisa começar com http:// ou https://.',
+        );
+      }
+    }
+    return this.prisma.concurso
+      .update({
+        where: { id: concursoId },
+        data: { documentsSourceUrl: clean },
+        select: { id: true, documentsSourceUrl: true },
+      })
+      .catch(() => {
+        throw new NotFoundException('concurso not found');
+      });
+  }
+
+  /** Cargos de enfermagem do concurso — desempatam qual certame procurar. */
+  private async nursingRoles(concursoId: string): Promise<string[]> {
+    const cargos = await this.prisma.cargo.findMany({
+      where: { concursoId, isNursingRelevant: true },
+      select: { role: true },
+      take: 5,
+    });
+    return [...new Set(cargos.map((c) => c.role).filter(Boolean))];
+  }
+
+  /**
+   * Medidor de custo da operação. A taxa da busca web vem do env (string), por
+   * isso a coerção explícita: `config.get<number>` NÃO converte o tipo.
+   */
+  private newMeter(): AiUsageMeter {
+    const raw = this.config.get<string>('OPENAI_WEB_SEARCH_CALL_USD');
+    const parsed = raw != null ? Number(raw) : NaN;
+    return new AiUsageMeter(
+      Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined,
+    );
+  }
+
+  /**
+   * Busca o link de UM concurso (aba Admin da página do concurso). Mesma busca
+   * web + verificação do fluxo em massa, mas com resposta detalhada para o admin
+   * decidir: diz se o link foi CONFIRMADO (a página lista documentos) ou apenas
+   * ACEITO SEM VERIFICAÇÃO (a origem bloqueou a raspagem).
+   *
+   * Preserva o link salvo quando não acha — mesma regra do em massa.
+   *
+   * Devolve também o CUSTO de IA da operação (`cost`), somado das chamadas que
+   * ela disparou: o admin vê o preço do clique na hora, em vez de descobrir no
+   * painel da OpenAI no dia seguinte e agregado.
+   */
+  async findLinkForConcurso(concursoId: string): Promise<{
+    found: boolean;
+    url: string | null;
+    verified: boolean;
+    docCount: number;
+    previousUrl: string | null;
+    /** Candidato não confirmado — o admin abre e decide (não foi salvo). */
+    suggestion: LinkSuggestion | null;
+    cost: CostReport;
   }> {
-    const concursos = await this.prisma.concurso.findMany({
-      where: { pciListingUrl: { not: null } },
+    const c = await this.prisma.concurso.findUnique({
+      where: { id: concursoId },
       select: {
         id: true,
         institution: true,
         state: true,
         city: true,
         year: true,
+        documentsSourceUrl: true,
       },
     });
+    if (!c) throw new NotFoundException('concurso not found');
 
-    let updated = 0;
-    let stillMissing = 0;
-    for (const c of concursos) {
-      const found = await this.findVerifiedConcursoLink({
+    const meter = this.newMeter();
+    const { confirmed, suggestion } = await this.findVerifiedConcursoLink(
+      {
         institution: c.institution,
         uf: c.state,
         city: c.city,
         year: c.year,
-      }).catch((err) => {
+        targetRoles: await this.nursingRoles(c.id),
+      },
+      null,
+      meter,
+    );
+
+    // Só link CONFIRMADO é gravado. Sugestão vai para a tela e espera o aval.
+    await this.prisma.concurso.update({
+      where: { id: c.id },
+      data: {
+        ...(confirmed ? { documentsSourceUrl: confirmed.url } : {}),
+        documentsCheckedAt: new Date(),
+      },
+    });
+
+    const cost = meter.report();
+    this.logger.log(
+      `busca de link (${c.institution}): US$ ${cost.usd.toFixed(4)} em ${cost.entries.length} chamada(s)`,
+    );
+    return {
+      found: !!confirmed,
+      url: confirmed?.url ?? c.documentsSourceUrl,
+      verified: !!confirmed,
+      docCount: confirmed?.docCount ?? 0,
+      previousUrl: c.documentsSourceUrl,
+      suggestion,
+      cost,
+    };
+  }
+
+  /**
+   * Busca EM MASSA o link do concurso ("Buscar links faltantes"): BUSCA WEB +
+   * VERIFICAÇÃO por concurso (usando órgão/UF/cidade/ano salvos) e regrava
+   * `documentsSourceUrl` quando acha; não achando, PRESERVA o que já estava lá
+   * (pode ter sido colado à mão).
+   *
+   * ⚠️ CUSTO: cada concurso pode custar uma busca web + raspagens + chamadas de
+   * IA. Por isso o alvo é SEMPRE só quem está sem link e ativo — o modo antigo
+   * "revalidar todos os do pciconcursos" foi removido: rodava em ~100 concursos
+   * de um clique, quase todos já resolvidos, e foi o que queimou o crédito.
+   */
+  async reextractLinks(): Promise<{
+    processed: number;
+    updated: number;
+    stillMissing: number;
+    cost: CostReport;
+  }> {
+    const concursos = await this.prisma.concurso.findMany({
+      // Sem link e ainda ativo. Não exige `pciListingUrl`: concurso criado por
+      // outro fluxo também pode estar sem link.
+      where: { documentsSourceUrl: null, closedAt: null },
+      select: {
+        id: true,
+        institution: true,
+        state: true,
+        city: true,
+        year: true,
+        documentsSourceUrl: true,
+      },
+    });
+
+    // Um medidor para a rodada inteira — o total é o que o admin quer ver.
+    const meter = this.newMeter();
+    let updated = 0;
+    let stillMissing = 0;
+    for (const c of concursos) {
+      const outcome = await this.findVerifiedConcursoLink(
+        {
+          institution: c.institution,
+          uf: c.state,
+          city: c.city,
+          year: c.year,
+          targetRoles: await this.nursingRoles(c.id),
+        },
+        null,
+        meter,
+      ).catch((err) => {
+        // IA indisponível (sem crédito/chave inválida) não é "não achei": seria
+        // o mesmo erro nos N concursos seguintes. Aborta e avisa o admin.
+        if (err instanceof OpenAiUnavailableError) throw err;
         this.logger.warn(
           `reextract falhou (${c.institution}): ${(err as Error).message?.slice(0, 160)}`,
         );
-        return null;
+        return { confirmed: null, suggestion: null } as LinkSearchOutcome;
       });
+      const found = outcome.confirmed;
+      // NÃO limpa quando não achou: o link salvo pode ter sido colado à mão pelo
+      // admin (ou confirmado numa rodada anterior) e a busca é best-effort —
+      // apagá-lo destruía trabalho manual a cada rodada.
       await this.prisma.concurso.update({
         where: { id: c.id },
         data: {
-          documentsSourceUrl: found?.url ?? null,
+          ...(found ? { documentsSourceUrl: found.url } : {}),
           documentsCheckedAt: new Date(),
         },
       });
       if (found) updated++;
-      else stillMissing++;
+      else if (!c.documentsSourceUrl) stillMissing++;
     }
-    return { processed: concursos.length, updated, stillMissing };
+    const cost = meter.report();
+    this.logger.log(
+      `busca de links em massa: ${concursos.length} concurso(s), US$ ${cost.usd.toFixed(4)}`,
+    );
+    return { processed: concursos.length, updated, stillMissing, cost };
   }
 
   /** Listagem da página admin: todos os concursos + status temporal derivado. */
@@ -667,117 +980,398 @@ export class ConcursoDiscoveryService {
     extracted: ExtractedNews | null,
     identity: ConcursoIdentity,
   ): Promise<string | null> {
-    const found = await this.findVerifiedConcursoLink(identity, extracted);
-    return found?.url ?? null;
+    // No "add" também só entra link confirmado — sugestão fica para a aba Admin.
+    const { confirmed } = await this.findVerifiedConcursoLink(
+      identity,
+      extracted,
+    );
+    return confirmed?.url ?? null;
   }
 
   /**
-   * Busca web (várias candidatas) + VERIFICAÇÃO: raspa cada candidata e só
-   * aceita a que de fato lista documentos do concurso. Ordem: página específica
-   * (officialContestUrl) → home da banca (organizerUrl) → link achado no site da
-   * banca (1º salto). Devolve a 1ª confirmada, ou null.
+   * Busca web + 2º salto pelo site da banca, com VERIFICAÇÃO.
+   *
+   * ⚠️ NUNCA salva o que não conseguiu confirmar. Medimos que o modelo COMPÕE
+   * URLs em vez de copiá-las (Mondaí devolveu 3 endereços diferentes e todos
+   * 404, em `low`/`medium`/`high`), e que origens atrás de Cloudflare nunca
+   * podem ser verificadas — as duas coisas juntas tornam a decisão automática
+   * impossível. Então: confirmado vira link; não-confirmado vira SUGESTÃO, que
+   * o admin abre e aprova em segundos. Antes isso oscilou entre salvar link
+   * errado (Mondaí) e descartar link certo — os dois lados do mesmo palpite.
    */
   private async findVerifiedConcursoLink(
     identity: ConcursoIdentity,
     extracted: ExtractedNews | null = null,
-  ): Promise<{ url: string; docCount: number } | null> {
-    const candidates = await this.webSearchConcursoCandidates(identity).catch(
-      (err) => {
-        this.logger.warn(
-          `busca web falhou (${identity.institution}): ${(err as Error).message?.slice(0, 160)}`,
-        );
-        return [] as string[];
-      },
-    );
-    // Fallback: a página do concurso achada raspando o site da banca (1º salto).
-    const viaBanca = await this.findConcursoLinkOnBanca(
-      extracted?.bancaUrl ?? null,
-      identity,
-    );
-    if (viaBanca && !candidates.includes(viaBanca)) candidates.push(viaBanca);
+    meter?: AiUsageMeter,
+  ): Promise<LinkSearchOutcome> {
+    /* ORDEM POR CUSTO. A busca web é de longe a chamada mais cara (taxa por
+     * chamada + tokens dos resultados); o 2º salto é 1 raspagem + 1 chamada no
+     * mini. Quando a notícia já nos deu a banca, o caminho barato costuma
+     * bastar — então ele vem primeiro e a busca web só entra se ele falhar. */
+    const knownBanca = this.dedupeByHost([extracted?.bancaUrl ?? null]);
+    let earlyBlocked: string | null = null;
+    let earlyDeadEnd: string | null = null;
+    if (knownBanca.length > 0) {
+      const early = await this.hopThroughBancas(
+        knownBanca,
+        identity,
+        [],
+        meter,
+      );
+      if (early.confirmed)
+        return { confirmed: early.confirmed, suggestion: null };
+      earlyBlocked = early.blockedUrl;
+      earlyDeadEnd = early.deadEnd;
+    }
 
+    const search = await this.webSearchConcursoCandidates(
+      identity,
+      extracted,
+      meter,
+    ).catch((err) => {
+      // Conta/chave da OpenAI não é falha "deste" concurso — deixa subir.
+      if (err instanceof OpenAiUnavailableError) throw err;
+      this.logger.warn(
+        `busca web falhou (${identity.institution}): ${(err as Error).message?.slice(0, 160)}`,
+      );
+      return { candidates: [] as string[], organizerSeed: null };
+    });
+    const first = await this.verifyCandidates(
+      search.candidates,
+      identity,
+      meter,
+    );
+    if (first.confirmed)
+      return { confirmed: first.confirmed, suggestion: null };
+
+    /* 2º salto pela banca que a BUSCA indicou — salva o caso comum de acertar a
+     * organizadora e errar a URL (o modelo deduz o padrão do site e devolve um
+     * endereço plausível que dá 404). A `organizerUrl` era descartada por ser
+     * home "pelada", justamente o pedaço mais confiável da resposta. */
+    const second = await this.hopThroughBancas(
+      this.dedupeByHost([search.organizerSeed]).filter(
+        (s) => !knownBanca.includes(s),
+      ),
+      identity,
+      search.candidates,
+      meter,
+    );
+    if (second.confirmed)
+      return { confirmed: second.confirmed, suggestion: null };
+
+    /* Nada confirmado: o melhor candidato vira SUGESTÃO (não é salvo). A ordem
+     * reflete a confiança: link copiado do site da banca (2º salto) antes de
+     * link composto pela busca web. */
+    const fromBanca = earlyBlocked ?? second.blockedUrl;
+    /* Ordem de confiança. O `deadEnd` é a PLATAFORMA que identificamos mas não
+     * conseguimos ler (Cloudflare barra até o Chromium em selecao.net.br e
+     * afins): não é a resposta, mas dizer "a organizadora usa esta plataforma"
+     * é acionável — o admin abre lá e copia o link do concurso. Melhor que
+     * devolver "não achei nada", que joga fora o que já descobrimos. */
+    const deadEnd = earlyDeadEnd ?? second.deadEnd;
+    const suggestion: LinkSuggestion | null = fromBanca
+      ? { url: fromBanca, origin: 'site da banca' }
+      : first.blockedUrl
+        ? { url: first.blockedUrl, origin: 'busca web' }
+        : deadEnd
+          ? { url: deadEnd, origin: 'plataforma da organizadora' }
+          : null;
+    if (suggestion) {
+      this.logger.log(
+        `sugestão não verificada (${identity.institution}): ${suggestion.url} [${suggestion.origin}]`,
+      );
+    }
+    return { confirmed: null, suggestion };
+  }
+
+  /**
+   * 2º salto para um conjunto de sementes (sites de banca) + verificação do que
+   * sair. `skip` evita re-verificar URL que já passou pelo crivo nesta rodada.
+   */
+  private async hopThroughBancas(
+    seeds: string[],
+    identity: ConcursoIdentity,
+    skip: string[],
+    meter?: AiUsageMeter,
+  ): Promise<{
+    confirmed: { url: string; docCount: number; verified: boolean } | null;
+    blockedUrl: string | null;
+    deadEnd: string | null;
+  }> {
+    const found: string[] = [];
+    let deadEnd: string | null = null;
+    for (const seed of seeds) {
+      const hop = await this.findConcursoLinkOnBanca(seed, identity, 0, meter);
+      const url = hop.concursoUrl;
+      if (url && !skip.includes(url) && !found.includes(url)) found.push(url);
+      deadEnd ??= hop.deadEnd;
+    }
+    return {
+      ...(await this.verifyCandidates(found, identity, meter)),
+      deadEnd,
+    };
+  }
+
+  /**
+   * Raspa cada candidata e devolve a 1ª CONFIRMADA (a página lista documentos),
+   * mais a 1ª que ficou sem verificação por bloqueio da origem.
+   */
+  private async verifyCandidates(
+    candidates: string[],
+    identity: ConcursoIdentity,
+    meter?: AiUsageMeter,
+  ): Promise<{
+    confirmed: { url: string; docCount: number; verified: boolean } | null;
+    blockedUrl: string | null;
+  }> {
+    let blockedUrl: string | null = null;
     for (const url of candidates) {
-      const docCount = await this.countConcursoDocsAt(url);
+      const { docCount, blocked } = await this.countConcursoDocsAt(url, meter);
       if (docCount > 0) {
         this.logger.log(
           `link confirmado (${identity.institution}): ${url} — ${docCount} doc(s)`,
         );
-        return { url, docCount };
+        return {
+          confirmed: { url, docCount, verified: true },
+          blockedUrl,
+        };
+      }
+      if (blocked) {
+        blockedUrl ??= url;
+        this.logger.log(
+          `link não verificável — origem bloqueou a raspagem (${identity.institution}): ${url}`,
+        );
+        continue;
       }
       this.logger.log(
-        `link rejeitado — sem documentos (${identity.institution}): ${url}`,
+        `link rejeitado — página lida, sem documentos (${identity.institution}): ${url}`,
       );
     }
-    return null;
+    return { confirmed: null, blockedUrl };
   }
 
-  /** Busca web → candidatas (página do concurso + home da banca), limpas/dedup. */
+  /**
+   * Busca web → `candidates` (URLs prontas para verificar) + `organizerSeed`
+   * (o site da BANCA, ponto de partida do 2º salto).
+   *
+   * A semente é guardada mesmo sendo home "pelada": como resposta final ela é
+   * inútil (home não tem editais), mas como PISTA é o pedaço mais confiável do
+   * que a busca devolve — a banca o modelo acerta, a URL exata ele costuma
+   * deduzir errado.
+   */
   private async webSearchConcursoCandidates(
     identity: ConcursoIdentity,
-  ): Promise<string[]> {
+    extracted: ExtractedNews | null = null,
+    meter?: AiUsageMeter,
+  ): Promise<{ candidates: string[]; organizerSeed: string | null }> {
     const local =
       [identity.city, identity.uf].filter(Boolean).join(' / ') ||
       'não informado';
+    // Saber a BANCA é o dado que mais encurta a busca (a página de documentos
+    // vive no site dela). A notícia já nos deu o site da banca e, às vezes, o
+    // link do edital — de onde sai o domínio da organizadora.
+    const bancaHost =
+      this.hostOf(extracted?.bancaUrl) ?? this.hostOf(extracted?.editalUrl);
     const input = [
       `Nome: ${identity.headline ?? identity.institution}`,
       `Órgão: ${identity.institution}`,
       `Ano: ${identity.year ?? 'não informado'}`,
       `Estado ou município: ${local}`,
+      identity.targetRoles?.length
+        ? `CARGO DE INTERESSE: ${identity.targetRoles.join(', ')}. ⚠️ O órgão pode ter MAIS DE UM certame no mesmo ano (concurso público E processo seletivo, com números de edital diferentes e páginas separadas). Escolha o certame que oferece ESTE cargo.`
+        : '',
+      bancaHost
+        ? `Banca organizadora (site onde as inscrições são feitas): ${bancaHost} — a página de documentos quase certamente está NESTE domínio, procure ali primeiro.`
+        : 'Banca organizadora: não informada — descubra qual é.',
+      extracted?.editalUrl
+        ? `Link do edital citado na notícia (a página de documentos costuma ser a página que HOSPEDA este arquivo): ${extracted.editalUrl}`
+        : '',
       `Informações adicionais: ${identity.headline ?? '-'}`,
-    ].join('\n');
+    ]
+      .filter(Boolean)
+      .join('\n');
 
-    const text = await this.callOpenAiWebSearch(WEBSEARCH_SYSTEM_PROMPT, input);
-    if (!text) return [];
+    const empty = { candidates: [] as string[], organizerSeed: null };
+    const { text, citations } = await this.callOpenAiWebSearch(
+      WEBSEARCH_SYSTEM_PROMPT,
+      input,
+      meter,
+    );
+    if (!text) return empty;
     const raw = parseJsonLoose(text);
-    if (!raw) return [];
-    const out: string[] = [];
+    if (!raw) return empty;
+
+    /* As `citations` (url_citation) são URLs que a BUSCA de fato devolveu — não
+     * compostas pelo modelo. Entram como candidatas EXTRAS.
+     *
+     * ⚠️ Medimos que elas NÃO servem de filtro: com o prompt pedindo JSON, a
+     * resposta costuma vir com zero annotations (e mesmo em prosa vieram 0–1,
+     * apontando para a notícia e não para o alvo). Exigir "URL citada" rejeitaria
+     * quase tudo. Então a URL do modelo continua candidata — quem separa o joio
+     * é a VERIFICAÇÃO, e o que não dá para verificar vira sugestão na tela. */
+    const candidates: string[] = [];
     const primary = this.cleanOfficialUrl(raw.officialContestUrl);
-    if (primary) out.push(primary);
-    const fallback = this.cleanOfficialUrl(raw.organizerUrl);
-    if (fallback && !out.includes(fallback)) out.push(fallback);
+    if (primary) candidates.push(primary);
+    for (const c of citations) {
+      const clean = this.cleanOfficialUrl(c);
+      if (clean && !candidates.includes(clean)) candidates.push(clean);
+    }
+
+    // Semente do 2º salto: a organizadora dita pela busca (home serve), ou o
+    // domínio da candidata principal quando a busca não nomeou a banca.
+    const organizerSeed =
+      cleanSeedUrl(raw.organizerUrl) ?? cleanSeedUrl(raw.officialContestUrl);
+    return { candidates, organizerSeed };
+  }
+
+  /** Sementes distintas por host (não adianta raspar 2x o mesmo site). */
+  private dedupeByHost(urls: (string | null)[]): string[] {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const url of urls) {
+      const host = this.hostOf(url);
+      if (url == null || host == null || seen.has(host)) continue;
+      seen.add(host);
+      out.push(url);
+    }
     return out;
   }
 
   /**
    * Confirma que a URL é uma PÁGINA DE DOCUMENTOS do concurso: raspa a página e
    * conta os documentos (a IA do scraper já descarta navegação/menu). Home de
-   * prefeitura/banca → ~0. Best-effort (bloqueio/erro → 0 = rejeita).
+   * prefeitura/banca → ~0.
+   *
+   * ⚠️ Distingue REJEITAR de NÃO CONSEGUIR VERIFICAR: quando a raspagem lança
+   * (Cloudflare/WAF — comum nas bancas), o link pode estar perfeito e nós é que
+   * não conseguimos lê-lo. Devolver 0 aí descartava links certos; agora vira
+   * `blocked` e o chamador aceita como não-verificado.
    */
-  private async countConcursoDocsAt(url: string): Promise<number> {
+  private async countConcursoDocsAt(
+    url: string,
+    meter?: AiUsageMeter,
+  ): Promise<{ docCount: number; blocked: boolean }> {
     try {
-      const res = await this.docScraper.scrapeDocuments(url);
-      return res.documents.filter((d) => d.url).length;
-    } catch (err) {
-      this.logger.warn(
-        `verificação do link falhou (${url}): ${(err as Error).message?.slice(0, 120)}`,
+      // Perfil ENXUTO: aqui só perguntamos "esta página lista documentos?" — a
+      // lista fiel e completa é trabalho da aba Notícias, com o perfil cheio.
+      const res = await this.docScraper.scrapeDocuments(
+        url,
+        VERIFY_SCRAPE,
+        meter,
       );
-      return 0;
+      return {
+        docCount: res.documents.filter((d) => d.url).length,
+        blocked: false,
+      };
+    } catch (err) {
+      // 404 (ou qualquer status que não seja bloqueio) = a URL não existe →
+      // REJEITA. Só 403/429 conta como "não consegui ler".
+      const blocked =
+        err instanceof PageFetchError ? err.blocked : !(err instanceof Error);
+      this.logger.warn(
+        `verificação do link ${blocked ? 'bloqueada' : 'falhou'} (${url}): ${(err as Error).message?.slice(0, 120)}`,
+      );
+      return { docCount: 0, blocked };
     }
   }
 
-  /** Fallback do 1º salto: raspa o site da banca e procura o link ali dentro. */
+  /**
+   * 2º salto: raspa o site da banca e procura o link do concurso entre os links
+   * que EXISTEM na página (ao contrário da busca web, que deduz URLs).
+   *
+   * A home raramente lista os concursos (o IBGP, por exemplo, os guarda em
+   * `proximos.jsp`), então quando a IA não acha o concurso direto ela aponta a
+   * PÁGINA DE LISTAGEM e seguimos até lá — um pulo extra, no máximo.
+   */
   private async findConcursoLinkOnBanca(
     bancaUrl: string | null,
     identity: ConcursoIdentity,
-  ): Promise<string | null> {
-    if (!bancaUrl) return null;
-    const html = await this.docScraper.fetchPageHtml(bancaUrl);
-    if (!html) return null;
+    depth = 0,
+    meter?: AiUsageMeter,
+    rendered = false,
+  ): Promise<HopResult> {
+    if (!bancaUrl) return NO_HOP;
+    const html = await this.docScraper.fetchPageHtml(bancaUrl, {
+      render: rendered,
+    });
+    if (!html) return NO_HOP;
     const simplified = this.simplifyHtml(html, bancaUrl, 120);
-    if (!simplified.trim()) return null;
+    if (!simplified.trim()) return NO_HOP;
 
     const local = [identity.city, identity.uf].filter(Boolean).join('/');
     const user =
       `Concurso a localizar — Órgão: ${identity.institution}` +
       `${local ? ` (${local})` : ''}. Ano: ${identity.year ?? '?'}.\n\n` +
       simplified;
-    const raw = await this.callOpenAiJson(BANCA_SYSTEM_PROMPT, user, 256);
-    if (!raw) return null;
-    return this.resolveExternalUrl(raw.concursoUrl, bancaUrl);
+    const raw = await this.callOpenAiJson(
+      BANCA_SYSTEM_PROMPT,
+      user,
+      256,
+      meter,
+    );
+
+    const direct = raw
+      ? this.resolveExternalUrl(raw.concursoUrl, bancaUrl)
+      : null;
+    if (direct) return { concursoUrl: direct, deadEnd: null };
+
+    /* Nada aqui e ainda não renderizamos? A lista de concursos de muitas bancas
+     * vem por JS: o HTML estático chega inteiro (200, ~100kB) mas SEM nenhum
+     * link de concurso — foi o que travou o caso Mondaí, onde o link real mora
+     * num subdomínio de plataforma que só aparece depois do JS rodar. */
+    const listingRaw = raw
+      ? this.resolveExternalUrl(raw.listingUrl, bancaUrl)
+      : null;
+    if (!rendered && !listingRaw) {
+      this.logger.log(
+        `2º salto — HTML estático sem links, renderizando (${identity.institution}): ${bancaUrl}`,
+      );
+      return this.findConcursoLinkOnBanca(
+        bancaUrl,
+        identity,
+        depth,
+        meter,
+        true,
+      );
+    }
+    if (!raw) return NO_HOP;
+
+    // Só um nível de listagem: o suficiente para "home → Concursos → concurso",
+    // sem virar um crawler que passeia pelo site inteiro.
+    if (depth > 0) return { concursoUrl: null, deadEnd: bancaUrl };
+    const listing = listingRaw;
+    if (!listing || listing === bancaUrl) return NO_HOP;
+    this.logger.log(
+      `2º salto — seguindo a listagem da banca (${identity.institution}): ${listing}`,
+    );
+    const next = await this.findConcursoLinkOnBanca(
+      listing,
+      identity,
+      depth + 1,
+      meter,
+    );
+    /* Não conseguimos abrir a listagem (Cloudflare barra até o Chromium em
+     * plataformas como selecao.net.br)? Guardamos O ENDEREÇO DELA. Saber "a
+     * organizadora usa a plataforma X" é acionável — o admin abre lá e copia o
+     * link — e muito melhor que devolver "não achei nada". */
+    return next.concursoUrl
+      ? next
+      : { concursoUrl: null, deadEnd: next.deadEnd ?? listing };
   }
 
   private cleanOfficialUrl(v: unknown): string | null {
     return cleanConcursoUrl(v);
+  }
+
+  /** Hostname de uma URL (sem "www."), ou null. Usado p/ citar a banca na busca. */
+  private hostOf(v: string | null | undefined): string | null {
+    if (!v) return null;
+    try {
+      const host = new URL(v).hostname.replace(/^www\./i, '');
+      return isAggregatorHost(host) ? null : host;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -867,6 +1461,7 @@ export class ConcursoDiscoveryService {
     system: string,
     user: string,
     maxTokens: number,
+    meter?: AiUsageMeter,
   ): Promise<Record<string, unknown> | null> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) return null;
@@ -889,14 +1484,16 @@ export class ConcursoDiscoveryService {
       }),
     });
     if (!res.ok) {
-      this.logger.warn(
-        `OpenAI ${res.status}: ${(await res.text()).slice(0, 200)}`,
-      );
+      const body = (await res.text()).slice(0, 200);
+      this.logger.warn(`OpenAI ${res.status}: ${body}`);
+      if (res.status === 401 || res.status === 429)
+        throw new OpenAiUnavailableError(res.status, body);
       return null;
     }
     const data = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
     };
+    meter?.record('leitura de página (IA)', 'gpt-4.1-mini', data);
     const content = data.choices?.[0]?.message?.content?.trim() ?? '';
     try {
       return JSON.parse(content) as Record<string, unknown>;
@@ -917,11 +1514,21 @@ export class ConcursoDiscoveryService {
   private async callOpenAiWebSearch(
     instructions: string,
     input: string,
-  ): Promise<string | null> {
+    meter?: AiUsageMeter,
+  ): Promise<{ text: string | null; citations: string[] }> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
-    if (!apiKey) return null;
+    if (!apiKey) return { text: null, citations: [] };
+    /* ⚠️ MODELO IMPORTA MAIS QUE O PROMPT AQUI. Medido no caso Mondaí:
+     *   gpt-4.1-mini → 1 busca,  2,8s,  1k tokens  → URL errada (home da banca)
+     *   gpt-5.6-sol  → 4 buscas, 17s,  30k tokens  → URL correta
+     * O mini faz UMA busca e compõe a URL de memória (3 endereços diferentes,
+     * todos 404, em low/medium/high). O sol encadeia buscas e chega na página
+     * real — inclusive quando ela está numa plataforma terceira. Nenhum ajuste
+     * de prompt ou de search_context_size comprou isso.
+     * Custa ~30× mais tokens por busca; é aceitável porque a busca de link roda
+     * uma vez por concurso e o alvo é só quem está sem link. */
     const model =
-      this.config.get<string>('OPENAI_WEBSEARCH_MODEL') ?? 'gpt-4.1';
+      this.config.get<string>('OPENAI_WEBSEARCH_MODEL') ?? 'gpt-5.6-sol';
 
     const res = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -935,19 +1542,42 @@ export class ConcursoDiscoveryService {
         model,
         instructions,
         input,
-        tools: [{ type: 'web_search_preview' }],
-        // Deixa o modelo escolher pesquisar; a busca custa mais mas é o ponto.
+        tools: [
+          {
+            type: 'web_search_preview',
+            // Sem localização o buscador assume contexto US e devolve resultado
+            // ruim p/ "Prefeitura de X / SP". Isso é barato e ajuda — fica.
+            user_location: { type: 'approximate', country: 'BR' },
+            // ⚠️ CUSTO: 'high' injeta muito texto de resultado no prompt e foi o
+            // principal responsável por queimar crédito numa rodada em massa.
+            // Só precisamos de UMA URL, não de um panorama da web — e no teste
+            // com contexto alto o modelo devolveu URL inventada do mesmo jeito.
+            search_context_size: 'low',
+          },
+        ],
+        // 'auto' de volta: forçar a tool fazia o modelo pular o raciocínio e
+        // mandar o formulário INTEIRO como query de busca (verificado no caso
+        // Faria Lemos). Com auto ele formula a query — e pode responder sem
+        // buscar quando já sabe, o que também economiza.
         tool_choice: 'auto',
       }),
     });
     if (!res.ok) {
-      this.logger.warn(
-        `OpenAI web_search ${res.status}: ${(await res.text()).slice(0, 240)}`,
-      );
-      return null;
+      const body = (await res.text()).slice(0, 240);
+      this.logger.warn(`OpenAI web_search ${res.status}: ${body}`);
+      // 401/429 = conta/chave, não conteúdo: não vale seguir para o próximo.
+      if (res.status === 401 || res.status === 429)
+        throw new OpenAiUnavailableError(res.status, body);
+      return { text: null, citations: [] };
     }
     const data = (await res.json()) as unknown;
-    return extractResponsesText(data);
+    // A taxa por chamada da tool NÃO vem no `usage` — some à parte.
+    meter?.record('busca web (tokens)', model, data);
+    meter?.recordWebSearchCall();
+    return {
+      text: extractResponsesText(data),
+      citations: extractCitations(data),
+    };
   }
 
   /** Baixa o HTML com headers de navegador + retry (pciconcursos não é Cloudflare). */

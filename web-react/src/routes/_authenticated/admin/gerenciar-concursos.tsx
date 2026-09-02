@@ -4,12 +4,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@mui/material'
 import {
   ArchiveBoxIcon,
-  ArrowPathIcon,
   ArrowTopRightOnSquareIcon,
   ArrowUturnLeftIcon,
   ClockIcon,
   CloudArrowDownIcon,
   ExclamationTriangleIcon,
+  LinkIcon,
   MagnifyingGlassIcon,
   PencilSquareIcon,
 } from '@heroicons/react/24/outline'
@@ -29,21 +29,22 @@ import {
   useSetConcursoClosedMutation,
 } from '@/features/scraper/scraper.queries'
 import { scraperService } from '@/features/scraper/scraper.service'
+import { CostBadge } from '@/features/scraper/CostBadge'
 import { checkFreshness } from '@/features/scraper/check-freshness'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { ApiError } from '@/lib/api'
 
-export const Route = createFileRoute('/_authenticated/admin/gerenciar-concursos')(
-  {
-    beforeLoad: async () => {
-      const profile = await authService.getProfile()
-      if (profile.user?.role !== 'ADMIN') {
-        throw redirect({ to: '/dashboard' })
-      }
-    },
-    component: GerenciarConcursosPage,
+export const Route = createFileRoute(
+  '/_authenticated/admin/gerenciar-concursos',
+)({
+  beforeLoad: async () => {
+    const profile = await authService.getProfile()
+    if (profile.user?.role !== 'ADMIN') {
+      throw redirect({ to: '/dashboard' })
+    }
   },
-)
+  component: GerenciarConcursosPage,
+})
 
 const STATUS_LABEL: Record<ConcursoStatus, string> = {
   open: 'Inscrições abertas',
@@ -80,9 +81,9 @@ function GerenciarConcursosPage() {
     total: 0,
     current: null,
   })
-  const [updateReports, setUpdateReports] = useState<Array<ConcursoUpdateReport>>(
-    [],
-  )
+  const [updateReports, setUpdateReports] = useState<
+    Array<ConcursoUpdateReport>
+  >([])
 
   const candidates = searchMutation.data?.candidates ?? []
 
@@ -92,13 +93,15 @@ function GerenciarConcursosPage() {
     searchMutation.mutate(undefined)
   }
 
-  const handleReextract = () => {
-    if (reextractMutation.isPending) return
-    const total = concursosQuery.data?.length ?? 0
-    // Reprocessa todos de uma vez — confirma porque re-raspa N sites de banca.
+  /** Só os concursos ativos sem link — o único alvo em massa que sobrou.
+   *  O confirm diz o custo: cada concurso gasta uma busca web + raspagens. */
+  const handleFetchMissing = () => {
+    if (reextractMutation.isPending || missingCount === 0) return
     if (
       !window.confirm(
-        `Recorrigir o link do concurso de todos os ${total} concursos vindos do pciconcursos? Re-visita a notícia + o site da banca de cada um (pode levar minutos).`,
+        `Buscar o link oficial de ${missingCount} concursos sem link?\n\n` +
+          `Cada concurso consome uma busca web e algumas chamadas de IA — ` +
+          `isso custa créditos da OpenAI e pode levar minutos.`,
       )
     )
       return
@@ -106,7 +109,10 @@ function GerenciarConcursosPage() {
   }
 
   const handleAdd = async (c: DiscoveryCandidate) => {
-    if (addState[c.newsUrl] === 'adding' || addState[c.newsUrl]?.startsWith('done'))
+    if (
+      addState[c.newsUrl] === 'adding' ||
+      addState[c.newsUrl]?.startsWith('done')
+    )
       return
     setAddState((s) => ({ ...s, [c.newsUrl]: 'adding' }))
     try {
@@ -152,7 +158,12 @@ function GerenciarConcursosPage() {
       return
 
     setUpdateReports([])
-    setUpdatePhase({ running: true, done: 0, total: targets.length, current: null })
+    setUpdatePhase({
+      running: true,
+      done: 0,
+      total: targets.length,
+      current: null,
+    })
     const reports: Array<ConcursoUpdateReport> = []
     for (const t of targets) {
       // Sequencial, 1 request por concurso (cada um raspa + lê PDFs com IA).
@@ -174,7 +185,9 @@ function GerenciarConcursosPage() {
     }
     setUpdateReports(reports)
     setUpdatePhase((p) => ({ ...p, running: false, current: null }))
-    void queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+    void queryClient.invalidateQueries({
+      queryKey: scraperKeys.adminConcursos(),
+    })
     void queryClient.invalidateQueries({ queryKey: ['concurso'] })
   }
 
@@ -183,6 +196,14 @@ function GerenciarConcursosPage() {
       ? searchMutation.error.message
       : 'Erro inesperado ao procurar concursos.'
     : null
+
+  /** Ativos sem link — o alvo do "Buscar links faltantes" (espelha o backend). */
+  const missingCount = useMemo(
+    () =>
+      (concursosQuery.data ?? []).filter((r) => !r.closed && r.needsSourceUrl)
+        .length,
+    [concursosQuery.data],
+  )
 
   const { attention, concluded } = useMemo(() => {
     const rows = concursosQuery.data ?? []
@@ -207,8 +228,8 @@ function GerenciarConcursosPage() {
             Gerenciar concursos
           </h1>
           <p className="text-sm text-slate-500">
-            Todos os concursos da base. Os que exigem manutenção (em andamento ou
-            sem link oficial) ficam no topo.
+            Todos os concursos da base. Os que exigem manutenção (em andamento
+            ou sem link oficial) ficam no topo.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -218,18 +239,24 @@ function GerenciarConcursosPage() {
             onClick={handleSearch}
             disabled={searchMutation.isPending}
           >
-            {searchMutation.isPending ? 'Procurando...' : 'Procurar novos concursos'}
+            {searchMutation.isPending
+              ? 'Procurando...'
+              : 'Procurar novos concursos'}
           </Button>
           <Button
             variant="outlined"
-            startIcon={<ArrowPathIcon className="size-4" />}
-            onClick={handleReextract}
-            disabled={reextractMutation.isPending}
-            title="Re-visita a notícia + o site da banca de cada concurso e regrava o link do concurso"
+            startIcon={<LinkIcon className="size-4" />}
+            onClick={handleFetchMissing}
+            disabled={reextractMutation.isPending || missingCount === 0}
+            title={
+              missingCount === 0
+                ? 'Todos os concursos ativos já têm link oficial'
+                : 'Faz busca web + verificação só nos concursos ativos que estão sem link'
+            }
           >
             {reextractMutation.isPending
-              ? 'Recorrigindo...'
-              : 'Recorrigir links oficiais'}
+              ? 'Buscando...'
+              : `Buscar links faltantes${missingCount > 0 ? ` (${missingCount})` : ''}`}
           </Button>
           <Button
             variant="outlined"
@@ -258,26 +285,27 @@ function GerenciarConcursosPage() {
         />
       )}
 
-      {/* Feedback do "recorrigir links" em massa */}
+      {/* Feedback da busca de links faltantes */}
       {reextractMutation.isPending && (
         <div className="animate-pulse rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-700">
-          Re-visitando as notícias e os sites das bancas para achar o link de
-          cada concurso — isso pode levar alguns minutos...
+          Procurando o link oficial dos {missingCount} concursos sem link — isso
+          pode levar alguns minutos...
         </div>
       )}
       {reextractMutation.data && (
         <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
-          Recorrigidos <strong>{reextractMutation.data.processed}</strong>{' '}
+          Processados <strong>{reextractMutation.data.processed}</strong>{' '}
           concursos: <strong>{reextractMutation.data.updated}</strong> com link
           do concurso, <strong>{reextractMutation.data.stillMissing}</strong>{' '}
           ainda sem link (pegar manual).
+          <CostBadge cost={reextractMutation.data.cost} className="mt-2" />
         </div>
       )}
       {reextractMutation.error && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {reextractMutation.error instanceof ApiError
             ? reextractMutation.error.message
-            : 'Erro ao recorrigir os links.'}
+            : 'Erro ao buscar os links.'}
         </div>
       )}
 
@@ -376,7 +404,8 @@ function DiscoveryPanel({
 
       {isPending ? (
         <div className="animate-pulse p-4 text-sm text-cyan-700">
-          Raspando a página de enfermeiro do pciconcursos e cruzando com a base...
+          Raspando a página de enfermeiro do pciconcursos e cruzando com a
+          base...
         </div>
       ) : error ? (
         <div className="p-4 text-sm text-red-700">{error}</div>
@@ -466,11 +495,15 @@ function CandidateAction({
 }) {
   if (state === 'adding') {
     return (
-      <span className="text-xs text-cyan-700 animate-pulse">adicionando...</span>
+      <span className="text-xs text-cyan-700 animate-pulse">
+        adicionando...
+      </span>
     )
   }
   if (state === 'done') {
-    return <span className="text-xs font-medium text-emerald-600">✓ adicionado</span>
+    return (
+      <span className="text-xs font-medium text-emerald-600">✓ adicionado</span>
+    )
   }
   if (state === 'done-nolink') {
     return (
@@ -685,7 +718,9 @@ function UpdateReportPanel({
                 )}
                 {r.skipped && (
                   <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-500">
-                    {r.skipped === 'encerrado' ? 'encerrado' : 'sem página de origem'}
+                    {r.skipped === 'encerrado'
+                      ? 'encerrado'
+                      : 'sem página de origem'}
                   </span>
                 )}
                 {r.error && (

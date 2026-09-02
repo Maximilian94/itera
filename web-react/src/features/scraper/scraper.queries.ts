@@ -26,7 +26,8 @@ export function useAdminConcursosQuery() {
 
 export function useDiscoverySearchMutation() {
   return useMutation({
-    mutationFn: (cargoSlug?: string) => scraperService.discoverySearch(cargoSlug),
+    mutationFn: (cargoSlug?: string) =>
+      scraperService.discoverySearch(cargoSlug),
   })
 }
 
@@ -50,6 +51,32 @@ export function useDiscoveryReextractMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
       queryClient.invalidateQueries({ queryKey: ['concurso'] })
+    },
+  })
+}
+
+/** Aba Admin: grava/limpa o link de documentos digitado pelo admin. */
+export function useSetConcursoSourceUrlMutation(concursoId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (url: string | null) =>
+      scraperService.setConcursoSourceUrl(concursoId, url),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+    },
+  })
+}
+
+/** Aba Admin do concurso: procura o link oficial e regrava no concurso. */
+export function useFindConcursoLinkMutation(concursoId: string) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => scraperService.findConcursoLink(concursoId),
+    onSuccess: () => {
+      // documentsSourceUrl mudou → a ficha e a barra de Notícias reagem.
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
     },
   })
 }
