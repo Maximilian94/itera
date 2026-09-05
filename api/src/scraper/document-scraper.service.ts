@@ -5,11 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { ConcursoAiPhase } from '@prisma/client';
 import * as cheerio from 'cheerio';
 import { jsonrepair } from 'jsonrepair';
 import { decodeHtmlBody } from '../common/decode-body';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiUsageMeter } from './ai-cost';
+import { ConcursoCostService } from './concurso-cost.service';
+import { AiUsageMeter } from '../common/ai-cost';
+import type { CostReport } from '../common/ai-cost';
 
 export const SCRAPED_DOCUMENT_KINDS = [
   'EDITAL_ABERTURA',
@@ -164,6 +167,7 @@ export class DocumentScraperService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly costs: ConcursoCostService,
   ) {}
 
   /**
@@ -205,6 +209,7 @@ export class DocumentScraperService {
     sourceUrl: string;
     checkedAt: string;
     documents: (ScrapedDocument & { isNew: boolean })[];
+    cost: CostReport;
   }> {
     const concurso = await this.prisma.concurso.findUnique({
       where: { id: concursoId },
@@ -230,9 +235,12 @@ export class DocumentScraperService {
     });
     const existingUrls = new Set(existing.map((d) => d.url));
 
+    const meter = new AiUsageMeter();
     const scrape = opts.html
-      ? await this.scrapeDocumentsFromHtml(opts.html, sourceUrl)
-      : await this.scrapeDocuments(sourceUrl);
+      ? await this.scrapeDocumentsFromHtml(opts.html, sourceUrl, meter)
+      : await this.scrapeDocuments(sourceUrl, FULL_SCRAPE, meter);
+    const cost = meter.report();
+    await this.costs.record(concursoId, ConcursoAiPhase.DOCUMENTS_CHECK, cost);
 
     // Registra a verificação (data + origem informada, se veio).
     const checkedAt = new Date();
@@ -253,6 +261,7 @@ export class DocumentScraperService {
         ...d,
         isNew: d.url != null && !existingUrls.has(d.url),
       })),
+      cost,
     };
   }
 
@@ -343,8 +352,9 @@ export class DocumentScraperService {
   async scrapeDocumentsFromHtml(
     html: string,
     sourceUrl: string,
+    meter?: AiUsageMeter,
   ): Promise<DocumentScrapeResult> {
-    const documents = await this.extractDocuments(html);
+    const documents = await this.extractDocuments(html, FULL_SCRAPE, meter);
     this.logger.log(
       `scrape (HTML colado) ${sourceUrl}: ${documents.length} doc(s) de ${html.length} chars`,
     );

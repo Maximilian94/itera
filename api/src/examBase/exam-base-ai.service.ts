@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { jsonrepair } from 'jsonrepair';
 import { decodeHtmlBody } from '../common/decode-body';
+import type { AiUsageMeter } from '../common/ai-cost';
 import { PdfOcrService } from '../pdf/pdf-ocr.service';
 import type {
   ExtractedCargoFicha,
@@ -292,10 +293,13 @@ export class ExamBaseAiService {
   async extractSyllabusForCargo(
     editalText: string,
     role: string,
+    meter?: AiUsageMeter,
   ): Promise<ExtractedSyllabusGroup[]> {
     const parsed = await this.callOpenAI<{
       syllabusGroups?: unknown;
     }>(this.buildFocusedText(editalText, [role]), {
+      meter,
+      costLabel: `quadro de matérias — ${role}`,
       systemPrompt: SYLLABUS_PROMPT.replace('{{ROLE}}', role),
       maxTokens: 16_384,
       maxChars: 400_000,
@@ -405,6 +409,7 @@ export class ExamBaseAiService {
   async extractFichasLiterais(
     editalText: string,
     roles: string[],
+    meter?: AiUsageMeter,
   ): Promise<
     { role: string; requirements: string | null; description: string | null }[]
   > {
@@ -415,6 +420,8 @@ export class ExamBaseAiService {
         description?: string | null;
       }[];
     }>(this.buildFocusedText(editalText, roles), {
+      meter,
+      costLabel: `fichas literais (${roles.length} cargo${roles.length > 1 ? 's' : ''})`,
       systemPrompt: FICHAS_PROMPT.replace(
         '{{ROLES}}',
         roles.map((r) => `- ${r}`).join('\n'),
@@ -457,8 +464,13 @@ export class ExamBaseAiService {
    * "perceber" um cargo incluído ou um salário num anexo de dados. Retorna []
    * quando o documento não traz cargos com dados próprios.
    */
-  async extractCargosFromText(text: string): Promise<ExtractedCargoFicha[]> {
+  async extractCargosFromText(
+    text: string,
+    meter?: AiUsageMeter,
+  ): Promise<ExtractedCargoFicha[]> {
     const parsed = await this.callOpenAI<{ cargos?: unknown }>(text, {
+      meter,
+      costLabel: 'extração de cargos do documento',
       systemPrompt: CARGOS_DOC_PROMPT,
       maxTokens: 16_384,
       maxChars: 400_000,
@@ -606,7 +618,15 @@ export class ExamBaseAiService {
 
   private async callOpenAI<T>(
     text: string,
-    opts: { systemPrompt: string; maxTokens: number; maxChars?: number },
+    opts: {
+      systemPrompt: string;
+      maxTokens: number;
+      maxChars?: number;
+      /** Medidor da operação que chamou (a análise de documento mede o total). */
+      meter?: AiUsageMeter;
+      /** Rótulo desta chamada no relatório de custo. */
+      costLabel?: string;
+    },
   ): Promise<T> {
     const apiKey = this.config.get<string>('OPENAI_API_KEY');
     if (!apiKey) {
@@ -647,6 +667,11 @@ export class ExamBaseAiService {
     const dataRes = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
     };
+    opts.meter?.record(
+      opts.costLabel ?? 'extração (IA)',
+      'gpt-4.1-mini',
+      dataRes,
+    );
     const content = dataRes.choices?.[0]?.message?.content?.trim() ?? '';
 
     let jsonStr = content

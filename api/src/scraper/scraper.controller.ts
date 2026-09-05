@@ -34,6 +34,7 @@ import {
   OpenAiUnavailableError,
 } from './concurso-discovery.service';
 import { ConcursoUpdateService } from './concurso-update.service';
+import { ConcursoCostService } from './concurso-cost.service';
 
 class SetSourceUrlDto {
   /** null/vazio limpa o link (volta a contar como "sem link"). */
@@ -308,6 +309,12 @@ class SetClosedDto {
   closed: boolean;
 }
 
+/** Publica/despublica um concurso (fase 6 — libera para o usuário final). */
+class SetPublishedDto {
+  @IsBoolean()
+  published: boolean;
+}
+
 @Controller('admin/scraper')
 @Roles('ADMIN')
 export class ScraperController {
@@ -317,6 +324,7 @@ export class ScraperController {
     private readonly documentAnalysis: ConcursoDocumentAnalysisService,
     private readonly discovery: ConcursoDiscoveryService,
     private readonly concursoUpdate: ConcursoUpdateService,
+    private readonly costs: ConcursoCostService,
   ) {}
 
   /** "Atualizar concursos": roda Fase 1 + Fase 2 em massa (1 concurso/request). */
@@ -346,7 +354,10 @@ export class ScraperController {
     return this.discovery.search(dto.cargoSlug);
   }
 
-  /** Adiciona um concurso descoberto (stub + link oficial extraído da notícia). */
+  /**
+   * FASE 1 — adiciona um concurso descoberto como RASCUNHO. Sem IA, sem custo:
+   * as fases caras são botões próprios, disparados um a um pelo admin.
+   */
   @Post('discovery/add')
   discoveryAdd(@Body() dto: DiscoveryAddDto) {
     return this.discovery.add({
@@ -355,6 +366,33 @@ export class ScraperController {
       headline: dto.headline,
       newsUrl: dto.newsUrl,
     });
+  }
+
+  /** FASE 2 — lê a notícia de origem e preenche banca/edital/janela. */
+  @Post('concursos/:concursoId/extract-news')
+  async extractNews(@Param('concursoId', ParseUUIDPipe) concursoId: string) {
+    try {
+      return await this.discovery.extractNewsForConcurso(concursoId);
+    } catch (err) {
+      if (err instanceof OpenAiUnavailableError)
+        throw new BadRequestException(err.message);
+      throw err;
+    }
+  }
+
+  /** FASE 6 — publica/despublica (o único ponto que expõe ao usuário final). */
+  @Patch('concursos/:concursoId/published')
+  setConcursoPublished(
+    @Param('concursoId', ParseUUIDPipe) concursoId: string,
+    @Body() dto: SetPublishedDto,
+  ) {
+    return this.discovery.setPublished(concursoId, dto.published);
+  }
+
+  /** Custo de IA acumulado por fase (aba Admin do concurso). */
+  @Get('concursos/:concursoId/costs')
+  getConcursoCosts(@Param('concursoId', ParseUUIDPipe) concursoId: string) {
+    return this.costs.getForConcurso(concursoId);
   }
 
   /** Aba Admin do concurso: procura (e salva) o link oficial DESTE concurso. */

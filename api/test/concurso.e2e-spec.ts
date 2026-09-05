@@ -443,6 +443,8 @@ describe('Concurso endpoints (e2e)', () => {
             city: 'São Gonçalo',
             examBoardId: board.id,
             examDate: daysFromNow(120),
+            // Publicado: o gate de rascunho esconderia o card do usuário final.
+            publishedAt: new Date(),
             cargos: { create: { role: 'Enfermeiro', isNursingRelevant: true } },
           },
         });
@@ -538,6 +540,79 @@ describe('Concurso endpoints (e2e)', () => {
         request(http).get(`/concursos/${aux2024.id}`),
       ).expect(200);
       expect(res.body.concurso.slug).toBe(PAST_SLUG);
+    });
+  });
+
+  /* Fase 6 do fluxo admin. A descoberta cria stubs sem edital, data nem
+   * salário; antes deste gate eles caíam direto no feed do usuário final. */
+  describe('concurso em RASCUNHO (publishedAt null)', () => {
+    let draft: { id: string };
+
+    beforeAll(async () => {
+      const board = await createExamBoard(prisma, { name: 'Banca Rascunho' });
+      draft = await prisma.concurso.create({
+        data: {
+          institution: 'Prefeitura Rascunho',
+          year: 2027,
+          governmentScope: 'MUNICIPAL',
+          state: 'SP',
+          examBoardId: board.id,
+          examDate: daysFromNow(200),
+          publishedAt: null,
+          cargos: { create: { role: 'Enfermeiro', isNursingRelevant: true } },
+        },
+      });
+    });
+
+    afterAll(async () => {
+      await prisma.concurso.delete({ where: { id: draft.id } });
+    });
+
+    it('não aparece na listagem para anônimo nem para usuário comum', async () => {
+      const anon = await request(http).get('/concursos').expect(200);
+      expect(
+        anon.body.concursos.some((c: { id: string }) => c.id === draft.id),
+      ).toBe(false);
+
+      const common = await request(http)
+        .get('/concursos')
+        .set(TEST_USER_HEADER, user.id)
+        .expect(200);
+      expect(
+        common.body.concursos.some((c: { id: string }) => c.id === draft.id),
+      ).toBe(false);
+    });
+
+    it('não é alcançável por link direto (senão o gate seria contornável)', async () => {
+      await request(http).get(`/concursos/${draft.id}`).expect(404);
+    });
+
+    it('ADMIN vê o rascunho na listagem e na página', async () => {
+      const list = await asAdmin(request(http).get('/concursos')).expect(200);
+      expect(
+        list.body.concursos.some((c: { id: string }) => c.id === draft.id),
+      ).toBe(true);
+
+      await asAdmin(request(http).get(`/concursos/${draft.id}`)).expect(200);
+    });
+
+    it('publicar torna visível para todos', async () => {
+      await prisma.concurso.update({
+        where: { id: draft.id },
+        data: { publishedAt: new Date() },
+      });
+
+      const res = await request(http).get('/concursos').expect(200);
+      expect(
+        res.body.concursos.some((c: { id: string }) => c.id === draft.id),
+      ).toBe(true);
+      await request(http).get(`/concursos/${draft.id}`).expect(200);
+
+      // Volta ao rascunho para não vazar para os describes seguintes.
+      await prisma.concurso.update({
+        where: { id: draft.id },
+        data: { publishedAt: null },
+      });
     });
   });
 

@@ -11,14 +11,16 @@ import {
 import { CARD } from './card'
 import { enter } from './motion'
 import type {
+  ConcursoAiPhase,
   FindConcursoLinkResult,
   LinkSuggestion,
 } from '@/features/scraper/scraper.types'
 import {
+  useConcursoCostsQuery,
   useFindConcursoLinkMutation,
   useSetConcursoSourceUrlMutation,
 } from '@/features/scraper/scraper.queries'
-import { CostBadge } from '@/features/scraper/CostBadge'
+import { CostBadge, formatUsd } from '@/features/scraper/CostBadge'
 import { ApiError } from '@/lib/api'
 
 const stamp = new Intl.DateTimeFormat('pt-BR', {
@@ -133,7 +135,81 @@ export function ConcursoAdmin({
           </p>
         )}
       </div>
+
+      <PhaseCosts concursoId={concursoId} />
     </section>
+  )
+}
+
+/** Nome de cada fase na tela — o enum do backend é código, não copy. */
+const PHASE_LABELS: Record<ConcursoAiPhase, string> = {
+  NEWS_EXTRACT: 'Fase 2 · Leitura da notícia',
+  LINK_SEARCH: 'Fase 3 · Busca do link oficial',
+  DOCUMENTS_CHECK: 'Fase 4 · Raspagem de documentos',
+  DOCUMENT_ANALYSIS: 'Fase 5 · Análise de documentos',
+}
+
+/**
+ * Quanto de IA cada fase já consumiu NESTE concurso.
+ *
+ * Some as repetições de propósito: a busca de link que não achou nada custou
+ * igual, e é justamente o gasto invisível que estourou a conta antes. Por isso
+ * cada fase mostra o número de execuções ao lado do valor.
+ */
+function PhaseCosts({ concursoId }: { concursoId: string }) {
+  const { data, isPending } = useConcursoCostsQuery(concursoId)
+
+  return (
+    <div className={`${CARD} p-4`}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-sm font-bold text-slate-900">Custo de IA</h3>
+        {data != null && data.byPhase.length > 0 && (
+          <p className="text-sm font-semibold tabular-nums text-slate-900">
+            {formatUsd(data.total)}
+          </p>
+        )}
+      </div>
+      <p className="mt-0.5 text-xs text-slate-500">
+        O que cada fase já consumiu neste concurso, somando todas as execuções.
+      </p>
+
+      {isPending ? (
+        <p className="mt-3 text-sm text-slate-400">Carregando…</p>
+      ) : !data || data.byPhase.length === 0 ? (
+        // "Nunca medido" ≠ "custou zero": concursos anteriores à medição e
+        // concursos que só passaram pela fase 1 (grátis) contam a mesma
+        // história aqui, e nenhum dos dois merece um "US$ 0,00" enganoso.
+        <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-500">
+          Nenhum gasto de IA registrado. O cadastro do concurso (fase 1) não
+          usa IA; as fases seguintes passam a aparecer aqui conforme você as
+          executa.
+        </p>
+      ) : (
+        <ul className="mt-3 flex flex-col divide-y divide-slate-100">
+          {data.byPhase.map((p) => (
+            <li key={p.phase} className="py-2 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span className="text-sm font-medium text-slate-700">
+                  {PHASE_LABELS[p.phase]}
+                </span>
+                <span className="text-sm tabular-nums text-slate-600">
+                  {formatUsd(p.usd)}
+                </span>
+              </div>
+              <div className="mt-0.5 flex flex-wrap items-baseline gap-x-2 text-xs text-slate-400">
+                <span>
+                  {p.runs} {p.runs === 1 ? 'execução' : 'execuções'}
+                </span>
+                {p.lastAt != null && (
+                  <span>· última em {stamp.format(new Date(p.lastAt))}</span>
+                )}
+              </div>
+              <CostBadge cost={{ usd: p.usd, entries: p.entries }} />
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   )
 }
 

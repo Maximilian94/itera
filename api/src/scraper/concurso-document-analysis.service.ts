@@ -5,11 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Prisma } from '@prisma/client';
+import { ConcursoAiPhase, Prisma } from '@prisma/client';
 import { jsonrepair } from 'jsonrepair';
 import { PrismaService } from '../prisma/prisma.service';
 import { ExamBaseAiService } from '../examBase/exam-base-ai.service';
 import { PdfOcrService } from '../pdf/pdf-ocr.service';
+import { AiUsageMeter } from '../common/ai-cost';
+import { ConcursoCostService } from './concurso-cost.service';
 
 /** Campos do CONCURSO que uma retificação pode alterar (+ tipo p/ coerção). */
 const CONCURSO_FIELDS = {
@@ -237,7 +239,8 @@ function normalizeNewCargos(raw: unknown): ProposedNewCargo[] {
       minPassingGradeNonQuota: decimal(c.minPassingGradeNonQuota),
       workload: str(c.workload),
       requirements: str(c.requirements),
-      hasReserveList: typeof c.hasReserveList === 'boolean' ? c.hasReserveList : null,
+      hasReserveList:
+        typeof c.hasReserveList === 'boolean' ? c.hasReserveList : null,
       isNursingRelevant: c.isNursingRelevant === true,
       evidence: str(c.evidence),
     }))
@@ -315,6 +318,7 @@ export class ConcursoDocumentAnalysisService {
     private readonly prisma: PrismaService,
     private readonly examBaseAi: ExamBaseAiService,
     private readonly pdfOcr: PdfOcrService,
+    private readonly costs: ConcursoCostService,
   ) {}
 
   async analyze(
@@ -329,15 +333,43 @@ export class ConcursoDocumentAnalysisService {
     if (!doc) throw new NotFoundException('documento não encontrado');
 
     const concurso = await this.loadSnapshot(concursoId);
-    // Upload manual do PDF: fallback permanente p/ quando o site bloqueia o
-    // download automático (403/Cloudflare) — o admin baixa no próprio navegador
-    // e envia o arquivo; a análise segue idêntica.
-    const text =
-      uploadedPdf != null
-        ? await this.uploadedPdfToText(uploadedPdf)
-        : await this.fetchDocumentText(doc.url);
+    // Um medidor para a análise inteira: OCR do PDF + diff + fichas literais +
+    // um quadro de matérias por cargo. É a fase mais cara do fluxo, e antes
+    // nada disso era medido — o OCR nem sequer tinha preço no sistema.
+    const meter = new AiUsageMeter();
+    try {
+      // Upload manual do PDF: fallback permanente p/ quando o site bloqueia o
+      // download automático (403/Cloudflare) — o admin baixa no próprio navegador
+      // e envia o arquivo; a análise segue idêntica.
+      const text =
+        uploadedPdf != null
+          ? await this.uploadedPdfToText(uploadedPdf, meter)
+          : await this.fetchDocumentText(doc.url, meter);
 
-    const parsed = await this.callOpenAI(text, concurso.snapshotJson);
+      return await this.runAnalysis(doc, concurso, text, meter);
+    } finally {
+      // Registra mesmo se a análise falhar no meio: o OCR de um edital de 200
+      // páginas já foi pago, e um erro depois dele não devolve o dinheiro.
+      const cost = meter.report();
+      await this.costs.record(
+        concursoId,
+        ConcursoAiPhase.DOCUMENT_ANALYSIS,
+        cost,
+        doc.id,
+      );
+    }
+  }
+
+  /** O miolo da análise, depois de o texto do PDF estar em mãos. */
+  private async runAnalysis(
+    doc: { id: string; url: string; title: string; kind: string },
+    concurso: Awaited<
+      ReturnType<ConcursoDocumentAnalysisService['loadSnapshot']>
+    >,
+    text: string,
+    meter: AiUsageMeter,
+  ): Promise<AnalyzeResult> {
+    const parsed = await this.callOpenAI(text, concurso.snapshotJson, meter);
     const changes = this.buildChanges(parsed, concurso);
 
     // Extração DETERMINÍSTICA de cargos do documento: em vez de confiar no
@@ -350,13 +382,13 @@ export class ConcursoDocumentAnalysisService {
     // documentos sem ficha de cargo (gabarito/resultado/convocação).
     const extractionNewCargos = SKIP_CARGO_EXTRACTION.has(doc.kind)
       ? []
-      : await this.proposeFromCargoExtraction(text, concurso, changes);
+      : await this.proposeFromCargoExtraction(text, concurso, changes, meter);
 
     // Edital de abertura → transcrição LITERAL de requisitos/atribuições pelo
     // extrator focado da criação. Roda DEPOIS da extração de cargos para que a
     // versão literal (mais completa) vença no campo requirements/description.
     if (doc.kind === 'EDITAL_ABERTURA') {
-      await this.proposeFichasFromEdital(text, concurso, changes);
+      await this.proposeFichasFromEdital(text, concurso, changes, meter);
     }
 
     // Cronograma proposto: etapas datadas extraídas do PDF. Só entra quando o
@@ -389,7 +421,7 @@ export class ConcursoDocumentAnalysisService {
       seenCargo.add(cargo.id);
       const groups = normalizeSyllabusGroups(
         await this.examBaseAi
-          .extractSyllabusForCargo(text, cargo.role)
+          .extractSyllabusForCargo(text, cargo.role, meter)
           .catch(() => []),
       );
       if (groups.length === 0) continue;
@@ -513,6 +545,7 @@ export class ConcursoDocumentAnalysisService {
     text: string,
     ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
     changes: ProposedChange[],
+    meter?: AiUsageMeter,
   ): Promise<void> {
     const nursing = [...ctx.cargosByRole.values()].filter(
       (c) => c.isNursingRelevant,
@@ -522,6 +555,7 @@ export class ConcursoDocumentAnalysisService {
       .extractFichasLiterais(
         text,
         nursing.map((c) => c.role),
+        meter,
       )
       .catch(() => []);
     const FIELDS = ['requirements', 'description'] as const;
@@ -563,9 +597,10 @@ export class ConcursoDocumentAnalysisService {
     text: string,
     ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
     changes: ProposedChange[],
+    meter?: AiUsageMeter,
   ): Promise<ProposedNewCargo[]> {
     const fichas = await this.examBaseAi
-      .extractCargosFromText(text)
+      .extractCargosFromText(text, meter)
       .catch(() => []);
     if (fichas.length === 0) return [];
 
@@ -579,7 +614,8 @@ export class ConcursoDocumentAnalysisService {
         const n = Number(v);
         return Number.isFinite(n) ? String(Math.round(n)) : null;
       }
-      if (type === 'boolean') return v === true || v === 'true' ? 'true' : 'false';
+      if (type === 'boolean')
+        return v === true || v === 'true' ? 'true' : 'false';
       return String(v).trim() || null;
     };
 
@@ -990,7 +1026,10 @@ export class ConcursoDocumentAnalysisService {
     return null;
   }
 
-  private async fetchDocumentText(url: string): Promise<string> {
+  private async fetchDocumentText(
+    url: string,
+    meter?: AiUsageMeter,
+  ): Promise<string> {
     let res: Response;
     try {
       res = await fetch(url, {
@@ -1022,28 +1061,37 @@ export class ConcursoDocumentAnalysisService {
         'O documento não é um PDF legível — a análise automática só cobre PDFs por enquanto.',
       );
     }
-    return this.pdfBufferToText(buffer);
+    return this.pdfBufferToText(buffer, meter);
   }
 
   /** PDF enviado pelo admin (upload manual): valida a assinatura e extrai. */
-  private async uploadedPdfToText(buffer: Buffer): Promise<string> {
+  private async uploadedPdfToText(
+    buffer: Buffer,
+    meter?: AiUsageMeter,
+  ): Promise<string> {
     if (buffer.subarray(0, 5).toString('latin1') !== '%PDF-') {
       throw new BadRequestException(
         'O arquivo enviado não parece ser um PDF válido.',
       );
     }
-    return this.pdfBufferToText(buffer);
+    return this.pdfBufferToText(buffer, meter);
   }
 
   /** Buffer de PDF → texto via OCR (Mistral com fallback pdf-parse). */
-  private async pdfBufferToText(buffer: Buffer): Promise<string> {
+  private async pdfBufferToText(
+    buffer: Buffer,
+    meter?: AiUsageMeter,
+  ): Promise<string> {
     try {
       // Mistral OCR (com fallback pdf-parse): preserva as TABELAS do documento
       // como markdown — essencial para cronograma e quadro de matérias, que o
       // pdf-parse achatava. O OCR ainda lê PDF escaneado (que o pdf-parse não).
-      const { text, source } = await this.pdfOcr.pdfToText(buffer, {
+      const { text, source, ocrPages } = await this.pdfOcr.pdfToText(buffer, {
         maxPages: 200,
       });
+      // OCR é cobrado por PÁGINA, não por token: um edital de 200 páginas é o
+      // item mais caro desta fase e não aparecia em conta nenhuma.
+      meter?.recordOcr('OCR do documento', ocrPages);
       if (!text.trim()) {
         throw new BadRequestException(
           'O PDF parece ser escaneado ou vazio. Não dá para analisar automaticamente.',
@@ -1064,6 +1112,7 @@ export class ConcursoDocumentAnalysisService {
   private async callOpenAI(
     documentText: string,
     snapshotJson: string,
+    meter?: AiUsageMeter,
   ): Promise<{
     changes?: unknown;
     cronograma?: unknown;
@@ -1102,6 +1151,7 @@ export class ConcursoDocumentAnalysisService {
     const dataRes = (await res.json()) as {
       choices?: { message?: { content?: string } }[];
     };
+    meter?.record('análise de alterações (diff)', 'gpt-4.1-mini', dataRes);
     let jsonStr = (dataRes.choices?.[0]?.message?.content ?? '')
       .replace(/^```(?:json)?\s*/i, '')
       .replace(/\s*```\s*$/m, '')
