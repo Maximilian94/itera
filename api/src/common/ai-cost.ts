@@ -38,6 +38,17 @@ const FALLBACK_PRICE = MODEL_PRICES['gpt-4.1-mini'];
  */
 export const DEFAULT_WEB_SEARCH_CALL_USD = 0.025;
 
+/**
+ * Preço por PÁGINA do Mistral OCR (`mistral-ocr-latest`), usado na leitura dos
+ * PDFs da fase de análise. OCR não é cobrado por token, então não cabe em
+ * `MODEL_PRICES` — a unidade é a página.
+ *
+ * ⚠️ Mesma ressalva do `DEFAULT_WEB_SEARCH_CALL_USD`: é estimativa, não vem na
+ * resposta da API. Confira em mistral.ai/pricing e ajuste por
+ * `MISTRAL_OCR_PAGE_USD`. Um edital de 200 páginas não é troco.
+ */
+export const DEFAULT_OCR_PAGE_USD = 0.001;
+
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
@@ -86,6 +97,7 @@ export class AiUsageMeter {
 
   constructor(
     private readonly webSearchCallUsd = DEFAULT_WEB_SEARCH_CALL_USD,
+    private readonly ocrPageUsd = DEFAULT_OCR_PAGE_USD,
   ) {}
 
   /** Registra uma chamada a partir do corpo bruto da resposta da OpenAI. */
@@ -96,6 +108,23 @@ export class AiUsageMeter {
       model,
       ...usage,
       usd: priceOf(model, usage),
+    });
+  }
+
+  /**
+   * OCR de um PDF, cobrado por página. `pages` vem de `data.pages.length` da
+   * resposta da Mistral — o número de páginas que ela de fato processou, que
+   * não é o mesmo que o total do PDF quando há limite.
+   */
+  recordOcr(label: string, pages: number): void {
+    const billable = Number.isFinite(pages) && pages > 0 ? Math.ceil(pages) : 0;
+    if (billable === 0) return;
+    this.items.push({
+      label: `${label} (${billable} pág.)`,
+      model: 'mistral-ocr-latest',
+      inputTokens: 0,
+      outputTokens: 0,
+      usd: billable * this.ocrPageUsd,
     });
   }
 

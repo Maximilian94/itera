@@ -15,6 +15,7 @@ export const scraperKeys = {
   run: (id: string) => ['scraper', 'run', id] as const,
   diff: (runId: string) => ['scraper', 'diff', runId] as const,
   adminConcursos: () => ['scraper', 'admin-concursos'] as const,
+  concursoCosts: (id: string) => ['scraper', 'concurso-costs', id] as const,
 }
 
 export function useAdminConcursosQuery() {
@@ -89,6 +90,45 @@ export function useSetConcursoClosedMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
     },
+  })
+}
+
+/** Fase 2: lê a notícia de origem e preenche a ficha do concurso. */
+export function useExtractNewsMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (concursoId: string) => scraperService.extractNews(concursoId),
+    onSuccess: (_res, concursoId) => {
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+      queryClient.invalidateQueries({
+        queryKey: scraperKeys.concursoCosts(concursoId),
+      })
+    },
+  })
+}
+
+/** Fase 6: publica/despublica o concurso. */
+export function useSetConcursoPublishedMutation() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, published }: { id: string; published: boolean }) =>
+      scraperService.setConcursoPublished(id, published),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: scraperKeys.adminConcursos() })
+      // A visibilidade mudou: a listagem pública e o nível 1 reagem.
+      queryClient.invalidateQueries({ queryKey: ['concurso'] })
+      queryClient.invalidateQueries({ queryKey: ['concursos'] })
+    },
+  })
+}
+
+/** Histórico de custo de IA por fase (aba Admin do concurso). */
+export function useConcursoCostsQuery(concursoId: string, enabled = true) {
+  return useQuery({
+    queryKey: scraperKeys.concursoCosts(concursoId),
+    queryFn: () => scraperService.getConcursoCosts(concursoId),
+    enabled: enabled && !!concursoId,
   })
 }
 

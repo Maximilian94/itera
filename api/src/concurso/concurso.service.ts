@@ -454,6 +454,9 @@ export class ConcursoService {
       where: {
         examBases: { none: {} },
         cargos: { some: { isNursingRelevant: true } },
+        // Rascunho só aparece para ADMIN. A descoberta cria stubs sem edital,
+        // data ou salário; sem este gate eles caíam direto no feed do usuário.
+        ...(showUnpublished ? {} : { publishedAt: { not: null } }),
         ...(filters.scope ? { governmentScope: filters.scope } : {}),
         ...(filters.state ? { state: filters.state } : {}),
         ...(filters.city ? { city: filters.city } : {}),
@@ -560,9 +563,7 @@ export class ConcursoService {
     };
     let annotated = items.map((it) => ({
       ...it,
-      match: (preference
-        ? matchConcurso(preference, it, travelTo(it))
-        : null) as ConcursoMatch | null,
+      match: preference ? matchConcurso(preference, it, travelTo(it)) : null,
     }));
 
     if (filters.status) {
@@ -604,7 +605,12 @@ export class ConcursoService {
       examBoard: { select: { id: true, name: true, alias: true } },
     } as const;
     const concurso = await this.prisma.concurso.findFirst({
-      where: UUID_RE.test(slugOrId) ? { id: slugOrId } : { slug: slugOrId },
+      where: {
+        ...(UUID_RE.test(slugOrId) ? { id: slugOrId } : { slug: slugOrId }),
+        // Rascunho (fase 6 pendente) não é alcançável por link direto: sem
+        // isto, o gate da listagem seria contornável só sabendo a URL.
+        ...(showUnpublished ? {} : { publishedAt: { not: null } }),
+      },
       include,
     });
     if (concurso || !UUID_RE.test(slugOrId)) return concurso;

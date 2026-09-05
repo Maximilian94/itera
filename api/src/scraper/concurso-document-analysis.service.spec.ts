@@ -3,6 +3,8 @@ import type { ConfigService } from '@nestjs/config';
 import type { PrismaService } from '../prisma/prisma.service';
 import type { ExamBaseAiService } from '../examBase/exam-base-ai.service';
 import type { PdfOcrService } from '../pdf/pdf-ocr.service';
+import type { ConcursoCostService } from './concurso-cost.service';
+import { AiUsageMeter } from '../common/ai-cost';
 
 /** Cargo mínimo do snapshot (shape do select de loadSnapshot). */
 function cargo(over: Partial<Record<string, unknown>> = {}) {
@@ -39,7 +41,7 @@ function build(opts: {
     description: string | null;
   }[];
   /** Cargos que a extração determinística (extractCargosFromText) devolve. */
-  fichaCargos?: Array<Record<string, unknown>>;
+  fichaCargos?: Record<string, unknown>[];
 }) {
   const prisma = {
     concursoDocument: {
@@ -86,6 +88,9 @@ function build(opts: {
     prisma,
     examBaseAi,
     {} as PdfOcrService,
+    {
+      record: jest.fn().mockResolvedValue(undefined),
+    } as unknown as ConcursoCostService,
   );
   const fetchDocumentText = jest
     .spyOn(
@@ -133,9 +138,12 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
 
     const r = await service.analyze('c1', 'doc-1');
 
-    expect(extractFichasLiterais).toHaveBeenCalledWith(expect.any(String), [
-      'Enfermeiro',
-    ]);
+    // 3º arg: o medidor de custo da análise (a fase mede OCR + cada chamada).
+    expect(extractFichasLiterais).toHaveBeenCalledWith(
+      expect.any(String),
+      ['Enfermeiro'],
+      expect.any(AiUsageMeter),
+    );
     expect(r.changes).toEqual([
       expect.objectContaining({
         id: 'cargo:cargo-1:requirements',
@@ -196,7 +204,11 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
         }),
       ],
       fichas: [
-        { role: 'Enfermeiro', requirements: null, description: 'Já cadastrada.' },
+        {
+          role: 'Enfermeiro',
+          requirements: null,
+          description: 'Já cadastrada.',
+        },
         { role: 'Motorista', requirements: null, description: 'Dirigir.' },
       ],
     });
@@ -204,9 +216,12 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
     const r = await service.analyze('c1', 'doc-1');
 
     // Só o cargo de enfermagem é pedido ao extrator.
-    expect(extractFichasLiterais).toHaveBeenCalledWith(expect.any(String), [
-      'Enfermeiro',
-    ]);
+    // 3º arg: o medidor de custo da análise (a fase mede OCR + cada chamada).
+    expect(extractFichasLiterais).toHaveBeenCalledWith(
+      expect.any(String),
+      ['Enfermeiro'],
+      expect.any(AiUsageMeter),
+    );
     expect(r.changes).toEqual([]);
   });
 
@@ -238,9 +253,7 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
   it('documento que não é edital de abertura não roda a transcrição', async () => {
     const { service, extractFichasLiterais } = build({
       docKind: 'RETIFICACAO',
-      fichas: [
-        { role: 'Enfermeiro', requirements: 'X', description: 'Y' },
-      ],
+      fichas: [{ role: 'Enfermeiro', requirements: 'X', description: 'Y' }],
     });
 
     const r = await service.analyze('c1', 'doc-1');
@@ -291,7 +304,12 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     const { service } = build({
       docKind: 'OUTRO', // ANEXO I — Requisitos costuma cair aqui
       // O prompt de diff não achou nada; a extração de cargos é que traz o dado.
-      diff: { changes: [], cronograma: [], syllabusCargos: [], novosCargos: [] },
+      diff: {
+        changes: [],
+        cronograma: [],
+        syllabusCargos: [],
+        novosCargos: [],
+      },
       fichaCargos: [
         { role: 'Enfermeiro', salaryBase: '4750.00', isNursingRelevant: true },
       ],
@@ -366,7 +384,9 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     ]);
 
     expect(res.appliedCount).toBe(1);
-    expect((prisma.cargo as unknown as { create: jest.Mock }).create).toHaveBeenCalledWith(
+    expect(
+      (prisma.cargo as unknown as { create: jest.Mock }).create,
+    ).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           concursoId: 'c1',
@@ -381,7 +401,9 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
 
   it('apply NÃO recria um cargo cujo role já existe (retorna 0)', async () => {
     const { service, prisma } = build({ docKind: 'RETIFICACAO' });
-    (prisma.cargo as unknown as { findFirst: jest.Mock }).findFirst.mockResolvedValue({
+    (
+      prisma.cargo as unknown as { findFirst: jest.Mock }
+    ).findFirst.mockResolvedValue({
       id: 'cargo-1',
     });
 
@@ -390,6 +412,8 @@ describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)'
     ]);
 
     expect(res.appliedCount).toBe(0);
-    expect((prisma.cargo as unknown as { create: jest.Mock }).create).not.toHaveBeenCalled();
+    expect(
+      (prisma.cargo as unknown as { create: jest.Mock }).create,
+    ).not.toHaveBeenCalled();
   });
 });

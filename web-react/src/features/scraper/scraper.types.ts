@@ -188,6 +188,14 @@ export interface AdminConcursoRow {
   documentsCheckedAt: string | null
   registrationEnd: string | null
   createdAt: string
+  /** Fase 6: visível ao usuário final. false = rascunho, só o admin vê. */
+  published: boolean
+  /** Tem notícia de origem — pré-requisito da fase 2. */
+  hasNewsUrl: boolean
+  hasEditalUrl: boolean
+  documentCount: number
+  /** Custo de IA acumulado; null quando nunca foi medido (≠ US$ 0). */
+  aiCostUsd: number | null
 }
 
 /** Uma chamada de IA já precificada (detalhe do custo da operação). */
@@ -203,6 +211,39 @@ export interface CostEntry {
 export interface CostReport {
   usd: number
   entries: Array<CostEntry>
+}
+
+/** Fases do fluxo admin que gastam IA (espelha o enum ConcursoAiPhase). */
+export type ConcursoAiPhase =
+  | 'NEWS_EXTRACT'
+  | 'LINK_SEARCH'
+  | 'DOCUMENTS_CHECK'
+  | 'DOCUMENT_ANALYSIS'
+
+/** Tudo que já se gastou numa fase deste concurso (soma das execuções). */
+export interface PhaseCost {
+  phase: ConcursoAiPhase
+  usd: number
+  /** Quantas vezes rodou — inclui tentativas que não acharam nada. */
+  runs: number
+  lastAt: string | null
+  entries: Array<CostEntry>
+}
+
+/** Histórico de custo de IA de um concurso, por fase. */
+export interface ConcursoCostReport {
+  total: number
+  byPhase: Array<PhaseCost>
+}
+
+/** Resultado da fase 2 (leitura da notícia de origem). */
+export interface NewsExtractResult {
+  concursoId: string
+  /** false quando a notícia não pôde ser lida (bloqueio, página vazia). */
+  extracted: boolean
+  /** Campos que a extração de fato preencheu. */
+  filled: Array<string>
+  cost: CostReport
 }
 
 /** Resultado do "buscar links faltantes" em massa. */

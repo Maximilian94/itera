@@ -290,6 +290,11 @@ model Concurso {
   /// /admin/gerenciar-concursos). null = ativo. O "Atualizar concursos" pula os
   /// fechados, e eles saem da seção "Precisam de atenção".
   closedAt        DateTime?
+  /// Liberado para o usuário final (fase 6 do fluxo admin). null = RASCUNHO:
+  /// o concurso existe para o admin trabalhar nele, mas não aparece em
+  /// /concursos nem é alcançável por link direto para quem não é ADMIN.
+  /// A descoberta (/admin/gerenciar-concursos) cria sempre como rascunho.
+  publishedAt     DateTime?
   createdAt       DateTime        @default(now())
 
   examBoardId     String?         @db.Uuid
@@ -298,10 +303,48 @@ model Concurso {
   examBases       ExamBase[]
   cargos          Cargo[]
   documents       ConcursoDocument[]
+  aiCosts         ConcursoAiCost[]
 
   @@unique([institution, year, examBoardId])
   @@index([year])
   @@map("concursos")
+}
+
+/// Fases do fluxo admin que gastam IA. A fase 1 (cadastro) não está aqui de
+/// propósito: ela não chama IA nenhuma, e a ausência de linhas é o registro.
+enum ConcursoAiPhase {
+  /// Fase 2 — lê a notícia do pciconcursos e extrai banca/edital/janela.
+  NEWS_EXTRACT
+  /// Fase 3 — busca web + verificação do link oficial. A mais cara.
+  LINK_SEARCH
+  /// Fase 4 — raspa a página de documentos e classifica o que encontrou.
+  DOCUMENTS_CHECK
+  /// Fase 5 — OCR do PDF + análise de alterações de UM documento.
+  DOCUMENT_ANALYSIS
+}
+
+/// Custo de IA de UMA execução de UMA fase, por concurso.
+///
+/// É append-only de propósito (uma linha por execução, nunca upsert por fase):
+/// a verdade de "quanto custou este concurso" inclui as tentativas repetidas e
+/// as que não acharam nada — foi justamente isso que queimou ~US$10 numa
+/// rodada em massa, e um upsert esconderia a terceira busca de link infrutífera.
+model ConcursoAiCost {
+  id         String          @id @default(uuid()) @db.Uuid
+  concursoId String          @db.Uuid
+  concurso   Concurso        @relation(fields: [concursoId], references: [id], onDelete: Cascade)
+  phase      ConcursoAiPhase
+  /// Total em USD desta execução (soma das entries).
+  usd        Decimal         @db.Decimal(10, 6)
+  /// Detalhe por chamada — `CostEntry[]` de `scraper/ai-cost.ts`.
+  entries    Json
+  /// Fase 5: qual documento foi analisado (não é FK — o custo sobrevive ao
+  /// documento ser removido da timeline).
+  documentId String?         @db.Uuid
+  createdAt  DateTime        @default(now())
+
+  @@index([concursoId, phase])
+  @@map("concurso_ai_costs")
 }
 
 /// Documento publicado do concurso (edital, retificação, gabarito, resultado,

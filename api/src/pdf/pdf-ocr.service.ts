@@ -30,12 +30,16 @@ export class PdfOcrService {
   async pdfToText(
     buffer: Buffer,
     opts: { maxPages?: number } = {},
-  ): Promise<{ text: string; source: PdfTextSource }> {
+  ): Promise<{ text: string; source: PdfTextSource; ocrPages: number }> {
     const key = this.config.get<string>('MISTRAL_API_KEY');
     if (key) {
       try {
-        const markdown = await this.extractMarkdownWithMistralOcr(buffer, key);
-        if (markdown.trim() !== '') return { text: markdown, source: 'ocr' };
+        const { markdown, pages } = await this.extractMarkdownWithMistralOcr(
+          buffer,
+          key,
+        );
+        if (markdown.trim() !== '')
+          return { text: markdown, source: 'ocr', ocrPages: pages };
         this.logger.warn('Mistral OCR retornou vazio — caindo para pdf-parse.');
       } catch (err) {
         this.logger.warn(
@@ -44,14 +48,19 @@ export class PdfOcrService {
       }
     }
     const text = await this.pdfParseText(buffer, opts.maxPages);
-    return { text, source: 'pdf-parse' };
+    // pdf-parse roda local: sem páginas cobráveis.
+    return { text, source: 'pdf-parse', ocrPages: 0 };
   }
 
-  /** PDF → markdown via Mistral OCR (tabelas preservadas). Sem imagens. */
+  /**
+   * PDF → markdown via Mistral OCR (tabelas preservadas). Sem imagens.
+   * Devolve também quantas páginas o OCR processou — a unidade de cobrança,
+   * que o chamador registra no medidor de custo.
+   */
   private async extractMarkdownWithMistralOcr(
     buffer: Buffer,
     apiKey: string,
-  ): Promise<string> {
+  ): Promise<{ markdown: string; pages: number }> {
     // undici + Agent p/ timeouts longos (edital de 200 págs demora no OCR); é
     // o mesmo padrão do parser de PDF de questões (ExamBaseQuestionPdfAiService).
     const { fetch: undiciFetch, Agent } = await import('undici');
@@ -88,7 +97,11 @@ export class PdfOcrService {
     const data = (await res.json()) as {
       pages?: { markdown: string }[];
     };
-    return (data.pages ?? []).map((p) => p.markdown).join('\n\n');
+    const pages = data.pages ?? [];
+    return {
+      markdown: pages.map((p) => p.markdown).join('\n\n'),
+      pages: pages.length,
+    };
   }
 
   /** Fallback local: extrai o texto cru (achata tabelas). */

@@ -19,6 +19,7 @@ import type {
   ConcursoUpdateReport,
   DiscoveryCandidate,
 } from '@/features/scraper/scraper.types'
+import type { ConcursoPhaseId } from '@/features/scraper/concurso-phase'
 import { authService } from '@/features/auth/services/auth.service'
 import {
   scraperKeys,
@@ -26,11 +27,18 @@ import {
   useDiscoveryAddMutation,
   useDiscoveryReextractMutation,
   useDiscoverySearchMutation,
+  useExtractNewsMutation,
+  useFindConcursoLinkMutation,
   useSetConcursoClosedMutation,
+  useSetConcursoPublishedMutation,
 } from '@/features/scraper/scraper.queries'
 import { scraperService } from '@/features/scraper/scraper.service'
-import { CostBadge } from '@/features/scraper/CostBadge'
+import { CostBadge, formatUsd } from '@/features/scraper/CostBadge'
 import { checkFreshness } from '@/features/scraper/check-freshness'
+import {
+  concursoPhase,
+  phaseProgressLabel,
+} from '@/features/scraper/concurso-phase'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { ApiError } from '@/lib/api'
 
@@ -53,7 +61,7 @@ const STATUS_LABEL: Record<ConcursoStatus, string> = {
 }
 
 /** Estado do add por candidato (chaveado pela URL da notícia). */
-type AddState = 'adding' | 'done' | 'done-nolink' | 'error'
+type AddState = 'adding' | 'done' | 'error'
 
 /** Progresso do "Atualizar concursos" em massa (loop sequencial no front). */
 type UpdatePhase = {
@@ -122,10 +130,9 @@ function GerenciarConcursosPage() {
         headline: c.headline,
         newsUrl: c.newsUrl,
       })
-      setAddState((s) => ({
-        ...s,
-        [c.newsUrl]: res.officialUrlFound ? 'done' : 'done-nolink',
-      }))
+      // A fase 1 não busca link nenhum — o único desfecho é "virou rascunho".
+      void res
+      setAddState((s) => ({ ...s, [c.newsUrl]: 'done' }))
     } catch {
       setAddState((s) => ({ ...s, [c.newsUrl]: 'error' }))
     }
@@ -138,7 +145,8 @@ function GerenciarConcursosPage() {
 
   const handleAddAll = async () => {
     for (const c of pendingNew) {
-      // Sequencial: cada add visita a notícia + IA; em paralelo estouraria a origem.
+      // Sequencial por simplicidade de progresso — agora é só um insert por
+      // concurso (sem IA, sem rede externa), então é rápido mesmo com 70.
       await handleAdd(c)
     }
   }
@@ -389,7 +397,7 @@ function DiscoveryPanel({
             >
               {pendingCount === 0
                 ? 'Todos adicionados'
-                : `Adicionar ${pendingCount} novo${pendingCount > 1 ? 's' : ''}`}
+                : `Adicionar ${pendingCount} como rascunho`}
             </Button>
           )}
           <button
@@ -502,14 +510,8 @@ function CandidateAction({
   }
   if (state === 'done') {
     return (
-      <span className="text-xs font-medium text-emerald-600">✓ adicionado</span>
-    )
-  }
-  if (state === 'done-nolink') {
-    return (
-      <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700">
-        <ExclamationTriangleIcon className="size-3.5" />
-        sem link oficial — pegar manual
+      <span className="text-xs font-medium text-emerald-600">
+        ✓ rascunho criado
       </span>
     )
   }
@@ -621,12 +623,7 @@ function ConcursoRow({ row }: { row: AdminConcursoRow }) {
             {freshness.label}
           </span>
         )}
-        {!row.closed && row.needsSourceUrl && (
-          <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20">
-            <ExclamationTriangleIcon className="size-3.5" />
-            sem link oficial
-          </span>
-        )}
+        {!row.closed && <PhaseCell row={row} />}
         {row.closed ? (
           <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-500">
             Encerrado
@@ -666,6 +663,92 @@ function ConcursoRow({ row }: { row: AdminConcursoRow }) {
         </button>
       </div>
     </li>
+  )
+}
+
+/** Cor do selo por fase: rascunho é neutro, pronto-para-publicar convida. */
+const PHASE_TONE: Record<ConcursoPhaseId, string> = {
+  news: 'bg-slate-100 text-slate-600',
+  link: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+  documents: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+  analysis: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
+  publish: 'bg-cyan-50 text-cyan-700 ring-1 ring-inset ring-cyan-600/20',
+  done: 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20',
+}
+
+/**
+ * Em que fase o concurso está + o botão da fase seguinte.
+ *
+ * A lista é a fila de trabalho: cada linha oferece UMA ação, a próxima. As
+ * fases 4 e 5 não têm botão aqui de propósito — elas exigem revisão do que a
+ * IA propôs (decisão de produto: nunca auto-aplicar), então a linha leva à
+ * página do concurso, onde essa revisão existe.
+ */
+function PhaseCell({ row }: { row: AdminConcursoRow }) {
+  const phase = concursoPhase(row)
+  const extractNews = useExtractNewsMutation()
+  const findLink = useFindConcursoLinkMutation(row.id)
+  const setPublished = useSetConcursoPublishedMutation()
+
+  const busy =
+    extractNews.isPending || findLink.isPending || setPublished.isPending
+
+  const run = () => {
+    if (busy) return
+    if (
+      phase.costsMoney &&
+      !window.confirm(
+        `${phase.actionLabel} para ${row.institution}? Esta fase consome créditos de IA.`,
+      )
+    )
+      return
+    if (phase.id === 'news') extractNews.mutate(row.id)
+    else if (phase.id === 'link') findLink.mutate()
+    else if (phase.id === 'publish')
+      setPublished.mutate({ id: row.id, published: true })
+    else if (phase.id === 'done')
+      setPublished.mutate({ id: row.id, published: false })
+  }
+
+  const needsReview = phase.id === 'documents' || phase.id === 'analysis'
+
+  return (
+    <div className="flex items-center gap-2">
+      {row.aiCostUsd != null && (
+        <span
+          title="Custo de IA acumulado neste concurso"
+          className="text-xs tabular-nums text-slate-400"
+        >
+          {formatUsd(row.aiCostUsd)}
+        </span>
+      )}
+      <span
+        title={phaseProgressLabel(phase)}
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${PHASE_TONE[phase.id]}`}
+      >
+        {phase.label}
+      </span>
+      {needsReview ? (
+        <Link
+          to="/concursos/$concursoSlug"
+          params={{ concursoSlug: row.slug ?? row.id }}
+          aria-label={`${phase.actionLabel}: ${row.institution}`}
+          className="text-xs font-medium text-cyan-700 hover:underline"
+        >
+          {phase.actionLabel} →
+        </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          aria-label={`${phase.actionLabel}: ${row.institution}`}
+          className="text-xs font-medium text-cyan-700 hover:underline disabled:opacity-50"
+        >
+          {busy ? 'processando…' : phase.actionLabel}
+        </button>
+      )}
+    </div>
   )
 }
 

@@ -1,5 +1,6 @@
 import {
   AiUsageMeter,
+  DEFAULT_OCR_PAGE_USD,
   DEFAULT_WEB_SEARCH_CALL_USD,
   MODEL_PRICES,
   priceOf,
@@ -87,5 +88,28 @@ describe('AiUsageMeter', () => {
 
   it('medidor sem chamadas custa zero', () => {
     expect(new AiUsageMeter().report()).toEqual({ usd: 0, entries: [] });
+  });
+
+  it('cobra o OCR por página e diz quantas foram', () => {
+    const meter = new AiUsageMeter();
+    meter.recordOcr('OCR do edital', 200);
+
+    const { usd, entries } = meter.report();
+    expect(usd).toBeCloseTo(200 * DEFAULT_OCR_PAGE_USD, 6);
+    expect(entries[0].label).toBe('OCR do edital (200 pág.)');
+    // OCR não é por token: mostrar 0/0 evita fingir uma medição que não existe.
+    expect(entries[0]).toMatchObject({ inputTokens: 0, outputTokens: 0 });
+  });
+
+  it('aceita preço de página customizado', () => {
+    const meter = new AiUsageMeter(DEFAULT_WEB_SEARCH_CALL_USD, 0.005);
+    meter.recordOcr('OCR', 10);
+    expect(meter.report().usd).toBeCloseTo(0.05, 6);
+  });
+
+  it('OCR de zero página não vira linha (fallback pdf-parse é local e grátis)', () => {
+    const meter = new AiUsageMeter();
+    meter.recordOcr('OCR', 0);
+    expect(meter.report()).toEqual({ usd: 0, entries: [] });
   });
 });

@@ -47,6 +47,13 @@ export class ConcursoLinkService {
    * (complementado por um índice único parcial para examBoardId NULL, onde
    * o @@unique do Postgres não protege — NULLs são distintos).
    * Rows created before slugs existed are healed with one on read.
+   *
+   * @param input.draft cria em RASCUNHO (`publishedAt: null`). Só a descoberta
+   *   usa: ela inventa um stub sem edital, data ou salário, que não pode cair
+   *   no feed do usuário final. Todo o resto — lazy-link a partir de uma prova
+   *   JÁ publicada, wizard de edital — nasce publicado; do contrário,
+   *   materializar a linha na primeira leitura faria o concurso, que já era
+   *   visível pelas provas, sumir do nível 1.
    */
   async findOrCreateConcurso(input: {
     institution: string;
@@ -56,6 +63,7 @@ export class ConcursoLinkService {
     city: string | null;
     examBoardId: string | null;
     boardLabel: string | null;
+    draft?: boolean;
   }) {
     const where = {
       institution: input.institution,
@@ -88,6 +96,7 @@ export class ConcursoLinkService {
           state: input.state,
           city: input.city,
           examBoardId: input.examBoardId,
+          publishedAt: input.draft ? null : new Date(),
         },
       });
     } catch (err) {

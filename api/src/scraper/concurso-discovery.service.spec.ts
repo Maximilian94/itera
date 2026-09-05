@@ -20,6 +20,13 @@ import {
   VERIFY_SCRAPE,
 } from './document-scraper.service';
 import type { DocumentScraperService } from './document-scraper.service';
+import type { ConcursoCostService } from './concurso-cost.service';
+
+/** Registro de custo é contabilidade: os testes só precisam que não exploda. */
+const costsStub = () =>
+  ({
+    record: jest.fn().mockResolvedValue(undefined),
+  }) as unknown as ConcursoCostService;
 
 // Trecho fiel do HTML real de /cargos/enfermeiro (dois concursos + links de vaga).
 const FIXTURE = `
@@ -267,9 +274,11 @@ describe('listConcursosAdmin', () => {
     documentsSourceUrl: 'https://banca.org/x',
     documentsCheckedAt,
     editalUrl: null,
+    pciListingUrl: null,
     closedAt,
+    publishedAt: null,
     createdAt: new Date('2026-01-01'),
-    _count: { examBases: 0 },
+    _count: { examBases: 0, documents: 0, aiCosts: 0 },
   });
 
   const build = (rows: ReturnType<typeof row>[]) => {
@@ -277,12 +286,15 @@ describe('listConcursosAdmin', () => {
       concurso: { findMany: jest.fn().mockResolvedValue(rows) },
       // Cargos de enfermagem entram no input da busca (desempate de certame).
       cargo: { findMany: jest.fn().mockResolvedValue([]) },
+      // Custo acumulado por concurso (agregado numa query só na listagem).
+      concursoAiCost: { groupBy: jest.fn().mockResolvedValue([]) },
     } as unknown as PrismaService;
     return new ConcursoDiscoveryService(
       {} as ConfigService,
       prisma,
       {} as ConcursoLinkService,
       {} as DocumentScraperService,
+      costsStub(),
     );
   };
 
@@ -416,6 +428,7 @@ describe('reextractLinks — busca web + verificação', () => {
         scrapeDocuments,
         fetchPageHtml: jest.fn().mockResolvedValue(null),
       } as unknown as DocumentScraperService,
+      costsStub(),
     );
     return { service, update, findMany };
   };
@@ -507,6 +520,7 @@ describe('reextractLinks — busca web + verificação', () => {
           ),
         fetchPageHtml: jest.fn().mockResolvedValue(null),
       } as unknown as DocumentScraperService,
+      costsStub(),
     );
 
     expect(await service.reextractLinks()).toMatchObject({ updated: 1 });
@@ -559,6 +573,7 @@ describe('reextractLinks — busca web + verificação', () => {
         scrapeDocuments: jest.fn(),
         fetchPageHtml: jest.fn().mockResolvedValue(null),
       } as unknown as DocumentScraperService,
+      costsStub(),
     );
 
     await service.findLinkForConcurso('c1');
@@ -638,6 +653,7 @@ describe('reextractLinks — busca web + verificação', () => {
           .fn()
           .mockResolvedValue('<a href="/concursos/mondai">Mondaí</a>'),
       } as unknown as DocumentScraperService,
+      costsStub(),
     );
 
     // Em massa, só confirmado entra no banco.
@@ -837,6 +853,7 @@ describe('reextractLinks — busca web + verificação', () => {
           .fn()
           .mockResolvedValue('<a href="/pagina/faria-lemos">Faria Lemos</a>'),
       } as unknown as DocumentScraperService,
+      costsStub(),
     );
 
     expect(await service.reextractLinks()).toMatchObject({ updated: 1 });
@@ -860,5 +877,96 @@ describe('reextractLinks — busca web + verificação', () => {
     );
     await expect(service.reextractLinks()).rejects.toThrow(/sem créditos/);
     expect(update).not.toHaveBeenCalled();
+  });
+});
+
+describe('add — fase 1 (cadastro sem IA)', () => {
+  const candidate = {
+    institution: 'Prefeitura de Santos',
+    uf: 'SP',
+    headline: 'Prefeitura de Santos abre concurso 2027 com vagas de enfermeiro',
+    newsUrl: 'https://www.pciconcursos.com.br/noticias/santos-2027',
+  };
+
+  const build = () => {
+    const update = jest.fn().mockResolvedValue({
+      id: 'c1',
+      slug: null,
+      institution: candidate.institution,
+    });
+    const prisma = {
+      concurso: { findMany: jest.fn().mockResolvedValue([]), update },
+      cargo: {
+        count: jest.fn().mockResolvedValue(0),
+        create: jest.fn().mockResolvedValue({ id: 'cargo-1' }),
+      },
+    } as unknown as PrismaService;
+    const findOrCreateConcurso = jest.fn().mockResolvedValue({ id: 'c1' });
+    const service = new ConcursoDiscoveryService(
+      { get: () => 'sk-test' } as unknown as ConfigService,
+      prisma,
+      { findOrCreateConcurso } as unknown as ConcursoLinkService,
+      {} as DocumentScraperService,
+      costsStub(),
+    );
+    return { service, prisma, update, findOrCreateConcurso };
+  };
+
+  it('não faz NENHUMA chamada de rede/IA ao adicionar', async () => {
+    // O ponto do fluxo faseado: adicionar 70 concursos não pode custar nada.
+    // Antes, cada add lia a notícia com IA e disparava uma busca web.
+    const fetchSpy = jest.fn();
+    global.fetch = fetchSpy as unknown as typeof fetch;
+    const { service } = build();
+
+    await service.add(candidate);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('cria como RASCUNHO e sem carimbar verificação', async () => {
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    const { service, update } = build();
+
+    const res = await service.add(candidate);
+
+    expect(res.created).toBe(true);
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ pciListingUrl: candidate.newsUrl }),
+      }),
+    );
+    // `documentsCheckedAt` mentiria: nada foi verificado nesta fase, e o
+    // rótulo "verificado hoje" da fila sairia errado no dia 1.
+    const data = update.mock.calls[0][0].data as Record<string, unknown>;
+    expect('documentsCheckedAt' in data).toBe(false);
+    expect('documentsSourceUrl' in data).toBe(false);
+  });
+
+  it('tira o ano da manchete, sem precisar ler a notícia', async () => {
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    const { service, findOrCreateConcurso } = build();
+
+    await service.add(candidate);
+
+    expect(findOrCreateConcurso).toHaveBeenCalledWith(
+      expect.objectContaining({ year: 2027, state: 'SP', city: null }),
+    );
+  });
+
+  it('pede o rascunho na CRIAÇÃO, sem despublicar concurso já existente', async () => {
+    // `findOrCreateConcurso` pode ENCONTRAR um concurso publicado (chave mais
+    // frouxa que a dedupe do add); zerar publishedAt num update tiraria do ar
+    // um concurso real.
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    const { service, findOrCreateConcurso, update } = build();
+
+    await service.add(candidate);
+
+    expect(findOrCreateConcurso).toHaveBeenCalledWith(
+      expect.objectContaining({ draft: true }),
+    );
+    const data = update.mock.calls[0][0].data as Record<string, unknown>;
+    expect('publishedAt' in data).toBe(false);
   });
 });

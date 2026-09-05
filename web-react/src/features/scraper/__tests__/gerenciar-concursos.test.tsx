@@ -85,6 +85,11 @@ const ROWS: Array<AdminConcursoRow> = [
     documentsCheckedAt: null,
     registrationEnd: '2026-08-01',
     createdAt: '2026-07-10T00:00:00.000Z',
+    published: false,
+    hasNewsUrl: true,
+    hasEditalUrl: false,
+    documentCount: 0,
+    aiCostUsd: null,
   },
   {
     id: 'c-govsp',
@@ -99,6 +104,11 @@ const ROWS: Array<AdminConcursoRow> = [
     documentsCheckedAt: daysAgo(3),
     registrationEnd: null,
     createdAt: '2023-01-10T00:00:00.000Z',
+    published: false,
+    hasNewsUrl: true,
+    hasEditalUrl: false,
+    documentCount: 0,
+    aiCostUsd: null,
   },
 ]
 
@@ -145,9 +155,14 @@ describe('gerenciar concursos (admin)', () => {
       }),
     ).toBeTruthy()
 
-    // Santos (aberto, sem link) na seção de atenção com o badge; Governo (past) concluído.
+    // Santos (aberto, rascunho, sem link) na atenção; Governo (past) concluído.
     expect(await screen.findByText('Prefeitura de Santos')).toBeTruthy()
-    expect(screen.getByText('sem link oficial')).toBeTruthy()
+    // O selo agora é a FASE do fluxo: Santos veio da descoberta e ainda não
+    // teve a notícia lida, então a próxima pendência é a fase 2.
+    expect(screen.getByText('Rascunho')).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: /Ler notícia: Prefeitura de Santos/ }),
+    ).toBeTruthy()
     expect(screen.getByText('Inscrições abertas')).toBeTruthy()
     expect(screen.getByText('Governo de São Paulo')).toBeTruthy()
     expect(screen.getByText('Concluído')).toBeTruthy()
@@ -155,7 +170,8 @@ describe('gerenciar concursos (admin)', () => {
     await expectNoSeriousAxeViolations(container)
   })
 
-  it('procura novos concursos e adiciona um sem link oficial (highlight)', async () => {
+  it('adicionar cria rascunho sem disparar nenhuma chamada de IA', async () => {
+    const calls: Array<string> = []
     mockAll({
       [SEARCH]: { body: SEARCH_RESULT },
       [ADD]: {
@@ -170,6 +186,14 @@ describe('gerenciar concursos (admin)', () => {
         },
       },
     })
+    // Espia TODOS os pathnames chamados: a fase 1 não pode tocar em
+    // extract-news nem find-link, que são as rotas que gastam crédito.
+    const realFetch = global.fetch
+    global.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(new URL(String(input), 'http://x').pathname)
+      return (realFetch)(input, init)
+    }) as typeof fetch
+
     renderPage()
 
     fireEvent.click(
@@ -182,10 +206,9 @@ describe('gerenciar concursos (admin)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Adicionar' }))
 
-    // Add lazy sem link oficial → destaque para captura manual.
-    expect(
-      await screen.findByText(/sem link oficial — pegar manual/),
-    ).toBeTruthy()
+    expect(await screen.findByText('✓ rascunho criado')).toBeTruthy()
+    expect(calls.some((p) => p.includes('/extract-news'))).toBe(false)
+    expect(calls.some((p) => p.includes('/find-link'))).toBe(false)
   })
 
   it('Buscar links faltantes: conta os sem link e avisa do custo antes', async () => {
@@ -325,6 +348,11 @@ describe('gerenciar concursos (admin)', () => {
             documentsCheckedAt: null,
             registrationEnd: null,
             createdAt: '2026-07-01T00:00:00.000Z',
+            published: false,
+            hasNewsUrl: true,
+            hasEditalUrl: false,
+            documentCount: 0,
+            aiCostUsd: null,
           },
         ] satisfies Array<AdminConcursoRow>,
       },

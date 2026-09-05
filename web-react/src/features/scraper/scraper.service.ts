@@ -2,6 +2,7 @@ import type {
   AdminConcursoRow,
   AnalyzeDocumentResult,
   CheckConcursoDocumentsResult,
+  ConcursoCostReport,
   ConcursoUpdateReport,
   DiscoveryAddInput,
   DiscoveryAddResult,
@@ -10,6 +11,7 @@ import type {
   DocumentScrapeResult,
   FindConcursoLinkResult,
   NewConcursoDocument,
+  NewsExtractResult,
   PciEntryStatus,
   PciExamEntry,
   ProposedCargoSyllabus,
@@ -192,6 +194,30 @@ export const scraperService = {
       `${BASE}/concursos/${concursoId}/find-link`,
       { method: 'POST', body: JSON.stringify({}) },
     )
+  },
+
+  /** Fase 2: lê a notícia de origem e preenche banca/edital/janela. */
+  extractNews(concursoId: string): Promise<NewsExtractResult> {
+    return apiFetch<NewsExtractResult>(
+      `${BASE}/concursos/${concursoId}/extract-news`,
+      { method: 'POST', body: JSON.stringify({}) },
+    )
+  },
+
+  /** Fase 6: publica/despublica — o único ponto que expõe ao usuário final. */
+  setConcursoPublished(
+    concursoId: string,
+    published: boolean,
+  ): Promise<{ id: string; publishedAt: string | null }> {
+    return apiFetch(`${BASE}/concursos/${concursoId}/published`, {
+      method: 'PATCH',
+      body: JSON.stringify({ published }),
+    })
+  },
+
+  /** Custo de IA acumulado por fase (aba Admin do concurso). */
+  getConcursoCosts(concursoId: string): Promise<ConcursoCostReport> {
+    return apiFetch<ConcursoCostReport>(`${BASE}/concursos/${concursoId}/costs`)
   },
 
   /** "Atualizar": roda Fase 1 + Fase 2 de UM concurso (o front chama em loop). */

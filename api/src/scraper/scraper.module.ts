@@ -13,6 +13,7 @@ import { DocumentScraperService } from './document-scraper.service';
 import { ConcursoDocumentAnalysisService } from './concurso-document-analysis.service';
 import { ConcursoDiscoveryService } from './concurso-discovery.service';
 import { ConcursoUpdateService } from './concurso-update.service';
+import { ConcursoCostService } from './concurso-cost.service';
 import { NormalizerService } from './normalizer.service';
 import { ScoringService } from './scoring.service';
 import { SCRAPER_QUEUE_NAME } from './scraper.constants';
@@ -35,6 +36,7 @@ import { SCRAPER_QUEUE_NAME } from './scraper.constants';
     ConcursoDocumentAnalysisService,
     ConcursoDiscoveryService,
     ConcursoUpdateService,
+    ConcursoCostService,
     NormalizerService,
     ScoringService,
   ],

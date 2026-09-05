@@ -534,16 +534,23 @@ describe('ConcursoService.getConcursoDetail (página do concurso, MAX-15)', () =
     );
   });
 
-  it('busca por slug ou por UUID', async () => {
+  it('busca por slug ou por UUID, sempre com o gate de publicação', async () => {
+    // Sem `publishedAt` no where, um rascunho seria alcançável por link direto
+    // e o gate da listagem viraria decoração.
     await service.getConcursoDetail(CONCURSO.slug);
     expect(prisma.concurso.findFirst).toHaveBeenLastCalledWith(
-      expect.objectContaining({ where: { slug: CONCURSO.slug } }),
+      expect.objectContaining({
+        where: { slug: CONCURSO.slug, publishedAt: { not: null } },
+      }),
     );
 
     await service.getConcursoDetail('11111111-2222-3333-4444-555555555555');
     expect(prisma.concurso.findFirst).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        where: { id: '11111111-2222-3333-4444-555555555555' },
+        where: {
+          id: '11111111-2222-3333-4444-555555555555',
+          publishedAt: { not: null },
+        },
       }),
     );
   });

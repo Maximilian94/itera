@@ -5,10 +5,11 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { GovernmentScope } from '@prisma/client';
+import { ConcursoAiPhase, GovernmentScope, Prisma } from '@prisma/client';
 import * as cheerio from 'cheerio';
 import { jsonrepair } from 'jsonrepair';
 import { PrismaService } from '../prisma/prisma.service';
+import { ConcursoCostService } from './concurso-cost.service';
 import { ConcursoLinkService } from '../concurso/concurso-link.service';
 import { deriveConcursoStatus } from '../concurso/concurso-status';
 import type { ConcursoStatus } from '../concurso/concurso-status';
@@ -17,8 +18,8 @@ import {
   PageFetchError,
   VERIFY_SCRAPE,
 } from './document-scraper.service';
-import { AiUsageMeter } from './ai-cost';
-import type { CostReport } from './ai-cost';
+import { AiUsageMeter } from '../common/ai-cost';
+import type { CostEntry, CostReport } from '../common/ai-cost';
 
 const PCI_BASE_URL = 'https://www.pciconcursos.com.br';
 
@@ -54,6 +55,16 @@ export interface DiscoveryAddResult {
   created: boolean;
 }
 
+/** Resultado da fase 2 — o que a notícia do pciconcursos deu sobre o concurso. */
+export interface NewsExtractResult {
+  concursoId: string;
+  /** false quando a notícia não pôde ser lida (bloqueio, página vazia). */
+  extracted: boolean;
+  /** Campos que a extração de fato preencheu, para a UI dizer o que mudou. */
+  filled: string[];
+  cost: CostReport;
+}
+
 /** Linha da listagem admin de concursos. */
 export interface AdminConcursoRow {
   id: string;
@@ -71,6 +82,14 @@ export interface AdminConcursoRow {
   documentsCheckedAt: string | null;
   registrationEnd: string | null;
   createdAt: string;
+  /** Fase 6: visível ao usuário final. false = rascunho, só o admin vê. */
+  published: boolean;
+  /** Tem notícia de origem — pré-requisito da fase 2. */
+  hasNewsUrl: boolean;
+  hasEditalUrl: boolean;
+  documentCount: number;
+  /** Custo de IA acumulado; null quando nunca foi medido (≠ US$ 0). */
+  aiCostUsd: number | null;
 }
 
 /** Resultado do 2º salto: o link do concurso, ou a pista que não abrimos. */
@@ -498,9 +517,16 @@ export function classifyCandidates(
 /**
  * "Procurar novos concursos" (/admin/gerenciar-concursos): raspa a página de
  * cargo do pciconcursos, cruza os concursos listados com a base e permite
- * adicionar em 1 clique só os que ainda não existem — já salvando o link
- * oficial da organizadora (extraído da notícia por IA). Concurso sem link
- * oficial é criado mesmo assim e destacado para captura manual.
+ * adicionar só os que ainda não existem.
+ *
+ * ⚠️ O fluxo é **faseado e manual**. `add` (fase 1) NÃO chama IA: cria o
+ * concurso como RASCUNHO com o que a listagem já deu (órgão, UF, ano da
+ * manchete) e para por aí. As fases caras — ler a notícia (2), achar o link
+ * oficial (3), raspar documentos (4), analisar o edital (5) — são botões
+ * separados, disparados um a um pelo admin, e cada uma grava o que custou
+ * (`ConcursoCostService`). Antes, um clique em "Adicionar" disparava a leitura
+ * da notícia + a busca web para cada candidato: adicionar 70 concursos de uma
+ * vez custava dezenas de dólares antes de o admin ver o primeiro resultado.
  */
 @Injectable()
 export class ConcursoDiscoveryService {
@@ -511,6 +537,7 @@ export class ConcursoDiscoveryService {
     private readonly prisma: PrismaService,
     private readonly concursoLink: ConcursoLinkService,
     private readonly docScraper: DocumentScraperService,
+    private readonly costs: ConcursoCostService,
   ) {}
 
   async search(cargoSlug = 'enfermeiro'): Promise<DiscoverySearchResult> {
@@ -538,6 +565,10 @@ export class ConcursoDiscoveryService {
     };
   }
 
+  /**
+   * FASE 1 — cadastro. Cria o concurso como rascunho, sem IA e sem custo, a
+   * partir apenas do que a listagem do pciconcursos já trazia. Idempotente.
+   */
   async add(candidate: DiscoveryCandidate): Promise<DiscoveryAddResult> {
     const institution = candidate.institution.trim();
     if (!institution)
@@ -576,58 +607,35 @@ export class ConcursoDiscoveryService {
       };
     }
 
-    // Visita a notícia e extrai o site da banca + metadados (best-effort).
-    const extracted = await this.extractFromNews(candidate.newsUrl).catch(
-      (err) => {
-        // Sem IA disponível o "add" inteiro sai errado (sem banca, sem link):
-        // melhor falhar visível do que criar um stub vazio em silêncio.
-        if (err instanceof OpenAiUnavailableError) throw err;
-        this.logger.warn(
-          `extração da notícia falhou (${candidate.newsUrl}): ${(err as Error).message?.slice(0, 160)}`,
-        );
-        return null;
-      },
-    );
-
+    // Só o que a própria listagem já deu — sem visitar a notícia, sem IA.
     const year =
-      extracted?.year ??
-      this.yearFromText(candidate.headline) ??
-      new Date().getUTCFullYear();
-    const scope =
-      extracted?.governmentScope ?? this.scopeFromInstitution(institution);
-    // Acha a página oficial do concurso (busca web + fallback no site da banca).
-    const concursoUrl = await this.resolveConcursoLink(extracted, {
-      institution,
-      uf,
-      city: extracted?.city ?? null,
-      year,
-      headline: candidate.headline,
-    });
+      this.yearFromText(candidate.headline) ?? new Date().getUTCFullYear();
 
     const concurso = await this.concursoLink.findOrCreateConcurso({
       institution,
       year,
-      governmentScope: scope,
+      governmentScope: this.scopeFromInstitution(institution),
       state: uf,
-      city: extracted?.city ?? null,
+      city: null,
       examBoardId: null,
       boardLabel: null,
+      // Nasce RASCUNHO: existe para o admin trabalhar, invisível ao usuário até
+      // a fase 6. Sem isto, um stub sem edital nem data cairia direto no feed
+      // de /concursos, que é justamente o que a fase de publicação evita.
+      //
+      // A flag vai na CRIAÇÃO, não num update depois: `findOrCreateConcurso`
+      // pode ter ENCONTRADO um concurso que já existia e estava publicado (a
+      // chave dele — instituição+ano+banca — é mais frouxa que a dedupe acima),
+      // e despublicá-lo aqui tiraria do ar um concurso real.
+      draft: true,
     });
 
     const updated = await this.prisma.concurso.update({
       where: { id: concurso.id },
       data: {
         pciListingUrl: candidate.newsUrl,
-        documentsSourceUrl: concursoUrl,
-        editalUrl: extracted?.editalUrl ?? null,
-        registrationStart: extracted?.registrationStart
-          ? new Date(extracted.registrationStart)
-          : null,
-        registrationEnd: extracted?.registrationEnd
-          ? new Date(extracted.registrationEnd)
-          : null,
-        ...(extracted?.city ? { city: extracted.city } : {}),
-        documentsCheckedAt: new Date(),
+        // NÃO carimba `documentsCheckedAt`: nada foi verificado ainda, e mentir
+        // aqui envenena o `checkFreshness` da fila de manutenção.
       },
       select: { id: true, slug: true, institution: true },
     });
@@ -649,8 +657,106 @@ export class ConcursoDiscoveryService {
 
     return {
       concurso: updated,
-      officialUrlFound: !!concursoUrl,
+      officialUrlFound: false,
       created: true,
+    };
+  }
+
+  /**
+   * FASE 2 — lê a notícia do pciconcursos que originou o concurso e preenche o
+   * que ela souber dizer: banca, link do edital, cidade, escopo e janela de
+   * inscrição. Uma chamada barata no mini, medida e registrada.
+   *
+   * Só preenche campo VAZIO (`??`): a notícia é a fonte mais fraca do fluxo, e
+   * uma rodada tardia não pode sobrescrever o que o edital (fase 5) ou o admin
+   * já corrigiram à mão.
+   */
+  async extractNewsForConcurso(concursoId: string): Promise<NewsExtractResult> {
+    const c = await this.prisma.concurso.findUnique({
+      where: { id: concursoId },
+      select: {
+        id: true,
+        pciListingUrl: true,
+        city: true,
+        editalUrl: true,
+        registrationStart: true,
+        registrationEnd: true,
+      },
+    });
+    if (!c) throw new NotFoundException('concurso not found');
+    if (!c.pciListingUrl)
+      throw new BadRequestException(
+        'Este concurso não veio da descoberta (sem notícia de origem) — não há o que extrair.',
+      );
+
+    const meter = this.newMeter();
+    const extracted = await this.extractFromNews(c.pciListingUrl, meter).catch(
+      (err) => {
+        // Crédito/chave: erro visível, não "não achei nada".
+        if (err instanceof OpenAiUnavailableError) throw err;
+        this.logger.warn(
+          `extração da notícia falhou (${c.pciListingUrl}): ${(err as Error).message?.slice(0, 160)}`,
+        );
+        return null;
+      },
+    );
+
+    const cost = meter.report();
+    await this.costs.record(c.id, ConcursoAiPhase.NEWS_EXTRACT, cost);
+
+    if (!extracted)
+      return { concursoId: c.id, extracted: false, filled: [], cost };
+
+    const data: Prisma.ConcursoUpdateInput = {};
+    const filled: string[] = [];
+    if (!c.city && extracted.city) {
+      data.city = extracted.city;
+      filled.push('cidade');
+    }
+    if (!c.editalUrl && extracted.editalUrl) {
+      data.editalUrl = extracted.editalUrl;
+      filled.push('edital');
+    }
+    if (!c.registrationStart && extracted.registrationStart) {
+      data.registrationStart = new Date(extracted.registrationStart);
+      filled.push('início das inscrições');
+    }
+    if (!c.registrationEnd && extracted.registrationEnd) {
+      data.registrationEnd = new Date(extracted.registrationEnd);
+      filled.push('fim das inscrições');
+    }
+    if (extracted.governmentScope) {
+      data.governmentScope = extracted.governmentScope;
+    }
+    if (Object.keys(data).length > 0) {
+      await this.prisma.concurso.update({ where: { id: c.id }, data });
+    }
+
+    return { concursoId: c.id, extracted: true, filled, cost };
+  }
+
+  /**
+   * FASE 6 — publica ou volta para rascunho. É o único ponto que torna o
+   * concurso visível ao usuário final; tudo antes disso é bancada de trabalho.
+   */
+  async setPublished(
+    concursoId: string,
+    published: boolean,
+  ): Promise<{ id: string; publishedAt: string | null }> {
+    const exists = await this.prisma.concurso.findUnique({
+      where: { id: concursoId },
+      select: { id: true },
+    });
+    if (!exists) throw new NotFoundException('concurso not found');
+
+    const updated = await this.prisma.concurso.update({
+      where: { id: concursoId },
+      data: { publishedAt: published ? new Date() : null },
+      select: { id: true, publishedAt: true },
+    });
+    return {
+      id: updated.id,
+      publishedAt: updated.publishedAt?.toISOString() ?? null,
     };
   }
 
@@ -768,6 +874,7 @@ export class ConcursoDiscoveryService {
     });
 
     const cost = meter.report();
+    await this.costs.record(c.id, ConcursoAiPhase.LINK_SEARCH, cost);
     this.logger.log(
       `busca de link (${c.institution}): US$ ${cost.usd.toFixed(4)} em ${cost.entries.length} chamada(s)`,
     );
@@ -813,30 +920,45 @@ export class ConcursoDiscoveryService {
       },
     });
 
-    // Um medidor para a rodada inteira — o total é o que o admin quer ver.
-    const meter = this.newMeter();
+    // Um medidor POR CONCURSO (e não um só para a rodada): o total da rodada é
+    // a soma deles, mas cada concurso precisa carregar o próprio custo no
+    // histórico — senão o gasto do em massa some da conta individual.
+    const entries: CostEntry[] = [];
     let updated = 0;
     let stillMissing = 0;
     for (const c of concursos) {
-      const outcome = await this.findVerifiedConcursoLink(
-        {
-          institution: c.institution,
-          uf: c.state,
-          city: c.city,
-          year: c.year,
-          targetRoles: await this.nursingRoles(c.id),
-        },
-        null,
-        meter,
-      ).catch((err) => {
+      const meter = this.newMeter();
+      let outcome: LinkSearchOutcome;
+      try {
+        outcome = await this.findVerifiedConcursoLink(
+          {
+            institution: c.institution,
+            uf: c.state,
+            city: c.city,
+            year: c.year,
+            targetRoles: await this.nursingRoles(c.id),
+          },
+          null,
+          meter,
+        );
+      } catch (err) {
+        // O que já foi gasto até o erro foi gasto — registra antes de decidir.
+        const partial = meter.report();
+        entries.push(...partial.entries);
+        await this.costs.record(c.id, ConcursoAiPhase.LINK_SEARCH, partial);
         // IA indisponível (sem crédito/chave inválida) não é "não achei": seria
         // o mesmo erro nos N concursos seguintes. Aborta e avisa o admin.
         if (err instanceof OpenAiUnavailableError) throw err;
         this.logger.warn(
           `reextract falhou (${c.institution}): ${(err as Error).message?.slice(0, 160)}`,
         );
-        return { confirmed: null, suggestion: null } as LinkSearchOutcome;
-      });
+        continue;
+      }
+
+      const roundCost = meter.report();
+      entries.push(...roundCost.entries);
+      await this.costs.record(c.id, ConcursoAiPhase.LINK_SEARCH, roundCost);
+
       const found = outcome.confirmed;
       // NÃO limpa quando não achou: o link salvo pode ter sido colado à mão pelo
       // admin (ou confirmado numa rodada anterior) e a busca é best-effort —
@@ -851,7 +973,10 @@ export class ConcursoDiscoveryService {
       if (found) updated++;
       else if (!c.documentsSourceUrl) stillMissing++;
     }
-    const cost = meter.report();
+    const cost: CostReport = {
+      usd: entries.reduce((sum, e) => sum + e.usd, 0),
+      entries,
+    };
     this.logger.log(
       `busca de links em massa: ${concursos.length} concurso(s), US$ ${cost.usd.toFixed(4)}`,
     );
@@ -874,11 +999,25 @@ export class ConcursoDiscoveryService {
         documentsSourceUrl: true,
         documentsCheckedAt: true,
         editalUrl: true,
+        pciListingUrl: true,
         closedAt: true,
+        publishedAt: true,
         createdAt: true,
-        _count: { select: { examBases: true } },
+        _count: {
+          select: { examBases: true, documents: true, aiCosts: true },
+        },
       },
     });
+
+    // Custo acumulado por concurso, numa query só (a listagem tem ~170 linhas;
+    // um findMany por linha seria N+1 gratuito).
+    const costRows = await this.prisma.concursoAiCost.groupBy({
+      by: ['concursoId'],
+      _sum: { usd: true },
+    });
+    const costByConcurso = new Map(
+      costRows.map((r) => [r.concursoId, Number(r._sum.usd ?? 0)]),
+    );
 
     const iso = (d: Date | null) => d?.toISOString().slice(0, 10) ?? null;
     const rank: Record<ConcursoStatus, number> = {
@@ -908,6 +1047,15 @@ export class ConcursoDiscoveryService {
           documentsCheckedAt: c.documentsCheckedAt?.toISOString() ?? null,
           registrationEnd: iso(c.registrationEnd),
           createdAt: c.createdAt.toISOString(),
+          published: c.publishedAt != null,
+          // Sinais que o front usa para derivar em que fase o concurso está.
+          hasNewsUrl: c.pciListingUrl != null,
+          hasEditalUrl: c.editalUrl != null,
+          documentCount: c._count.documents,
+          // undefined ≠ 0: "nunca mediu" é diferente de "custou zero", e a
+          // listagem precisa distinguir os concursos anteriores à medição.
+          aiCostUsd:
+            c._count.aiCosts > 0 ? (costByConcurso.get(c.id) ?? 0) : null,
         }))
         // Encerrados vão para o fim; entre os ativos, ordena por status temporal
         // e, dentro do status, do mais desatualizado para o mais recém-visto —
@@ -962,30 +1110,19 @@ export class ConcursoDiscoveryService {
 
   private async extractFromNews(
     newsUrl: string,
+    meter?: AiUsageMeter,
   ): Promise<ExtractedNews | null> {
     const html = await this.fetchHtml(newsUrl);
     const simplified = this.simplifyHtml(html, newsUrl);
     if (!simplified.trim()) return null;
-    const raw = await this.callOpenAiJson(NEWS_SYSTEM_PROMPT, simplified, 512);
+    const raw = await this.callOpenAiJson(
+      NEWS_SYSTEM_PROMPT,
+      simplified,
+      512,
+      meter,
+    );
     if (!raw) return null;
     return this.normalizeExtracted(raw);
-  }
-
-  /**
-   * Acha E CONFIRMA a página de documentos do concurso. Só devolve uma URL que
-   * realmente lista documentos do concurso (senão null → captura manual — evita
-   * salvar home de prefeitura/banca, que quebra a Fase 1 do "Atualizar").
-   */
-  private async resolveConcursoLink(
-    extracted: ExtractedNews | null,
-    identity: ConcursoIdentity,
-  ): Promise<string | null> {
-    // No "add" também só entra link confirmado — sugestão fica para a aba Admin.
-    const { confirmed } = await this.findVerifiedConcursoLink(
-      identity,
-      extracted,
-    );
-    return confirmed?.url ?? null;
   }
 
   /**
