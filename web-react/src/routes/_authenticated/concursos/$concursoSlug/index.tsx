@@ -350,10 +350,16 @@ function ConcursoContent({ data }: { data: ConcursoDetail }) {
             title="Ficha do concurso"
             hero={fichaHero}
             rows={ficha}
-            // Link da ORGANIZADORA (página de origem raspada), não do edital —
-            // sem ela, o botão some (o edital fica na timeline de Notícias).
-            editalUrl={concurso.documentsSourceUrl ?? null}
-            editalLabel="Link oficial da organizadora"
+            // O edital é o documento que o candidato quer ler (botão);
+            // a organizadora é a página de origem raspada, onde saem as
+            // retificações (link secundário). Ausentes, cada um some sozinho.
+            links={[
+              { href: concurso.editalUrl, label: 'Ver edital original' },
+              {
+                href: concurso.documentsSourceUrl ?? null,
+                label: 'Link oficial da organizadora',
+              },
+            ]}
             enterIdx={2}
             viewTransitionName="ficha-card"
           />

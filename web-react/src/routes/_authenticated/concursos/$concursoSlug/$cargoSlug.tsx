@@ -39,11 +39,18 @@ import { TrainingFlow } from '@/features/concurso/components/treino/TrainingFlow
 import { StudyFocusHeader } from '@/features/concurso/components/treino/StudyItemFocus'
 import { ProvasBoard } from '@/features/concurso/components/treino/ProvasBoard'
 import { CARD } from '@/features/concurso/components/card'
-import { enter, useMeters, withViewTransition } from '@/features/concurso/components/motion'
+import {
+  enter,
+  useMeters,
+  withViewTransition,
+} from '@/features/concurso/components/motion'
 import { ReadinessBar } from '@/features/concurso/components/ReadinessBar'
 import { StatusPill } from '@/features/concurso/components/StatusPill'
 import { GoalToggle } from '@/features/goal/components/GoalToggle'
-import { BACK_SQUARE, BackSquare } from '@/features/concurso/components/BackSquare'
+import {
+  BACK_SQUARE,
+  BackSquare,
+} from '@/features/concurso/components/BackSquare'
 import { FichaCard } from '@/features/concurso/components/FichaCard'
 import { SubjectDistribution } from '@/features/concurso/components/SubjectDistribution'
 import { ApiError } from '@/lib/api'
@@ -82,8 +89,11 @@ function daysUntil(iso: string | null): number | null {
   if (Number.isNaN(target.getTime())) return null
   const now = new Date()
   const ms =
-    Date.UTC(target.getUTCFullYear(), target.getUTCMonth(), target.getUTCDate()) -
-    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
+    Date.UTC(
+      target.getUTCFullYear(),
+      target.getUTCMonth(),
+      target.getUTCDate(),
+    ) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())
   return Math.round(ms / 86_400_000)
 }
 
@@ -169,7 +179,10 @@ function buildTrainingOptions(data: CargoDetail): Array<TrainingOption> {
 
 function CargoPage() {
   const { concursoSlug, cargoSlug } = Route.useParams()
-  const { data, isPending, error, refetch } = useCargoQuery(concursoSlug, cargoSlug)
+  const { data, isPending, error, refetch } = useCargoQuery(
+    concursoSlug,
+    cargoSlug,
+  )
 
   return (
     /* Com o player embutido (prova/re-tentativa), a página troca para altura
@@ -199,7 +212,10 @@ function CargoPage() {
 
 /** Back-link ao concurso — o título do concurso encolhe até aqui
  *  (view transition compartilhada). Label null → silhueta de loading. */
-function ConcursoBackLink(props: { concursoSlug: string; label: string | null }) {
+function ConcursoBackLink(props: {
+  concursoSlug: string
+  label: string | null
+}) {
   return (
     <Link
       to="/concursos/$concursoSlug"
@@ -212,7 +228,10 @@ function ConcursoBackLink(props: { concursoSlug: string; label: string | null })
       {props.label != null ? (
         <span className="truncate">{props.label}</span>
       ) : (
-        <span aria-hidden className="h-4 w-40 animate-pulse rounded bg-slate-200" />
+        <span
+          aria-hidden
+          className="h-4 w-40 animate-pulse rounded bg-slate-200"
+        />
       )}
     </Link>
   )
@@ -287,12 +306,15 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
       ? (treinoOptions.all.find((o) => o.examBaseId === trainingSel) ?? null)
       : null
   const trainingSession =
-    training != null ? (latestTrainingByExamBase.get(training.examBaseId) ?? null) : null
+    training != null
+      ? (latestTrainingByExamBase.get(training.examBaseId) ?? null)
+      : null
 
   /* Ponto de estudo em foco (3º nível): o header vira o ponto (matéria +
    * título + concluir) e o breadcrumb desce para "← Estudo". */
   const [studyFocusId, setStudyFocusId] = useState<string | null>(null)
-  const studyFocus = training != null && trainingSession != null ? studyFocusId : null
+  const studyFocus =
+    training != null && trainingSession != null ? studyFocusId : null
 
   /* Morph do título do ponto (card ↔ header): o item clicado recebe o
    * view-transition-name ANTES do snapshot (flushSync) e o mantém depois de
@@ -313,7 +335,8 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
     })
   }
 
-  const bancaName = concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
+  const bancaName =
+    concurso.examBoard?.alias ?? concurso.examBoard?.name ?? null
   const examDate = cargo.examDate
   const cut = toPercent(cargo.minPassingGrade)
 
@@ -337,7 +360,8 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
     {
       icon: TicketIcon,
       label: 'Taxa de inscrição',
-      value: cargo.registrationFee != null ? formatBRL(cargo.registrationFee) : null,
+      value:
+        cargo.registrationFee != null ? formatBRL(cargo.registrationFee) : null,
     },
     {
       icon: FlagIcon,
@@ -465,7 +489,9 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
           {/* ░░ Coluna principal ░░ */}
           <div className="flex flex-col gap-4 lg:col-span-2">
             <section {...enter(1)} className={`${CARD} p-5 sm:p-6`}>
-              <h2 className="text-base font-bold text-slate-900">Sobre a vaga</h2>
+              <h2 className="text-base font-bold text-slate-900">
+                Sobre a vaga
+              </h2>
               <p className="mt-0.5 text-sm text-slate-500">
                 O que o edital diz sobre o trabalho deste cargo
               </p>
@@ -473,23 +499,24 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
                 <DescriptionBlock text={cargo.description} />
               ) : (
                 <p className="mt-3 text-sm text-slate-500">
-                  A descrição das atribuições desta vaga ainda não foi cadastrada
-                  no edital.
+                  A descrição das atribuições desta vaga ainda não foi
+                  cadastrada no edital.
                 </p>
               )}
 
               {/* Requisitos: callout de destaque (curto e decisivo p/ o candidato) */}
-              {cargo.requirements != null && cargo.requirements.trim() !== '' && (
-                <div className="mt-4 rounded-xl bg-cyan-50/70 p-4 ring-1 ring-inset ring-cyan-100">
-                  <div className="flex items-center gap-2">
-                    <AcademicCapIcon className="h-5 w-5 shrink-0 text-cyan-600" />
-                    <h3 className="text-sm font-bold text-cyan-900">
-                      Requisitos para assumir
-                    </h3>
+              {cargo.requirements != null &&
+                cargo.requirements.trim() !== '' && (
+                  <div className="mt-4 rounded-xl bg-cyan-50/70 p-4 ring-1 ring-inset ring-cyan-100">
+                    <div className="flex items-center gap-2">
+                      <AcademicCapIcon className="h-5 w-5 shrink-0 text-cyan-600" />
+                      <h3 className="text-sm font-bold text-cyan-900">
+                        Requisitos para assumir
+                      </h3>
+                    </div>
+                    <RequirementsBody text={cargo.requirements} />
                   </div>
-                  <RequirementsBody text={cargo.requirements} />
-                </div>
-              )}
+                )}
             </section>
 
             {concurso.status !== 'past' && syllabusGroups.length > 0 && (
@@ -522,7 +549,7 @@ function CargoContent(props: { data: CargoDetail; concursoSlug: string }) {
               title="Ficha do cargo"
               hero={fichaHero}
               rows={ficha}
-              editalUrl={cargo.editalUrl}
+              links={[{ href: cargo.editalUrl, label: 'Ver edital oficial' }]}
               enterIdx={2}
               viewTransitionName="ficha-card"
             />
@@ -556,7 +583,10 @@ function splitEditalItems(text: string): Array<string> {
     .map((t) =>
       t
         .trim()
-        .replace(/^(?:[-–—]|\d{1,2}\s*[.)]|[a-z]\s*[.)]|[IVXLCDM]{1,6}\s*[-–—.)])\s*/i, '')
+        .replace(
+          /^(?:[-–—]|\d{1,2}\s*[.)]|[a-z]\s*[.)]|[IVXLCDM]{1,6}\s*[-–—.)])\s*/i,
+          '',
+        )
         .trim()
         .replace(/[.;,]+$/, '')
         .trim(),
@@ -626,7 +656,8 @@ function DescriptionBlock(props: { text: string }) {
 
   /* Só colapsa quando esconde de verdade (≥3 itens a mais que o preview). */
   const collapsible = items.length > DESCRIPTION_PREVIEW + 2
-  const shown = collapsible && !expanded ? items.slice(0, DESCRIPTION_PREVIEW) : items
+  const shown =
+    collapsible && !expanded ? items.slice(0, DESCRIPTION_PREVIEW) : items
 
   return (
     <>
@@ -887,8 +918,15 @@ function TreinoTab(props: {
   morphExamBaseId?: string | null
   onTrain: (examBaseId: string) => void
 }) {
-  const { official, recommended, sessionByExamBase, cut, meters, morphExamBaseId, onTrain } =
-    props
+  const {
+    official,
+    recommended,
+    sessionByExamBase,
+    cut,
+    meters,
+    morphExamBaseId,
+    onTrain,
+  } = props
 
   // Sem prova oficial treinável e sem recomendadas → empty state.
   const officialTrainable = official != null && official.questionCount > 0
@@ -899,8 +937,8 @@ function TreinoTab(props: {
           Ainda não há provas para treinar este cargo
         </h2>
         <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">
-          Enquanto cadastramos as questões, você pode treinar por outro
-          concurso do mesmo cargo.
+          Enquanto cadastramos as questões, você pode treinar por outro concurso
+          do mesmo cargo.
         </p>
         <Link
           to="/concursos"
@@ -947,11 +985,16 @@ function TrainingHeader(props: {
 }) {
   const { concursoTitle, role, option, cut, meters, onBack } = props
   const score =
-    option.studyPlan.bestScore != null ? Math.round(option.studyPlan.bestScore) : null
+    option.studyPlan.bestScore != null
+      ? Math.round(option.studyPlan.bestScore)
+      : null
   const passing = score != null && cut != null && score >= cut
 
   return (
-    <header {...enter(0)} className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3">
+    <header
+      {...enter(0)}
+      className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-3"
+    >
       <BackSquare aria-label={`Voltar às provas de ${role}`} onClick={onBack} />
       <div className="min-w-0 flex-1 basis-48">
         {/* Subtítulo composto: o subtítulo do concurso e o h1 do cargo do
@@ -964,7 +1007,10 @@ function TrainingHeader(props: {
             {concursoTitle}
           </span>
           <span aria-hidden>·</span>
-          <span style={{ viewTransitionName: 'cargo-heading' }} className="truncate">
+          <span
+            style={{ viewTransitionName: 'cargo-heading' }}
+            className="truncate"
+          >
             {role}
           </span>
         </p>
@@ -985,13 +1031,27 @@ function TrainingHeader(props: {
           <p className="flex items-baseline justify-between text-xs font-semibold text-slate-600">
             <span>Prontidão</span>
             <span className="tabular-nums">
-              <span className={passing ? 'font-bold text-emerald-600' : 'font-bold text-slate-900'}>
+              <span
+                className={
+                  passing
+                    ? 'font-bold text-emerald-600'
+                    : 'font-bold text-slate-900'
+                }
+              >
                 {score}%
               </span>
-              {cut != null && !passing && <span> · faltam {cut - score} pts</span>}
+              {cut != null && !passing && (
+                <span> · faltam {cut - score} pts</span>
+              )}
             </span>
           </p>
-          <ReadinessBar value={score} cut={cut} meters={meters} size="sm" className="mt-1" />
+          <ReadinessBar
+            value={score}
+            cut={cut}
+            meters={meters}
+            size="sm"
+            className="mt-1"
+          />
         </div>
       )}
     </header>
@@ -1028,7 +1088,12 @@ function metaLine(
 function splitTopics(topics: string): Array<string> {
   return topics
     .split(/;|\n|•/)
-    .map((t) => t.trim().replace(/[.;,]+$/, '').trim())
+    .map((t) =>
+      t
+        .trim()
+        .replace(/[.;,]+$/, '')
+        .trim(),
+    )
     .filter((t) => t !== '')
 }
 
@@ -1057,15 +1122,25 @@ function SyllabusSection(props: {
       ? 'count'
       : null
   const valueOf = (g: CargoDetail['syllabusGroups'][number]) =>
-    metric === 'score' ? Number(g.maxScore) : metric === 'count' ? (g.questionCount ?? 0) : 0
+    metric === 'score'
+      ? Number(g.maxScore)
+      : metric === 'count'
+        ? (g.questionCount ?? 0)
+        : 0
 
   const groups = metric
     ? base.sort((a, b) => valueOf(b) - valueOf(a) || a.order - b.order)
     : base.sort((a, b) => a.order - b.order)
   const total = groups.reduce((acc, g) => acc + valueOf(g), 0)
 
-  const totalQuestions = groups.reduce((acc, g) => acc + (g.questionCount ?? 0), 0)
-  const totalScore = groups.reduce((acc, g) => acc + (Number(g.maxScore) || 0), 0)
+  const totalQuestions = groups.reduce(
+    (acc, g) => acc + (g.questionCount ?? 0),
+    0,
+  )
+  const totalScore = groups.reduce(
+    (acc, g) => acc + (Number(g.maxScore) || 0),
+    0,
+  )
   const totalLine = [
     totalQuestions > 0
       ? `${totalQuestions} ${totalQuestions === 1 ? 'questão' : 'questões'}`
@@ -1081,7 +1156,10 @@ function SyllabusSection(props: {
       style={e.style}
       className={`${e.className} ${CARD} p-5 sm:p-6`}
     >
-      <h2 id="programatico-heading" className="text-base font-bold text-slate-900">
+      <h2
+        id="programatico-heading"
+        className="text-base font-bold text-slate-900"
+      >
         Conteúdo programático
       </h2>
       <p className="mt-0.5 text-sm text-slate-500">
@@ -1335,7 +1413,10 @@ function CompetitionSection(props: {
     >
       <div className="flex items-center gap-2">
         <ChartBarIcon className="h-4 w-4 text-slate-400" />
-        <h2 id="concorrencia-heading" className="text-base font-bold text-slate-900">
+        <h2
+          id="concorrencia-heading"
+          className="text-base font-bold text-slate-900"
+        >
           Concorrência histórica
         </h2>
       </div>
@@ -1368,9 +1449,13 @@ function CompetitionSection(props: {
                   key={ed.examBaseId}
                   className="border-b border-slate-50 transition-colors last:border-0 hover:bg-slate-50/60"
                 >
-                  <td className="py-2.5 font-semibold text-slate-800">{ed.year}</td>
+                  <td className="py-2.5 font-semibold text-slate-800">
+                    {ed.year}
+                  </td>
                   <td className="py-2.5 text-right tabular-nums text-slate-600">
-                    {ed.applicantCount != null ? integer.format(ed.applicantCount) : '—'}
+                    {ed.applicantCount != null
+                      ? integer.format(ed.applicantCount)
+                      : '—'}
                   </td>
                   <td className="py-2.5 text-right tabular-nums text-slate-600">
                     {ed.perVacancy != null ? `${ed.perVacancy} / vaga` : '—'}
@@ -1405,7 +1490,10 @@ function PreviousExamsCard(props: {
       style={e.style}
       className={`${e.className} ${CARD} p-5`}
     >
-      <h2 id="provas-anteriores-heading" className="text-sm font-bold text-slate-900">
+      <h2
+        id="provas-anteriores-heading"
+        className="text-sm font-bold text-slate-900"
+      >
         Provas anteriores
       </h2>
       <p className="mt-1 text-sm leading-6 text-slate-600">
@@ -1425,7 +1513,8 @@ function PreviousExamsCard(props: {
                 Prova {exam.year}
                 {exam.questionCount > 0 && (
                   <span className="font-normal text-slate-400">
-                    {' '}· {exam.questionCount}{' '}
+                    {' '}
+                    · {exam.questionCount}{' '}
                     {exam.questionCount === 1 ? 'questão' : 'questões'}
                   </span>
                 )}
@@ -1488,7 +1577,9 @@ function CargoErrorState(props: {
       </span>
       <div>
         <h1 className="text-lg font-bold text-slate-900">
-          {notFound ? 'Cargo não encontrado' : 'Não foi possível carregar o cargo'}
+          {notFound
+            ? 'Cargo não encontrado'
+            : 'Não foi possível carregar o cargo'}
         </h1>
         <p className="mx-auto mt-1 max-w-sm text-sm leading-6 text-slate-500">
           {notFound

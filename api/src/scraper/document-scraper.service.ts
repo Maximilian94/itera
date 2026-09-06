@@ -26,6 +26,26 @@ export const SCRAPED_DOCUMENT_KINDS = [
 
 export type ScrapedDocumentKind = (typeof SCRAPED_DOCUMENT_KINDS)[number];
 
+/** O documento que vira o "Ver edital original" da ficha do concurso. */
+export const EDITAL_ABERTURA_KIND: ScrapedDocumentKind = 'EDITAL_ABERTURA';
+
+/**
+ * Home "pelada" (domínio sem caminho) — mesmo critério do `cleanConcursoUrl` da
+ * descoberta: lá não mora edital nenhum. O classificador às vezes marca o link
+ * da home da banca como EDITAL_ABERTURA, e prometer "Ver edital original" para
+ * cair na home é pior que não mostrar botão. (Função local em vez de importar a
+ * da descoberta — aquele módulo depende DESTE serviço; importar de volta faria
+ * ciclo.)
+ */
+export function isBareHome(v: string): boolean {
+  try {
+    const u = new URL(v);
+    return u.pathname.replace(/\/+$/, '') === '' && !u.search;
+  } catch {
+    return false;
+  }
+}
+
 export interface ScrapedDocument {
   /** Nome do documento como aparece na página */
   name: string;
@@ -268,6 +288,11 @@ export class DocumentScraperService {
   /**
    * Adiciona (upsert por concursoId+url) os documentos escolhidos pelo admin à
    * timeline de Notícias. Idempotente — repetir não duplica.
+   *
+   * Também promove o edital de abertura a `Concurso.editalUrl` quando o campo
+   * está vazio: o link já estava aqui, só não subia para a ficha. Um concurso
+   * vindo da descoberta cuja notícia não citava o edital ficava sem link para
+   * sempre, mesmo com o edital visível na timeline ao lado.
    */
   async addConcursoDocuments(
     concursoId: string,
@@ -278,14 +303,15 @@ export class DocumentScraperService {
       kind?: string | null;
       publishedAt?: string | null;
     }[],
-  ): Promise<{ addedCount: number }> {
+  ): Promise<{ addedCount: number; editalUrlFilled: string | null }> {
     const concurso = await this.prisma.concurso.findUnique({
       where: { id: concursoId },
-      select: { id: true, documentsSourceUrl: true },
+      select: { id: true, documentsSourceUrl: true, editalUrl: true },
     });
     if (!concurso) throw new NotFoundException('concurso not found');
 
     let addedCount = 0;
+    const editais: { url: string; publishedAt: Date | null }[] = [];
     for (const doc of documents) {
       const url = doc.url?.trim();
       if (!url) continue;
@@ -305,8 +331,56 @@ export class DocumentScraperService {
         update: data,
       });
       addedCount++;
+      if (data.kind === EDITAL_ABERTURA_KIND)
+        editais.push({ url, publishedAt: data.publishedAt });
     }
-    return { addedCount };
+
+    const editalUrlFilled = await this.fillEditalUrl(
+      concursoId,
+      concurso.editalUrl,
+      editais,
+    );
+    return { addedCount, editalUrlFilled };
+  }
+
+  /**
+   * Grava o edital de abertura em `Concurso.editalUrl` — **só quando o campo
+   * está vazio**, mesma convenção da leitura da notícia (`extractNewsForConcurso`):
+   * a classificação por IA nunca sobrescreve o que o admin colou à mão.
+   *
+   * Havendo mais de um edital de abertura no lote, vence o publicado mais
+   * recentemente (um consolidado republicado substitui o original); sem data,
+   * a ordem da lista decide.
+   */
+  private async fillEditalUrl(
+    concursoId: string,
+    currentUrl: string | null,
+    editais: { url: string; publishedAt: Date | null }[],
+  ): Promise<string | null> {
+    if (currentUrl != null && currentUrl.trim().length > 0) return null;
+    const best = editais
+      .filter((e) => !isBareHome(e.url))
+      .reduce<{
+        url: string;
+        publishedAt: Date | null;
+      } | null>(
+        (acc, e) =>
+          acc == null ||
+          (e.publishedAt != null &&
+            (acc.publishedAt == null || e.publishedAt > acc.publishedAt))
+            ? e
+            : acc,
+        null,
+      );
+    if (best == null) return null;
+    await this.prisma.concurso.update({
+      where: { id: concursoId },
+      data: { editalUrl: best.url },
+    });
+    this.logger.log(
+      `concurso ${concursoId}: edital de abertura vinculado à ficha (${best.url})`,
+    );
+    return best.url;
   }
 
   async scrapeDocuments(
