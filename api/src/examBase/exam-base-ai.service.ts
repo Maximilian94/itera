@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { jsonrepair } from 'jsonrepair';
 import { decodeHtmlBody } from '../common/decode-body';
 import type { AiUsageMeter } from '../common/ai-cost';
+import { buildFocusedText } from './focused-text';
 import { PdfOcrService } from '../pdf/pdf-ocr.service';
 import type {
   ExtractedCargoFicha,
@@ -88,6 +89,10 @@ Você receberá o texto de um edital. Para CADA cargo da lista abaixo, localize 
 Onde procurar: as atribuições costumam ficar num ANEXO no fim do edital (ex.: "ANEXO — ATRIBUIÇÕES DOS CARGOS"), sob um cabeçalho com o nome do cargo, como uma lista de 10 a 25 itens/frases. Copie TODOS os itens, até o último (geralmente "Realizar outras atividades inerentes à profissão...").
 Sinal de erro: se a sua description tem só 1-2 frases mas o edital lista muitos itens para o cargo, você resumiu — isso é PROIBIDO; volte ao texto e copie a lista inteira. Comprimento não é problema: transcrições longas são o resultado esperado.
 
+NÃO CONFUNDA COM O CONTEÚDO PROGRAMÁTICO. O edital também traz um anexo com as MATÉRIAS DA PROVA ("Língua Portuguesa", "Raciocínio Lógico", "Legislação do SUS", "Conhecimentos Específicos") e seus tópicos de estudo. Isso é o que o candidato vai ESTUDAR, não o que ele vai FAZER no cargo — nunca é description. Se o único trecho que você encontrou para o cargo é uma lista de matérias/assuntos de prova, retorne description: null.
+
+CARGOS DE NOME PARECIDO SÃO CARGOS DIFERENTES. "Enfermeiro", "Enfermeiro Plantonista" e "Enfermeiro do Trabalho" têm seções próprias: use a seção do cargo EXATO que você está transcrevendo e não reaproveite o texto de um para o outro. Se o edital só descreve as atribuições de um deles, retorne null para os demais em vez de copiar o do vizinho.
+
 Cargos a transcrever (use o campo "role" EXATAMENTE como listado aqui):
 {{ROLES}}
 
@@ -136,6 +141,20 @@ ATENÇÃO ÀS TABELAS: no texto extraído do PDF o quadro de vagas/salários cos
 Retorne apenas o JSON, no formato:
 {"cargos":[{"role":"Enfermeiro","salaryBase":"4750.00","vacancyCount":12,"registrationFee":"110.00","minPassingGradeNonQuota":"60.00","workload":"40 horas semanais","requirements":"Superior em Enfermagem e registro no COREN","hasReserveList":true,"isNursingRelevant":true}]}
 `.trim();
+
+/**
+ * Chave de casamento entre o `role` que o modelo devolveu e o cargo salvo.
+ * O modelo às vezes reescreve "Enfermeiro - 40h" como "Enfermeiro – 40 h";
+ * comparar só com `toLowerCase()` perdia a ficha inteira desses cargos.
+ */
+function normalizeRole(role: string): string {
+  return role
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
 
 @Injectable()
 export class ExamBaseAiService {
@@ -211,10 +230,18 @@ export class ExamBaseAiService {
     // paralelos. Lote que falhar não derruba a extração — os cargos dele
     // seguem para o retry e, no limite, ficam sem description (o admin vê o
     // campo vazio no form de revisão em vez de um resumo inventado).
+    const allRoles = cargos.map((c) => c.role);
+    // Cargos de enfermagem vão SOZINHOS na chamada — são os que a plataforma
+    // exibe e os que mais colidem entre si ("Enfermeiro" vs "Enfermeiro
+    // Plantonista"). Num lote compartilhado eles disputam o orçamento de texto
+    // e o modelo mistura as seções; sozinho, cada um leva o recorte inteiro.
     const BATCH_SIZE = 8;
-    const batches: string[][] = [];
-    for (let i = 0; i < cargos.length; i += BATCH_SIZE) {
-      batches.push(cargos.slice(i, i + BATCH_SIZE).map((c) => c.role));
+    const batches: string[][] = cargos
+      .filter((c) => c.isNursingRelevant)
+      .map((c) => [c.role]);
+    const others = cargos.filter((c) => !c.isNursingRelevant);
+    for (let i = 0; i < others.length; i += BATCH_SIZE) {
+      batches.push(others.slice(i, i + BATCH_SIZE).map((c) => c.role));
     }
     const applyFichas = (
       fichas: {
@@ -224,10 +251,10 @@ export class ExamBaseAiService {
       }[],
     ) => {
       const fichaByRole = new Map(
-        fichas.map((f) => [f.role.trim().toLowerCase(), f]),
+        fichas.map((f) => [normalizeRole(f.role), f]),
       );
       for (const cargo of cargos) {
-        const ficha = fichaByRole.get(cargo.role.toLowerCase());
+        const ficha = fichaByRole.get(normalizeRole(cargo.role));
         if (!ficha) continue;
         if (ficha.description) cargo.description = ficha.description;
         if (ficha.requirements) cargo.requirements = ficha.requirements;
@@ -238,7 +265,9 @@ export class ExamBaseAiService {
       (
         await Promise.all(
           batches.map((roles) =>
-            this.extractFichasLiterais(text, roles).catch(() => []),
+            this.extractFichasLiterais(text, roles, undefined, allRoles).catch(
+              () => [],
+            ),
           ),
         )
       ).flat(),
@@ -246,17 +275,27 @@ export class ExamBaseAiService {
 
     // Retry: cargos ainda sem atribuições ganham uma segunda rodada em lotes
     // menores (melhor recall num edital de centenas de milhares de chars).
-    const pendentes = cargos.filter((c) => !c.description).map((c) => c.role);
+    const pendentes = cargos.filter((c) => !c.description);
     if (pendentes.length > 0) {
-      const retryBatches: string[][] = [];
-      for (let i = 0; i < pendentes.length; i += 4) {
-        retryBatches.push(pendentes.slice(i, i + 4));
+      const retryBatches: string[][] = pendentes
+        .filter((c) => c.isNursingRelevant)
+        .map((c) => [c.role]);
+      const rest = pendentes
+        .filter((c) => !c.isNursingRelevant)
+        .map((c) => c.role);
+      for (let i = 0; i < rest.length; i += 4) {
+        retryBatches.push(rest.slice(i, i + 4));
       }
       applyFichas(
         (
           await Promise.all(
             retryBatches.map((roles) =>
-              this.extractFichasLiterais(text, roles).catch(() => []),
+              this.extractFichasLiterais(
+                text,
+                roles,
+                undefined,
+                allRoles,
+              ).catch(() => []),
             ),
           )
         ).flat(),
@@ -273,6 +312,8 @@ export class ExamBaseAiService {
         cargo.syllabusGroups = await this.extractSyllabusForCargo(
           text,
           cargo.role,
+          undefined,
+          allRoles,
         ).catch(() => []);
       }),
     );
@@ -294,16 +335,20 @@ export class ExamBaseAiService {
     editalText: string,
     role: string,
     meter?: AiUsageMeter,
+    allRoles?: string[],
   ): Promise<ExtractedSyllabusGroup[]> {
     const parsed = await this.callOpenAI<{
       syllabusGroups?: unknown;
-    }>(this.buildFocusedText(editalText, [role]), {
-      meter,
-      costLabel: `quadro de matérias — ${role}`,
-      systemPrompt: SYLLABUS_PROMPT.replace('{{ROLE}}', role),
-      maxTokens: 16_384,
-      maxChars: 400_000,
-    });
+    }>(
+      buildFocusedText(editalText, [role], { allRoles, purpose: 'syllabus' }),
+      {
+        meter,
+        costLabel: `quadro de matérias — ${role}`,
+        systemPrompt: SYLLABUS_PROMPT.replace('{{ROLE}}', role),
+        maxTokens: 16_384,
+        maxChars: 400_000,
+      },
+    );
     const raw = Array.isArray(parsed.syllabusGroups)
       ? parsed.syllabusGroups
       : [];
@@ -344,61 +389,6 @@ export class ExamBaseAiService {
   }
 
   /**
-   * Recorta do edital só as janelas de texto onde os cargos do lote aparecem
-   * (o anexo de atribuições repete o nome do cargo como cabeçalho). Palheiro
-   * menor = recall muito melhor do que mandar as 372k chars inteiras.
-   */
-  private buildFocusedText(text: string, roles: string[]): string {
-    const upper = text.toUpperCase();
-    const windows: [number, number][] = [];
-    const addWindows = (needle: string) => {
-      const hits: number[] = [];
-      let from = 0;
-      while (true) {
-        const idx = upper.indexOf(needle, from);
-        if (idx === -1) break;
-        hits.push(idx);
-        from = idx + needle.length;
-      }
-      // O anexo de atribuições mora no FIM do edital, mas o cargo aparece
-      // muitas vezes ANTES (tabelas de vagas/taxas, conteúdo programático).
-      // Cortar só as primeiras ocorrências decapitava o anexo → mantém as
-      // primeiras E as últimas.
-      const kept =
-        hits.length > 8 ? [...hits.slice(0, 4), ...hits.slice(-4)] : hits;
-      for (const idx of kept) {
-        windows.push([
-          Math.max(0, idx - 2_000),
-          Math.min(text.length, idx + 8_000),
-        ]);
-      }
-      return hits.length;
-    };
-    for (const role of roles) {
-      const hits = addWindows(role.toUpperCase());
-      if (hits === 0) {
-        // "Motorista - Categoria B" pode aparecer sem o hífen no anexo:
-        // cai para o token mais longo do nome (>=5 letras).
-        const token = role
-          .toUpperCase()
-          .split(/[^A-ZÁÉÍÓÚÂÊÔÃÕÇ]+/)
-          .filter((t) => t.length >= 5)
-          .sort((a, b) => b.length - a.length)[0];
-        if (token) addWindows(token);
-      }
-    }
-    if (windows.length === 0) return text;
-    windows.sort((a, b) => a[0] - b[0]);
-    const merged: [number, number][] = [];
-    for (const w of windows) {
-      const last = merged[merged.length - 1];
-      if (last && w[0] <= last[1]) last[1] = Math.max(last[1], w[1]);
-      else merged.push([w[0], w[1]]);
-    }
-    return merged.map(([s, e]) => text.slice(s, e)).join('\n[...]\n');
-  }
-
-  /**
    * Fase 2 da extração de edital: para um LOTE de cargos, transcreve do texto
    * do edital os requisitos e as atribuições EXATAMENTE como escritos.
    *
@@ -410,6 +400,7 @@ export class ExamBaseAiService {
     editalText: string,
     roles: string[],
     meter?: AiUsageMeter,
+    allRoles?: string[],
   ): Promise<
     { role: string; requirements: string | null; description: string | null }[]
   > {
@@ -419,7 +410,7 @@ export class ExamBaseAiService {
         requirements?: string | null;
         description?: string | null;
       }[];
-    }>(this.buildFocusedText(editalText, roles), {
+    }>(buildFocusedText(editalText, roles, { allRoles, purpose: 'fichas' }), {
       meter,
       costLabel: `fichas literais (${roles.length} cargo${roles.length > 1 ? 's' : ''})`,
       systemPrompt: FICHAS_PROMPT.replace(
@@ -483,7 +474,11 @@ export class ExamBaseAiService {
           : null;
     const decimal = (v: unknown): string | null => {
       if (typeof v === 'number' && Number.isFinite(v)) return v.toFixed(2);
-      if (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)))
+      if (
+        typeof v === 'string' &&
+        v.trim() !== '' &&
+        Number.isFinite(Number(v))
+      )
         return Number(v).toFixed(2);
       return null;
     };
