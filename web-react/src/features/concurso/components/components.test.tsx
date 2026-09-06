@@ -78,7 +78,9 @@ describe('FichaCard', () => {
           },
           { icon: AcademicCapIcon, label: 'Jornada', value: null },
         ]}
-        editalUrl="https://example.com/edital.pdf"
+        links={[
+          { href: 'https://example.com/edital.pdf', label: 'Ver edital' },
+        ]}
         enterIdx={0}
       />,
     )
@@ -87,30 +89,51 @@ describe('FichaCard', () => {
     expect(screen.queryByText(/não informado/i)).toBeNull()
   })
 
-  it('esconde o botão de edital quando editalUrl é null', () => {
+  it('esconde o link cujo href é null e mantém os demais', () => {
     const { rerender } = render(
       <FichaCard
         title="Ficha"
         hero={hero}
         rows={[]}
-        editalUrl="https://example.com/e.pdf"
+        links={[
+          { href: 'https://example.com/e.pdf', label: 'Ver edital original' },
+          { href: null, label: 'Link oficial da organizadora' },
+        ]}
         enterIdx={0}
       />,
     )
     expect(
-      screen.getByText('Ver edital oficial').closest('a')?.getAttribute('href'),
+      screen
+        .getByText('Ver edital original')
+        .closest('a')
+        ?.getAttribute('href'),
     ).toBe('https://example.com/e.pdf')
+    expect(screen.queryByText('Link oficial da organizadora')).toBeNull()
 
     rerender(
+      <FichaCard title="Ficha" hero={hero} rows={[]} links={[]} enterIdx={0} />,
+    )
+    expect(screen.queryByText('Ver edital original')).toBeNull()
+  })
+
+  it('dedupe links repetidos — edital que é a própria página da origem', () => {
+    render(
       <FichaCard
         title="Ficha"
         hero={hero}
         rows={[]}
-        editalUrl={null}
+        links={[
+          { href: 'https://banca.org/c', label: 'Ver edital original' },
+          {
+            href: 'https://banca.org/c',
+            label: 'Link oficial da organizadora',
+          },
+        ]}
         enterIdx={0}
       />,
     )
-    expect(screen.queryByText('Ver edital oficial')).toBeNull()
+    expect(screen.getAllByRole('link')).toHaveLength(1)
+    expect(screen.getByText('Ver edital original')).toBeTruthy()
   })
 
   it('mantém a semântica dl/dt/dd', () => {
@@ -119,7 +142,7 @@ describe('FichaCard', () => {
         title="Ficha"
         hero={hero}
         rows={[{ icon: AcademicCapIcon, label: 'Jornada', value: '40h' }]}
-        editalUrl={null}
+        links={[]}
         enterIdx={0}
       />,
     )
@@ -144,7 +167,11 @@ describe('VerticalTimeline', () => {
             state: 'done',
           },
           { label: 'Prova objetiva', startIso: null, state: 'upcoming' },
-          { label: 'Resultado final', startIso: '2026-09-30', state: 'upcoming' },
+          {
+            label: 'Resultado final',
+            startIso: '2026-09-30',
+            state: 'upcoming',
+          },
         ]}
       />,
     )
@@ -168,14 +195,20 @@ describe('VerticalTimeline', () => {
             state: 'upcoming',
             major: false,
           },
-          { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'upcoming' },
+          {
+            label: 'Prova Objetiva',
+            startIso: '2026-09-06',
+            state: 'upcoming',
+          },
         ]}
         keepUndated
       />,
     )
     // Colapsado: só os marcos.
     expect(container.querySelectorAll('ol li')).toHaveLength(2)
-    expect(screen.queryByText('Data limite para pagamento do boleto')).toBeNull()
+    expect(
+      screen.queryByText('Data limite para pagamento do boleto'),
+    ).toBeNull()
 
     const toggle = screen.getByRole('button', {
       name: 'Ver cronograma completo (3 etapas)',
@@ -184,8 +217,12 @@ describe('VerticalTimeline', () => {
     fireEvent.click(toggle)
 
     expect(container.querySelectorAll('ol li')).toHaveLength(3)
-    expect(screen.getByText('Data limite para pagamento do boleto')).toBeTruthy()
-    expect(screen.getByRole('button', { name: 'Mostrar só os marcos' })).toBeTruthy()
+    expect(
+      screen.getByText('Data limite para pagamento do boleto'),
+    ).toBeTruthy()
+    expect(
+      screen.getByRole('button', { name: 'Mostrar só os marcos' }),
+    ).toBeTruthy()
   })
 
   it('etapa corrente aparece mesmo sendo burocrática; sem escondidas não há botão', () => {
@@ -224,7 +261,11 @@ describe('VerticalTimeline', () => {
             endIso: '2026-08-17',
             state: 'current',
           },
-          { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'upcoming' },
+          {
+            label: 'Prova Objetiva',
+            startIso: '2026-09-06',
+            state: 'upcoming',
+          },
         ]}
       />,
     )
@@ -246,7 +287,11 @@ describe('VerticalTimeline', () => {
       <VerticalTimeline
         steps={[
           { label: 'Prova Objetiva', startIso: '2026-09-06', state: 'current' },
-          { label: 'Resultado final', startIso: '2026-10-23', state: 'upcoming' },
+          {
+            label: 'Resultado final',
+            startIso: '2026-10-23',
+            state: 'upcoming',
+          },
         ]}
       />,
     )
@@ -260,7 +305,9 @@ describe('isEtapaMajor', () => {
     expect(isEtapaMajor('Inscrições')).toBe(true)
     expect(isEtapaMajor('Prova Objetiva')).toBe(true)
     expect(isEtapaMajor('Realização da prova prática')).toBe(true)
-    expect(isEtapaMajor('Divulgação de gabarito das provas objetivas')).toBe(true)
+    expect(isEtapaMajor('Divulgação de gabarito das provas objetivas')).toBe(
+      true,
+    )
     // Homologação final vence a regra de "retificação".
     expect(
       isEtapaMajor(
@@ -274,9 +321,13 @@ describe('isEtapaMajor', () => {
     expect(
       isEtapaMajor('Data limite para pagamento do boleto da taxa de inscrição'),
     ).toBe(false)
-    expect(isEtapaMajor('Divulgação da relação de candidatos inscritos')).toBe(false)
+    expect(isEtapaMajor('Divulgação da relação de candidatos inscritos')).toBe(
+      false,
+    )
     expect(
-      isEtapaMajor('Prazo de recursos em relação ao gabarito das provas objetivas'),
+      isEtapaMajor(
+        'Prazo de recursos em relação ao gabarito das provas objetivas',
+      ),
     ).toBe(false)
     expect(isEtapaMajor('Divulgação da Nota da Prova Prática')).toBe(false)
     expect(
@@ -312,7 +363,11 @@ describe('condenseEtapas', () => {
 
   it('metade sem par mantém a data que tiver', () => {
     const out = condenseEtapas([
-      { name: 'Prazo de recursos - fim', description: null, date: '2026-09-10' },
+      {
+        name: 'Prazo de recursos - fim',
+        description: null,
+        date: '2026-09-10',
+      },
     ])
     expect(out).toEqual([
       {
@@ -400,7 +455,12 @@ describe('buildConcursoTimelineSteps', () => {
         endIso: null,
         state: 'upcoming',
       },
-      { label: 'Resultado final', startIso: null, endIso: null, state: 'upcoming' },
+      {
+        label: 'Resultado final',
+        startIso: null,
+        endIso: null,
+        state: 'upcoming',
+      },
     ])
   })
 

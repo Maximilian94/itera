@@ -58,6 +58,14 @@ describe('página do concurso (nível 1)', () => {
     expect(screen.getByText('VUNESP')).toBeTruthy()
     expect(screen.getByText('12 + cadastro reserva')).toBeTruthy()
     expect(screen.getByText('Campinas / SP')).toBeTruthy()
+    // O edital original é o botão da ficha; sem documentsSourceUrl no payload,
+    // o link da organizadora nem aparece.
+    expect(
+      screen
+        .getByRole('link', { name: 'Ver edital original' })
+        .getAttribute('href'),
+    ).toBe('https://example.com/edital.pdf')
+    expect(screen.queryByText('Link oficial da organizadora')).toBeNull()
 
     // Cronograma: as etapas datadas do edital viram os passos da timeline.
     expect(screen.getByText('Cronograma')).toBeTruthy()

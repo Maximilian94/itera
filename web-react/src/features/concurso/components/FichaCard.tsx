@@ -1,4 +1,7 @@
-import { DocumentTextIcon } from '@heroicons/react/24/outline'
+import {
+  ArrowTopRightOnSquareIcon,
+  DocumentTextIcon,
+} from '@heroicons/react/24/outline'
 import { CARD } from './card'
 import { enter } from './motion'
 
@@ -9,19 +12,28 @@ export type FichaFact = {
   value: string | null
 }
 
+/** Link externo do rodapé da ficha (edital, página da organizadora...).
+ *  `href` null → o link some; quem monta a lista não precisa filtrar. */
+export type FichaLink = {
+  href: string | null
+  label: string
+  icon?: React.ComponentType<React.SVGProps<SVGSVGElement>>
+}
+
 /**
  * Ficha lateral: um fato-herói no topo (o dado que mais pesa na decisão)
  * e os demais como linhas com ícone + label sobre valor — valores longos
  * quebram alinhados à esquerda em vez de flutuar à direita.
- * Linhas com `value` null somem; sem `editalUrl`, o botão some.
+ * Linhas com `value` null somem; o mesmo vale para links sem `href`.
+ *
+ * O 1º link é o botão do card; os seguintes descem de peso (só texto),
+ * para o rodapé não virar uma pilha de botões concorrentes.
  */
 export function FichaCard(props: {
   title: string
   hero: FichaFact
   rows: Array<FichaFact>
-  editalUrl: string | null
-  /** Rótulo do botão de link; default "Ver edital oficial". */
-  editalLabel?: string
+  links: Array<FichaLink>
   enterIdx: number
   /** Nome da transição compartilhada (ex.: 'ficha-card') para morfar a ficha
    *  do concurso na ficha do cargo. */
@@ -29,6 +41,11 @@ export function FichaCard(props: {
 }) {
   const e = enter(props.enterIdx)
   const rows = props.rows.filter((r) => r.value != null)
+  // Dedupe por href: quando o edital É a página da organizadora, um link só.
+  const links = props.links.filter(
+    (l, i, all) =>
+      l.href != null && all.findIndex((o) => o.href === l.href) === i,
+  )
   return (
     <section
       style={{ ...e.style, viewTransitionName: props.viewTransitionName }}
@@ -76,16 +93,30 @@ export function FichaCard(props: {
         </dl>
       )}
 
-      {props.editalUrl != null && (
-        <a
-          href={props.editalUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-5 flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 no-underline transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2"
-        >
-          <DocumentTextIcon className="h-4 w-4" />
-          {props.editalLabel ?? 'Ver edital oficial'}
-        </a>
+      {links.length > 0 && (
+        <div className="mt-5 flex flex-col gap-1.5">
+          {links.map((link, i) => {
+            const Icon =
+              link.icon ??
+              (i === 0 ? DocumentTextIcon : ArrowTopRightOnSquareIcon)
+            return (
+              <a
+                key={link.href}
+                href={link.href!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={
+                  i === 0
+                    ? 'flex w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 no-underline transition-colors hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
+                    : 'flex w-full items-center justify-center gap-2 rounded-lg px-4 py-1.5 text-sm font-semibold text-slate-600 no-underline transition-colors hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-500 focus-visible:ring-offset-2'
+                }
+              >
+                <Icon className="h-4 w-4" />
+                {link.label}
+              </a>
+            )
+          })}
+        </div>
       )}
     </section>
   )
