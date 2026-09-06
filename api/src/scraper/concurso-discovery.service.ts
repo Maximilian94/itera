@@ -640,20 +640,16 @@ export class ConcursoDiscoveryService {
       select: { id: true, slug: true, institution: true },
     });
 
-    // Cargo default "Enfermeiro" (isNursingRelevant) p/ o concurso aparecer nos
-    // agregados de enfermagem e não ficar vazio. Só se ainda não tem cargo.
-    const cargoCount = await this.prisma.cargo.count({
-      where: { concursoId: concurso.id },
-    });
-    if (cargoCount === 0) {
-      await this.prisma.cargo.create({
-        data: {
-          concursoId: concurso.id,
-          role: 'Enfermeiro',
-          isNursingRelevant: true,
-        },
-      });
-    }
+    // ⚠️ NÃO cria cargo aqui. A fase 1 é cadastro sem IA: a listagem do
+    // pciconcursos não diz QUAIS cargos o certame tem, e o "Enfermeiro" default
+    // que existia aqui era um chute. Ele causava dano real: como o cargo já
+    // constava no snapshot, a análise do edital transcrevia as atribuições NELE
+    // — inclusive as de um cargo de nome parecido ("Enfermeiro de Unidade
+    // Básica de Saúde"), publicando ficha errada — enquanto o cargo verdadeiro
+    // nascia como "cargo novo" ao lado. Os cargos vêm da fase 5 (análise do
+    // edital), que é quem de fato sabe quais são. Concurso sem cargo fica fora
+    // do `listConcursos` (que exige cargo de enfermagem), o que é correto: ele
+    // é rascunho (`publishedAt: null`) e já não era público.
 
     return {
       concurso: updated,

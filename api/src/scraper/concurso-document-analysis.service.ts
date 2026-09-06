@@ -76,6 +76,7 @@ const NEW_CARGO_FIELDS = {
   minPassingGradeNonQuota: { type: 'decimal' },
   workload: { type: 'string' },
   requirements: { type: 'string' },
+  description: { type: 'string' },
   hasReserveList: { type: 'boolean' },
 } as const;
 
@@ -88,6 +89,10 @@ export interface ProposedNewCargo {
   minPassingGradeNonQuota: string | null;
   workload: string | null;
   requirements: string | null;
+  /** Atribuições literais. Vêm de uma 2ª passada focada, não do extrator de
+   *  ficha — o cargo novo não está no snapshot e por isso não é coberto pelo
+   *  `proposeFichasFromEdital`, que itera os cargos JÁ existentes. */
+  description: string | null;
   hasReserveList: boolean | null;
   isNursingRelevant: boolean;
   evidence: string | null;
@@ -102,6 +107,7 @@ export interface NewCargoInput {
   minPassingGradeNonQuota?: string | null;
   workload?: string | null;
   requirements?: string | null;
+  description?: string | null;
   hasReserveList?: boolean | null;
   isNursingRelevant?: boolean | null;
 }
@@ -239,6 +245,9 @@ function normalizeNewCargos(raw: unknown): ProposedNewCargo[] {
       minPassingGradeNonQuota: decimal(c.minPassingGradeNonQuota),
       workload: str(c.workload),
       requirements: str(c.requirements),
+      // O prompt de diff não transcreve atribuições (textos longos estouram a
+      // saída); quem preenche é o `fillFichasForNewCargos`, depois.
+      description: null,
       hasReserveList:
         typeof c.hasReserveList === 'boolean' ? c.hasReserveList : null,
       isNursingRelevant: c.isNursingRelevant === true,
@@ -388,7 +397,16 @@ export class ConcursoDocumentAnalysisService {
     // extrator focado da criação. Roda DEPOIS da extração de cargos para que a
     // versão literal (mais completa) vença no campo requirements/description.
     if (doc.kind === 'EDITAL_ABERTURA') {
-      await this.proposeFichasFromEdital(text, concurso, changes, meter);
+      // Os cargos que a extração acabou de revelar entram como `allRoles` do
+      // recorte: é o que impede um "Enfermeiro" existente de levar a seção do
+      // "Enfermeiro de Unidade Básica de Saúde" que o edital traz ao lado.
+      await this.proposeFichasFromEdital(
+        text,
+        concurso,
+        changes,
+        meter,
+        extractionNewCargos.map((c) => c.role),
+      );
     }
 
     // Cronograma proposto: etapas datadas extraídas do PDF. Só entra quando o
@@ -453,6 +471,12 @@ export class ConcursoDocumentAnalysisService {
       seenNewRole.add(key);
       return true;
     });
+    // Ficha literal dos cargos NOVOS de enfermagem. Sem isto, um cargo que o
+    // edital traz mas que ainda não existia no banco nasce SEM atribuições:
+    // `proposeFichasFromEdital` itera o snapshot, que foi carregado antes de
+    // sabermos que este cargo existe. Era o caso do "Enfermeiro de Unidade
+    // Básica de Saúde" — criado pela análise e eternamente sem `description`.
+    await this.fillFichasForNewCargos(text, newCargosList, concurso, meter);
     const newCargos = newCargosList.length > 0 ? newCargosList : null;
 
     const analyzedAt = new Date();
@@ -539,6 +563,41 @@ export class ConcursoDocumentAnalysisService {
   // ── internals ──────────────────────────────────────────────────────────
 
   /**
+   * Transcreve as atribuições/requisitos dos cargos NOVOS de enfermagem, in
+   * place. Contraparte do `proposeFichasFromEdital` para o outro lado da
+   * fronteira: aquele cobre quem já está no snapshot, este cobre quem o
+   * documento acabou de revelar. Uma chamada focada por cargo (normalmente 0-2);
+   * cargos fora da enfermagem não gastam chamada, como no resto do fluxo.
+   */
+  private async fillFichasForNewCargos(
+    text: string,
+    newCargos: ProposedNewCargo[],
+    ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
+    meter?: AiUsageMeter,
+  ): Promise<void> {
+    const nursing = newCargos.filter((c) => c.isNursingRelevant);
+    if (nursing.length === 0) return;
+    // `allRoles` = cargos existentes + os novos: é o que permite ao recorte
+    // distinguir "Enfermeiro" de "Enfermeiro de Unidade Básica de Saúde".
+    const allRoles = [
+      ...[...ctx.cargosByRole.values()].map((c) => c.role),
+      ...newCargos.map((c) => c.role),
+    ];
+    await Promise.all(
+      nursing.map(async (cargo) => {
+        const [ficha] = await this.examBaseAi
+          .extractFichasLiterais(text, [cargo.role], meter, allRoles)
+          .catch(() => []);
+        if (!ficha) return;
+        if (ficha.description) cargo.description = ficha.description;
+        // O requisito do quadro de vagas costuma ser mais curto que o literal;
+        // só sobrescreve quando o extrator literal de fato achou algo.
+        if (ficha.requirements) cargo.requirements = ficha.requirements;
+      }),
+    );
+  }
+
+  /**
    * Análise completa da ficha (só p/ EDITAL_ABERTURA): transcreve requisitos e
    * atribuições dos cargos de enfermagem com o extrator literal da criação do
    * concurso e mescla o resultado em `changes` (a transcrição literal vence a
@@ -549,6 +608,7 @@ export class ConcursoDocumentAnalysisService {
     ctx: Awaited<ReturnType<typeof this.loadSnapshot>>,
     changes: ProposedChange[],
     meter?: AiUsageMeter,
+    extraRoles: string[] = [],
   ): Promise<void> {
     const allCargos = [...ctx.cargosByRole.values()];
     const nursing = allCargos.filter((c) => c.isNursingRelevant);
@@ -556,7 +616,7 @@ export class ConcursoDocumentAnalysisService {
     // Uma chamada POR cargo: num lote compartilhado, cargos de nome parecido
     // ("Enfermeiro" vs "Enfermeiro Plantonista") disputam o recorte de texto e
     // o modelo devolve a ficha de um só — ou mistura as duas seções.
-    const allRoles = allCargos.map((c) => c.role);
+    const allRoles = [...allCargos.map((c) => c.role), ...extraRoles];
     const fichas = (
       await Promise.all(
         nursing.map((c) =>
@@ -647,6 +707,9 @@ export class ConcursoDocumentAnalysisService {
           minPassingGradeNonQuota: ficha.minPassingGradeNonQuota ?? null,
           workload: ficha.workload ?? null,
           requirements: ficha.requirements ?? null,
+          // Preenchida adiante pelo `fillFichasForNewCargos` (o extrator de
+          // ficha lê tabelas, não transcreve o anexo de atribuições).
+          description: null,
           hasReserveList: ficha.hasReserveList ?? null,
           isNursingRelevant: true,
           evidence: 'Cargo listado no documento e ausente do concurso.',
@@ -764,6 +827,10 @@ export class ConcursoDocumentAnalysisService {
           typeof input.requirements === 'string' &&
           input.requirements.trim() !== ''
             ? input.requirements.trim()
+            : null,
+        description:
+          typeof input.description === 'string' && input.description.trim()
+            ? input.description.trim()
             : null,
         hasReserveList: input.hasReserveList === true,
         isNursingRelevant: input.isNursingRelevant === true,
