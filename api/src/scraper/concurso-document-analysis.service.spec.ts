@@ -139,10 +139,13 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
     const r = await service.analyze('c1', 'doc-1');
 
     // 3º arg: o medidor de custo da análise (a fase mede OCR + cada chamada).
+    // 1 chamada POR cargo de enfermagem; o 4º arg leva TODOS os cargos do
+    // concurso para o recorte distinguir cargos de nome parecido.
     expect(extractFichasLiterais).toHaveBeenCalledWith(
       expect.any(String),
       ['Enfermeiro'],
       expect.any(AiUsageMeter),
+      ['Enfermeiro'],
     );
     expect(r.changes).toEqual([
       expect.objectContaining({
@@ -221,8 +224,57 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
       expect.any(String),
       ['Enfermeiro'],
       expect.any(AiUsageMeter),
+      ['Enfermeiro', 'Motorista'],
     );
     expect(r.changes).toEqual([]);
+  });
+
+  it('dá uma chamada própria a CADA cargo de enfermagem', async () => {
+    // Regressão: com os dois cargos num lote só, o modelo devolvia a ficha de
+    // um e o outro ficava sem atribuições (ou herdava as do vizinho).
+    const { service, extractFichasLiterais } = build({
+      docKind: 'EDITAL_ABERTURA',
+      cargos: [
+        cargo(),
+        cargo({ id: 'cargo-2', role: 'Enfermeiro Plantonista' }),
+        cargo({ id: 'cargo-3', role: 'Motorista', isNursingRelevant: false }),
+      ],
+    });
+    extractFichasLiterais.mockImplementation((_text, roles: string[]) =>
+      Promise.resolve([
+        {
+          role: roles[0],
+          requirements: null,
+          description: `Atribuições de ${roles[0]}.`,
+        },
+      ]),
+    );
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    const allRoles = ['Enfermeiro', 'Enfermeiro Plantonista', 'Motorista'];
+    expect(extractFichasLiterais).toHaveBeenCalledTimes(2);
+    for (const role of ['Enfermeiro', 'Enfermeiro Plantonista']) {
+      expect(extractFichasLiterais).toHaveBeenCalledWith(
+        expect.any(String),
+        [role],
+        expect.any(AiUsageMeter),
+        allRoles,
+      );
+    }
+    // Cada cargo recebe a SUA transcrição, não a do vizinho.
+    expect(r.changes).toEqual([
+      expect.objectContaining({
+        cargoId: 'cargo-1',
+        field: 'description',
+        newValue: 'Atribuições de Enfermeiro.',
+      }),
+      expect.objectContaining({
+        cargoId: 'cargo-2',
+        field: 'description',
+        newValue: 'Atribuições de Enfermeiro Plantonista.',
+      }),
+    ]);
   });
 
   it('PDF enviado por upload é analisado sem baixar da URL', async () => {

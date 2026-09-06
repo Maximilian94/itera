@@ -414,6 +414,9 @@ export class ConcursoDocumentAnalysisService {
       .map((r) => r.trim());
     const proposedSyllabus: ProposedCargoSyllabus[] = [];
     const seenCargo = new Set<string>();
+    const syllabusAllRoles = [...concurso.cargosByRole.values()].map(
+      (c) => c.role,
+    );
     for (const role of roles) {
       const cargo = concurso.cargosByRole.get(role.toLowerCase());
       if (!cargo || seenCargo.has(cargo.id) || !cargo.isNursingRelevant)
@@ -421,7 +424,7 @@ export class ConcursoDocumentAnalysisService {
       seenCargo.add(cargo.id);
       const groups = normalizeSyllabusGroups(
         await this.examBaseAi
-          .extractSyllabusForCargo(text, cargo.role, meter)
+          .extractSyllabusForCargo(text, cargo.role, meter, syllabusAllRoles)
           .catch(() => []),
       );
       if (groups.length === 0) continue;
@@ -547,17 +550,22 @@ export class ConcursoDocumentAnalysisService {
     changes: ProposedChange[],
     meter?: AiUsageMeter,
   ): Promise<void> {
-    const nursing = [...ctx.cargosByRole.values()].filter(
-      (c) => c.isNursingRelevant,
-    );
+    const allCargos = [...ctx.cargosByRole.values()];
+    const nursing = allCargos.filter((c) => c.isNursingRelevant);
     if (nursing.length === 0) return;
-    const fichas = await this.examBaseAi
-      .extractFichasLiterais(
-        text,
-        nursing.map((c) => c.role),
-        meter,
+    // Uma chamada POR cargo: num lote compartilhado, cargos de nome parecido
+    // ("Enfermeiro" vs "Enfermeiro Plantonista") disputam o recorte de texto e
+    // o modelo devolve a ficha de um só — ou mistura as duas seções.
+    const allRoles = allCargos.map((c) => c.role);
+    const fichas = (
+      await Promise.all(
+        nursing.map((c) =>
+          this.examBaseAi
+            .extractFichasLiterais(text, [c.role], meter, allRoles)
+            .catch(() => []),
+        ),
       )
-      .catch(() => []);
+    ).flat();
     const FIELDS = ['requirements', 'description'] as const;
     for (const ficha of fichas) {
       const cargo = ctx.cargosByRole.get(ficha.role.toLowerCase());
