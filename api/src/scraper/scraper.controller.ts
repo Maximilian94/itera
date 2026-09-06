@@ -236,6 +236,10 @@ export class NewCargoDto {
   requirements?: string | null;
 
   @IsOptional()
+  @IsString()
+  description?: string | null;
+
+  @IsOptional()
   @IsBoolean()
   hasReserveList?: boolean | null;
 

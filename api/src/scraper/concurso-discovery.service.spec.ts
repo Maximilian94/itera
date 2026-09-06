@@ -943,6 +943,19 @@ describe('add — fase 1 (cadastro sem IA)', () => {
     expect('documentsSourceUrl' in data).toBe(false);
   });
 
+  it('NÃO inventa um cargo "Enfermeiro" — a fase 1 não sabe quais são', async () => {
+    // Regressão: o cargo default era um chute (a listagem do pciconcursos não
+    // diz os cargos) e a análise do edital transcrevia as atribuições NELE —
+    // inclusive as de um cargo de nome parecido —, publicando ficha errada,
+    // enquanto o cargo verdadeiro nascia como "cargo novo" ao lado.
+    global.fetch = jest.fn() as unknown as typeof fetch;
+    const { service, prisma } = build();
+
+    await service.add(candidate);
+
+    expect(prisma.cargo.create).not.toHaveBeenCalled();
+  });
+
   it('tira o ano da manchete, sem precisar ler a notícia', async () => {
     global.fetch = jest.fn() as unknown as typeof fetch;
     const { service, findOrCreateConcurso } = build();

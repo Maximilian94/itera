@@ -315,6 +315,59 @@ describe('ConcursoDocumentAnalysisService.analyze — ficha do edital de abertur
   });
 });
 
+describe('ConcursoDocumentAnalysisService — ficha do cargo NOVO', () => {
+  it('cargo novo de enfermagem recebe as atribuições literais', async () => {
+    // Regressão (Lagoa da Prata): "Enfermeiro de Unidade Básica de Saúde" era
+    // descoberto pela análise e criado SEM `description` — o snapshot foi
+    // carregado antes de ele existir, então `proposeFichasFromEdital` não o
+    // cobria, e `createNewCargo` não gravava o campo.
+    const { service, extractFichasLiterais } = build({
+      docKind: 'EDITAL_ABERTURA',
+      cargos: [],
+      fichaCargos: [
+        {
+          role: 'Enfermeiro de Unidade Básica de Saúde',
+          salaryBase: '4750.00',
+          isNursingRelevant: true,
+        },
+      ],
+    });
+    extractFichasLiterais.mockImplementation((_t, roles: string[]) =>
+      Promise.resolve([
+        {
+          role: roles[0],
+          requirements: 'Superior em Enfermagem e COREN.',
+          description: `Atribuições de ${roles[0]}.`,
+        },
+      ]),
+    );
+
+    const r = await service.analyze('c1', 'doc-1');
+
+    expect(r.newCargos).toEqual([
+      expect.objectContaining({
+        role: 'Enfermeiro de Unidade Básica de Saúde',
+        description: 'Atribuições de Enfermeiro de Unidade Básica de Saúde.',
+        requirements: 'Superior em Enfermagem e COREN.',
+      }),
+    ]);
+  });
+
+  it('cargo novo FORA da enfermagem não gasta chamada de ficha', async () => {
+    const { service, extractFichasLiterais } = build({
+      docKind: 'RETIFICACAO',
+      cargos: [],
+      fichaCargos: [
+        { role: 'Motorista', salaryBase: '1600.00', isNursingRelevant: false },
+      ],
+    });
+
+    await service.analyze('c1', 'doc-1');
+
+    expect(extractFichasLiterais).not.toHaveBeenCalled();
+  });
+});
+
 describe('ConcursoDocumentAnalysisService — cargos novos (inclusão de cargo)', () => {
   it('propõe um cargo novo que a retificação adiciona e não existe no estado atual', async () => {
     const { service } = build({
